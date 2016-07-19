@@ -1,0 +1,14 @@
+[package]
+name = "customassembly"
+version = "0.1.0"
+authors = ["Henrique Lorenzi <hlorenzi12@gmail.com>"]
+
+[lib]
+name = "customassembly"
+path = "src/lib.rs"
+
+[[bin]]
+name = "customassembly"
+path = "src/main.rs"
+
+[dependencies]
