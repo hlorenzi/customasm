@@ -1,15 +1,8 @@
-pub mod configuration;
 mod parser;
+mod parser_tests;
 
+pub mod configuration;
+pub mod translator;
 
 pub use configuration::Configuration;
-
-
-#[cfg(test)]
-mod tests
-{
-    #[test]
-    fn it_works()
-	{
-    }
-}
+pub use translator::translate;

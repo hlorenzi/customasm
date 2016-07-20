@@ -131,9 +131,7 @@ impl<'src> Parser<'src>
 			Ok(())
 		}
 		else
-		{
-			Err(self.error(format!("expected `{}`", c)))
-		}
+			{ Err(self.error(format!("expected `{}`", c))) }
 	}
 	
 	
@@ -173,9 +171,32 @@ impl<'src> Parser<'src>
 	}
 	
 	
+	pub fn current_is_identifier(&self) -> bool
+	{
+		is_identifier_start(self.current())
+	}
+	
+	
 	pub fn current_is_number(&self) -> bool
 	{
-		is_number_start(self.current())
+		self.current().is_digit(10)
+	}
+	
+	
+	pub fn get_line(&mut self) -> String
+	{
+		let mut result = String::new();
+		
+		while !self.is_over() && self.current() != '\n'
+		{
+			result.push(self.current());
+			self.advance();
+		}
+		
+		if self.current() == '\n'
+			{ self.advance(); }
+
+		result
 	}
 	
 	
@@ -217,85 +238,100 @@ impl<'src> Parser<'src>
 	}
 	
 	
-	pub fn get_number(&mut self) -> Result<String, ParserError>
+	pub fn get_usize(&mut self) -> Result<usize, ParserError>
 	{
-		if !is_number(self.current())
-			{ return Err(self.error("expected number".to_string())); }
-		
-		let mut result = String::new();
-		result.push(self.current());
-		self.advance();
-		
-		while is_number(self.current())
-		{
-			result.push(self.current());
-			self.advance();
-		}
-		
-		Ok(result)
-	}
-	
-	
-	pub fn get_integer(&mut self) -> Result<String, ParserError>
-	{
-		if !is_number_start(self.current())
-			{ return Err(self.error("expected number".to_string())); }
-		
-		let mut result = String::new();
-		result.push(self.current());
-		self.advance();
-		
-		while is_number(self.current())
-		{
-			result.push(self.current());
-			self.advance();
-		}
-		
-		Ok(result)
-	}
-	
-	
-	pub fn get_radix_integer(&mut self) -> Result<(usize, String), ParserError>
-	{
-		let mut radix = 10;
-		
-		if self.matches_str("0x")
-			{ radix = 16; }
-		else if self.matches_str("0b")
-			{ radix = 2; }
+		let radix =
+			if self.matches_str("0x")
+				{ 16 }
+			else if self.matches_str("0b")
+				{ 2 }
+			else
+				{ 10 };
 			
-		let number = try!(self.get_number());
-		Ok((radix, number))
+		if !self.current().is_digit(16)
+			{ return Err(self.error("expected number".to_string())); }
+			
+		if !self.current().is_digit(radix)
+			{ return Err(self.error("invalid digit".to_string())); }
+		
+		let mut result = self.current().to_digit(radix).unwrap() as usize;
+		self.advance();
+		
+		while self.current().is_digit(16)
+		{
+			if !self.current().is_digit(radix)
+				{ return Err(self.error("invalid digit".to_string())); }
+			
+			let digit = self.current().to_digit(radix).unwrap() as usize;
+			result = match result.checked_mul(radix as usize).and_then(|x| x.checked_add(digit))
+			{
+				Some(x) => x,
+				None => return Err(self.error("value is too large".to_string()))
+			};
+			self.advance();
+		}
+		
+		Ok(result)
 	}
 	
 	
 	pub fn get_bits(&mut self) -> Result<Vec<bool>, ParserError>
 	{
+		let bit_num = try!(self.get_usize());
+		if bit_num == 0
+			{ return Err(self.error("invalid bit length".to_string())); }
+		
+		try!(self.expect('\''));
+		let (radix, value_str) = try!(self.get_integer_str());
+		
 		let mut bits = Vec::new();
-		let mut radix = 10;
-		let mut value_str = try!(self.get_integer());
-		let mut bit_num = 0;
-		
-		if self.matches('\'')
+		match radix
 		{
-			bit_num = value_str.parse::<usize>().unwrap();
-			let radix_integer = try!(self.get_radix_integer());
-			radix = radix_integer.0;
-			value_str = radix_integer.1;
-		}
-		
-		if radix == 10
-		{
-			let mut value = value_str.parse::<usize>().unwrap();
-			while bits.len() < bit_num
+			10 =>
 			{
-				bits.insert(0, value & 1 != 0);
-				value >>= 1;
+				let mut value = match value_str.parse::<u64>()
+				{
+					Ok(x) => x,
+					Err(_) => return Err(self.error(format!("decimal value `{}` is too large", value_str)))
+				};
+				
+				while value != 0
+				{
+					bits.insert(0, value & 1 != 0);
+					value >>= 1;
+				}
 			}
 			
-			if value != 0
-				{ return Err(self.error(format!("value `{}` does not fit given size of `{}`", value_str, bit_num))); }
+			16 =>
+			{
+				for c in value_str.chars()
+				{
+					let mut nibble = c.to_digit(16).unwrap();
+					for _ in 0..4
+					{
+						bits.push(nibble & 0b1000 != 0);
+						nibble <<= 1;
+					}
+				}
+			}
+			
+			2 =>
+			{
+				for c in value_str.chars()
+					{ bits.push(c == '1'); }
+			}
+			
+			_ => unreachable!()
 		}
+		
+		while bits.len() > 1 && !bits[0]
+			{ bits.remove(0); }
+		
+		if bits.len() > bit_num
+			{ return Err(self.error(format!("value `{}{}` does not fit given size of `{}`", get_radix_prefix(radix), value_str, bit_num))); }
+			
+		while bits.len() < bit_num
+			{ bits.insert(0, false); }
 		
 		Ok(bits)
 	}
@@ -309,6 +345,39 @@ impl<'src> Parser<'src>
 			line_num: self.line_num,
 			column_num: self.column_num
 		}
+	}
+	
+	
+	fn get_integer_str(&mut self) -> Result<(usize, String), ParserError>
+	{
+		let radix =
+			if self.matches_str("0x")
+				{ 16 }
+			else if self.matches_str("0b")
+				{ 2 }
+			else
+				{ 10 };
+			
+		if !self.current().is_digit(16)
+			{ return Err(self.error("expected number".to_string())); }
+			
+		if !self.current().is_digit(radix)
+			{ return Err(self.error("invalid digit".to_string())); }
+		
+		let mut value = String::new();
+		value.push(self.current());
+		self.advance();
+		
+		while self.current().is_digit(16)
+		{
+			if !self.current().is_digit(radix)
+				{ return Err(self.error("invalid digit".to_string())); }
+			
+			value.push(self.current());
+			self.advance();
+		}
+		
+		Ok((radix as usize, value))
 	}
 }
 
@@ -339,20 +408,6 @@ fn is_identifier_mid(c: char) -> bool
 }
 
 
-fn is_number(c: char) -> bool
-{
-	c >= '0' && c <= '9'
-}
-
-
-fn is_number_start(c: char) -> bool
-{
-	(c >= '0' && c <= '9') ||
-	c == '-' ||
-	c == '+'
-}
-
-
 fn is_pattern(c: char) -> bool
 {
 	(c >= 'a' && c <= 'z') ||
@@ -365,4 +420,16 @@ fn is_pattern(c: char) -> bool
 	c == '<' || c == '>' || c == ':' || c == '?' ||
 	c == '-' || c == '+' || c == '=' || c == '|' ||
 	c == '~' || c == '`' || c == '\''
+}
+
+
+fn get_radix_prefix(radix: usize) -> &'static str
+{
+	match radix
+	{
+		2 => "0b",
+		10 => "",
+		16 => "0x",
+		_ => panic!("invalid radix")
+	}
 }

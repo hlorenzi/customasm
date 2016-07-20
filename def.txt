@@ -1,6 +1,7 @@
-!align: 8;
-!address: 24;
+.align 8
+.address 24
 
-lda #{a: u8} -> 8'256 a;
-lda #{a: u16} -> 8'x02 a[8:0] a[15:8];
-bra {a: addr} -> 8'x10 (a-pc):i8;
+lda #{a: u8} -> 8'0xfe a;
+lda #{a: u8} {b:u128} -> 8'0xfe b;
+lda #{a: u16} -> 8'0x02 a[8:0] a[15:8];
+bra {a: u24} -> 8'0x10 a;
