@@ -1,4 +1,6 @@
 use parser::{Parser, ParserError};
+use tokenizer;
+use numbits;
 
 
 pub struct Configuration
@@ -45,7 +47,7 @@ pub enum ProductionSegment
 
 impl Configuration
 {
-	pub fn from_src(src: &mut Iterator<Item = char>) -> Result<Configuration, ParserError>
+	pub fn from_src(src: &[char]) -> Result<Configuration, ParserError>
 	{
 		let mut config = Configuration
 		{
@@ -54,7 +56,8 @@ impl Configuration
 			rules: Vec::new()
 		};
 		
-		let mut parser = Parser::new(src);
+		let tokens = tokenizer::tokenize(src);
+		let mut parser = Parser::new(&tokens);
 		try!(parse_directives(&mut config, &mut parser));
 		try!(parse_rules(&mut config, &mut parser));
 		
@@ -65,21 +68,16 @@ impl Configuration
 
 fn parse_directives(config: &mut Configuration, parser: &mut Parser) -> Result<(), ParserError>
 {
-	parser.skip_white();
-	while parser.matches('.')
+	while parser.match_operator(".")
 	{
-		parser.skip_white();
-		let directive = try!(parser.get_identifier());
-		parser.skip_white();
+		let directive = try!(parser.expect_identifier()).clone();
 		
-		match directive.as_ref()
+		match directive.identifier().as_ref()
 		{
-			"align" => config.align_bits = try!(parser.get_usize()),
-			"address" => config.address_bits = try!(parser.get_usize()),
-			_ => return Err(parser.error(format!("unknown directive `{}`", directive)))
+			"align" => config.align_bits = try!(parser.expect_number()).number_usize(),
+			"address" => config.address_bits = try!(parser.expect_number()).number_usize(),
+			_ => return Err(ParserError::new(format!("unknown directive `{}`", directive.identifier()), directive.span))
 		}
-		
-		parser.skip_white();
 	}
 	
 	Ok(())
@@ -88,11 +86,10 @@ fn parse_directives(config: &mut Configuration, parser: &mut Parser) -> Result<(
 
 fn parse_rules(config: &mut Configuration, parser: &mut Parser) -> Result<(), ParserError>
 {
-	parser.skip_white();
 	while !parser.is_over()
 	{
 		let pattern_segments = try!(parse_pattern(parser));
-		try!(parser.expect_str("->"));
+		try!(parser.expect_operator("->"));
 		let production_segments = try!(parse_production(parser, &pattern_segments));
 	
 		config.rules.push(Rule
@@ -101,9 +98,7 @@ fn parse_rules(config: &mut Configuration, parser: &mut Parser) -> Result<(), Pa
 			production_segments: production_segments
 		});
 		
-		parser.skip_white();
-		try!(parser.expect(';'));
-		parser.skip_white();
+		try!(parser.expect_operator(";"));
 	}
 	
 	Ok(())
@@ -114,42 +109,41 @@ fn parse_pattern(parser: &mut Parser) -> Result<Vec<PatternSegment>, ParserError
 {
 	let mut segments = Vec::new();
 	
-	parser.skip_white();
-	while !parser.current_is_str("->")
+	while !parser.current().is_operator("->")
 	{
-		parser.skip_white();
-		
-		if parser.current_is_pattern()
+		if parser.current().is_identifier()
 		{
-			let literal = try!(parser.get_pattern());
-			println!("literal: {}", literal);
-			segments.push(PatternSegment::Literal(literal));
-			parser.skip_white();
+			let ident = try!(parser.expect_identifier());
+			//println!("literal: {}", ident.identifier());
+			segments.push(PatternSegment::Literal(ident.identifier().clone()));
 		}
-		else if parser.matches('{')
+		else if parser.match_operator("{")
 		{
-			parser.skip_white();
-			let variable_name = try!(parser.get_identifier());
-			if does_variable_exists(&segments, &variable_name)
-				{ return Err(parser.error(format!("duplicate variable `{}`", variable_name))); }
+			let name_token = try!(parser.expect_identifier()).clone();
+			let name = name_token.identifier();
 			
-			parser.skip_white();
-			try!(parser.expect(':'));
-			parser.skip_white();
+			if does_variable_exists(&segments, &name)
+				{ return Err(ParserError::new(format!("duplicate variable `{}`", name), name_token.span)); }
+			
+			try!(parser.expect_operator(":"));
+			
 			let variable_type = try!(parse_variable_type(parser));
-			parser.skip_white();
 			
-			println!("variable: {}, signed: {}, bits: {}", variable_name, variable_type.signed, variable_type.size_bits);
-			segments.push(PatternSegment::Variable(variable_name, variable_type));
+			//println!("variable: {}, signed: {}, bits: {}", name, variable_type.signed, variable_type.size_bits);
+			segments.push(PatternSegment::Variable(name.clone(), variable_type));
 			
-			try!(parser.expect('}'));
-			parser.skip_white();
+			try!(parser.expect_operator("}"));
+		}
+		else if parser.current().is_any_operator()
+		{
+			let op = try!(parser.expect_any_operator());
+			//println!("literal: {}", op.operator());
+			segments.push(PatternSegment::Literal(op.operator().to_string()));
 		}
 		else
-			{ return Err(parser.error("expected `->`".to_string())); }
+			{ return Err(ParserError::new("expected pattern".to_string(), parser.current().span)); }
 	}
 	
-	parser.skip_white();
 	Ok(segments)
 }
 
@@ -158,57 +152,61 @@ fn parse_production(parser: &mut Parser, pattern: &Vec<PatternSegment>) -> Resul
 {
 	let mut segments = Vec::new();
 	
-	parser.skip_white();
-	while !parser.current_is(';')
+	while !parser.current().is_operator(";")
 	{
-		parser.skip_white();
-		
-		if parser.current_is_number()
+		if parser.current().is_number()
 		{
-			let bits = try!(parser.get_bits());
-			println!("produce bits: {:?}", bits);
+			let size_token = try!(parser.expect_number()).clone();
+			let size = size_token.number_usize();
+			
+			try!(parser.expect_operator("'"));
+			let number_token = try!(parser.expect_number()).clone();
+			let (radix, value_str) = number_token.number();
+			
+			let bits = match numbits::get_bits(size, radix, value_str)
+			{
+				Ok(bitvec) => bitvec,
+				Err(msg) =>
+					{ return Err(ParserError::new(msg, size_token.span)); }
+			};
+			
+			//println!("produce bits: {:?}", bits);
 			segments.push(ProductionSegment::Literal(bits));
-			parser.skip_white();
 		}
-		else if parser.current_is_identifier()
+		else if parser.current().is_identifier()
 		{
-			let variable_name = try!(parser.get_identifier());
-			let variable_type = match get_variable_type(pattern, &variable_name)
+			let name_token = (*try!(parser.expect_identifier())).clone();
+			let name = name_token.identifier();
+			
+			let variable_type = match get_variable_type(pattern, &name)
 			{
 				Some(typ) => typ,
-				None => return Err(parser.error(format!("unknown variable `{}`", variable_name)))
+				None => return Err(ParserError::new(format!("unknown variable `{}`", name), name_token.span))
 			};
 			
 			let mut rightmost_bit = variable_type.size_bits;
 			let mut leftmost_bit = 0;
 			
-			parser.skip_white();
-			if parser.matches('[')
+			if parser.match_operator("[")
 			{
-				parser.skip_white();
-				rightmost_bit = try!(parser.get_usize());
-				parser.skip_white();
-				try!(parser.expect(':'));
-				parser.skip_white();
-				leftmost_bit = try!(parser.get_usize());
-				parser.skip_white();
-				try!(parser.expect(']'));
-				parser.skip_white();
+				rightmost_bit = try!(parser.expect_number()).number_usize();
+				try!(parser.expect_operator(":"));
+				leftmost_bit = try!(parser.expect_number()).number_usize();
+				try!(parser.expect_operator("]"));
 			}
 			
-			println!("produce variable: {}, bits: [{}:{}]", variable_name, rightmost_bit, leftmost_bit);
+			//println!("produce variable: {}, bits: [{}:{}]", name, rightmost_bit, leftmost_bit);
 			segments.push(ProductionSegment::Variable
 			{
-				name: variable_name,
+				name: name.clone(),
 				leftmost_bit: leftmost_bit,
 				rightmost_bit: rightmost_bit
 			});
 		}
 		else
-			{ return Err(parser.error("expected `;`".to_string())); }
+			{ return Err(ParserError::new("expected production".to_string(), parser.current().span)); }
 	}
 	
-	parser.skip_white();
 	Ok(segments)
 }
 
@@ -221,14 +219,24 @@ fn parse_variable_type(parser: &mut Parser) -> Result<VariableType, ParserError>
 		signed: false
 	};
 	
-	if parser.matches('u')
-		{ typ.signed = false; }
-	else if parser.matches('i')
-		{ typ.signed = true; }
-	else
-		{ return Err(parser.error("invalid type".to_string())); }
+	let ident_token = try!(parser.expect_identifier());
+	let ident = ident_token.identifier();
 	
-	typ.size_bits = try!(parser.get_usize());
+	match ident.chars().next().unwrap()
+	{
+		'u' => typ.signed = false,
+		'i' => typ.signed = true,
+		_ =>
+			{ return Err(ParserError::new("invalid type".to_string(), ident_token.span)); }
+	}
+	
+	match usize::from_str_radix(&ident[1..], 10)
+	{
+		Ok(bits) => typ.size_bits = bits,
+		Err(..) =>
+			{ return Err(ParserError::new("invalid type".to_string(), ident_token.span)); }
+	}
+	
 	Ok(typ)
 }
 
@@ -269,21 +277,3 @@ fn get_variable_type(pattern_segments: &Vec<PatternSegment>, name: &str) -> Opti
 	
 	None
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,5 +1,6 @@
 mod parser;
-mod parser_tests;
+mod tokenizer;
+mod numbits;
 
 pub mod configuration;
 pub mod translator;
