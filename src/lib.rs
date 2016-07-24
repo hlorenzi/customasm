@@ -1,7 +1,8 @@
 mod parser;
 mod tokenizer;
-mod numbits;
+mod rule;
 
+pub mod bitvec;
 pub mod configuration;
 pub mod translator;
 

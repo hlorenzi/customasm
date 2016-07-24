@@ -1,3 +1,7 @@
-lda #0256
-lda #1
-bra 0x2000
+start:
+	lda #0xff
+	bra loop
+
+loop:
+	lda #0xabc
+	bra start

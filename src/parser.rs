@@ -61,21 +61,15 @@ impl<'tok> Parser<'tok>
 	}
 	
 	
-	pub fn clone_from_current(&self) -> Parser
+	pub fn clone_from_current(&self) -> Parser<'tok>
 	{
-		Parser::new_from_index(&self.tokens[self.index..], 0)
+		Parser::new_from_index(&self.tokens, self.index)
 	}
 	
 	
 	pub fn current(&self) -> &Token
 	{
 		self.next(0)
-	}
-	
-	
-	pub fn current_index(&self) -> usize
-	{
-		self.index
 	}
 	
 	

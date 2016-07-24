@@ -11,8 +11,6 @@ fn main()
 	File::open("def.txt").unwrap().read_to_string(&mut cfg_src).unwrap();
 	let cfg_chars = cfg_src.chars().collect::<Vec<_>>();
 	
-	//println!("{:#?}", customasm::tokenize(&src.chars().collect::<Vec<_>>()));
-	
 	println!("parsing configuration...");
 	let cfg = match customasm::Configuration::from_src(&cfg_chars)
 	{
@@ -32,7 +30,7 @@ fn main()
 	let asm_chars = asm_src.chars().collect::<Vec<_>>();
 	
 	println!("assembling...");
-	let _output = match customasm::translate(&cfg, &asm_chars)
+	let output = match customasm::translate(&cfg, &asm_chars)
 	{
 		Ok(output) => output,
 		Err(err) =>
@@ -45,4 +43,6 @@ fn main()
 	};
 	
 	println!("success");
+	
+	println!("output: {:?}", output);
 }

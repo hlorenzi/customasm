@@ -1,6 +1,7 @@
-use parser::{Parser, ParserError};
 use tokenizer;
-use numbits;
+use parser::{Parser, ParserError};
+use rule::{Rule, PatternSegment, ProductionSegment, VariableType};
+use bitvec::BitVec;
 
 
 pub struct Configuration
@@ -8,40 +9,6 @@ pub struct Configuration
 	pub align_bits: usize,
 	pub address_bits: usize,
 	pub rules: Vec<Rule>
-}
-
-
-pub struct Rule
-{
-	pub pattern_segments: Vec<PatternSegment>,
-	pub production_segments: Vec<ProductionSegment>
-}
-
-
-pub enum PatternSegment
-{
-	Literal(String),
-	Variable(String, VariableType)
-}
-
-
-#[derive(Copy, Clone)]
-pub struct VariableType
-{
-	pub size_bits: usize,
-	pub signed: bool
-}
-
-
-pub enum ProductionSegment
-{
-	Literal(Vec<bool>),
-	Variable
-	{
-		name: String,
-		leftmost_bit: usize,
-		rightmost_bit: usize
-	}
 }
 
 
@@ -88,15 +55,18 @@ fn parse_rules(config: &mut Configuration, parser: &mut Parser) -> Result<(), Pa
 {
 	while !parser.is_over()
 	{
-		let pattern_segments = try!(parse_pattern(parser));
-		try!(parser.expect_operator("->"));
-		let production_segments = try!(parse_production(parser, &pattern_segments));
+		let mut rule = Rule::new();
 	
-		config.rules.push(Rule
-		{
-			pattern_segments: pattern_segments,
-			production_segments: production_segments
-		});
+		let rule_span = parser.current().span;
+		
+		try!(parse_pattern(parser, &mut rule));
+		try!(parser.expect_operator("->"));
+		try!(parse_production(parser, &mut rule));
+		
+		if rule.production_bit_num % config.align_bits != 0
+			{ return Err(ParserError::new(format!("production is not aligned to `{}` bits", config.align_bits), rule_span)); }
+	
+		config.rules.push(rule);
 		
 		try!(parser.expect_operator(";"));
 	}
@@ -105,53 +75,48 @@ fn parse_rules(config: &mut Configuration, parser: &mut Parser) -> Result<(), Pa
 }
 
 
-fn parse_pattern(parser: &mut Parser) -> Result<Vec<PatternSegment>, ParserError>
+fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserError>
 {
-	let mut segments = Vec::new();
-	
 	while !parser.current().is_operator("->")
 	{
 		if parser.current().is_identifier()
 		{
 			let ident = try!(parser.expect_identifier());
-			//println!("literal: {}", ident.identifier());
-			segments.push(PatternSegment::Literal(ident.identifier().clone()));
+			rule.pattern_segments.push(PatternSegment::Exact(ident.identifier().clone()));
 		}
+		
 		else if parser.match_operator("{")
 		{
 			let name_token = try!(parser.expect_identifier()).clone();
 			let name = name_token.identifier();
-			
-			if does_variable_exists(&segments, &name)
-				{ return Err(ParserError::new(format!("duplicate variable `{}`", name), name_token.span)); }
-			
 			try!(parser.expect_operator(":"));
+			let typ = try!(parse_variable_type(parser));
 			
-			let variable_type = try!(parse_variable_type(parser));
+			if rule.check_argument_exists(&name)
+				{ return Err(ParserError::new(format!("duplicate argument `{}`", name), name_token.span)); }
 			
-			//println!("variable: {}, signed: {}, bits: {}", name, variable_type.signed, variable_type.size_bits);
-			segments.push(PatternSegment::Variable(name.clone(), variable_type));
+			let arg_index = rule.add_argument(name.clone(), typ);
+			rule.pattern_segments.push(PatternSegment::Argument(arg_index));
 			
 			try!(parser.expect_operator("}"));
 		}
+		
 		else if parser.current().is_any_operator()
 		{
 			let op = try!(parser.expect_any_operator());
-			//println!("literal: {}", op.operator());
-			segments.push(PatternSegment::Literal(op.operator().to_string()));
+			rule.pattern_segments.push(PatternSegment::Exact(op.operator().to_string()));
 		}
+		
 		else
 			{ return Err(ParserError::new("expected pattern".to_string(), parser.current().span)); }
 	}
 	
-	Ok(segments)
+	Ok(())
 }
 
 
-fn parse_production(parser: &mut Parser, pattern: &Vec<PatternSegment>) -> Result<Vec<ProductionSegment>, ParserError>
+fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserError>
 {
-	let mut segments = Vec::new();
-	
 	while !parser.current().is_operator(";")
 	{
 		if parser.current().is_number()
@@ -163,28 +128,29 @@ fn parse_production(parser: &mut Parser, pattern: &Vec<PatternSegment>) -> Resul
 			let number_token = try!(parser.expect_number()).clone();
 			let (radix, value_str) = number_token.number();
 			
-			let bits = match numbits::get_bits(size, radix, value_str)
+			let bitvec = match BitVec::new_from_str_sized(size, radix, value_str)
 			{
 				Ok(bitvec) => bitvec,
-				Err(msg) =>
-					{ return Err(ParserError::new(msg, size_token.span)); }
+				Err(msg) => return Err(ParserError::new(msg, size_token.span))
 			};
 			
-			//println!("produce bits: {:?}", bits);
-			segments.push(ProductionSegment::Literal(bits));
+			rule.production_bit_num += bitvec.len();
+			rule.production_segments.push(ProductionSegment::Literal(bitvec));
 		}
 		else if parser.current().is_identifier()
 		{
-			let name_token = (*try!(parser.expect_identifier())).clone();
+			let name_token = try!(parser.expect_identifier()).clone();
 			let name = name_token.identifier();
 			
-			let variable_type = match get_variable_type(pattern, &name)
+			let arg_index = match rule.get_argument(&name)
 			{
-				Some(typ) => typ,
-				None => return Err(ParserError::new(format!("unknown variable `{}`", name), name_token.span))
+				Some(arg_index) => arg_index,
+				None => return Err(ParserError::new(format!("unknown argument `{}`", name), name_token.span))
 			};
 			
-			let mut rightmost_bit = variable_type.size_bits;
+			let typ = rule.get_argument_type(arg_index);
+			
+			let mut rightmost_bit = typ.bit_num;
 			let mut leftmost_bit = 0;
 			
 			if parser.match_operator("[")
@@ -195,10 +161,10 @@ fn parse_production(parser: &mut Parser, pattern: &Vec<PatternSegment>) -> Resul
 				try!(parser.expect_operator("]"));
 			}
 			
-			//println!("produce variable: {}, bits: [{}:{}]", name, rightmost_bit, leftmost_bit);
-			segments.push(ProductionSegment::Variable
+			rule.production_bit_num += rightmost_bit - leftmost_bit;
+			rule.production_segments.push(ProductionSegment::Argument
 			{
-				name: name.clone(),
+				index: arg_index,
 				leftmost_bit: leftmost_bit,
 				rightmost_bit: rightmost_bit
 			});
@@ -207,7 +173,7 @@ fn parse_production(parser: &mut Parser, pattern: &Vec<PatternSegment>) -> Resul
 			{ return Err(ParserError::new("expected production".to_string(), parser.current().span)); }
 	}
 	
-	Ok(segments)
+	Ok(())
 }
 
 
@@ -215,7 +181,7 @@ fn parse_variable_type(parser: &mut Parser) -> Result<VariableType, ParserError>
 {
 	let mut typ = VariableType
 	{
-		size_bits: 0,
+		bit_num: 0,
 		signed: false
 	};
 	
@@ -232,48 +198,10 @@ fn parse_variable_type(parser: &mut Parser) -> Result<VariableType, ParserError>
 	
 	match usize::from_str_radix(&ident[1..], 10)
 	{
-		Ok(bits) => typ.size_bits = bits,
+		Ok(bits) => typ.bit_num = bits,
 		Err(..) =>
 			{ return Err(ParserError::new("invalid type".to_string(), ident_token.span)); }
 	}
 	
 	Ok(typ)
-}
-
-
-fn does_variable_exists(pattern_segments: &Vec<PatternSegment>, name: &str) -> bool
-{
-	for segment in pattern_segments
-	{
-		match segment
-		{
-			&PatternSegment::Variable(ref n, _) =>
-			{
-				if n == name
-					{ return true; }
-			}
-			_ => { }
-		}
-	}
-	
-	false
-}
-
-
-fn get_variable_type(pattern_segments: &Vec<PatternSegment>, name: &str) -> Option<VariableType>
-{
-	for segment in pattern_segments
-	{
-		match segment
-		{
-			&PatternSegment::Variable(ref n, ref typ) =>
-			{
-				if n == name
-					{ return Some(*typ); }
-			}
-			_ => { }
-		}
-	}
-	
-	None
 }
