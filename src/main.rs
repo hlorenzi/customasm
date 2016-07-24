@@ -1,48 +1,37 @@
 extern crate customasm;
+extern crate docopt;
 
 
-use std::fs::File;
-use std::io::Read;
+const USAGE: &'static str = "
+Usage:
+	customasm [--format=<format>] <def_file> <asm_file> <out_file>
+	
+Options:
+	-f <format>, --format=<format>  The format of the output file. Can be one of: binary, hexdump. [Default: binary]
+";
 
 
 fn main()
 {
-	let mut cfg_src = String::new();
-	File::open("def.txt").unwrap().read_to_string(&mut cfg_src).unwrap();
-	let cfg_chars = cfg_src.chars().collect::<Vec<_>>();
+	let args = docopt::Docopt::new(USAGE)
+		.and_then(|d| d.parse())
+		.unwrap_or_else(|e| e.exit());
 	
-	println!("parsing configuration...");
-	let cfg = match customasm::Configuration::from_src(&cfg_chars)
+	let out_format = match args.get_str("--format")
 	{
-		Ok(cfg) => cfg,
-		Err(err) =>
-		{
-			let (line, column) = err.span.get_line_column(&cfg_chars);
-			println!("");
-			println!("error:{}:{}: {}", line, column, err.msg);
-			return;
-		}
+		"binary" => customasm::driver::OutputFormat::Binary,
+		"hexdump" => customasm::driver::OutputFormat::HexDump,
+		"" => customasm::driver::OutputFormat::Binary,
+		_ => customasm::driver::error_exit("invalid format")
 	};
 	
-	
-	let mut asm_src = String::new();
-	File::open("input.asm").unwrap().read_to_string(&mut asm_src).unwrap();
-	let asm_chars = asm_src.chars().collect::<Vec<_>>();
-	
-	println!("assembling...");
-	let output = match customasm::translate(&cfg, &asm_chars)
+	let opt = customasm::driver::DriverOptions
 	{
-		Ok(output) => output,
-		Err(err) =>
-		{
-			let (line, column) = err.span.get_line_column(&asm_chars);
-			println!("");
-			println!("error:{}:{}: {}", line, column, err.msg);
-			return;
-		}
+		def_file: args.get_str("<def_file>"),
+		asm_file: args.get_str("<asm_file>"),
+		out_file: args.get_str("<out_file>"),
+		out_format: out_format
 	};
 	
-	println!("success");
-	
-	println!("output: {:?}", output);
+	customasm::driver::driver_main(&opt);
 }

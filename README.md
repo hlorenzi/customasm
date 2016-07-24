@@ -1,6 +1,13 @@
 # customasm
 This is an assembler that takes custom instruction definitions, and assembles files based on them.
-Currently it's just a proof-of-concept, and there's no command line interface, so it's not in an usable state.
+
+```
+Usage:
+	customasm [--format=<format>] <def_file> <asm_file> <out_file>
+	
+Options:
+	-f <format>, --format=<format>  The format of the output file. Can be one of: binary, hexdump. [Default: binary]
+```
 
 The idea is that, given this definition file:
 

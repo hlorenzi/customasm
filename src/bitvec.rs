@@ -194,31 +194,55 @@ impl BitVec
 			{ self.push_bit(other.get_bit(i)); }
 	}
 	
+	
+	pub fn get_byte(&self, byte_index: usize) -> u8
+	{
+		let mut value = 0;
+		for bit_index in 0..8
+		{
+			if byte_index * 8 + bit_index >= self.bits.len()
+				{ break; }
+			
+			let bit_value = 
+				if self.bits[byte_index * 8 + bit_index] { 1 } else { 0 };
+			
+			value |= bit_value << (7 - bit_index);
+		}
 		
-	pub fn get_repr_hex_bytes(&self) -> String
+		value
+	}
+	
+	
+	pub fn get_bytes(&self) -> Vec<u8>
+	{
+		let mut result = Vec::new();
+		let mut byte_index = 0;
+		
+		while byte_index <= self.bits.len() / 8
+		{
+			result.push(self.get_byte(byte_index));
+			byte_index += 1;
+		}
+		
+		result
+	}
+	
+		
+	pub fn get_hex_dump(&self) -> String
 	{
 		let mut result = String::new();
 		let mut byte_index = 0;
 		
-		while byte_index < self.bits.len()
+		while byte_index <= self.bits.len() / 8
 		{
-			let mut value = 0;
-			for bit_index in 0..8
-			{
-				if byte_index + bit_index >= self.bits.len()
-					{ break; }
+			if byte_index % 0x10 == 0
+				{ result.push_str(&format!("0x{:04x}: ", byte_index)); }
 				
-				let bit_value = 
-					if self.bits[byte_index + bit_index] { 1 } else { 0 };
-				
-				value |= bit_value << (7 - bit_index);
-			}
+			result.push_str(&format!("0x{:02x} ", self.get_byte(byte_index)));
+			byte_index += 1;
 			
-			result.push_str(&format!("0x{:02x}", value));
-			byte_index += 8;
-			
-			if byte_index < self.bits.len()
-				{ result.push_str(" "); }
+			if byte_index % 0x10 == 0
+				{ result.push_str("\n"); }
 		}
 		
 		result
@@ -259,7 +283,7 @@ impl fmt::Debug for BitVec
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result
 	{
-        write!(f, "[{}]", self.get_repr_hex_bytes())
+        write!(f, "{}", self.get_hex_dump())
     }
 }
 

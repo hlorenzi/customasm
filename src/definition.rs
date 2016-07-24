@@ -4,7 +4,7 @@ use rule::{Rule, PatternSegment, ProductionSegment, VariableType};
 use bitvec::BitVec;
 
 
-pub struct Configuration
+pub struct Definition
 {
 	pub align_bits: usize,
 	pub address_bits: usize,
@@ -12,11 +12,11 @@ pub struct Configuration
 }
 
 
-impl Configuration
+impl Definition
 {
-	pub fn from_src(src: &[char]) -> Result<Configuration, ParserError>
+	pub fn from_src(src: &[char]) -> Result<Definition, ParserError>
 	{
-		let mut config = Configuration
+		let mut def = Definition
 		{
 			align_bits: 8,
 			address_bits: 8,
@@ -25,15 +25,15 @@ impl Configuration
 		
 		let tokens = tokenizer::tokenize(src);
 		let mut parser = Parser::new(&tokens);
-		try!(parse_directives(&mut config, &mut parser));
-		try!(parse_rules(&mut config, &mut parser));
+		try!(parse_directives(&mut def, &mut parser));
+		try!(parse_rules(&mut def, &mut parser));
 		
-		Ok(config)
+		Ok(def)
 	}
 }
 
 
-fn parse_directives(config: &mut Configuration, parser: &mut Parser) -> Result<(), ParserError>
+fn parse_directives(def: &mut Definition, parser: &mut Parser) -> Result<(), ParserError>
 {
 	while parser.match_operator(".")
 	{
@@ -41,8 +41,8 @@ fn parse_directives(config: &mut Configuration, parser: &mut Parser) -> Result<(
 		
 		match directive.identifier().as_ref()
 		{
-			"align" => config.align_bits = try!(parser.expect_number()).number_usize(),
-			"address" => config.address_bits = try!(parser.expect_number()).number_usize(),
+			"align" => def.align_bits = try!(parser.expect_number()).number_usize(),
+			"address" => def.address_bits = try!(parser.expect_number()).number_usize(),
 			_ => return Err(ParserError::new(format!("unknown directive `{}`", directive.identifier()), directive.span))
 		}
 	}
@@ -51,7 +51,7 @@ fn parse_directives(config: &mut Configuration, parser: &mut Parser) -> Result<(
 }
 
 
-fn parse_rules(config: &mut Configuration, parser: &mut Parser) -> Result<(), ParserError>
+fn parse_rules(def: &mut Definition, parser: &mut Parser) -> Result<(), ParserError>
 {
 	while !parser.is_over()
 	{
@@ -63,10 +63,10 @@ fn parse_rules(config: &mut Configuration, parser: &mut Parser) -> Result<(), Pa
 		try!(parser.expect_operator("->"));
 		try!(parse_production(parser, &mut rule));
 		
-		if rule.production_bit_num % config.align_bits != 0
-			{ return Err(ParserError::new(format!("production is not aligned to `{}` bits", config.align_bits), rule_span)); }
+		if rule.production_bit_num % def.align_bits != 0
+			{ return Err(ParserError::new(format!("production is not aligned to `{}` bits", def.align_bits), rule_span)); }
 	
-		config.rules.push(rule);
+		def.rules.push(rule);
 		
 		try!(parser.expect_operator(";"));
 	}

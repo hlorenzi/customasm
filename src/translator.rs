@@ -2,14 +2,14 @@ use parser::{Parser, ParserError};
 use tokenizer;
 use tokenizer::Span;
 use bitvec::BitVec;
-use configuration::{Configuration};
+use definition::{Definition};
 use rule::{PatternSegment, ProductionSegment};
 use std::collections::HashMap;
 
 
-struct Translator<'cfg>
+struct Translator<'def>
 {
-	config: &'cfg Configuration,
+	def: &'def Definition,
 	cur_address: usize,
 	cur_output: usize,
 	labels: HashMap<String, usize>,
@@ -36,11 +36,11 @@ enum Expression
 }
 
 
-pub fn translate(config: &Configuration, src: &[char]) -> Result<BitVec, ParserError>
+pub fn translate(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 {
 	let mut translator = Translator
 	{
-		config: config,
+		def: def,
 		cur_address: 0,
 		cur_output: 0,
 		labels: HashMap::new(),
@@ -70,7 +70,7 @@ pub fn translate(config: &Configuration, src: &[char]) -> Result<BitVec, ParserE
 		{
 			Ok(bits) =>
 			{
-				let cur_output = inst.output * translator.config.align_bits;
+				let cur_output = inst.output * translator.def.align_bits;
 				translator.output(cur_output, &bits);
 			}
 			
@@ -82,7 +82,7 @@ pub fn translate(config: &Configuration, src: &[char]) -> Result<BitVec, ParserE
 }
 
 
-impl<'cfg> Translator<'cfg>
+impl<'def> Translator<'def>
 {
 	pub fn output(&mut self, index: usize, bitvec: &BitVec)
 	{
@@ -127,7 +127,7 @@ fn translate_instruction<'p, 'tok>(translator: &mut Translator, parser: &'p mut 
 	let mut maybe_inst = None;
 	let inst_span = parser.current().span;
 
-	for rule_index in 0..translator.config.rules.len()
+	for rule_index in 0..translator.def.rules.len()
 	{
 		let mut rule_parser = parser.clone_from_current();
 		
@@ -155,9 +155,9 @@ fn translate_instruction<'p, 'tok>(translator: &mut Translator, parser: &'p mut 
 	{
 		Some(inst) =>
 		{
-			let rule = &translator.config.rules[inst.rule_index];
-			translator.cur_address += rule.production_bit_num / translator.config.align_bits;
-			translator.cur_output += rule.production_bit_num / translator.config.align_bits;
+			let rule = &translator.def.rules[inst.rule_index];
+			translator.cur_address += rule.production_bit_num / translator.def.align_bits;
+			translator.cur_output += rule.production_bit_num / translator.def.align_bits;
 			
 			if can_resolve_instruction(translator, &inst)
 			{
@@ -165,7 +165,7 @@ fn translate_instruction<'p, 'tok>(translator: &mut Translator, parser: &'p mut 
 				{
 					Ok(bits) =>
 					{
-						let cur_output = inst.output * translator.config.align_bits;
+						let cur_output = inst.output * translator.def.align_bits;
 						translator.output(cur_output, &bits);
 					}
 					
@@ -187,7 +187,7 @@ fn translate_instruction<'p, 'tok>(translator: &mut Translator, parser: &'p mut 
 
 fn try_match_rule(translator: &mut Translator, parser: &mut Parser, rule_index: usize) -> Option<Instruction>
 {
-	let rule = &translator.config.rules[rule_index];
+	let rule = &translator.def.rules[rule_index];
 	
 	let mut inst = Instruction
 	{
@@ -260,7 +260,7 @@ fn parse_expression(parser: &mut Parser) -> Result<Expression, ParserError>
 
 fn can_resolve_instruction(translator: &Translator, inst: &Instruction) -> bool
 {
-	for segment in translator.config.rules[inst.rule_index].production_segments.iter()
+	for segment in translator.def.rules[inst.rule_index].production_segments.iter()
 	{
 		match segment
 		{
@@ -282,7 +282,7 @@ fn resolve_instruction(translator: &Translator, inst: &Instruction) -> Result<Bi
 {
 	let mut bitvec = BitVec::new();
 	
-	for segment in translator.config.rules[inst.rule_index].production_segments.iter()
+	for segment in translator.def.rules[inst.rule_index].production_segments.iter()
 	{
 		match segment
 		{
@@ -324,7 +324,7 @@ fn get_expression_min_bit_num(translator: &Translator, expr: &Expression) -> usi
 		&Expression::Variable(ref name) =>
 		{
 			if !translator.labels.contains_key(name)
-				{ translator.config.address_bits }
+				{ translator.def.address_bits }
 			else
 			{
 				let bitvec = BitVec::new_from_usize(translator.labels[name]);
