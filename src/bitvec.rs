@@ -216,12 +216,69 @@ impl BitVec
 	pub fn get_bytes(&self) -> Vec<u8>
 	{
 		let mut result = Vec::new();
+		let mut bit_index = 0;
+		
+		while bit_index < self.bits.len()
+		{
+			result.push(self.get_byte(bit_index / 8));
+			bit_index += 8;
+		}
+		
+		result
+	}
+	
+		
+	pub fn get_bin_str(&self) -> String
+	{
+		let mut result = String::new();
+		
+		for bit in self.bits.iter()
+			{ result.push_str(if *bit { "1" } else { "0" }); }
+		
+		result
+	}
+	
+		
+	pub fn get_bin_dump(&self) -> String
+	{
+		let mut result = String::new();
 		let mut byte_index = 0;
 		
+		result.push_str("         | ");
+		for i in 0..8
+			{ result.push_str(&format!("       {:01x} ", i)); }
+		
+		result.push_str("\n");
+		result.push_str("---------+-");
+		for _ in 0..8
+			{ result.push_str("---------"); }
+			
+		result.push_str("\n");
 		while byte_index <= self.bits.len() / 8
 		{
-			result.push(self.get_byte(byte_index));
+			if byte_index % 0x8 == 0
+				{ result.push_str(&format!("{:08x} | ", byte_index)); }
+				
+			result.push_str(&format!("{:08b} ", self.get_byte(byte_index)));
 			byte_index += 1;
+			
+			if byte_index % 0x8 == 0
+				{ result.push_str("\n"); }
+		}
+		
+		result
+	}
+	
+		
+	pub fn get_hex_str(&self) -> String
+	{
+		let mut result = String::new();
+		let mut bit_index = 0;
+		
+		while bit_index < self.bits.len()
+		{
+			result.push_str(&format!("{:02x}", self.get_byte(bit_index / 8)));
+			bit_index += 8;
 		}
 		
 		result
@@ -231,17 +288,28 @@ impl BitVec
 	pub fn get_hex_dump(&self) -> String
 	{
 		let mut result = String::new();
-		let mut byte_index = 0;
 		
-		while byte_index <= self.bits.len() / 8
-		{
-			if byte_index % 0x10 == 0
-				{ result.push_str(&format!("0x{:04x}: ", byte_index)); }
-				
-			result.push_str(&format!("0x{:02x} ", self.get_byte(byte_index)));
-			byte_index += 1;
+		result.push_str("         | ");
+		for i in 0..16
+			{ result.push_str(&format!(" {:01x} ", i)); }
+		
+		result.push_str("\n");
+		result.push_str("---------+-");
+		for _ in 0..16
+			{ result.push_str("---"); }
 			
-			if byte_index % 0x10 == 0
+		result.push_str("\n");
+		
+		let mut bit_index = 0;
+		while bit_index < self.bits.len()
+		{
+			if bit_index % 0x80 == 0
+				{ result.push_str(&format!("{:08x} | ", bit_index / 8)); }
+				
+			result.push_str(&format!("{:02x} ", self.get_byte(bit_index / 8)));
+			bit_index += 8;
+			
+			if bit_index % 0x80 == 0
 				{ result.push_str("\n"); }
 		}
 		

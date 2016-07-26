@@ -4,32 +4,51 @@ extern crate docopt;
 
 const USAGE: &'static str = "
 Usage:
-	customasm [--format=<format>] <def_file> <asm_file> <out_file>
+	customasm [options] <def_file> <asm_file> [<out_file>]
+	customasm -v | --version
+	customasm -h | --help
 	
 Options:
-	-f <format>, --format=<format>  The format of the output file. Can be one of: binary, hexdump. [Default: binary]
+	-q, --quiet                     Do not print progress to stdout.
+	-f <format>, --format=<format>  The format of the output file. Can be one of:
+	                                    binary, binstr, hexstr, bindump, hexdump.
+	                                    [default: hexdump]
+	-v, --version                   Display version information.
+	-h, --help                      Display help.
 ";
 
 
 fn main()
 {
 	let args = docopt::Docopt::new(USAGE)
+		.and_then(|d| Ok(d.help(true)))
+		.and_then(|d| Ok(d.version(Some(format!("customasm v{}", env!("CARGO_PKG_VERSION"))))))
 		.and_then(|d| d.parse())
 		.unwrap_or_else(|e| e.exit());
 	
 	let out_format = match args.get_str("--format")
 	{
 		"binary" => customasm::driver::OutputFormat::Binary,
+		"binstr" => customasm::driver::OutputFormat::BinStr,
+		"hexstr" => customasm::driver::OutputFormat::HexStr,
+		"bindump" => customasm::driver::OutputFormat::BinDump,
 		"hexdump" => customasm::driver::OutputFormat::HexDump,
-		"" => customasm::driver::OutputFormat::Binary,
+		"" => customasm::driver::OutputFormat::HexDump,
 		_ => customasm::driver::error_exit("invalid format")
+	};
+	
+	let out_file = match args.get_str("<out_file>")
+	{
+		"" => None,
+		f => Some(f)
 	};
 	
 	let opt = customasm::driver::DriverOptions
 	{
+		quiet: args.get_bool("--quiet"),
 		def_file: args.get_str("<def_file>"),
 		asm_file: args.get_str("<asm_file>"),
-		out_file: args.get_str("<out_file>"),
+		out_file: out_file,
 		out_format: out_format
 	};
 	

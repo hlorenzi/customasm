@@ -3,10 +3,17 @@ This is an assembler that takes custom instruction definitions, and assembles fi
 
 ```
 Usage:
-	customasm [--format=<format>] <def_file> <asm_file> <out_file>
+	customasm [options] <def_file> <asm_file> [<out_file>]
+	customasm -v | --version
+	customasm -h | --help
 	
 Options:
-	-f <format>, --format=<format>  The format of the output file. Can be one of: binary, hexdump. [Default: binary]
+	-q, --quiet                     Do not print progress to stdout.
+	-f <format>, --format=<format>  The format of the output file. Can be one of:
+	                                    binary, binstr, hexstr, bindump, hexdump.
+	                                    [default: hexdump]
+	-v, --version                   Display version information.
+	-h, --help                      Display help.
 ```
 
 The idea is that, given this definition file:

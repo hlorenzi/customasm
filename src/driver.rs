@@ -1,5 +1,6 @@
 use definition::Definition;
 use translator::translate;
+use std::iter::Iterator;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::process::exit;
@@ -7,9 +8,10 @@ use std::process::exit;
 
 pub struct DriverOptions<'s>
 {
+	pub quiet: bool,
 	pub def_file: &'s str,
 	pub asm_file: &'s str,
-	pub out_file: &'s str,
+	pub out_file: Option<&'s str>,
 	pub out_format: OutputFormat
 }
 
@@ -17,13 +19,17 @@ pub struct DriverOptions<'s>
 pub enum OutputFormat
 {
 	Binary,
+	BinStr,
+	HexStr,
+	BinDump,
 	HexDump
 }
 
 
 pub fn driver_main(opt: &DriverOptions)
 {
-	println!("parsing definition...");
+	if !opt.quiet
+		{ println!("parsing definition..."); }
 	
 	let def_chars = read_file(opt.def_file);
 	let cfg = match Definition::from_src(&def_chars)
@@ -38,12 +44,13 @@ pub fn driver_main(opt: &DriverOptions)
 		}
 	};
 	
-	println!("assembling...");
+	if !opt.quiet
+		{ println!("assembling..."); }
 	
 	let asm_chars = read_file(opt.asm_file);
-	let output = match translate(&cfg, &asm_chars)
+	let output_bitvec = match translate(&cfg, &asm_chars)
 	{
-		Ok(output) => output,
+		Ok(output_bitvec) => output_bitvec,
 		Err(err) =>
 		{
 			let (line, column) = err.span.get_line_column(&asm_chars);
@@ -54,30 +61,41 @@ pub fn driver_main(opt: &DriverOptions)
 		}
 	};
 	
-	println!("success");
+	if !opt.quiet
+		{ println!("success"); }
 	
-	let mut out_file = match File::create(opt.out_file)
+	let output = match opt.out_format
 	{
-		Ok(file) => file,
-		Err(err) => error_exit(&format!("{}: error: {}", opt.out_file, err))
-	};
+		OutputFormat::Binary => output_bitvec.get_bytes(),
+		OutputFormat::BinStr => output_bitvec.get_bin_str().as_bytes().to_vec(),
+		OutputFormat::HexStr => output_bitvec.get_hex_str().as_bytes().to_vec(),
+		OutputFormat::BinDump => output_bitvec.get_bin_dump().as_bytes().to_vec(),
+		OutputFormat::HexDump => output_bitvec.get_hex_dump().as_bytes().to_vec()
+	};	
 	
-	match opt.out_format
+	match opt.out_file
 	{
-		OutputFormat::Binary =>
-			match out_file.write_all(&output.get_bytes())
+		Some(filename) =>
+		{
+			let mut out_file = match File::create(filename)
+			{
+				Ok(file) => file,
+				Err(err) => error_exit(&format!("{}: error: {}", filename, err))
+			};
+			match out_file.write_all(&output)
 			{
 				Ok(..) => { }
-				Err(err) => error_exit(&format!("{}: error: {}", opt.out_file, err))
-			},
-
-		OutputFormat::HexDump =>
-			match out_file.write_all(output.get_hex_dump().as_bytes())
-			{
-				Ok(..) => { }
-				Err(err) => error_exit(&format!("{}: error: {}", opt.out_file, err))
+				Err(err) => error_exit(&format!("{}: error: {}", filename, err))
 			}
-	}
+		}
+		
+		None =>
+		{
+			if !opt.quiet
+				{ println!("output:"); }
+			print!("{}", String::from_utf8_lossy(&output))
+		}
+	};
 }
 
 
