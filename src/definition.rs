@@ -1,7 +1,7 @@
-use tokenizer;
-use parser::{Parser, ParserError};
+use util::tokenizer;
+use util::parser::{Parser, ParserError};
+use util::bitvec::BitVec;
 use rule::{Rule, PatternSegment, ProductionSegment, VariableType};
-use bitvec::BitVec;
 
 
 pub struct Definition
@@ -12,24 +12,21 @@ pub struct Definition
 }
 
 
-impl Definition
+pub fn parse(src: &[char]) -> Result<Definition, ParserError>
 {
-	pub fn from_src(src: &[char]) -> Result<Definition, ParserError>
+	let mut def = Definition
 	{
-		let mut def = Definition
-		{
-			align_bits: 8,
-			address_bits: 8,
-			rules: Vec::new()
-		};
-		
-		let tokens = tokenizer::tokenize(src);
-		let mut parser = Parser::new(&tokens);
-		try!(parse_directives(&mut def, &mut parser));
-		try!(parse_rules(&mut def, &mut parser));
-		
-		Ok(def)
-	}
+		align_bits: 8,
+		address_bits: 8,
+		rules: Vec::new()
+	};
+	
+	let tokens = tokenizer::tokenize(src);
+	let mut parser = Parser::new(&tokens);
+	try!(parse_directives(&mut def, &mut parser));
+	try!(parse_rules(&mut def, &mut parser));
+	
+	Ok(def)
 }
 
 

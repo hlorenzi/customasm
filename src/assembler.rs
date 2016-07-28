@@ -1,13 +1,13 @@
-use parser::{Parser, ParserError};
-use tokenizer;
-use tokenizer::Span;
-use bitvec::BitVec;
-use definition::{Definition};
+use util::parser::{Parser, ParserError};
+use util::tokenizer;
+use util::tokenizer::Span;
+use util::bitvec::BitVec;
+use definition::Definition;
 use rule::{PatternSegment, ProductionSegment};
 use std::collections::HashMap;
 
 
-struct Translator<'def>
+struct Assembler<'def>
 {
 	def: &'def Definition,
 	cur_address: usize,
@@ -36,9 +36,9 @@ enum Expression
 }
 
 
-pub fn translate(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
+pub fn assemble(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 {
-	let mut translator = Translator
+	let mut assembler = Assembler
 	{
 		def: def,
 		cur_address: 0,
@@ -54,35 +54,35 @@ pub fn translate(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 	while !parser.is_over()
 	{
 		if parser.current().is_operator(".")
-			{ try!(translate_directive(&mut translator, &mut parser)); }
+			{ try!(translate_directive(&mut assembler, &mut parser)); }
 		else if parser.current().is_identifier() && parser.next(1).is_operator(":")
-			{ try!(translate_label(&mut translator, &mut parser)); }
+			{ try!(translate_label(&mut assembler, &mut parser)); }
 		else
-			{ try!(translate_instruction(&mut translator, &mut parser)); }
+			{ try!(translate_instruction(&mut assembler, &mut parser)); }
 	}
 	
 	let mut unresolved_insts = Vec::new();
-	unresolved_insts.append(&mut translator.unresolved_instructions);
+	unresolved_insts.append(&mut assembler.unresolved_instructions);
 	
 	for inst in unresolved_insts.iter()
 	{
-		match resolve_instruction(&translator, &inst)
+		match resolve_instruction(&assembler, &inst)
 		{
 			Ok(bits) =>
 			{
-				let cur_output = inst.output * translator.def.align_bits;
-				translator.output(cur_output, &bits);
+				let cur_output = inst.output * assembler.def.align_bits;
+				assembler.output(cur_output, &bits);
 			}
 			
 			Err(msg) => return Err(ParserError::new(msg, inst.span))
 		}
 	}
 	
-	Ok(translator.output_bits)
+	Ok(assembler.output_bits)
 }
 
 
-impl<'def> Translator<'def>
+impl<'def> Assembler<'def>
 {
 	pub fn output(&mut self, index: usize, bitvec: &BitVec)
 	{
@@ -91,7 +91,7 @@ impl<'def> Translator<'def>
 }
 
 
-fn translate_directive(translator: &mut Translator, parser: &mut Parser) -> Result<(), ParserError>
+fn translate_directive(assembler: &mut Assembler, parser: &mut Parser) -> Result<(), ParserError>
 {
 	try!(parser.expect_operator("."));
 	let directive_token = try!(parser.expect_identifier()).clone();
@@ -99,8 +99,8 @@ fn translate_directive(translator: &mut Translator, parser: &mut Parser) -> Resu
 	
 	match directive.as_ref()
 	{
-		"address" => translator.cur_address = try!(parser.expect_number()).number_usize(),
-		"output" => translator.cur_output = try!(parser.expect_number()).number_usize(),
+		"address" => assembler.cur_address = try!(parser.expect_number()).number_usize(),
+		"output" => assembler.cur_output = try!(parser.expect_number()).number_usize(),
 		_ => return Err(ParserError::new(format!("unknown directive `{}`", directive), directive_token.span))
 	}
 	
@@ -108,34 +108,34 @@ fn translate_directive(translator: &mut Translator, parser: &mut Parser) -> Resu
 }
 
 
-fn translate_label(translator: &mut Translator, parser: &mut Parser) -> Result<(), ParserError>
+fn translate_label(assembler: &mut Assembler, parser: &mut Parser) -> Result<(), ParserError>
 {
 	let label_token = try!(parser.expect_identifier()).clone();
 	let label = label_token.identifier();
 	try!(parser.expect_operator(":"));
 	
-	if translator.labels.contains_key(label)
+	if assembler.labels.contains_key(label)
 		{ return Err(ParserError::new(format!("duplicate label `{}`", label), label_token.span)); }
 	
-	translator.labels.insert(label.clone(), translator.cur_address);
+	assembler.labels.insert(label.clone(), assembler.cur_address);
 	Ok(())
 }
 
 
-fn translate_instruction<'p, 'tok>(translator: &mut Translator, parser: &'p mut Parser<'tok>) -> Result<(), ParserError>
+fn translate_instruction<'p, 'tok>(assembler: &mut Assembler, parser: &'p mut Parser<'tok>) -> Result<(), ParserError>
 {
 	let mut maybe_inst = None;
 	let inst_span = parser.current().span;
 
-	for rule_index in 0..translator.def.rules.len()
+	for rule_index in 0..assembler.def.rules.len()
 	{
 		let mut rule_parser = parser.clone_from_current();
 		
-		match try_match_rule(translator, &mut rule_parser, rule_index)
+		match try_match_rule(assembler, &mut rule_parser, rule_index)
 		{
 			Some(inst) =>
 			{
-				if can_resolve_instruction(translator, &inst)
+				if can_resolve_instruction(assembler, &inst)
 				{
 					maybe_inst = Some(inst);
 					*parser = rule_parser;
@@ -155,18 +155,18 @@ fn translate_instruction<'p, 'tok>(translator: &mut Translator, parser: &'p mut 
 	{
 		Some(inst) =>
 		{
-			let rule = &translator.def.rules[inst.rule_index];
-			translator.cur_address += rule.production_bit_num / translator.def.align_bits;
-			translator.cur_output += rule.production_bit_num / translator.def.align_bits;
+			let rule = &assembler.def.rules[inst.rule_index];
+			assembler.cur_address += rule.production_bit_num / assembler.def.align_bits;
+			assembler.cur_output += rule.production_bit_num / assembler.def.align_bits;
 			
-			if can_resolve_instruction(translator, &inst)
+			if can_resolve_instruction(assembler, &inst)
 			{
-				match resolve_instruction(translator, &inst)
+				match resolve_instruction(assembler, &inst)
 				{
 					Ok(bits) =>
 					{
-						let cur_output = inst.output * translator.def.align_bits;
-						translator.output(cur_output, &bits);
+						let cur_output = inst.output * assembler.def.align_bits;
+						assembler.output(cur_output, &bits);
 					}
 					
 					Err(msg) => return Err(ParserError::new(msg, inst.span))
@@ -174,7 +174,7 @@ fn translate_instruction<'p, 'tok>(translator: &mut Translator, parser: &'p mut 
 			}
 			else
 			{
-				translator.unresolved_instructions.push(inst);
+				assembler.unresolved_instructions.push(inst);
 			}
 		}
 	
@@ -185,16 +185,16 @@ fn translate_instruction<'p, 'tok>(translator: &mut Translator, parser: &'p mut 
 }
 
 
-fn try_match_rule(translator: &mut Translator, parser: &mut Parser, rule_index: usize) -> Option<Instruction>
+fn try_match_rule(assembler: &mut Assembler, parser: &mut Parser, rule_index: usize) -> Option<Instruction>
 {
-	let rule = &translator.def.rules[rule_index];
+	let rule = &assembler.def.rules[rule_index];
 	
 	let mut inst = Instruction
 	{
 		span: parser.current().span,
 		rule_index: rule_index,
-		address: translator.cur_address,
-		output: translator.cur_output,
+		address: assembler.cur_address,
+		output: assembler.cur_output,
 		arguments: Vec::new()
 	};
 	
@@ -220,7 +220,7 @@ fn try_match_rule(translator: &mut Translator, parser: &mut Parser, rule_index: 
 				{
 					Ok(expr) =>
 					{
-						let expr_len = get_expression_min_bit_num(translator, &expr);
+						let expr_len = get_expression_min_bit_num(assembler, &expr);
 						if expr_len <= typ.bit_num
 							{ inst.arguments.push(expr); }
 						else
@@ -258,9 +258,9 @@ fn parse_expression(parser: &mut Parser) -> Result<Expression, ParserError>
 }
 
 
-fn can_resolve_instruction(translator: &Translator, inst: &Instruction) -> bool
+fn can_resolve_instruction(assembler: &Assembler, inst: &Instruction) -> bool
 {
-	for segment in translator.def.rules[inst.rule_index].production_segments.iter()
+	for segment in assembler.def.rules[inst.rule_index].production_segments.iter()
 	{
 		match segment
 		{
@@ -268,7 +268,7 @@ fn can_resolve_instruction(translator: &Translator, inst: &Instruction) -> bool
 			
 			&ProductionSegment::Argument { index, leftmost_bit: _, rightmost_bit: _ } =>
 			{
-				if !can_resolve_expression(translator, &inst.arguments[index])
+				if !can_resolve_expression(assembler, &inst.arguments[index])
 					{ return false; }
 			}
 		}
@@ -278,11 +278,11 @@ fn can_resolve_instruction(translator: &Translator, inst: &Instruction) -> bool
 }
 
 
-fn resolve_instruction(translator: &Translator, inst: &Instruction) -> Result<BitVec, String>
+fn resolve_instruction(assembler: &Assembler, inst: &Instruction) -> Result<BitVec, String>
 {
 	let mut bitvec = BitVec::new();
 	
-	for segment in translator.def.rules[inst.rule_index].production_segments.iter()
+	for segment in assembler.def.rules[inst.rule_index].production_segments.iter()
 	{
 		match segment
 		{
@@ -293,7 +293,7 @@ fn resolve_instruction(translator: &Translator, inst: &Instruction) -> Result<Bi
 			
 			&ProductionSegment::Argument { index, leftmost_bit, rightmost_bit } =>
 			{
-				let expr_bitvec = try!(resolve_expression(translator, &inst.arguments[index], rightmost_bit - leftmost_bit));
+				let expr_bitvec = try!(resolve_expression(assembler, &inst.arguments[index], rightmost_bit - leftmost_bit));
 				bitvec.push(&expr_bitvec);
 			}
 		}
@@ -303,7 +303,7 @@ fn resolve_instruction(translator: &Translator, inst: &Instruction) -> Result<Bi
 }
 
 
-fn can_resolve_expression(translator: &Translator, expr: &Expression) -> bool
+fn can_resolve_expression(assembler: &Assembler, expr: &Expression) -> bool
 {
 	match expr
 	{
@@ -311,23 +311,23 @@ fn can_resolve_expression(translator: &Translator, expr: &Expression) -> bool
 			{ return true; }
 		
 		&Expression::Variable(ref name) =>
-			{ return translator.labels.contains_key(name); }
+			{ return assembler.labels.contains_key(name); }
 	}
 }
 
 
-fn get_expression_min_bit_num(translator: &Translator, expr: &Expression) -> usize
+fn get_expression_min_bit_num(assembler: &Assembler, expr: &Expression) -> usize
 {
 	match expr
 	{
 		&Expression::LiteralUInt(ref literal_bitvec) => return literal_bitvec.len(),
 		&Expression::Variable(ref name) =>
 		{
-			if !translator.labels.contains_key(name)
-				{ translator.def.address_bits }
+			if !assembler.labels.contains_key(name)
+				{ assembler.def.address_bits }
 			else
 			{
-				let bitvec = BitVec::new_from_usize(translator.labels[name]);
+				let bitvec = BitVec::new_from_usize(assembler.labels[name]);
 				bitvec.len()
 			}
 		}
@@ -335,7 +335,7 @@ fn get_expression_min_bit_num(translator: &Translator, expr: &Expression) -> usi
 }
 
 
-fn resolve_expression(translator: &Translator, expr: &Expression, bit_num: usize) -> Result<BitVec, String>
+fn resolve_expression(assembler: &Assembler, expr: &Expression, bit_num: usize) -> Result<BitVec, String>
 {
 	match expr
 	{
@@ -352,10 +352,10 @@ fn resolve_expression(translator: &Translator, expr: &Expression, bit_num: usize
 		
 		&Expression::Variable(ref name) =>
 		{
-			if !translator.labels.contains_key(name)
+			if !assembler.labels.contains_key(name)
 				{ return Err(format!("unknown variable `{}`", name)); }
 				
-			let mut bitvec = BitVec::new_from_usize(translator.labels[name]);
+			let mut bitvec = BitVec::new_from_usize(assembler.labels[name]);
 			bitvec.zero_extend(bit_num);
 			return Ok(bitvec);
 		}

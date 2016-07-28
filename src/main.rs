@@ -1,5 +1,11 @@
-extern crate customasm;
 extern crate docopt;
+
+
+pub mod util;
+pub mod rule;
+pub mod definition;
+pub mod assembler;
+pub mod driver;
 
 
 const USAGE: &'static str = "
@@ -28,13 +34,13 @@ fn main()
 	
 	let out_format = match args.get_str("--format")
 	{
-		"binary" => customasm::driver::OutputFormat::Binary,
-		"binstr" => customasm::driver::OutputFormat::BinStr,
-		"hexstr" => customasm::driver::OutputFormat::HexStr,
-		"bindump" => customasm::driver::OutputFormat::BinDump,
-		"hexdump" => customasm::driver::OutputFormat::HexDump,
-		"" => customasm::driver::OutputFormat::HexDump,
-		_ => customasm::driver::error_exit("invalid format")
+		"binary" => driver::OutputFormat::Binary,
+		"binstr" => driver::OutputFormat::BinStr,
+		"hexstr" => driver::OutputFormat::HexStr,
+		"bindump" => driver::OutputFormat::BinDump,
+		"hexdump" => driver::OutputFormat::HexDump,
+		"" => driver::OutputFormat::HexDump,
+		_ => driver::error_exit("invalid format")
 	};
 	
 	let out_file = match args.get_str("<out_file>")
@@ -43,7 +49,7 @@ fn main()
 		f => Some(f)
 	};
 	
-	let opt = customasm::driver::DriverOptions
+	let opt = driver::DriverOptions
 	{
 		quiet: args.get_bool("--quiet"),
 		def_file: args.get_str("<def_file>"),
@@ -52,5 +58,5 @@ fn main()
 		out_format: out_format
 	};
 	
-	customasm::driver::driver_main(&opt);
+	driver::driver_main(&opt);
 }

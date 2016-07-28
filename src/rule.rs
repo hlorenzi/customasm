@@ -1,4 +1,4 @@
-use bitvec::BitVec;
+use util::bitvec::BitVec;
 
 
 pub struct Rule

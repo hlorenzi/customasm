@@ -1,5 +1,5 @@
-use definition::Definition;
-use translator::translate;
+use definition;
+use assembler;
 use std::iter::Iterator;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -29,12 +29,12 @@ pub enum OutputFormat
 pub fn driver_main(opt: &DriverOptions)
 {
 	if !opt.quiet
-		{ println!("parsing definition..."); }
+		{ println!("reading definition..."); }
 	
 	let def_chars = read_file(opt.def_file);
-	let cfg = match Definition::from_src(&def_chars)
+	let def = match definition::parse(&def_chars)
 	{
-		Ok(cfg) => cfg,
+		Ok(def) => def,
 		Err(err) =>
 		{
 			let (line, column) = err.span.get_line_column(&def_chars);
@@ -48,7 +48,7 @@ pub fn driver_main(opt: &DriverOptions)
 		{ println!("assembling..."); }
 	
 	let asm_chars = read_file(opt.asm_file);
-	let output_bitvec = match translate(&cfg, &asm_chars)
+	let output_bitvec = match assembler::assemble(&def, &asm_chars)
 	{
 		Ok(output_bitvec) => output_bitvec,
 		Err(err) =>
@@ -57,12 +57,8 @@ pub fn driver_main(opt: &DriverOptions)
 			println!("");
 			println!("{}:{}:{}: error: {}", opt.asm_file, line, column, err.msg);
 			return;
-			
 		}
 	};
-	
-	if !opt.quiet
-		{ println!("success"); }
 	
 	let output = match opt.out_format
 	{
@@ -87,12 +83,15 @@ pub fn driver_main(opt: &DriverOptions)
 				Ok(..) => { }
 				Err(err) => error_exit(&format!("{}: error: {}", filename, err))
 			}
+			if !opt.quiet
+				{ println!("success"); }
 		}
 		
 		None =>
 		{
 			if !opt.quiet
 				{ println!("output:"); }
+			
 			print!("{}", String::from_utf8_lossy(&output))
 		}
 	};

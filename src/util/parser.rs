@@ -1,4 +1,4 @@
-use tokenizer::{Token, TokenKind, Span};
+use util::tokenizer::{Token, TokenKind, Span};
 
 
 pub struct Parser<'tok>
