@@ -7,6 +7,8 @@ pub mod definition;
 pub mod assembler;
 pub mod driver;
 
+mod tests;
+
 
 const USAGE: &'static str = "
 Usage:

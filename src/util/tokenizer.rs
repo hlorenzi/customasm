@@ -226,7 +226,7 @@ fn try_read_operator(src: &[char], index: &mut usize) -> Option<Token>
 {
 	let operators =
 	[
-		".", "->", ":", ";",
+		".", "->", ":", ";", ",",
 		"(", ")", "[", "]", "{", "}",
 		"'",
 		"#", "$"

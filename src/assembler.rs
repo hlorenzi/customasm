@@ -14,6 +14,7 @@ struct Assembler<'def>
 	cur_output: usize,
 	labels: HashMap<String, usize>,
 	unresolved_instructions: Vec<Instruction>,
+	unresolved_expressions: Vec<UnresolvedExpression>,
 	
 	output_bits: BitVec
 }
@@ -26,6 +27,16 @@ struct Instruction
 	address: usize,
 	output: usize,
 	arguments: Vec<Expression>
+}
+
+
+struct UnresolvedExpression
+{
+	span: Span,
+	expr: Expression,
+	address: usize,
+	output: usize,
+	bit_num: usize
 }
 
 
@@ -45,6 +56,7 @@ pub fn assemble(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 		cur_output: 0,
 		labels: HashMap::new(),
 		unresolved_instructions: Vec::new(),
+		unresolved_expressions: Vec::new(),
 		output_bits: BitVec::new()
 	};
 	
@@ -68,13 +80,20 @@ pub fn assemble(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 	{
 		match resolve_instruction(&assembler, &inst)
 		{
-			Ok(bits) =>
-			{
-				let cur_output = inst.output * assembler.def.align_bits;
-				assembler.output(cur_output, &bits);
-			}
-			
+			Ok(bits) => assembler.output_aligned(inst.output, &bits),			
 			Err(msg) => return Err(ParserError::new(msg, inst.span))
+		}
+	}
+	
+	let mut unresolved_exprs = Vec::new();
+	unresolved_exprs.append(&mut assembler.unresolved_expressions);
+	
+	for unres in unresolved_exprs.iter()
+	{
+		match resolve_expression(&assembler, &unres.expr, unres.bit_num)
+		{
+			Ok(bits) => assembler.output_aligned(unres.output, &bits),			
+			Err(msg) => return Err(ParserError::new(msg, unres.span))
 		}
 	}
 	
@@ -84,9 +103,10 @@ pub fn assemble(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 
 impl<'def> Assembler<'def>
 {
-	pub fn output(&mut self, index: usize, bitvec: &BitVec)
+	pub fn output_aligned(&mut self, index: usize, bitvec: &BitVec)
 	{
-		self.output_bits.set(index, bitvec);
+		let aligned_index = index * self.def.align_bits;
+		self.output_bits.set(aligned_index, bitvec);
 	}
 }
 
@@ -97,11 +117,71 @@ fn translate_directive(assembler: &mut Assembler, parser: &mut Parser) -> Result
 	let directive_token = try!(parser.expect_identifier()).clone();
 	let directive = directive_token.identifier();
 	
+	if directive.chars().next() == Some('d')
+	{
+		let mut bit_num_str = directive.clone();
+		bit_num_str.remove(0);
+		
+		match usize::from_str_radix(&bit_num_str, 10)
+		{
+			Ok(bit_num) =>
+			{
+				if bit_num % assembler.def.align_bits != 0
+					{ return Err(ParserError::new(format!("literal is not aligned to `{}` bits", assembler.def.align_bits), directive_token.span)); }
+			
+				return translate_literal(assembler, parser, bit_num);
+			}
+			Err(..) => { }
+		}
+	}
+	
 	match directive.as_ref()
 	{
 		"address" => assembler.cur_address = try!(parser.expect_number()).number_usize(),
 		"output" => assembler.cur_output = try!(parser.expect_number()).number_usize(),
 		_ => return Err(ParserError::new(format!("unknown directive `{}`", directive), directive_token.span))
+	}
+	
+	Ok(())
+}
+
+
+fn translate_literal(assembler: &mut Assembler, parser: &mut Parser, bit_num: usize) -> Result<(), ParserError>
+{
+	loop
+	{
+		let span = parser.current().span;
+		let expr = try!(parse_expression(parser));
+		
+		if can_resolve_expression(assembler, &expr)
+		{
+			let bits = match resolve_expression(assembler, &expr, bit_num)
+			{
+				Ok(bits) => bits,
+				Err(msg) => return Err(ParserError::new(msg, span))
+			};
+			
+			let cur_output = assembler.cur_output;
+			assembler.output_aligned(cur_output, &bits);
+			
+		}
+		else
+		{
+			assembler.unresolved_expressions.push(UnresolvedExpression
+			{
+				span: span,
+				expr: expr,
+				address: assembler.cur_address,
+				output: assembler.cur_output,
+				bit_num: bit_num
+			});
+		}
+		
+		assembler.cur_address += bit_num / assembler.def.align_bits;
+		assembler.cur_output += bit_num / assembler.def.align_bits;
+		
+		if !parser.match_operator(",")
+			{ break; }
 	}
 	
 	Ok(())
@@ -163,12 +243,7 @@ fn translate_instruction<'p, 'tok>(assembler: &mut Assembler, parser: &'p mut Pa
 			{
 				match resolve_instruction(assembler, &inst)
 				{
-					Ok(bits) =>
-					{
-						let cur_output = inst.output * assembler.def.align_bits;
-						assembler.output(cur_output, &bits);
-					}
-					
+					Ok(bits) => assembler.output_aligned(inst.output, &bits),					
 					Err(msg) => return Err(ParserError::new(msg, inst.span))
 				}
 			}
@@ -246,7 +321,7 @@ fn parse_expression(parser: &mut Parser) -> Result<Expression, ParserError>
 		let token = try!(parser.expect_number());
 		let (radix, value_str) = token.number();
 		
-		match BitVec::new_from_str(radix, value_str)
+		match BitVec::new_from_str_min(radix, value_str)
 		{
 			Err(msg) => Err(ParserError::new(msg, token.span)),
 			Ok(bitvec) => Ok(Expression::LiteralUInt(bitvec))
