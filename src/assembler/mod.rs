@@ -95,9 +95,9 @@ pub fn assemble(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 	
 	for unres in unresolved_exprs.iter()
 	{
-		match resolve_expression(&assembler, &unres.expr, unres.bit_num)
+		match resolve_expression(&assembler, &unres.expr)
 		{
-			Ok(bits) => assembler.output_aligned(unres.output, &bits),			
+			Ok(bits) => assembler.output_aligned(unres.output, &bits.slice(unres.bit_num - 1, 0)),
 			Err(msg) => return Err(ParserError::new(msg, unres.span))
 		}
 	}
@@ -161,14 +161,14 @@ fn translate_literal(assembler: &mut Assembler, parser: &mut Parser, bit_num: us
 		
 		if can_resolve_expression(assembler, &expr)
 		{
-			let bits = match resolve_expression(assembler, &expr, bit_num)
+			let bits = match resolve_expression(assembler, &expr)
 			{
 				Ok(bits) => bits,
 				Err(msg) => return Err(ParserError::new(msg, span))
 			};
 			
 			let cur_output = assembler.cur_output;
-			assembler.output_aligned(cur_output, &bits);
+			assembler.output_aligned(cur_output, &bits.slice(bit_num - 1, 0));
 			
 		}
 		else
@@ -409,8 +409,8 @@ fn resolve_instruction(assembler: &Assembler, inst: &Instruction) -> Result<BitV
 			
 			&ProductionSegment::Argument { index, leftmost_bit, rightmost_bit } =>
 			{
-				let expr_bitvec = try!(resolve_expression(assembler, &inst.arguments[index], rightmost_bit - leftmost_bit));
-				bitvec.push(&expr_bitvec);
+				let expr_bitvec = try!(resolve_expression(assembler, &inst.arguments[index]));
+				bitvec.push(&expr_bitvec.slice(leftmost_bit, rightmost_bit));
 			}
 		}
 	}
@@ -460,31 +460,20 @@ fn get_expression_min_bit_num(assembler: &Assembler, expr: &Expression) -> usize
 }
 
 
-fn resolve_expression(assembler: &Assembler, expr: &Expression, bit_num: usize) -> Result<BitVec, String>
+fn resolve_expression(assembler: &Assembler, expr: &Expression) -> Result<BitVec, String>
 {
 	match expr
 	{
 		&Expression::LiteralUInt(ref literal_bitvec) =>
 		{
-			let mut bitvec = literal_bitvec.clone();
-			
-			if bitvec.len() > bit_num
-				{ return Err("value does not fit".to_string()); }
-			
-			bitvec.zero_extend(bit_num);
-			return Ok(bitvec);
+			return Ok(literal_bitvec.clone());
 		}
 		
 		&Expression::GlobalLabel(ref name) =>
 		{
 			match assembler.labels.get_global_value(name)
 			{
-				Some(value) =>
-				{
-					let mut bitvec = value.clone();
-					bitvec.zero_extend(bit_num);
-					return Ok(bitvec);
-				}
+				Some(value) => return Ok(value.clone()),
 				None => return Err(format!("unknown global label `{}`", name))
 			}
 		}
@@ -493,12 +482,7 @@ fn resolve_expression(assembler: &Assembler, expr: &Expression, bit_num: usize) 
 		{
 			match assembler.labels.get_local_value(ctx, name)
 			{
-				Some(value) =>
-				{
-					let mut bitvec = value.clone();
-					bitvec.zero_extend(bit_num);
-					return Ok(bitvec);
-				}
+				Some(value) => return Ok(value.clone()),
 				None => return Err(format!("unknown local label `{}`", name))
 			}
 		}

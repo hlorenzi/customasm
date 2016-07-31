@@ -134,19 +134,28 @@ impl BitVec
 	}
 	
 	
-	pub fn extract(&self, left: usize, right: usize) -> BitVec
+	pub fn get_bit_rev(&self, index: usize) -> bool
+	{
+		if index >= self.bits.len()
+			{ false }
+		else
+			{ self.bits[self.bits.len() - 1 - index] }
+	}
+	
+	
+	pub fn slice(&self, left: usize, right: usize) -> BitVec
 	{
 		let mut result = BitVec::new();
 		
-		if left < right
+		if right < left
 		{
-			for i in left..right
-				{ result.push_bit(self.get_bit(i)) }
+			for i in right..(left + 1)
+				{ result.insert_bit(0, self.get_bit_rev(i)); }
 		}
 		else
 		{
-			for i in right..left
-				{ result.push_bit(self.get_bit(i)) }
+			for i in left..(right + 1)
+				{ result.push_bit(self.get_bit_rev(i)); }
 		}
 		
 		result

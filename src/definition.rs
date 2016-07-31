@@ -149,18 +149,23 @@ fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserEr
 			
 			let typ = rule.get_argument_type(arg_index);
 			
-			let mut rightmost_bit = typ.bit_num;
-			let mut leftmost_bit = 0;
+			let mut leftmost_bit = typ.bit_num - 1;
+			let mut rightmost_bit = 0;
 			
 			if parser.match_operator("[")
 			{
-				rightmost_bit = try!(parser.expect_number()).number_usize();
-				try!(parser.expect_operator(":"));
 				leftmost_bit = try!(parser.expect_number()).number_usize();
+				try!(parser.expect_operator(":"));
+				rightmost_bit = try!(parser.expect_number()).number_usize();
 				try!(parser.expect_operator("]"));
 			}
 			
-			rule.production_bit_num += rightmost_bit - leftmost_bit;
+			rule.production_bit_num +=
+				if leftmost_bit > rightmost_bit
+					{ leftmost_bit - rightmost_bit + 1 }
+				else
+					{ rightmost_bit - leftmost_bit + 1 };
+			
 			rule.production_segments.push(ProductionSegment::Argument
 			{
 				index: arg_index,
