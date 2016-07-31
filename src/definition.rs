@@ -42,6 +42,8 @@ fn parse_directives(def: &mut Definition, parser: &mut Parser) -> Result<(), Par
 			"address" => def.address_bits = try!(parser.expect_number()).number_usize(),
 			_ => return Err(ParserError::new(format!("unknown directive `{}`", directive.identifier()), directive.span))
 		}
+		
+		try!(parser.expect_separator_linebreak());
 	}
 	
 	Ok(())
@@ -65,7 +67,7 @@ fn parse_rules(def: &mut Definition, parser: &mut Parser) -> Result<(), ParserEr
 	
 		def.rules.push(rule);
 		
-		try!(parser.expect_operator(";"));
+		try!(parser.expect_separator_linebreak());
 	}
 	
 	Ok(())
@@ -114,7 +116,7 @@ fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserError
 
 fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserError>
 {
-	while !parser.current().is_operator(";")
+	while !parser.current().is_linebreak_or_end()
 	{
 		if parser.current().is_number()
 		{

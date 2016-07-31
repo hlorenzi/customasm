@@ -20,11 +20,12 @@ static DEF1: &'static str =
 	.align 8
 	.address 8
 	
-	halt                  -> 8'0xaa;
-	add {a: u8}           -> 8'0xbb a;
-	add {a: u16}          -> 8'0xcc a;
-	sub {a: u8}  {b: u8}  -> 8'0xdd a b;
-	sub {a: u16} {b: u16} -> 8'0xee a b; 
+	halt                  -> 8'0xaa
+	add {a: u8}           -> 8'0xbb a
+	add {a: u16}          -> 8'0xcc a
+	sub {a: u8}  {b: u8}  -> 8'0xdd a b
+	sub {a: u16} {b: u16} -> 8'0xee a b
+	jmp {a: u8}           -> 8'0xff a
 ";
 
 
@@ -65,4 +66,17 @@ fn test_literals_simple()
 	pass(".align 8", ".d32 0x12345678, 0x1, 0xabcdef", "123456780000000100abcdef");
 	pass(".align 8", ".d64 0x12345678abcdef00, 0x123", "12345678abcdef000000000000000123");
 	pass(".align 8", ".d128 0x12345678abcdef", "00000000000000000012345678abcdef");
+}
+
+
+#[test]
+fn test_labels_simple()
+{	
+	pass(DEF1, "start: \n jmp start", "ff00");
+	
+	pass(DEF1, "jmp loop \n loop: \n halt", "ff02aa");
+	pass(DEF1, "jmp loop \n loop: \n jmp loop", "ff02ff02");
+	
+	pass(DEF1, "start: \n 'x: \n jmp 'x \n loop: \n 'x: \n jmp 'x", "ff00ff02");
+	pass(DEF1, "          'x: \n jmp 'x \n loop: \n 'x: \n jmp 'x", "ff00ff02");
 }

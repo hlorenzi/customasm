@@ -110,6 +110,24 @@ impl<'tok> Parser<'tok>
 	}
 	
 	
+	pub fn expect_linebreak(&mut self) -> Result<&Token, ParserError>
+	{
+		if self.current().is_linebreak()
+			{ Ok(self.advance()) }
+		else
+			{ Err(ParserError::new("expected line break".to_string(), self.current().span)) }
+	}
+	
+	
+	pub fn expect_separator_linebreak(&mut self) -> Result<&Token, ParserError>
+	{
+		if self.current().is_linebreak() || self.index >= self.tokens.len()
+			{ Ok(self.advance()) }
+		else
+			{ Err(ParserError::new("expected line break".to_string(), self.current().span)) }
+	}
+	
+	
 	pub fn expect_identifier(&mut self) -> Result<&Token, ParserError>
 	{
 		if self.current().is_identifier()

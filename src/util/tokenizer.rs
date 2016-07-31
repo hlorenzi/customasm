@@ -18,6 +18,7 @@ pub struct Token
 pub enum TokenKind
 {
 	Error(char),
+	LineBreak,
 	Identifier(String),
 	Number(usize, String),
 	Operator(&'static str),
@@ -29,10 +30,12 @@ pub fn tokenize(src: &[char]) -> Vec<Token>
 {
 	let mut tokens = Vec::new();
 	let mut index = 0;
+	let mut last_was_linebreak = true;
 	
 	while index < src.len()
 	{
-		if is_whitespace(src[index])
+		if is_whitespace(src[index]) ||
+			(last_was_linebreak && src[index] == '\n')
 		{
 			index += 1;
 			continue;
@@ -41,8 +44,15 @@ pub fn tokenize(src: &[char]) -> Vec<Token>
 		let token =
 			try_read_identifier(src, &mut index).unwrap_or_else(||
 			try_read_integer(src, &mut index).unwrap_or_else(||
+			try_read_linebreak(src, &mut index).unwrap_or_else(||
 			try_read_operator(src, &mut index).unwrap_or_else(||
-			read_error(src, &mut index))));
+			read_error(src, &mut index)))));
+		
+		last_was_linebreak = match token.kind
+		{
+			TokenKind::LineBreak => true,
+			_ => false
+		};
 		
 		tokens.push(token);
 	}
@@ -81,6 +91,27 @@ impl Span
 
 impl Token
 {
+	pub fn is_linebreak(&self) -> bool
+	{
+		match self.kind
+		{
+			TokenKind::LineBreak => true,
+			_ => false
+		}
+	}
+	
+	
+	pub fn is_linebreak_or_end(&self) -> bool
+	{
+		match self.kind
+		{
+			TokenKind::End => true,
+			TokenKind::LineBreak => true,
+			_ => false
+		}
+	}
+	
+	
 	pub fn is_identifier(&self) -> bool
 	{
 		match self.kind
@@ -259,6 +290,20 @@ fn try_read_operator(src: &[char], index: &mut usize) -> Option<Token>
 }
 
 
+fn try_read_linebreak(src: &[char], index: &mut usize) -> Option<Token>
+{
+	if src[*index] != '\n'
+		{ return None; }
+
+	*index += 1;
+	Some(Token
+	{
+		span: Span { start: *index - 1, end: *index },
+		kind: TokenKind::LineBreak
+	})
+}
+
+
 fn read_error(src: &[char], index: &mut usize) -> Token
 {
 	*index += 1;
@@ -274,8 +319,7 @@ fn is_whitespace(c: char) -> bool
 {
 	c == ' ' ||
 	c == '\t' ||
-	c == '\r' ||
-	c == '\n'
+	c == '\r'
 }
 
 

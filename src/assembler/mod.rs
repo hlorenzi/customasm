@@ -1,10 +1,12 @@
+mod labels;
+
+
 use util::parser::{Parser, ParserError};
 use util::tokenizer;
 use util::tokenizer::Span;
 use util::bitvec::BitVec;
 use definition::Definition;
 use rule::{PatternSegment, ProductionSegment};
-use std::collections::HashMap;
 
 
 struct Assembler<'def>
@@ -12,7 +14,7 @@ struct Assembler<'def>
 	def: &'def Definition,
 	cur_address: usize,
 	cur_output: usize,
-	labels: HashMap<String, usize>,
+	labels: labels::Manager,
 	unresolved_instructions: Vec<Instruction>,
 	unresolved_expressions: Vec<UnresolvedExpression>,
 	
@@ -43,7 +45,8 @@ struct UnresolvedExpression
 enum Expression
 {
 	LiteralUInt(BitVec),
-	Variable(String)
+	GlobalLabel(String),
+	LocalLabel(labels::Context, String)
 }
 
 
@@ -54,7 +57,7 @@ pub fn assemble(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 		def: def,
 		cur_address: 0,
 		cur_output: 0,
-		labels: HashMap::new(),
+		labels: labels::Manager::new(),
 		unresolved_instructions: Vec::new(),
 		unresolved_expressions: Vec::new(),
 		output_bits: BitVec::new()
@@ -68,7 +71,9 @@ pub fn assemble(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 		if parser.current().is_operator(".")
 			{ try!(translate_directive(&mut assembler, &mut parser)); }
 		else if parser.current().is_identifier() && parser.next(1).is_operator(":")
-			{ try!(translate_label(&mut assembler, &mut parser)); }
+			{ try!(translate_global_label(&mut assembler, &mut parser)); }
+		else if parser.current().is_operator("'") && parser.next(1).is_identifier() && parser.next(2).is_operator(":")
+			{ try!(translate_local_label(&mut assembler, &mut parser)); }
 		else
 			{ try!(translate_instruction(&mut assembler, &mut parser)); }
 	}
@@ -142,6 +147,7 @@ fn translate_directive(assembler: &mut Assembler, parser: &mut Parser) -> Result
 		_ => return Err(ParserError::new(format!("unknown directive `{}`", directive), directive_token.span))
 	}
 	
+	try!(parser.expect_separator_linebreak());
 	Ok(())
 }
 
@@ -151,7 +157,7 @@ fn translate_literal(assembler: &mut Assembler, parser: &mut Parser, bit_num: us
 	loop
 	{
 		let span = parser.current().span;
-		let expr = try!(parse_expression(parser));
+		let expr = try!(parse_expression(assembler, parser));
 		
 		if can_resolve_expression(assembler, &expr)
 		{
@@ -184,20 +190,46 @@ fn translate_literal(assembler: &mut Assembler, parser: &mut Parser, bit_num: us
 			{ break; }
 	}
 	
+	try!(parser.expect_separator_linebreak());
 	Ok(())
 }
 
 
-fn translate_label(assembler: &mut Assembler, parser: &mut Parser) -> Result<(), ParserError>
+fn translate_global_label(assembler: &mut Assembler, parser: &mut Parser) -> Result<(), ParserError>
 {
 	let label_token = try!(parser.expect_identifier()).clone();
 	let label = label_token.identifier();
 	try!(parser.expect_operator(":"));
 	
-	if assembler.labels.contains_key(label)
-		{ return Err(ParserError::new(format!("duplicate label `{}`", label), label_token.span)); }
+	if assembler.labels.does_global_exist(label)
+		{ return Err(ParserError::new(format!("duplicate global label `{}`", label), label_token.span)); }
 	
-	assembler.labels.insert(label.clone(), assembler.cur_address);
+	assembler.labels.add_global(
+		label.clone(),
+		BitVec::new_from_usize(assembler.cur_address));
+	
+	try!(parser.expect_separator_linebreak());
+	Ok(())
+}
+
+
+fn translate_local_label(assembler: &mut Assembler, parser: &mut Parser) -> Result<(), ParserError>
+{
+	try!(parser.expect_operator("'"));
+	let label_token = try!(parser.expect_identifier()).clone();
+	let label = label_token.identifier();
+	try!(parser.expect_operator(":"));
+	
+	if assembler.labels.does_local_exist(assembler.labels.get_cur_context(), label)
+		{ return Err(ParserError::new(format!("duplicate local label `{}`", label), label_token.span)); }
+	
+	let local_ctx = assembler.labels.get_cur_context();
+	assembler.labels.add_local(
+		local_ctx,
+		label.clone(),
+		BitVec::new_from_usize(assembler.cur_address));
+	
+	try!(parser.expect_separator_linebreak());
 	Ok(())
 }
 
@@ -256,6 +288,7 @@ fn translate_instruction<'p, 'tok>(assembler: &mut Assembler, parser: &'p mut Pa
 		None => return Err(ParserError::new("no match found for instruction".to_string(), inst_span))
 	}
 	
+	try!(parser.expect_separator_linebreak());
 	Ok(())
 }
 
@@ -291,7 +324,7 @@ fn try_match_rule(assembler: &mut Assembler, parser: &mut Parser, rule_index: us
 			{
 				let typ = rule.get_argument_type(arg_index);
 				
-				match parse_expression(parser)
+				match parse_expression(assembler, parser)
 				{
 					Ok(expr) =>
 					{
@@ -311,10 +344,18 @@ fn try_match_rule(assembler: &mut Assembler, parser: &mut Parser, rule_index: us
 }
 
 
-fn parse_expression(parser: &mut Parser) -> Result<Expression, ParserError>
+fn parse_expression(assembler: &Assembler, parser: &mut Parser) -> Result<Expression, ParserError>
 {
 	if parser.current().is_identifier()
-		{ Ok(Expression::Variable(try!(parser.expect_identifier()).identifier().clone())) }
+		{ Ok(Expression::GlobalLabel(try!(parser.expect_identifier()).identifier().clone())) }
+	
+	else if parser.current().is_operator("'") && parser.next(1).is_identifier()
+	{
+		parser.advance();
+		Ok(Expression::LocalLabel(
+			assembler.labels.get_cur_context(),
+			try!(parser.expect_identifier()).identifier().clone()))
+	}
 	
 	else if parser.current().is_number()
 	{
@@ -385,8 +426,11 @@ fn can_resolve_expression(assembler: &Assembler, expr: &Expression) -> bool
 		&Expression::LiteralUInt(..) =>
 			{ return true; }
 		
-		&Expression::Variable(ref name) =>
-			{ return assembler.labels.contains_key(name); }
+		&Expression::GlobalLabel(ref name) =>
+			{ return assembler.labels.does_global_exist(name); }
+			
+		&Expression::LocalLabel(ctx, ref name) =>
+			{ return assembler.labels.does_local_exist(ctx, name); }
 	}
 }
 
@@ -396,14 +440,20 @@ fn get_expression_min_bit_num(assembler: &Assembler, expr: &Expression) -> usize
 	match expr
 	{
 		&Expression::LiteralUInt(ref literal_bitvec) => return literal_bitvec.len(),
-		&Expression::Variable(ref name) =>
+		&Expression::GlobalLabel(ref name) =>
 		{
-			if !assembler.labels.contains_key(name)
-				{ assembler.def.address_bits }
-			else
+			match assembler.labels.get_global_value(name)
 			{
-				let bitvec = BitVec::new_from_usize(assembler.labels[name]);
-				bitvec.len()
+				Some(bitvec) => bitvec.len(),
+				None => assembler.def.address_bits
+			}
+		}
+		&Expression::LocalLabel(ctx, ref name) =>
+		{
+			match assembler.labels.get_local_value(ctx, name)
+			{
+				Some(bitvec) => bitvec.len(),
+				None => assembler.def.address_bits
 			}
 		}
 	}
@@ -419,20 +469,38 @@ fn resolve_expression(assembler: &Assembler, expr: &Expression, bit_num: usize) 
 			let mut bitvec = literal_bitvec.clone();
 			
 			if bitvec.len() > bit_num
-				{ return Err("argument does not fit".to_string()); }
+				{ return Err("value does not fit".to_string()); }
 			
 			bitvec.zero_extend(bit_num);
 			return Ok(bitvec);
 		}
 		
-		&Expression::Variable(ref name) =>
+		&Expression::GlobalLabel(ref name) =>
 		{
-			if !assembler.labels.contains_key(name)
-				{ return Err(format!("unknown variable `{}`", name)); }
-				
-			let mut bitvec = BitVec::new_from_usize(assembler.labels[name]);
-			bitvec.zero_extend(bit_num);
-			return Ok(bitvec);
+			match assembler.labels.get_global_value(name)
+			{
+				Some(value) =>
+				{
+					let mut bitvec = value.clone();
+					bitvec.zero_extend(bit_num);
+					return Ok(bitvec);
+				}
+				None => return Err(format!("unknown global label `{}`", name))
+			}
+		}
+		
+		&Expression::LocalLabel(ctx, ref name) =>
+		{
+			match assembler.labels.get_local_value(ctx, name)
+			{
+				Some(value) =>
+				{
+					let mut bitvec = value.clone();
+					bitvec.zero_extend(bit_num);
+					return Ok(bitvec);
+				}
+				None => return Err(format!("unknown local label `{}`", name))
+			}
 		}
 	}
 }
