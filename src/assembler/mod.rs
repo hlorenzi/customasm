@@ -1,12 +1,13 @@
 mod labels;
 
 
-use util::parser::{Parser, ParserError};
+use definition::Definition;
+use util::bitvec::BitVec;
+use util::error::Error;
+use util::misc;
+use util::parser::Parser;
 use util::tokenizer;
 use util::tokenizer::Span;
-use util::bitvec::BitVec;
-use util::misc;
-use definition::Definition;
 use rule::{PatternSegment, ProductionSegment};
 use std::path::PathBuf;
 
@@ -52,7 +53,7 @@ enum Expression
 }
 
 
-pub fn assemble(def: &Definition, src_filename: &str, src: &[char]) -> Result<BitVec, ParserError>
+pub fn assemble(def: &Definition, src_filename: &str, src: &[char]) -> Result<BitVec, Error>
 {
 	let mut assembler = Assembler
 	{
@@ -75,7 +76,7 @@ pub fn assemble(def: &Definition, src_filename: &str, src: &[char]) -> Result<Bi
 		match resolve_instruction(&assembler, &inst)
 		{
 			Ok(bits) => assembler.output_aligned_at(inst.output, &bits),			
-			Err(msg) => return Err(ParserError::new(src_filename.to_string(), msg, inst.span))
+			Err(msg) => return Err(Error::new_with_file_span(src_filename, msg, inst.span))
 		}
 	}
 	
@@ -87,7 +88,7 @@ pub fn assemble(def: &Definition, src_filename: &str, src: &[char]) -> Result<Bi
 		match resolve_expression(&assembler, &unres.expr)
 		{
 			Ok(bits) => assembler.output_aligned_at(unres.output, &bits.slice(unres.bit_num - 1, 0)),
-			Err(msg) => return Err(ParserError::new(src_filename.to_string(), msg, unres.span))
+			Err(msg) => return Err(Error::new_with_file_span(src_filename, msg, unres.span))
 		}
 	}
 	
@@ -114,7 +115,7 @@ impl<'def> Assembler<'def>
 }
 
 
-fn translate_file(assembler: &mut Assembler, src_filename: &str, src: &[char]) -> Result<(), ParserError>
+fn translate_file(assembler: &mut Assembler, src_filename: &str, src: &[char]) -> Result<(), Error>
 {
 	let tokens = tokenizer::tokenize(src);
 	let mut parser = Parser::new(src_filename, &tokens);
@@ -135,7 +136,7 @@ fn translate_file(assembler: &mut Assembler, src_filename: &str, src: &[char]) -
 }
 
 
-fn translate_directive(assembler: &mut Assembler, parser: &mut Parser) -> Result<(), ParserError>
+fn translate_directive(assembler: &mut Assembler, parser: &mut Parser) -> Result<(), Error>
 {
 	try!(parser.expect_operator("."));
 	let directive_token = try!(parser.expect_identifier()).clone();
@@ -187,7 +188,7 @@ fn translate_directive(assembler: &mut Assembler, parser: &mut Parser) -> Result
 }
 
 
-fn translate_literal(assembler: &mut Assembler, parser: &mut Parser, bit_num: usize) -> Result<(), ParserError>
+fn translate_literal(assembler: &mut Assembler, parser: &mut Parser, bit_num: usize) -> Result<(), Error>
 {
 	loop
 	{
@@ -228,7 +229,7 @@ fn translate_literal(assembler: &mut Assembler, parser: &mut Parser, bit_num: us
 }
 
 
-fn translate_global_label(assembler: &mut Assembler, parser: &mut Parser) -> Result<(), ParserError>
+fn translate_global_label(assembler: &mut Assembler, parser: &mut Parser) -> Result<(), Error>
 {
 	let label_token = try!(parser.expect_identifier()).clone();
 	let label = label_token.identifier();
@@ -246,7 +247,7 @@ fn translate_global_label(assembler: &mut Assembler, parser: &mut Parser) -> Res
 }
 
 
-fn translate_local_label(assembler: &mut Assembler, parser: &mut Parser) -> Result<(), ParserError>
+fn translate_local_label(assembler: &mut Assembler, parser: &mut Parser) -> Result<(), Error>
 {
 	try!(parser.expect_operator("'"));
 	let label_token = try!(parser.expect_identifier()).clone();
@@ -267,7 +268,7 @@ fn translate_local_label(assembler: &mut Assembler, parser: &mut Parser) -> Resu
 }
 
 
-fn translate_instruction<'p, 'f, 'tok>(assembler: &mut Assembler, parser: &'p mut Parser<'f, 'tok>) -> Result<(), ParserError>
+fn translate_instruction<'p, 'f, 'tok>(assembler: &mut Assembler, parser: &'p mut Parser<'f, 'tok>) -> Result<(), Error>
 {
 	let mut maybe_inst = None;
 	let inst_span = parser.current().span;
@@ -318,7 +319,7 @@ fn translate_instruction<'p, 'f, 'tok>(assembler: &mut Assembler, parser: &'p mu
 			}
 		}
 	
-		None => return Err(parser.make_error("no match found for instruction".to_string(), inst_span))
+		None => return Err(parser.make_error("no match found for instruction", inst_span))
 	}
 	
 	try!(parser.expect_separator_linebreak());
@@ -377,7 +378,7 @@ fn try_match_rule(assembler: &mut Assembler, parser: &mut Parser, rule_index: us
 }
 
 
-fn parse_expression(assembler: &Assembler, parser: &mut Parser) -> Result<Expression, ParserError>
+fn parse_expression(assembler: &Assembler, parser: &mut Parser) -> Result<Expression, Error>
 {
 	if parser.current().is_identifier()
 		{ Ok(Expression::GlobalLabel(try!(parser.expect_identifier()).identifier().clone())) }
@@ -403,7 +404,7 @@ fn parse_expression(assembler: &Assembler, parser: &mut Parser) -> Result<Expres
 	}
 	
 	else
-		{ Err(parser.make_error("expected expression".to_string(), parser.current().span)) }
+		{ Err(parser.make_error("expected expression", parser.current().span)) }
 }
 
 

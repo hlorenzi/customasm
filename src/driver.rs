@@ -1,6 +1,7 @@
 use definition;
 use assembler;
 use util::misc;
+use util::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -35,7 +36,7 @@ pub fn driver_main(opt: &DriverOptions)
 	let def = match definition::parse(&opt.def_file, &def_chars)
 	{
 		Ok(def) => def,
-		Err(err) => misc::error_exit(&format!("{}:{}:{}: error: {}", opt.def_file, err.span.start.line, err.span.start.column, err.msg))
+		Err(err) => misc::error_exit(err)
 	};
 	
 	if !opt.quiet
@@ -45,7 +46,7 @@ pub fn driver_main(opt: &DriverOptions)
 	let output_bitvec = match assembler::assemble(&def, &opt.asm_file, &asm_chars)
 	{
 		Ok(output_bitvec) => output_bitvec,
-		Err(err) => misc::error_exit(&format!("{}:{}:{}: error: {}", err.filename, err.span.start.line, err.span.start.column, err.msg))
+		Err(err) => misc::error_exit(err)
 	};
 	
 	let output = match opt.out_format
@@ -64,13 +65,13 @@ pub fn driver_main(opt: &DriverOptions)
 			let mut out_file = match File::create(filename)
 			{
 				Ok(file) => file,
-				Err(err) => misc::error_exit(&format!("{}: error: {}", filename, err))
+				Err(err) => misc::error_exit(Error::new_with_file(filename, format!("{}", err)))
 			};
 			
 			match out_file.write_all(&output)
 			{
 				Ok(..) => { }
-				Err(err) => misc::error_exit(&format!("{}: error: {}", filename, err))
+				Err(err) => misc::error_exit(Error::new_with_file(filename, format!("{}", err)))
 			};
 			
 			if !opt.quiet

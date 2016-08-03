@@ -1,3 +1,4 @@
+use util::error::Error;
 use util::tokenizer::{Token, TokenKind, CharIndex, Span};
 
 
@@ -7,29 +8,6 @@ pub struct Parser<'f, 'tok>
 	tokens: &'tok [Token],
 	index: usize,
 	end_token: Token
-}
-
-
-#[derive(Debug)]
-pub struct ParserError
-{
-	pub filename: String,
-	pub msg: String,
-	pub span: Span
-}
-
-
-impl ParserError
-{
-	pub fn new(filename: String, msg: String, span: Span) -> ParserError
-	{
-		ParserError
-		{
-			filename: filename,
-			msg: msg,
-			span: span
-		}
-	}
 }
 
 
@@ -77,9 +55,10 @@ impl<'f, 'tok> Parser<'f, 'tok>
 	}
 	
 	
-	pub fn make_error(&self, msg: String, span: Span) -> ParserError
+	pub fn make_error<S>(&self, msg: S, span: Span) -> Error
+	where S: Into<String>
 	{
-		ParserError::new(self.filename.to_string(), msg, span)
+		Error::new_with_file_span(msg.into(), self.filename, span)
 	}
 	
 	
@@ -126,61 +105,61 @@ impl<'f, 'tok> Parser<'f, 'tok>
 	}
 	
 	
-	pub fn expect_linebreak(&mut self) -> Result<&Token, ParserError>
+	pub fn expect_linebreak(&mut self) -> Result<&Token, Error>
 	{
 		if self.current().is_linebreak()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected line break".to_string(), self.current().span)) }
+			{ Err(self.make_error("expected line break", self.current().span)) }
 	}
 	
 	
-	pub fn expect_separator_linebreak(&mut self) -> Result<&Token, ParserError>
+	pub fn expect_separator_linebreak(&mut self) -> Result<&Token, Error>
 	{
 		if self.current().is_linebreak() || self.index >= self.tokens.len()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected line break".to_string(), self.current().span)) }
+			{ Err(self.make_error("expected line break", self.current().span)) }
 	}
 	
 	
-	pub fn expect_identifier(&mut self) -> Result<&Token, ParserError>
+	pub fn expect_identifier(&mut self) -> Result<&Token, Error>
 	{
 		if self.current().is_identifier()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected identifier".to_string(), self.current().span)) }
+			{ Err(self.make_error("expected identifier", self.current().span)) }
 	}
 	
 	
-	pub fn expect_number(&mut self) -> Result<&Token, ParserError>
+	pub fn expect_number(&mut self) -> Result<&Token, Error>
 	{
 		if self.current().is_number()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected number".to_string(), self.current().span)) }
+			{ Err(self.make_error("expected number", self.current().span)) }
 	}
 	
 	
-	pub fn expect_string(&mut self) -> Result<&Token, ParserError>
+	pub fn expect_string(&mut self) -> Result<&Token, Error>
 	{
 		if self.current().is_string()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected string".to_string(), self.current().span)) }
+			{ Err(self.make_error("expected string", self.current().span)) }
 	}
 	
 	
-	pub fn expect_any_operator(&mut self) -> Result<&Token, ParserError>
+	pub fn expect_any_operator(&mut self) -> Result<&Token, Error>
 	{
 		if self.current().is_any_operator()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected operator".to_string(), self.current().span)) }
+			{ Err(self.make_error("expected operator", self.current().span)) }
 	}
 	
 	
-	pub fn expect_operator(&mut self, op: &str) -> Result<(), ParserError>
+	pub fn expect_operator(&mut self, op: &str) -> Result<(), Error>
 	{
 		if self.current().is_operator(op)
 		{

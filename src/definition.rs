@@ -1,6 +1,7 @@
-use util::tokenizer;
-use util::parser::{Parser, ParserError};
 use util::bitvec::BitVec;
+use util::error::Error;
+use util::parser::Parser;
+use util::tokenizer;
 use rule::{Rule, PatternSegment, ProductionSegment, VariableType};
 
 
@@ -12,7 +13,7 @@ pub struct Definition
 }
 
 
-pub fn parse(src_filename: &str, src: &[char]) -> Result<Definition, ParserError>
+pub fn parse(src_filename: &str, src: &[char]) -> Result<Definition, Error>
 {
 	let mut def = Definition
 	{
@@ -30,7 +31,7 @@ pub fn parse(src_filename: &str, src: &[char]) -> Result<Definition, ParserError
 }
 
 
-fn parse_directives(def: &mut Definition, parser: &mut Parser) -> Result<(), ParserError>
+fn parse_directives(def: &mut Definition, parser: &mut Parser) -> Result<(), Error>
 {
 	while parser.match_operator(".")
 	{
@@ -50,7 +51,7 @@ fn parse_directives(def: &mut Definition, parser: &mut Parser) -> Result<(), Par
 }
 
 
-fn parse_rules(def: &mut Definition, parser: &mut Parser) -> Result<(), ParserError>
+fn parse_rules(def: &mut Definition, parser: &mut Parser) -> Result<(), Error>
 {
 	while !parser.is_over()
 	{
@@ -74,7 +75,7 @@ fn parse_rules(def: &mut Definition, parser: &mut Parser) -> Result<(), ParserEr
 }
 
 
-fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserError>
+fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 {
 	while !parser.current().is_operator("->")
 	{
@@ -107,14 +108,14 @@ fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserError
 		}
 		
 		else
-			{ return Err(parser.make_error("expected pattern".to_string(), parser.current().span)); }
+			{ return Err(parser.make_error("expected pattern", parser.current().span)); }
 	}
 	
 	Ok(())
 }
 
 
-fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserError>
+fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 {
 	while !parser.current().is_linebreak_or_end()
 	{
@@ -174,14 +175,14 @@ fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserEr
 			});
 		}
 		else
-			{ return Err(parser.make_error("expected production".to_string(), parser.current().span)); }
+			{ return Err(parser.make_error("expected production", parser.current().span)); }
 	}
 	
 	Ok(())
 }
 
 
-fn parse_variable_type(parser: &mut Parser) -> Result<VariableType, ParserError>
+fn parse_variable_type(parser: &mut Parser) -> Result<VariableType, Error>
 {
 	let mut typ = VariableType
 	{
@@ -197,14 +198,14 @@ fn parse_variable_type(parser: &mut Parser) -> Result<VariableType, ParserError>
 		'u' => typ.signed = false,
 		'i' => typ.signed = true,
 		_ =>
-			{ return Err(parser.make_error("invalid type".to_string(), ident_token.span)); }
+			{ return Err(parser.make_error("invalid type", ident_token.span)); }
 	}
 	
 	match usize::from_str_radix(&ident[1..], 10)
 	{
 		Ok(bits) => typ.bit_num = bits,
 		Err(..) =>
-			{ return Err(parser.make_error("invalid type".to_string(), ident_token.span)); }
+			{ return Err(parser.make_error("invalid type", ident_token.span)); }
 	}
 	
 	Ok(typ)
