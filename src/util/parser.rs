@@ -1,5 +1,6 @@
 use util::error::Error;
 use util::tokenizer::{Token, TokenKind, CharIndex, Span};
+use std::rc::Rc;
 
 
 pub struct Parser<'f, 'tok>
@@ -23,7 +24,7 @@ impl<'f, 'tok> Parser<'f, 'tok>
 				
 		let end_token = Token
 		{
-			span: Span { start: end_index, end: end_index },
+			span: Span::new(Rc::new(filename.to_string()), end_index, end_index),
 			kind: TokenKind::End
 		};
 		
@@ -55,10 +56,10 @@ impl<'f, 'tok> Parser<'f, 'tok>
 	}
 	
 	
-	pub fn make_error<S>(&self, msg: S, span: Span) -> Error
+	pub fn make_error<S>(&self, msg: S, span: &Span) -> Error
 	where S: Into<String>
 	{
-		Error::new_with_file_span(msg.into(), self.filename, span)
+		Error::new_with_span(msg.into(), span.clone())
 	}
 	
 	
@@ -110,7 +111,7 @@ impl<'f, 'tok> Parser<'f, 'tok>
 		if self.current().is_linebreak()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected line break", self.current().span)) }
+			{ Err(self.make_error("expected line break", &self.current().span)) }
 	}
 	
 	
@@ -119,7 +120,7 @@ impl<'f, 'tok> Parser<'f, 'tok>
 		if self.current().is_linebreak() || self.index >= self.tokens.len()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected line break", self.current().span)) }
+			{ Err(self.make_error("expected line break", &self.current().span)) }
 	}
 	
 	
@@ -128,7 +129,7 @@ impl<'f, 'tok> Parser<'f, 'tok>
 		if self.current().is_identifier()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected identifier", self.current().span)) }
+			{ Err(self.make_error("expected identifier", &self.current().span)) }
 	}
 	
 	
@@ -137,7 +138,7 @@ impl<'f, 'tok> Parser<'f, 'tok>
 		if self.current().is_number()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected number", self.current().span)) }
+			{ Err(self.make_error("expected number", &self.current().span)) }
 	}
 	
 	
@@ -146,7 +147,7 @@ impl<'f, 'tok> Parser<'f, 'tok>
 		if self.current().is_string()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected string", self.current().span)) }
+			{ Err(self.make_error("expected string", &self.current().span)) }
 	}
 	
 	
@@ -155,7 +156,7 @@ impl<'f, 'tok> Parser<'f, 'tok>
 		if self.current().is_any_operator()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected operator", self.current().span)) }
+			{ Err(self.make_error("expected operator", &self.current().span)) }
 	}
 	
 	
@@ -167,6 +168,6 @@ impl<'f, 'tok> Parser<'f, 'tok>
 			Ok(())
 		}
 		else
-			{ Err(self.make_error(format!("expected `{}`", op), self.current().span)) }
+			{ Err(self.make_error(format!("expected `{}`", op), &self.current().span)) }
 	}
 }

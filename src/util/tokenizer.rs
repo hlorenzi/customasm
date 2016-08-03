@@ -1,3 +1,6 @@
+use std::rc::Rc;
+
+
 #[derive(Debug, Copy, Clone)]
 pub struct CharIndex
 {
@@ -7,9 +10,10 @@ pub struct CharIndex
 }
 
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct Span
 {
+	pub file: Rc<String>,
 	pub start: CharIndex,
 	pub end: CharIndex
 }
@@ -36,8 +40,10 @@ pub enum TokenKind
 }
 
 
-pub fn tokenize(src: &[char]) -> Vec<Token>
+pub fn tokenize<S>(src_filename: S, src: &[char]) -> Vec<Token>
+where S: Into<String>
 {
+	let shared_filename = Rc::<String>::new(src_filename.into());
 	let mut tokens = Vec::new();
 	let mut index = CharIndex::new();
 	let mut last_was_linebreak = true;
@@ -56,12 +62,12 @@ pub fn tokenize(src: &[char]) -> Vec<Token>
 		}
 	
 		let token =
-			try_read_identifier(src, &mut index).unwrap_or_else(||
-			try_read_integer(src, &mut index).unwrap_or_else(||
-			try_read_string(src, &mut index).unwrap_or_else(||
-			try_read_linebreak(src, &mut index).unwrap_or_else(||
-			try_read_operator(src, &mut index).unwrap_or_else(||
-			read_error(src, &mut index))))));
+			try_read_identifier(&shared_filename, src, &mut index).unwrap_or_else(||
+			try_read_integer(&shared_filename, src, &mut index).unwrap_or_else(||
+			try_read_string(&shared_filename, src, &mut index).unwrap_or_else(||
+			try_read_linebreak(&shared_filename, src, &mut index).unwrap_or_else(||
+			try_read_operator(&shared_filename, src, &mut index).unwrap_or_else(||
+			read_error(&shared_filename, src, &mut index))))));
 		
 		last_was_linebreak = match token.kind
 		{
@@ -108,6 +114,41 @@ impl CharIndex
 		self.linear += 1;
 		self.line += 1;
 		self.column = 1;
+	}
+}
+
+
+impl Span
+{
+	pub fn new(filename: Rc<String>, start: CharIndex, end: CharIndex) -> Span
+	{
+		Span
+		{
+			file: filename,
+			start: start,
+			end: end
+		}
+	}
+	
+	
+	pub fn join(&self, other: &Span) -> Span
+	{
+		if self.file != other.file
+			{ panic!("joining spans from different files"); }
+	
+		let start =
+			if self.start.linear < other.start.linear
+				{ self.start }
+			else
+				{ other.start };
+		
+		let end =
+			if self.end.linear < other.end.linear
+				{ self.end }
+			else
+				{ other.end };
+				
+		Span { file: self.file.clone(), start: start, end: end }
 	}
 }
 
@@ -236,7 +277,7 @@ impl Token
 }
 
 
-fn try_read_identifier(src: &[char], index: &mut CharIndex) -> Option<Token>
+fn try_read_identifier(file: &Rc<String>, src: &[char], index: &mut CharIndex) -> Option<Token>
 {
 	let index_before = *index;
 	
@@ -252,13 +293,13 @@ fn try_read_identifier(src: &[char], index: &mut CharIndex) -> Option<Token>
 	
 	Some(Token
 	{
-		span: Span { start: index_before, end: *index },
+		span: Span::new(file.clone(), index_before, *index),
 		kind: TokenKind::Identifier(identifier)
 	})
 }
 
 
-fn try_read_integer(src: &[char], index: &mut CharIndex) -> Option<Token>
+fn try_read_integer(file: &Rc<String>, src: &[char], index: &mut CharIndex) -> Option<Token>
 {
 	let index_before = *index;
 	
@@ -290,13 +331,13 @@ fn try_read_integer(src: &[char], index: &mut CharIndex) -> Option<Token>
 	
 	Some(Token
 	{
-		span: Span { start: index_before, end: *index },
+		span: Span::new(file.clone(), index_before, *index),
 		kind: TokenKind::Number(radix as usize, digits)
 	})
 }
 
 
-fn try_read_string(src: &[char], index: &mut CharIndex) -> Option<Token>
+fn try_read_string(file: &Rc<String>, src: &[char], index: &mut CharIndex) -> Option<Token>
 {
 	let index_before = *index;
 	
@@ -321,13 +362,13 @@ fn try_read_string(src: &[char], index: &mut CharIndex) -> Option<Token>
 	
 	Some(Token
 	{
-		span: Span { start: index_before, end: *index },
+		span: Span::new(file.clone(), index_before, *index),
 		kind: TokenKind::String(s)
 	})
 }
 
 
-fn try_read_operator(src: &[char], index: &mut CharIndex) -> Option<Token>
+fn try_read_operator(file: &Rc<String>, src: &[char], index: &mut CharIndex) -> Option<Token>
 {
 	let operators =
 	[
@@ -355,7 +396,7 @@ fn try_read_operator(src: &[char], index: &mut CharIndex) -> Option<Token>
 			index.advance_by(s.chars().count());
 			Some(Token
 			{
-				span: Span { start: index_before, end: *index },
+				span: Span::new(file.clone(), index_before, *index),
 				kind: TokenKind::Operator(s)
 			})
 		}
@@ -364,7 +405,7 @@ fn try_read_operator(src: &[char], index: &mut CharIndex) -> Option<Token>
 }
 
 
-fn try_read_linebreak(src: &[char], index: &mut CharIndex) -> Option<Token>
+fn try_read_linebreak(file: &Rc<String>, src: &[char], index: &mut CharIndex) -> Option<Token>
 {
 	let index_before = *index;
 	
@@ -374,20 +415,20 @@ fn try_read_linebreak(src: &[char], index: &mut CharIndex) -> Option<Token>
 	index.advance_line();
 	Some(Token
 	{
-		span: Span { start: index_before, end: *index },
+		span: Span::new(file.clone(), index_before, *index),
 		kind: TokenKind::LineBreak
 	})
 }
 
 
-fn read_error(src: &[char], index: &mut CharIndex) -> Token
+fn read_error(file: &Rc<String>, src: &[char], index: &mut CharIndex) -> Token
 {
 	let index_before = *index;
 	
 	index.advance();
 	Token
 	{
-		span: Span { start: index_before, end: *index },
+		span: Span::new(file.clone(), index_before, *index),
 		kind: TokenKind::Error(src[index.linear - 1])
 	}
 }

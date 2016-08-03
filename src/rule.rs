@@ -35,12 +35,7 @@ pub struct VariableType
 pub enum ProductionSegment
 {
 	Literal(BitVec),
-	Argument
-	{
-		index: usize,
-		leftmost_bit: usize,
-		rightmost_bit: usize
-	}
+	Argument(usize)
 }
 
 

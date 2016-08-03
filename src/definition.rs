@@ -22,7 +22,7 @@ pub fn parse(src_filename: &str, src: &[char]) -> Result<Definition, Error>
 		rules: Vec::new()
 	};
 	
-	let tokens = tokenizer::tokenize(src);
+	let tokens = tokenizer::tokenize(src_filename, src);
 	let mut parser = Parser::new(src_filename, &tokens);
 	try!(parse_directives(&mut def, &mut parser));
 	try!(parse_rules(&mut def, &mut parser));
@@ -41,7 +41,7 @@ fn parse_directives(def: &mut Definition, parser: &mut Parser) -> Result<(), Err
 		{
 			"align" => def.align_bits = try!(parser.expect_number()).number_usize(),
 			"address" => def.address_bits = try!(parser.expect_number()).number_usize(),
-			_ => return Err(parser.make_error(format!("unknown directive `{}`", directive.identifier()), directive.span))
+			_ => return Err(parser.make_error(format!("unknown directive `{}`", directive.identifier()), &directive.span))
 		}
 		
 		try!(parser.expect_separator_linebreak());
@@ -57,14 +57,14 @@ fn parse_rules(def: &mut Definition, parser: &mut Parser) -> Result<(), Error>
 	{
 		let mut rule = Rule::new();
 	
-		let rule_span = parser.current().span;
+		let rule_span = parser.current().span.clone();
 		
 		try!(parse_pattern(parser, &mut rule));
 		try!(parser.expect_operator("->"));
 		try!(parse_production(parser, &mut rule));
 		
 		if rule.production_bit_num % def.align_bits != 0
-			{ return Err(parser.make_error(format!("production is not aligned to `{}` bits", def.align_bits), rule_span)); }
+			{ return Err(parser.make_error(format!("production is not aligned to `{}` bits", def.align_bits), &rule_span)); }
 	
 		def.rules.push(rule);
 		
@@ -93,7 +93,7 @@ fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 			let typ = try!(parse_variable_type(parser));
 			
 			if rule.check_argument_exists(&name)
-				{ return Err(parser.make_error(format!("duplicate argument `{}`", name), name_token.span)); }
+				{ return Err(parser.make_error(format!("duplicate argument `{}`", name), &name_token.span)); }
 			
 			let arg_index = rule.add_argument(name.clone(), typ);
 			rule.pattern_segments.push(PatternSegment::Argument(arg_index));
@@ -108,7 +108,7 @@ fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 		}
 		
 		else
-			{ return Err(parser.make_error("expected pattern", parser.current().span)); }
+			{ return Err(parser.make_error("expected pattern", &parser.current().span)); }
 	}
 	
 	Ok(())
@@ -131,7 +131,7 @@ fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 			let bitvec = match BitVec::new_from_str_sized(size, radix, value_str)
 			{
 				Ok(bitvec) => bitvec,
-				Err(msg) => return Err(parser.make_error(msg, size_token.span))
+				Err(msg) => return Err(parser.make_error(msg, &size_token.span))
 			};
 			
 			rule.production_bit_num += bitvec.len();
@@ -145,7 +145,7 @@ fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 			let arg_index = match rule.get_argument(&name)
 			{
 				Some(arg_index) => arg_index,
-				None => return Err(parser.make_error(format!("unknown argument `{}`", name), name_token.span))
+				None => return Err(parser.make_error(format!("unknown argument `{}`", name), &name_token.span))
 			};
 			
 			let typ = rule.get_argument_type(arg_index);
@@ -153,29 +153,16 @@ fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 			let mut leftmost_bit = typ.bit_num - 1;
 			let mut rightmost_bit = 0;
 			
-			if parser.match_operator("[")
-			{
-				leftmost_bit = try!(parser.expect_number()).number_usize();
-				try!(parser.expect_operator(":"));
-				rightmost_bit = try!(parser.expect_number()).number_usize();
-				try!(parser.expect_operator("]"));
-			}
-			
 			rule.production_bit_num +=
 				if leftmost_bit > rightmost_bit
 					{ leftmost_bit - rightmost_bit + 1 }
 				else
 					{ rightmost_bit - leftmost_bit + 1 };
 			
-			rule.production_segments.push(ProductionSegment::Argument
-			{
-				index: arg_index,
-				leftmost_bit: leftmost_bit,
-				rightmost_bit: rightmost_bit
-			});
+			rule.production_segments.push(ProductionSegment::Argument(arg_index));
 		}
 		else
-			{ return Err(parser.make_error("expected production", parser.current().span)); }
+			{ return Err(parser.make_error("expected production", &parser.current().span)); }
 	}
 	
 	Ok(())
@@ -198,14 +185,14 @@ fn parse_variable_type(parser: &mut Parser) -> Result<VariableType, Error>
 		'u' => typ.signed = false,
 		'i' => typ.signed = true,
 		_ =>
-			{ return Err(parser.make_error("invalid type", ident_token.span)); }
+			{ return Err(parser.make_error("invalid type", &ident_token.span)); }
 	}
 	
 	match usize::from_str_radix(&ident[1..], 10)
 	{
 		Ok(bits) => typ.bit_num = bits,
 		Err(..) =>
-			{ return Err(parser.make_error("invalid type", ident_token.span)); }
+			{ return Err(parser.make_error("invalid type", &ident_token.span)); }
 	}
 	
 	Ok(typ)

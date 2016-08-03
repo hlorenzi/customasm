@@ -2,29 +2,29 @@ use std::collections::HashMap;
 use util::bitvec::BitVec;
 
 
-pub struct Manager
+pub struct LabelManager
 {
 	global_labels: Vec<GlobalLabel>,
 	name_to_index_map: HashMap<String, usize>
 }
 
 
-pub type Value = BitVec;
-pub type Context = usize;
+pub type LabelValue = BitVec;
+pub type LabelContext = usize;
 
 
 pub struct GlobalLabel
 {
-	value: Value,
-	local_labels: HashMap<String, Value>
+	value: LabelValue,
+	local_labels: HashMap<String, LabelValue>
 }
 
 
-impl Manager
+impl LabelManager
 {
-	pub fn new() -> Manager
+	pub fn new() -> LabelManager
 	{
-		let mut list = Manager
+		let mut list = LabelManager
 		{
 			global_labels: Vec::new(),
 			name_to_index_map: HashMap::new()
@@ -35,7 +35,7 @@ impl Manager
 	}
 	
 	
-	pub fn add_global(&mut self, name: String, value: Value)
+	pub fn add_global(&mut self, name: String, value: LabelValue)
 	{
 		self.name_to_index_map.insert(name, self.global_labels.len());
 		self.global_labels.push(GlobalLabel
@@ -46,20 +46,20 @@ impl Manager
 	}
 	
 	
-	pub fn add_local(&mut self, ctx: Context, name: String, value: Value)
+	pub fn add_local(&mut self, ctx: LabelContext, name: String, value: LabelValue)
 	{
 		let global_label = &mut self.global_labels[ctx as usize];
 		global_label.local_labels.insert(name, value);
 	}
 	
 	
-	pub fn get_cur_context(&self) -> Context
+	pub fn get_cur_context(&self) -> LabelContext
 	{
-		(self.global_labels.len() - 1) as Context
+		(self.global_labels.len() - 1) as LabelContext
 	}
 	
 	
-	pub fn get_global_value(&self, name: &str) -> Option<&Value>
+	pub fn get_global_value(&self, name: &str) -> Option<&LabelValue>
 	{
 		match self.name_to_index_map.get(name)
 		{
@@ -69,7 +69,7 @@ impl Manager
 	}
 	
 	
-	pub fn get_local_value(&self, ctx: Context, name: &str) -> Option<&Value>
+	pub fn get_local_value(&self, ctx: LabelContext, name: &str) -> Option<&LabelValue>
 	{
 		match self.global_labels[ctx as usize].local_labels.get(name)
 		{
@@ -89,7 +89,7 @@ impl Manager
 	}
 	
 	
-	pub fn does_local_exist(&self, ctx: Context, name: &str) -> bool
+	pub fn does_local_exist(&self, ctx: LabelContext, name: &str) -> bool
 	{
 		match self.global_labels[ctx as usize].local_labels.get(name)
 		{
