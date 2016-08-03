@@ -28,6 +28,23 @@ impl BitVec
 	}
 	
 	
+	pub fn new_from_bytes(bytes: &[u8]) -> BitVec
+	{
+		let mut bitvec = BitVec::new();
+		
+		for mut byte in bytes.iter().cloned()
+		{
+			for _ in 0..8
+			{
+				bitvec.push_bit(byte & 0x80 != 0);
+				byte <<= 1;
+			}
+		}
+		
+		bitvec
+	}
+	
+	
 	pub fn new_from_usize(mut value: usize) -> BitVec
 	{
 		let mut bitvec = BitVec::new();
@@ -87,7 +104,7 @@ impl BitVec
 	}
 
 
-	pub fn new_from_str_min(radix: usize, value_str: &str) -> Result<BitVec, String>
+	pub fn new_from_str_trimmed(radix: usize, value_str: &str) -> Result<BitVec, String>
 	{	
 		let mut bitvec = try!(BitVec::new_from_str(radix, value_str));
 		bitvec.trim();
@@ -97,7 +114,7 @@ impl BitVec
 
 	pub fn new_from_str_sized(bit_num: usize, radix: usize, value_str: &str) -> Result<BitVec, String>
 	{
-		let mut bitvec = try!(BitVec::new_from_str_min(radix, value_str));
+		let mut bitvec = try!(BitVec::new_from_str_trimmed(radix, value_str));
 		
 		if bitvec.len() > bit_num
 			{ return Err(format!("value `{}` does not fit given size of `{}`", value_str, bit_num)); }
@@ -264,28 +281,52 @@ impl BitVec
 	pub fn get_bin_dump(&self) -> String
 	{
 		let mut result = String::new();
-		let mut byte_index = 0;
 		
-		result.push_str("         | ");
+		result.push_str("          | ");
 		for i in 0..8
 			{ result.push_str(&format!("       {:01x} ", i)); }
 		
-		result.push_str("\n");
-		result.push_str("---------+-");
+		result.push_str("|\n");
+		result.push_str("----------+-");
 		for _ in 0..8
 			{ result.push_str("---------"); }
-			
+		
+		result.push_str("+--");
+		for _ in 0..8
+			{ result.push_str("-"); }
+		
 		result.push_str("\n");
-		while byte_index <= self.bits.len() / 8
+		
+		let mut byte_index = 0;
+		while byte_index * 8 < self.bits.len()
 		{
-			if byte_index % 0x8 == 0
-				{ result.push_str(&format!("{:08x} | ", byte_index)); }
-				
-			result.push_str(&format!("{:08b} ", self.get_byte(byte_index)));
-			byte_index += 1;
+			result.push_str(&format!(" {:08x} | ", byte_index));
 			
-			if byte_index % 0x8 == 0
-				{ result.push_str("\n"); }
+			for i in 0..8
+			{
+				for j in 0..8
+				{
+					if (byte_index + i) * 8 + j >= self.bits.len()
+						{ result.push('.'); }
+					else
+						{ result.push_str(&format!("{}", if self.get_bit((byte_index + i) * 8 + j) { "1" } else { "0" })); }
+				}
+				
+				result.push_str(" ");
+			}
+			
+			result.push_str("| ");
+			
+			for i in 0..8
+			{
+				if (byte_index + i) * 8 >= self.bits.len()
+					{ result.push('.'); }
+				else
+					{ result.push(get_byte_repr(self.get_byte(byte_index + i))); }
+			}
+			
+			result.push_str("\n");
+			byte_index += 8;
 		}
 		
 		result
@@ -311,28 +352,45 @@ impl BitVec
 	{
 		let mut result = String::new();
 		
-		result.push_str("         | ");
+		result.push_str("          | ");
 		for i in 0..16
 			{ result.push_str(&format!(" {:01x} ", i)); }
 		
-		result.push_str("\n");
-		result.push_str("---------+-");
+		result.push_str("|\n----------+-");
 		for _ in 0..16
 			{ result.push_str("---"); }
+		
+		result.push_str("+--");
+		for _ in 0..16
+			{ result.push_str("-"); }
 			
 		result.push_str("\n");
 		
-		let mut bit_index = 0;
-		while bit_index < self.bits.len()
+		let mut byte_index = 0;
+		while byte_index * 8 < self.bits.len()
 		{
-			if bit_index % 0x80 == 0
-				{ result.push_str(&format!("{:08x} | ", bit_index / 8)); }
-				
-			result.push_str(&format!("{:02x} ", self.get_byte(bit_index / 8)));
-			bit_index += 8;
+			result.push_str(&format!(" {:08x} | ", byte_index));
 			
-			if bit_index % 0x80 == 0
-				{ result.push_str("\n"); }
+			for i in 0..16
+			{
+				if (byte_index + i) * 8 >= self.bits.len()
+					{ result.push_str(".. "); }
+				else
+					{ result.push_str(&format!("{:02x} ", self.get_byte(byte_index + i))); }
+			}
+			
+			result.push_str("| ");
+			
+			for i in 0..16
+			{
+				if (byte_index + i) * 8 >= self.bits.len()
+					{ result.push('.'); }
+				else
+					{ result.push(get_byte_repr(self.get_byte(byte_index + i))); }
+			}
+			
+			result.push_str("\n");
+			byte_index += 16;
 		}
 		
 		result
@@ -375,4 +433,15 @@ impl fmt::Debug for BitVec
 	{
         write!(f, "{}", self.get_hex_dump())
     }
+}
+
+
+fn get_byte_repr(byte: u8) -> char
+{
+	if byte >= 0x20 && byte <= 0x7e
+		{ byte as char }
+	else if byte as char == '\n' || byte as char == '\r' || byte as char == '\t'
+		{ ' ' }
+	else
+		{ '.' }
 }

@@ -42,7 +42,7 @@ fn main()
 		"bindump" => driver::OutputFormat::BinDump,
 		"hexdump" => driver::OutputFormat::HexDump,
 		"" => driver::OutputFormat::HexDump,
-		_ => driver::error_exit("invalid format")
+		_ => util::misc::error_exit("invalid format")
 	};
 	
 	let out_file = match args.get_str("<out_file>")

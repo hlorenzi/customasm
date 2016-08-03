@@ -1,8 +1,9 @@
-use util::tokenizer::{Token, TokenKind, Span};
+use util::tokenizer::{Token, TokenKind, CharIndex, Span};
 
 
-pub struct Parser<'tok>
+pub struct Parser<'f, 'tok>
 {
+	filename: &'f str,
 	tokens: &'tok [Token],
 	index: usize,
 	end_token: Token
@@ -12,6 +13,7 @@ pub struct Parser<'tok>
 #[derive(Debug)]
 pub struct ParserError
 {
+	pub filename: String,
 	pub msg: String,
 	pub span: Span
 }
@@ -19,10 +21,11 @@ pub struct ParserError
 
 impl ParserError
 {
-	pub fn new(msg: String, span: Span) -> ParserError
+	pub fn new(filename: String, msg: String, span: Span) -> ParserError
 	{
 		ParserError
 		{
+			filename: filename,
 			msg: msg,
 			span: span
 		}
@@ -30,15 +33,15 @@ impl ParserError
 }
 
 
-impl<'tok> Parser<'tok>
+impl<'f, 'tok> Parser<'f, 'tok>
 {
-	pub fn new_from_index(tokens: &'tok [Token], start_index: usize) -> Parser<'tok>
+	pub fn new_from_index(filename: &'f str, tokens: &'tok [Token], start_index: usize) -> Parser<'f, 'tok>
 	{
 		let end_index =
 			if tokens.len() > 0
 				{ tokens[tokens.len() - 1].span.end }
 			else
-				{ 0 };
+				{ CharIndex::new() };
 				
 		let end_token = Token
 		{
@@ -48,6 +51,7 @@ impl<'tok> Parser<'tok>
 		
 		Parser
 		{
+			filename: filename,
 			tokens: tokens,
 			index: start_index,
 			end_token: end_token
@@ -55,15 +59,27 @@ impl<'tok> Parser<'tok>
 	}
 	
 	
-	pub fn new(tokens: &'tok [Token]) -> Parser<'tok>
+	pub fn new(filename: &'f str, tokens: &'tok [Token]) -> Parser<'f, 'tok>
 	{
-		Parser::new_from_index(tokens, 0)
+		Parser::new_from_index(filename, tokens, 0)
 	}
 	
 	
-	pub fn clone_from_current(&self) -> Parser<'tok>
+	pub fn clone_from_current(&self) -> Parser<'f, 'tok>
 	{
-		Parser::new_from_index(&self.tokens, self.index)
+		Parser::new_from_index(self.filename, self.tokens, self.index)
+	}
+	
+	
+	pub fn get_filename(&self) -> &'f str
+	{
+		self.filename
+	}
+	
+	
+	pub fn make_error(&self, msg: String, span: Span) -> ParserError
+	{
+		ParserError::new(self.filename.to_string(), msg, span)
 	}
 	
 	
@@ -115,7 +131,7 @@ impl<'tok> Parser<'tok>
 		if self.current().is_linebreak()
 			{ Ok(self.advance()) }
 		else
-			{ Err(ParserError::new("expected line break".to_string(), self.current().span)) }
+			{ Err(self.make_error("expected line break".to_string(), self.current().span)) }
 	}
 	
 	
@@ -124,7 +140,7 @@ impl<'tok> Parser<'tok>
 		if self.current().is_linebreak() || self.index >= self.tokens.len()
 			{ Ok(self.advance()) }
 		else
-			{ Err(ParserError::new("expected line break".to_string(), self.current().span)) }
+			{ Err(self.make_error("expected line break".to_string(), self.current().span)) }
 	}
 	
 	
@@ -133,7 +149,7 @@ impl<'tok> Parser<'tok>
 		if self.current().is_identifier()
 			{ Ok(self.advance()) }
 		else
-			{ Err(ParserError::new("expected identifier".to_string(), self.current().span)) }
+			{ Err(self.make_error("expected identifier".to_string(), self.current().span)) }
 	}
 	
 	
@@ -142,7 +158,16 @@ impl<'tok> Parser<'tok>
 		if self.current().is_number()
 			{ Ok(self.advance()) }
 		else
-			{ Err(ParserError::new("expected number".to_string(), self.current().span)) }
+			{ Err(self.make_error("expected number".to_string(), self.current().span)) }
+	}
+	
+	
+	pub fn expect_string(&mut self) -> Result<&Token, ParserError>
+	{
+		if self.current().is_string()
+			{ Ok(self.advance()) }
+		else
+			{ Err(self.make_error("expected string".to_string(), self.current().span)) }
 	}
 	
 	
@@ -151,7 +176,7 @@ impl<'tok> Parser<'tok>
 		if self.current().is_any_operator()
 			{ Ok(self.advance()) }
 		else
-			{ Err(ParserError::new("expected operator".to_string(), self.current().span)) }
+			{ Err(self.make_error("expected operator".to_string(), self.current().span)) }
 	}
 	
 	
@@ -163,6 +188,6 @@ impl<'tok> Parser<'tok>
 			Ok(())
 		}
 		else
-			{ Err(ParserError::new(format!("expected `{}`", op), self.current().span)) }
+			{ Err(self.make_error(format!("expected `{}`", op), self.current().span)) }
 	}
 }

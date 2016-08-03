@@ -12,7 +12,7 @@ pub struct Definition
 }
 
 
-pub fn parse(src: &[char]) -> Result<Definition, ParserError>
+pub fn parse(src_filename: &str, src: &[char]) -> Result<Definition, ParserError>
 {
 	let mut def = Definition
 	{
@@ -22,7 +22,7 @@ pub fn parse(src: &[char]) -> Result<Definition, ParserError>
 	};
 	
 	let tokens = tokenizer::tokenize(src);
-	let mut parser = Parser::new(&tokens);
+	let mut parser = Parser::new(src_filename, &tokens);
 	try!(parse_directives(&mut def, &mut parser));
 	try!(parse_rules(&mut def, &mut parser));
 	
@@ -40,7 +40,7 @@ fn parse_directives(def: &mut Definition, parser: &mut Parser) -> Result<(), Par
 		{
 			"align" => def.align_bits = try!(parser.expect_number()).number_usize(),
 			"address" => def.address_bits = try!(parser.expect_number()).number_usize(),
-			_ => return Err(ParserError::new(format!("unknown directive `{}`", directive.identifier()), directive.span))
+			_ => return Err(parser.make_error(format!("unknown directive `{}`", directive.identifier()), directive.span))
 		}
 		
 		try!(parser.expect_separator_linebreak());
@@ -63,7 +63,7 @@ fn parse_rules(def: &mut Definition, parser: &mut Parser) -> Result<(), ParserEr
 		try!(parse_production(parser, &mut rule));
 		
 		if rule.production_bit_num % def.align_bits != 0
-			{ return Err(ParserError::new(format!("production is not aligned to `{}` bits", def.align_bits), rule_span)); }
+			{ return Err(parser.make_error(format!("production is not aligned to `{}` bits", def.align_bits), rule_span)); }
 	
 		def.rules.push(rule);
 		
@@ -92,7 +92,7 @@ fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserError
 			let typ = try!(parse_variable_type(parser));
 			
 			if rule.check_argument_exists(&name)
-				{ return Err(ParserError::new(format!("duplicate argument `{}`", name), name_token.span)); }
+				{ return Err(parser.make_error(format!("duplicate argument `{}`", name), name_token.span)); }
 			
 			let arg_index = rule.add_argument(name.clone(), typ);
 			rule.pattern_segments.push(PatternSegment::Argument(arg_index));
@@ -107,7 +107,7 @@ fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserError
 		}
 		
 		else
-			{ return Err(ParserError::new("expected pattern".to_string(), parser.current().span)); }
+			{ return Err(parser.make_error("expected pattern".to_string(), parser.current().span)); }
 	}
 	
 	Ok(())
@@ -130,7 +130,7 @@ fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserEr
 			let bitvec = match BitVec::new_from_str_sized(size, radix, value_str)
 			{
 				Ok(bitvec) => bitvec,
-				Err(msg) => return Err(ParserError::new(msg, size_token.span))
+				Err(msg) => return Err(parser.make_error(msg, size_token.span))
 			};
 			
 			rule.production_bit_num += bitvec.len();
@@ -144,7 +144,7 @@ fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserEr
 			let arg_index = match rule.get_argument(&name)
 			{
 				Some(arg_index) => arg_index,
-				None => return Err(ParserError::new(format!("unknown argument `{}`", name), name_token.span))
+				None => return Err(parser.make_error(format!("unknown argument `{}`", name), name_token.span))
 			};
 			
 			let typ = rule.get_argument_type(arg_index);
@@ -174,7 +174,7 @@ fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), ParserEr
 			});
 		}
 		else
-			{ return Err(ParserError::new("expected production".to_string(), parser.current().span)); }
+			{ return Err(parser.make_error("expected production".to_string(), parser.current().span)); }
 	}
 	
 	Ok(())
@@ -189,7 +189,7 @@ fn parse_variable_type(parser: &mut Parser) -> Result<VariableType, ParserError>
 		signed: false
 	};
 	
-	let ident_token = try!(parser.expect_identifier());
+	let ident_token = try!(parser.expect_identifier()).clone();
 	let ident = ident_token.identifier();
 	
 	match ident.chars().next().unwrap()
@@ -197,14 +197,14 @@ fn parse_variable_type(parser: &mut Parser) -> Result<VariableType, ParserError>
 		'u' => typ.signed = false,
 		'i' => typ.signed = true,
 		_ =>
-			{ return Err(ParserError::new("invalid type".to_string(), ident_token.span)); }
+			{ return Err(parser.make_error("invalid type".to_string(), ident_token.span)); }
 	}
 	
 	match usize::from_str_radix(&ident[1..], 10)
 	{
 		Ok(bits) => typ.bit_num = bits,
 		Err(..) =>
-			{ return Err(ParserError::new("invalid type".to_string(), ident_token.span)); }
+			{ return Err(parser.make_error("invalid type".to_string(), ident_token.span)); }
 	}
 	
 	Ok(typ)

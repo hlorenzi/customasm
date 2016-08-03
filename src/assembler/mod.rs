@@ -5,8 +5,10 @@ use util::parser::{Parser, ParserError};
 use util::tokenizer;
 use util::tokenizer::Span;
 use util::bitvec::BitVec;
+use util::misc;
 use definition::Definition;
 use rule::{PatternSegment, ProductionSegment};
+use std::path::PathBuf;
 
 
 struct Assembler<'def>
@@ -50,7 +52,7 @@ enum Expression
 }
 
 
-pub fn assemble(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
+pub fn assemble(def: &Definition, src_filename: &str, src: &[char]) -> Result<BitVec, ParserError>
 {
 	let mut assembler = Assembler
 	{
@@ -63,20 +65,7 @@ pub fn assemble(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 		output_bits: BitVec::new()
 	};
 	
-	let tokens = tokenizer::tokenize(src);
-	let mut parser = Parser::new(&tokens);
-	
-	while !parser.is_over()
-	{
-		if parser.current().is_operator(".")
-			{ try!(translate_directive(&mut assembler, &mut parser)); }
-		else if parser.current().is_identifier() && parser.next(1).is_operator(":")
-			{ try!(translate_global_label(&mut assembler, &mut parser)); }
-		else if parser.current().is_operator("'") && parser.next(1).is_identifier() && parser.next(2).is_operator(":")
-			{ try!(translate_local_label(&mut assembler, &mut parser)); }
-		else
-			{ try!(translate_instruction(&mut assembler, &mut parser)); }
-	}
+	try!(translate_file(&mut assembler, src_filename, src));	
 	
 	let mut unresolved_insts = Vec::new();
 	unresolved_insts.append(&mut assembler.unresolved_instructions);
@@ -85,8 +74,8 @@ pub fn assemble(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 	{
 		match resolve_instruction(&assembler, &inst)
 		{
-			Ok(bits) => assembler.output_aligned(inst.output, &bits),			
-			Err(msg) => return Err(ParserError::new(msg, inst.span))
+			Ok(bits) => assembler.output_aligned_at(inst.output, &bits),			
+			Err(msg) => return Err(ParserError::new(src_filename.to_string(), msg, inst.span))
 		}
 	}
 	
@@ -97,8 +86,8 @@ pub fn assemble(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 	{
 		match resolve_expression(&assembler, &unres.expr)
 		{
-			Ok(bits) => assembler.output_aligned(unres.output, &bits.slice(unres.bit_num - 1, 0)),
-			Err(msg) => return Err(ParserError::new(msg, unres.span))
+			Ok(bits) => assembler.output_aligned_at(unres.output, &bits.slice(unres.bit_num - 1, 0)),
+			Err(msg) => return Err(ParserError::new(src_filename.to_string(), msg, unres.span))
 		}
 	}
 	
@@ -108,11 +97,41 @@ pub fn assemble(def: &Definition, src: &[char]) -> Result<BitVec, ParserError>
 
 impl<'def> Assembler<'def>
 {
-	pub fn output_aligned(&mut self, index: usize, bitvec: &BitVec)
+	pub fn output_aligned(&mut self, bitvec: &BitVec)
+	{
+		let aligned_index = self.cur_output * self.def.align_bits;
+		self.output_bits.set(aligned_index, bitvec);
+		self.cur_output += bitvec.len() / self.def.align_bits;
+		self.cur_address += bitvec.len() / self.def.align_bits;
+	}
+	
+	
+	pub fn output_aligned_at(&mut self, index: usize, bitvec: &BitVec)
 	{
 		let aligned_index = index * self.def.align_bits;
 		self.output_bits.set(aligned_index, bitvec);
 	}
+}
+
+
+fn translate_file(assembler: &mut Assembler, src_filename: &str, src: &[char]) -> Result<(), ParserError>
+{
+	let tokens = tokenizer::tokenize(src);
+	let mut parser = Parser::new(src_filename, &tokens);
+	
+	while !parser.is_over()
+	{
+		if parser.current().is_operator(".")
+			{ try!(translate_directive(assembler, &mut parser)); }
+		else if parser.current().is_identifier() && parser.next(1).is_operator(":")
+			{ try!(translate_global_label(assembler, &mut parser)); }
+		else if parser.current().is_operator("'") && parser.next(1).is_identifier() && parser.next(2).is_operator(":")
+			{ try!(translate_local_label(assembler, &mut parser)); }
+		else
+			{ try!(translate_instruction(assembler, &mut parser)); }
+	}
+	
+	Ok(())
 }
 
 
@@ -132,7 +151,7 @@ fn translate_directive(assembler: &mut Assembler, parser: &mut Parser) -> Result
 			Ok(bit_num) =>
 			{
 				if bit_num % assembler.def.align_bits != 0
-					{ return Err(ParserError::new(format!("literal is not aligned to `{}` bits", assembler.def.align_bits), directive_token.span)); }
+					{ return Err(parser.make_error(format!("literal is not aligned to `{}` bits", assembler.def.align_bits), directive_token.span)); }
 			
 				return translate_literal(assembler, parser, bit_num);
 			}
@@ -144,7 +163,23 @@ fn translate_directive(assembler: &mut Assembler, parser: &mut Parser) -> Result
 	{
 		"address" => assembler.cur_address = try!(parser.expect_number()).number_usize(),
 		"output" => assembler.cur_output = try!(parser.expect_number()).number_usize(),
-		_ => return Err(ParserError::new(format!("unknown directive `{}`", directive), directive_token.span))
+		"include" =>
+		{
+			let include_filename = try!(parser.expect_string()).string().clone();
+			let mut cur_path = PathBuf::from(parser.get_filename());
+			cur_path.set_file_name(&include_filename);
+			let include_chars = misc::read_file(&cur_path);
+			try!(translate_file(assembler, &cur_path.to_string_lossy().into_owned(), &include_chars));
+		}
+		"includebin" => 
+		{
+			let include_filename = try!(parser.expect_string()).string().clone();
+			let mut cur_path = PathBuf::from(parser.get_filename());
+			cur_path.set_file_name(&include_filename);
+			let include_bitvec = BitVec::new_from_bytes(&misc::read_file_bytes(&cur_path));
+			assembler.output_aligned(&include_bitvec);
+		}
+		_ => return Err(parser.make_error(format!("unknown directive `{}`", directive), directive_token.span))
 	}
 	
 	try!(parser.expect_separator_linebreak());
@@ -164,12 +199,10 @@ fn translate_literal(assembler: &mut Assembler, parser: &mut Parser, bit_num: us
 			let bits = match resolve_expression(assembler, &expr)
 			{
 				Ok(bits) => bits,
-				Err(msg) => return Err(ParserError::new(msg, span))
+				Err(msg) => return Err(parser.make_error(msg, span))
 			};
 			
-			let cur_output = assembler.cur_output;
-			assembler.output_aligned(cur_output, &bits.slice(bit_num - 1, 0));
-			
+			assembler.output_aligned(&bits.slice(bit_num - 1, 0));
 		}
 		else
 		{
@@ -181,10 +214,10 @@ fn translate_literal(assembler: &mut Assembler, parser: &mut Parser, bit_num: us
 				output: assembler.cur_output,
 				bit_num: bit_num
 			});
+			
+			assembler.cur_address += bit_num / assembler.def.align_bits;
+			assembler.cur_output += bit_num / assembler.def.align_bits;
 		}
-		
-		assembler.cur_address += bit_num / assembler.def.align_bits;
-		assembler.cur_output += bit_num / assembler.def.align_bits;
 		
 		if !parser.match_operator(",")
 			{ break; }
@@ -202,7 +235,7 @@ fn translate_global_label(assembler: &mut Assembler, parser: &mut Parser) -> Res
 	try!(parser.expect_operator(":"));
 	
 	if assembler.labels.does_global_exist(label)
-		{ return Err(ParserError::new(format!("duplicate global label `{}`", label), label_token.span)); }
+		{ return Err(parser.make_error(format!("duplicate global label `{}`", label), label_token.span)); }
 	
 	assembler.labels.add_global(
 		label.clone(),
@@ -221,7 +254,7 @@ fn translate_local_label(assembler: &mut Assembler, parser: &mut Parser) -> Resu
 	try!(parser.expect_operator(":"));
 	
 	if assembler.labels.does_local_exist(assembler.labels.get_cur_context(), label)
-		{ return Err(ParserError::new(format!("duplicate local label `{}`", label), label_token.span)); }
+		{ return Err(parser.make_error(format!("duplicate local label `{}`", label), label_token.span)); }
 	
 	let local_ctx = assembler.labels.get_cur_context();
 	assembler.labels.add_local(
@@ -234,7 +267,7 @@ fn translate_local_label(assembler: &mut Assembler, parser: &mut Parser) -> Resu
 }
 
 
-fn translate_instruction<'p, 'tok>(assembler: &mut Assembler, parser: &'p mut Parser<'tok>) -> Result<(), ParserError>
+fn translate_instruction<'p, 'f, 'tok>(assembler: &mut Assembler, parser: &'p mut Parser<'f, 'tok>) -> Result<(), ParserError>
 {
 	let mut maybe_inst = None;
 	let inst_span = parser.current().span;
@@ -275,8 +308,8 @@ fn translate_instruction<'p, 'tok>(assembler: &mut Assembler, parser: &'p mut Pa
 			{
 				match resolve_instruction(assembler, &inst)
 				{
-					Ok(bits) => assembler.output_aligned(inst.output, &bits),					
-					Err(msg) => return Err(ParserError::new(msg, inst.span))
+					Ok(bits) => assembler.output_aligned_at(inst.output, &bits),					
+					Err(msg) => return Err(parser.make_error(msg, inst.span))
 				}
 			}
 			else
@@ -285,7 +318,7 @@ fn translate_instruction<'p, 'tok>(assembler: &mut Assembler, parser: &'p mut Pa
 			}
 		}
 	
-		None => return Err(ParserError::new("no match found for instruction".to_string(), inst_span))
+		None => return Err(parser.make_error("no match found for instruction".to_string(), inst_span))
 	}
 	
 	try!(parser.expect_separator_linebreak());
@@ -359,18 +392,18 @@ fn parse_expression(assembler: &Assembler, parser: &mut Parser) -> Result<Expres
 	
 	else if parser.current().is_number()
 	{
-		let token = try!(parser.expect_number());
+		let token = try!(parser.expect_number()).clone();
 		let (radix, value_str) = token.number();
 		
-		match BitVec::new_from_str_min(radix, value_str)
+		match BitVec::new_from_str_trimmed(radix, value_str)
 		{
-			Err(msg) => Err(ParserError::new(msg, token.span)),
+			Err(msg) => Err(parser.make_error(msg, token.span)),
 			Ok(bitvec) => Ok(Expression::LiteralUInt(bitvec))
 		}
 	}
 	
 	else
-		{ Err(ParserError::new("expected expression".to_string(), parser.current().span)) }
+		{ Err(parser.make_error("expected expression".to_string(), parser.current().span)) }
 }
 
 

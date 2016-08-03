@@ -1,8 +1,17 @@
 #[derive(Debug, Copy, Clone)]
+pub struct CharIndex
+{
+	pub linear: usize,
+	pub line: usize,
+	pub column: usize
+}
+
+
+#[derive(Debug, Copy, Clone)]
 pub struct Span
 {
-	pub start: usize,
-	pub end: usize
+	pub start: CharIndex,
+	pub end: CharIndex
 }
 
 
@@ -21,6 +30,7 @@ pub enum TokenKind
 	LineBreak,
 	Identifier(String),
 	Number(usize, String),
+	String(String),
 	Operator(&'static str),
 	End
 }
@@ -29,24 +39,29 @@ pub enum TokenKind
 pub fn tokenize(src: &[char]) -> Vec<Token>
 {
 	let mut tokens = Vec::new();
-	let mut index = 0;
+	let mut index = CharIndex::new();
 	let mut last_was_linebreak = true;
 	
-	while index < src.len()
+	while index.linear < src.len()
 	{
-		if is_whitespace(src[index]) ||
-			(last_was_linebreak && src[index] == '\n')
+		if is_whitespace(src[index.linear])
 		{
-			index += 1;
+			index.advance();
+			continue;
+		}
+		else if last_was_linebreak && src[index.linear] == '\n'
+		{
+			index.advance_line();
 			continue;
 		}
 	
 		let token =
 			try_read_identifier(src, &mut index).unwrap_or_else(||
 			try_read_integer(src, &mut index).unwrap_or_else(||
+			try_read_string(src, &mut index).unwrap_or_else(||
 			try_read_linebreak(src, &mut index).unwrap_or_else(||
 			try_read_operator(src, &mut index).unwrap_or_else(||
-			read_error(src, &mut index)))));
+			read_error(src, &mut index))))));
 		
 		last_was_linebreak = match token.kind
 		{
@@ -61,30 +76,38 @@ pub fn tokenize(src: &[char]) -> Vec<Token>
 }
 
 
-impl Span
+impl CharIndex
 {
-	pub fn get_line_column(&self, src: &[char]) -> (usize, usize)
+	pub fn new() -> CharIndex
 	{
-		let mut index = 0;
-		let mut line = 1;
-		let mut column = 1;
-		
-		while index < src.len() && index < self.start
+		CharIndex
 		{
-			if src[index] == '\n'
-			{
-				line += 1;
-				column = 1;
-			}
-			else
-			{
-				column += 1;
-			}
-			
-			index += 1;
+			linear: 0,
+			line: 1,
+			column: 1
 		}
-		
-		(line, column)
+	}
+	
+	
+	pub fn advance(&mut self)
+	{
+		self.linear += 1;
+		self.column += 1;
+	}
+	
+	
+	pub fn advance_by(&mut self, columns: usize)
+	{
+		self.linear += columns;
+		self.column += columns;
+	}
+	
+	
+	pub fn advance_line(&mut self)
+	{
+		self.linear += 1;
+		self.line += 1;
+		self.column = 1;
 	}
 }
 
@@ -162,6 +185,26 @@ impl Token
 	}
 	
 	
+	pub fn is_string(&self) -> bool
+	{
+		match self.kind
+		{
+			TokenKind::String(..) => true,
+			_ => false
+		}
+	}
+	
+	
+	pub fn string(&self) -> &String
+	{
+		match self.kind
+		{
+			TokenKind::String(ref s) => &s,
+			_ => panic!("not a string")
+		}
+	}
+	
+	
 	pub fn is_any_operator(&self) -> bool
 	{
 		match self.kind
@@ -193,42 +236,42 @@ impl Token
 }
 
 
-fn try_read_identifier(src: &[char], index: &mut usize) -> Option<Token>
+fn try_read_identifier(src: &[char], index: &mut CharIndex) -> Option<Token>
 {
-	let span_start = *index;
+	let index_before = *index;
 	
-	if !is_identifier_start(src[*index])
+	if !is_identifier_start(src[index.linear])
 		{ return None; }
 
 	let mut identifier = String::new();
-	while *index < src.len() && is_identifier_mid(src[*index])
+	while index.linear < src.len() && is_identifier_mid(src[index.linear])
 	{
-		identifier.push(src[*index]);
-		*index += 1;
+		identifier.push(src[index.linear]);
+		index.advance();
 	}
 	
 	Some(Token
 	{
-		span: Span { start: span_start, end: *index },
+		span: Span { start: index_before, end: *index },
 		kind: TokenKind::Identifier(identifier)
 	})
 }
 
 
-fn try_read_integer(src: &[char], index: &mut usize) -> Option<Token>
+fn try_read_integer(src: &[char], index: &mut CharIndex) -> Option<Token>
 {
-	let span_start = *index;
+	let index_before = *index;
 	
-	if !src[*index].is_digit(10)
+	if !src[index.linear].is_digit(10)
 		{ return None; }
 
 	let radix =
-		if src[*index] == '0' && *index + 1 < src.len()
+		if src[index.linear] == '0' && index.linear + 1 < src.len()
 		{
-			match src[*index + 1]
+			match src[index.linear + 1]
 			{
-				'b' => { *index += 2; 2 }
-				'x' => { *index += 2; 16 }
+				'b' => { index.advance_by(2); 2 }
+				'x' => { index.advance_by(2); 16 }
 				_ => 10
 			}
 		}
@@ -236,24 +279,55 @@ fn try_read_integer(src: &[char], index: &mut usize) -> Option<Token>
 			{ 10 };
 	
 	let mut digits = String::new();
-	while *index < src.len()
+	while index.linear < src.len()
 	{
-		if !src[*index].is_digit(radix) && src[*index] != '_'
+		if !src[index.linear].is_digit(radix) && src[index.linear] != '_'
 			{ break; }
 		
-		digits.push(src[*index]);
-		*index += 1;
+		digits.push(src[index.linear]);
+		index.advance();
 	}
 	
 	Some(Token
 	{
-		span: Span { start: span_start, end: *index },
+		span: Span { start: index_before, end: *index },
 		kind: TokenKind::Number(radix as usize, digits)
 	})
 }
 
 
-fn try_read_operator(src: &[char], index: &mut usize) -> Option<Token>
+fn try_read_string(src: &[char], index: &mut CharIndex) -> Option<Token>
+{
+	let index_before = *index;
+	
+	if src[index.linear] != '\"' // "
+		{ return None; }
+		
+	index.advance();
+
+	let mut s = String::new();
+	while index.linear < src.len() && src[index.linear] != '\"' // "
+	{
+		s.push(src[index.linear]);
+		
+		if src[index.linear] == '\n'
+			{ index.advance_line(); }
+		else
+			{ index.advance(); }
+	}
+	
+	if src[index.linear] == '\"' // "
+		{ index.advance(); }
+	
+	Some(Token
+	{
+		span: Span { start: index_before, end: *index },
+		kind: TokenKind::String(s)
+	})
+}
+
+
+fn try_read_operator(src: &[char], index: &mut CharIndex) -> Option<Token>
 {
 	let operators =
 	[
@@ -267,7 +341,7 @@ fn try_read_operator(src: &[char], index: &mut usize) -> Option<Token>
 	{
 		for (i, c) in op.chars().enumerate()
 		{
-			if *index + i >= src.len() || src[*index + i] != c
+			if index.linear + i >= src.len() || src[index.linear + i] != c
 				{ return false; }
 		}
 		true
@@ -277,11 +351,11 @@ fn try_read_operator(src: &[char], index: &mut usize) -> Option<Token>
 	{
 		Some(s) =>
 		{
-			let len = s.chars().count();
-			*index += len;
+			let index_before = *index;
+			index.advance_by(s.chars().count());
 			Some(Token
 			{
-				span: Span { start: *index - len, end: *index },
+				span: Span { start: index_before, end: *index },
 				kind: TokenKind::Operator(s)
 			})
 		}
@@ -290,27 +364,31 @@ fn try_read_operator(src: &[char], index: &mut usize) -> Option<Token>
 }
 
 
-fn try_read_linebreak(src: &[char], index: &mut usize) -> Option<Token>
+fn try_read_linebreak(src: &[char], index: &mut CharIndex) -> Option<Token>
 {
-	if src[*index] != '\n'
+	let index_before = *index;
+	
+	if src[index.linear] != '\n'
 		{ return None; }
-
-	*index += 1;
+	
+	index.advance_line();
 	Some(Token
 	{
-		span: Span { start: *index - 1, end: *index },
+		span: Span { start: index_before, end: *index },
 		kind: TokenKind::LineBreak
 	})
 }
 
 
-fn read_error(src: &[char], index: &mut usize) -> Token
+fn read_error(src: &[char], index: &mut CharIndex) -> Token
 {
-	*index += 1;
+	let index_before = *index;
+	
+	index.advance();
 	Token
 	{
-		span: Span { start: *index - 1, end: *index },
-		kind: TokenKind::Error(src[*index - 1])
+		span: Span { start: index_before, end: *index },
+		kind: TokenKind::Error(src[index.linear - 1])
 	}
 }
 

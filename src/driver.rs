@@ -1,9 +1,9 @@
 use definition;
 use assembler;
-use std::iter::Iterator;
+use util::misc;
 use std::fs::File;
-use std::io::{Read, Write};
-use std::process::exit;
+use std::io::Write;
+use std::path::PathBuf;
 
 
 pub struct DriverOptions<'s>
@@ -31,33 +31,21 @@ pub fn driver_main(opt: &DriverOptions)
 	if !opt.quiet
 		{ println!("reading definition..."); }
 	
-	let def_chars = read_file(opt.def_file);
-	let def = match definition::parse(&def_chars)
+	let def_chars = misc::read_file(&PathBuf::from(opt.def_file));
+	let def = match definition::parse(&opt.def_file, &def_chars)
 	{
 		Ok(def) => def,
-		Err(err) =>
-		{
-			let (line, column) = err.span.get_line_column(&def_chars);
-			println!("");
-			println!("{}:{}:{}: error: {}", opt.def_file, line, column, err.msg);
-			return;
-		}
+		Err(err) => misc::error_exit(&format!("{}:{}:{}: error: {}", opt.def_file, err.span.start.line, err.span.start.column, err.msg))
 	};
 	
 	if !opt.quiet
 		{ println!("assembling..."); }
 	
-	let asm_chars = read_file(opt.asm_file);
-	let output_bitvec = match assembler::assemble(&def, &asm_chars)
+	let asm_chars = misc::read_file(&PathBuf::from(opt.asm_file));
+	let output_bitvec = match assembler::assemble(&def, &opt.asm_file, &asm_chars)
 	{
 		Ok(output_bitvec) => output_bitvec,
-		Err(err) =>
-		{
-			let (line, column) = err.span.get_line_column(&asm_chars);
-			println!("");
-			println!("{}:{}:{}: error: {}", opt.asm_file, line, column, err.msg);
-			return;
-		}
+		Err(err) => misc::error_exit(&format!("{}:{}:{}: error: {}", err.filename, err.span.start.line, err.span.start.column, err.msg))
 	};
 	
 	let output = match opt.out_format
@@ -76,13 +64,15 @@ pub fn driver_main(opt: &DriverOptions)
 			let mut out_file = match File::create(filename)
 			{
 				Ok(file) => file,
-				Err(err) => error_exit(&format!("{}: error: {}", filename, err))
+				Err(err) => misc::error_exit(&format!("{}: error: {}", filename, err))
 			};
+			
 			match out_file.write_all(&output)
 			{
 				Ok(..) => { }
-				Err(err) => error_exit(&format!("{}: error: {}", filename, err))
-			}
+				Err(err) => misc::error_exit(&format!("{}: error: {}", filename, err))
+			};
+			
 			if !opt.quiet
 				{ println!("success"); }
 		}
@@ -90,33 +80,15 @@ pub fn driver_main(opt: &DriverOptions)
 		None =>
 		{
 			if !opt.quiet
-				{ println!("output:"); }
+			{
+				println!("output:");
+				println!("");
+			}
 			
-			print!("{}", String::from_utf8_lossy(&output))
+			print!("{}", String::from_utf8_lossy(&output));
+			
+			if !opt.quiet
+				{ println!(""); }
 		}
 	};
-}
-
-
-pub fn error_exit(msg: &str) -> !
-{
-	println!("{}", msg);
-	exit(1);
-}
-
-
-fn read_file(filename: &str) -> Vec<char>
-{
-	let mut file = match File::open(filename)
-	{
-		Ok(file) => file,
-		Err(err) => error_exit(&format!("{}: error: {}", filename, err))
-	};
-
-	let mut s = String::new();
-	match file.read_to_string(&mut s)
-	{
-		Ok(..) => s.chars().collect::<Vec<char>>(),
-		Err(err) => error_exit(&format!("{}: error: {}", filename, err))
-	}
 }
