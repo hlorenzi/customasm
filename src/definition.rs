@@ -1,8 +1,8 @@
-use util::bitvec::BitVec;
 use util::error::Error;
+use util::expression::Expression;
 use util::parser::Parser;
 use util::tokenizer;
-use rule::{Rule, PatternSegment, ProductionSegment, VariableType};
+use rule::{Rule, PatternSegment, VariableType};
 
 
 pub struct Definition
@@ -56,16 +56,11 @@ fn parse_rules(def: &mut Definition, parser: &mut Parser) -> Result<(), Error>
 	while !parser.is_over()
 	{
 		let mut rule = Rule::new();
-	
-		let rule_span = parser.current().span.clone();
 		
 		try!(parse_pattern(parser, &mut rule));
 		try!(parser.expect_operator("->"));
-		try!(parse_production(parser, &mut rule));
+		try!(parse_production(def, parser, &mut rule));
 		
-		if rule.production_bit_num % def.align_bits != 0
-			{ return Err(parser.make_error(format!("production is not aligned to `{}` bits", def.align_bits), &rule_span)); }
-	
 		def.rules.push(rule);
 		
 		try!(parser.expect_separator_linebreak());
@@ -115,54 +110,27 @@ fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 }
 
 
-fn parse_production(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
+fn parse_production(def: &mut Definition, parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 {
+	let begin_span = parser.current().span.clone();
+	
 	while !parser.current().is_linebreak_or_end()
 	{
-		if parser.current().is_number()
+		let expr = try!(Expression::new_by_parsing_checked(parser, &|name| rule.check_argument_exists(name)));
+		
+		rule.production_bit_num += match expr.get_fixed_bit_num()
 		{
-			let size_token = try!(parser.expect_number()).clone();
-			let size = size_token.number_usize();
-			
-			try!(parser.expect_operator("'"));
-			let number_token = try!(parser.expect_number()).clone();
-			let (radix, value_str) = number_token.number();
-			
-			let bitvec = match BitVec::new_from_str_sized(size, radix, value_str)
-			{
-				Ok(bitvec) => bitvec,
-				Err(msg) => return Err(parser.make_error(msg, &size_token.span))
-			};
-			
-			rule.production_bit_num += bitvec.len();
-			rule.production_segments.push(ProductionSegment::Literal(bitvec));
-		}
-		else if parser.current().is_identifier()
-		{
-			let name_token = try!(parser.expect_identifier()).clone();
-			let name = name_token.identifier();
-			
-			let arg_index = match rule.get_argument(&name)
-			{
-				Some(arg_index) => arg_index,
-				None => return Err(parser.make_error(format!("unknown argument `{}`", name), &name_token.span))
-			};
-			
-			let typ = rule.get_argument_type(arg_index);
-			
-			let mut leftmost_bit = typ.bit_num - 1;
-			let mut rightmost_bit = 0;
-			
-			rule.production_bit_num +=
-				if leftmost_bit > rightmost_bit
-					{ leftmost_bit - rightmost_bit + 1 }
-				else
-					{ rightmost_bit - leftmost_bit + 1 };
-			
-			rule.production_segments.push(ProductionSegment::Argument(arg_index));
-		}
-		else
-			{ return Err(parser.make_error("expected production", &parser.current().span)); }
+			Some(bit_num) => bit_num,
+			None => return Err(Error::new_with_span("expression has no fixed size; use a bit slice", expr.span.clone()))
+		};
+		
+		rule.production_segments.push(expr);
+	}
+	
+	if rule.production_bit_num % def.align_bits != 0
+	{
+		let full_span = begin_span.join(&parser.current().span);
+		return Err(Error::new_with_span(format!("production is not aligned to `{}` bits", def.align_bits), full_span));
 	}
 	
 	Ok(())

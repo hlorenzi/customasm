@@ -1,11 +1,11 @@
-use util::bitvec::BitVec;
+use util::expression::Expression;
 
 
 pub struct Rule
 {
 	pub pattern_segments: Vec<PatternSegment>,
 	pub pattern_args: Vec<Argument>,
-	pub production_segments: Vec<ProductionSegment>,
+	pub production_segments: Vec<Expression>,
 	pub production_bit_num: usize
 }
 
@@ -29,13 +29,6 @@ pub struct VariableType
 {
 	pub bit_num: usize,
 	pub signed: bool
-}
-
-
-pub enum ProductionSegment
-{
-	Literal(BitVec),
-	Argument(usize)
 }
 
 

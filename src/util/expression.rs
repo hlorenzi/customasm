@@ -1,14 +1,13 @@
 use util::bitvec::BitVec;
 use util::error::Error;
-use util::label::LabelContext;
 use util::parser::Parser;
 use util::tokenizer::Span;
 
 
 pub struct Expression
 {
-	span: Span,
-	term: ExpressionTerm
+	pub span: Span,
+	pub term: ExpressionTerm
 }
 
 
@@ -33,14 +32,15 @@ pub enum ExpressionTerm
 
 struct ExpressionParser<'p, 'f: 'p, 'tok: 'p>
 {
-	parser: &'p mut Parser<'f, 'tok>
+	parser: &'p mut Parser<'f, 'tok>,
+	check_var: Option<&'p Fn(&str) -> bool>
 }
 
 
-pub struct ExpressionResolver<'owner>
+pub struct ExpressionResolver<'owner, 's: 'owner>
 {
-	get_global: &'owner Fn(&str) -> Option<&'owner BitVec>,
-	get_local: Option<&'owner Fn(&str) -> Option<&'owner BitVec>>
+	get_global: &'owner Fn(&'s str) -> Option<BitVec>,
+	get_local: Option<&'owner Fn(&'s str) -> Option<BitVec>>
 }
 
 
@@ -48,16 +48,25 @@ impl Expression
 {
 	pub fn new_by_parsing<'p, 'f: 'p, 'tok: 'p>(parser: &'p mut Parser<'f, 'tok>) -> Result<Expression, Error>
 	{
-		let mut expr_parser = ExpressionParser { parser: parser };
+		let mut expr_parser = ExpressionParser { parser: parser, check_var: None };
 		expr_parser.parse()
 	}
 	
 	
-	pub fn can_resolve(&self, resolver: &ExpressionResolver) -> bool
+	pub fn new_by_parsing_checked<'p, 'f: 'p, 'tok: 'p>(
+		parser: &'p mut Parser<'f, 'tok>,
+		check_var: &Fn(&str) -> bool) -> Result<Expression, Error>
+	{
+		let mut expr_parser = ExpressionParser { parser: parser, check_var: Some(check_var) };
+		expr_parser.parse()
+	}
+	
+	
+	pub fn can_resolve<'a, 'b>(&'a self, resolver: &ExpressionResolver<'b, 'a>) -> bool
 	{
 		match &self.term
 		{
-			&ExpressionTerm::LiteralUInt(_)       => true,
+			&ExpressionTerm::LiteralUInt(_)           => true,
 			&ExpressionTerm::GlobalVariable(ref name) => (resolver.get_global)(&name).is_some(),
 			&ExpressionTerm::LocalVariable(ref name)  =>
 				if resolver.get_local.is_none()
@@ -80,7 +89,24 @@ impl Expression
 	}
 	
 	
-	pub fn get_minimum_bit_num(&self, resolver: &ExpressionResolver, undeclared_size: usize) -> usize
+	pub fn get_fixed_bit_num(&self) -> Option<usize>
+	{
+		match &self.term
+		{
+			&ExpressionTerm::LiteralUInt(ref bitvec) => Some(bitvec.len()),
+			
+			&ExpressionTerm::Slice(_, left, right) =>
+				if left > right
+					{ Some(left - right + 1) }
+				else
+					{ Some(right - left + 1) },
+					
+			_ => None
+		}
+	}
+	
+	
+	pub fn get_minimum_bit_num<'a, 'b>(&'a self, resolver: &ExpressionResolver<'b, 'a>, undeclared_size: usize) -> usize
 	{
 		match &self.term
 		{
@@ -105,7 +131,7 @@ impl Expression
 					}
 				},
 			
-			&ExpressionTerm::Slice(ref expr, left, right) =>
+			&ExpressionTerm::Slice(_, left, right) =>
 				if left > right
 					{ left - right + 1 }
 				else
@@ -116,7 +142,7 @@ impl Expression
 	}
 	
 	
-	pub fn resolve(&self, resolver: &ExpressionResolver) -> Result<BitVec, Error>
+	pub fn resolve<'a, 'b>(&'a self, resolver: &ExpressionResolver<'b, 'a>) -> Result<BitVec, Error>
 	{
 		match &self.term
 		{
@@ -125,7 +151,7 @@ impl Expression
 			&ExpressionTerm::GlobalVariable(ref name) =>
 				match (resolver.get_global)(&name)
 				{
-					Some(bitvec) => Ok(bitvec.clone()),
+					Some(bitvec) => Ok(bitvec),
 					None => Err(Error::new_with_span(format!("undeclared `{}`", name), self.span.clone()))
 				},
 				
@@ -136,7 +162,7 @@ impl Expression
 				{
 					match resolver.get_local.unwrap()(&name)
 					{
-						Some(bitvec) => Ok(bitvec.clone()),
+						Some(bitvec) => Ok(bitvec),
 						None => Err(Error::new_with_span(format!("undeclared local `{}`", name), self.span.clone()))
 					}
 				},
@@ -157,11 +183,11 @@ impl Expression
 }
 
 
-impl<'owner> ExpressionResolver<'owner>
+impl<'owner, 's> ExpressionResolver<'owner, 's>
 {
 	pub fn new(
-		get_global: &'owner Fn(&str) -> Option<&'owner BitVec>,
-		get_local: &'owner Fn(&str) -> Option<&'owner BitVec>) -> ExpressionResolver<'owner>
+		get_global: &'owner Fn(&'s str) -> Option<BitVec>,
+		get_local: &'owner Fn(&'s str) -> Option<BitVec>) -> ExpressionResolver<'owner, 's>
 	{
 		ExpressionResolver
 		{
@@ -171,7 +197,7 @@ impl<'owner> ExpressionResolver<'owner>
 	}
 	
 	
-	pub fn new_without_locals(get_global: &'owner Fn(&str) -> Option<&'owner BitVec>) -> ExpressionResolver<'owner>
+	pub fn new_without_locals(get_global: &'owner Fn(&'s str) -> Option<BitVec>) -> ExpressionResolver<'owner, 's>
 	{
 		ExpressionResolver
 		{
@@ -229,7 +255,7 @@ impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
 	
 	fn parse_multiplication_term(&mut self) -> Result<Expression, Error>
 	{
-		let mut lhs = try!(self.parse_leaf_term());
+		let mut lhs = try!(self.parse_slice_term());
 		
 		loop
 		{
@@ -243,7 +269,7 @@ impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
 			
 			self.parser.advance();
 			
-			let rhs = try!(self.parse_leaf_term());
+			let rhs = try!(self.parse_slice_term());
 			
 			let span = lhs.span.join(&rhs.span);
 			
@@ -264,14 +290,46 @@ impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
 	}
 	
 	
+	fn parse_slice_term(&mut self) -> Result<Expression, Error>
+	{
+		let expr = try!(self.parse_leaf_term());
+		
+		if self.parser.current().is_operator("[")
+		{
+			self.parser.advance();
+			let leftmost_bit = try!(self.parser.expect_number()).number_usize();
+			try!(self.parser.expect_operator(":"));
+			let rightmost_bit = try!(self.parser.expect_number()).number_usize();
+			try!(self.parser.expect_operator("]"));
+			
+			Ok(Expression
+			{
+				span: expr.span.join(&self.parser.current().span),
+				term: ExpressionTerm::Slice(Box::new(expr), leftmost_bit, rightmost_bit)
+			})
+		}
+		else
+			{ Ok(expr) }
+	}
+	
+	
 	fn parse_leaf_term(&mut self) -> Result<Expression, Error>
 	{
 		if self.parser.current().is_identifier()
 		{
+			let token = try!(self.parser.expect_identifier()).clone();
+			let ident = token.identifier().clone();
+			
+			if let Some(check_var) = self.check_var
+			{
+				if !check_var(&ident)
+					{ return Err(Error::new_with_span(format!("unknown variable `{}`", ident), token.span.clone())); }
+			}
+			
 			Ok(Expression
 			{
 				span: self.parser.current().span.clone(),
-				term: ExpressionTerm::GlobalVariable(try!(self.parser.expect_identifier()).identifier().clone())
+				term: ExpressionTerm::GlobalVariable(ident)
 			})
 		}
 		
@@ -288,18 +346,38 @@ impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
 		
 		else if self.parser.current().is_number()
 		{
+			let size = 
+				if self.parser.next(1).is_operator("'")
+				{
+					let size = try!(self.parser.expect_number()).number_usize();
+					try!(self.parser.expect_operator("'"));
+					size
+				}
+				else
+					{ 0 };
+					
 			let token = try!(self.parser.expect_number()).clone();
 			let (radix, value_str) = token.number();
 			
 			match BitVec::new_from_str_trimmed(radix, value_str)
 			{
 				Err(msg) => Err(self.parser.make_error(msg, &token.span)),
-				Ok(bitvec) => 
+				Ok(mut bitvec) =>
+				{
+					if size != 0
+					{
+						if bitvec.len() > size
+							{ return Err(Error::new_with_span("value does not fit given size", token.span.clone())); }
+					
+						bitvec.zero_extend(size);
+					}
+				
 					Ok(Expression
 					{
 						span: token.span.clone(),
 						term: ExpressionTerm::LiteralUInt(bitvec)
 					})
+				}
 			}
 		}
 		

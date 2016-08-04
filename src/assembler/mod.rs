@@ -6,8 +6,7 @@ use util::label::{LabelManager, LabelContext};
 use util::misc;
 use util::parser::Parser;
 use util::tokenizer;
-use util::tokenizer::Span;
-use rule::{PatternSegment, ProductionSegment};
+use rule::PatternSegment;
 use std::path::PathBuf;
 
 
@@ -26,7 +25,6 @@ struct Assembler<'def>
 
 struct Instruction
 {
-	span: Span,
 	rule_index: usize,
 	label_ctx: LabelContext,
 	address: usize,
@@ -72,17 +70,17 @@ pub fn assemble(def: &Definition, src_filename: &str, src: &[char]) -> Result<Bi
 		}
 	}
 	
-	/*let mut unresolved_exprs = Vec::new();
+	let mut unresolved_exprs = Vec::new();
 	unresolved_exprs.append(&mut assembler.unresolved_expressions);
 	
 	for unres in unresolved_exprs.iter()
 	{
-		match unres.expr.resolve(&assembler)
+		match assembler.resolve_expr(&unres.expr, unres.label_ctx)
 		{
 			Ok(bits) => assembler.output_aligned_at(unres.output, &bits.slice(unres.bit_num - 1, 0)),
-			Err(msg) => return Err(Error::new_with_file_span(src_filename, msg, unres.span))
+			Err(err) => return Err(err)
 		}
-	}*/
+	}
 	
 	Ok(assembler.output_bits)
 }
@@ -110,8 +108,8 @@ impl<'def> Assembler<'def>
 	{
 		expr.can_resolve(
 			&ExpressionResolver::new(
-				&|name| self.labels.get_global_value(name).map(|v| v as &BitVec),
-				&|name| self.labels.get_local_value(ctx, name).map(|v| v as &BitVec)))
+				&|name| self.labels.get_global_value(name).map(|v| v.clone()),
+				&|name| self.labels.get_local_value(ctx, name).map(|v| v.clone())))
 	}
 	
 	
@@ -119,8 +117,8 @@ impl<'def> Assembler<'def>
 	{
 		expr.get_minimum_bit_num(
 			&ExpressionResolver::new(
-				&|name| self.labels.get_global_value(name).map(|v| v as &BitVec),
-				&|name| self.labels.get_local_value(ctx, name).map(|v| v as &BitVec)),
+				&|name| self.labels.get_global_value(name).map(|v| v.clone()),
+				&|name| self.labels.get_local_value(ctx, name).map(|v| v.clone())),
 			self.def.address_bits)
 	}
 	
@@ -129,8 +127,8 @@ impl<'def> Assembler<'def>
 	{
 		expr.resolve(
 			&ExpressionResolver::new(
-				&|name| self.labels.get_global_value(name).map(|v| v as &BitVec),
-				&|name| self.labels.get_local_value(ctx, name).map(|v| v as &BitVec)))
+				&|name| self.labels.get_global_value(name).map(|v| v.clone()),
+				&|name| self.labels.get_local_value(ctx, name).map(|v| v.clone())))
 	}
 }
 
@@ -360,7 +358,6 @@ fn try_match_rule(assembler: &mut Assembler, parser: &mut Parser, rule_index: us
 	
 	let mut inst = Instruction
 	{
-		span: parser.current().span.clone(),
 		label_ctx: assembler.labels.get_cur_context(),
 		rule_index: rule_index,
 		address: assembler.cur_address,
@@ -408,18 +405,10 @@ fn try_match_rule(assembler: &mut Assembler, parser: &mut Parser, rule_index: us
 
 fn can_resolve_instruction(assembler: &Assembler, inst: &Instruction) -> bool
 {
-	for segment in assembler.def.rules[inst.rule_index].production_segments.iter()
+	for expr in inst.arguments.iter()
 	{
-		match segment
-		{
-			&ProductionSegment::Literal(..) => { }
-			
-			&ProductionSegment::Argument(index) =>
-			{
-				if !assembler.can_resolve_expr(&inst.arguments[index], inst.label_ctx)
-					{ return false; }
-			}
-		}
+		if !assembler.can_resolve_expr(expr, inst.label_ctx)
+			{ return false; }
 	}
 	
 	true
@@ -429,23 +418,14 @@ fn can_resolve_instruction(assembler: &Assembler, inst: &Instruction) -> bool
 fn resolve_instruction(assembler: &Assembler, inst: &Instruction) -> Result<BitVec, Error>
 {
 	let mut bitvec = BitVec::new();
+	let rule = &assembler.def.rules[inst.rule_index];
 	
-	for segment in assembler.def.rules[inst.rule_index].production_segments.iter()
+	for expr in rule.production_segments.iter()
 	{
-		match segment
-		{
-			&ProductionSegment::Literal(ref literal_bitvec) =>
-			{
-				bitvec.push(&literal_bitvec);
-			}
-			
-			&ProductionSegment::Argument(index) =>
-			{
-				let expr_bitvec = try!(assembler.resolve_expr(&inst.arguments[index], inst.label_ctx));
-				let arg_type = assembler.def.rules[inst.rule_index].get_argument_type(index);
-				bitvec.push(&expr_bitvec.slice(arg_type.bit_num - 1, 0));
-			}
-		}
+		let closure = |name| Some(assembler.resolve_expr(&inst.arguments[rule.get_argument(name).unwrap()], inst.label_ctx).unwrap());
+		let resolver = ExpressionResolver::new_without_locals(&closure);
+		
+		bitvec.push(&try!(expr.resolve(&resolver)));
 	}
 	
 	Ok(bitvec)

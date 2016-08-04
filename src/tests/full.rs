@@ -21,11 +21,11 @@ static DEF_SIMPLE: &'static str =
 	.address 8
 	
 	halt                  -> 8'0xaa
-	add {a: u8}           -> 8'0xbb a
-	add {a: u16}          -> 8'0xcc a
-	sub {a: u8}  {b: u8}  -> 8'0xdd a b
-	sub {a: u16} {b: u16} -> 8'0xee a b
-	jmp {a: u8}           -> 8'0xff a
+	add {a: u8}           -> 8'0xbb a[ 7:0]
+	add {a: u16}          -> 8'0xcc a[15:0]
+	sub {a: u8}  {b: u8}  -> 8'0xdd a[ 7:0] b[ 7:0]
+	sub {a: u16} {b: u16} -> 8'0xee a[15:0] b[15:0]
+	jmp {a: u8}           -> 8'0xff a[ 7:0]
 ";
 
 
@@ -35,10 +35,10 @@ static DEF_TRUNC: &'static str =
 	.address 8
 	
 	trunca {a: u16} -> 8'0x1a a[15:0]
-	truncb {a: u16} -> 8'0x1b a[15:8] a[7:0]
+	truncb {a: u16} -> 8'0x1b a[15:8] a[ 7:0]
 	truncc {a: u16} -> 8'0x1c a[15:8]
-	truncd {a: u16} -> 8'0x1d a[7:0]
-	trunce {a: u16} -> 8'0x1e a[7:0] a[15:8]
+	truncd {a: u16} -> 8'0x1d a[ 7:0]
+	trunce {a: u16} -> 8'0x1e a[ 7:0] a[15:8]
 	truncf {a: u16} -> 8'0x1f a[0:15]
 	
 	trunc0 {a: u16} -> 8'0x10 a[31:0]
@@ -103,6 +103,26 @@ fn test_literals_simple()
 	pass(".align 8", ".d32 0x12345678, 0x1, 0xabcdef", 16, "123456780000000100abcdef");
 	pass(".align 8", ".d64 0x12345678abcdef00, 0x123", 16, "12345678abcdef000000000000000123");
 	pass(".align 8", ".d128 0x12345678abcdef", 16, "00000000000000000012345678abcdef");
+}
+
+
+#[test]
+fn test_literals_with_variables()
+{
+	pass(".align 8", "start: \n .d8 start", 16, "00");
+	pass(".align 8", "start: \n .d8 0x12, 0x34, start", 16, "123400");
+	pass(".align 8", ".d8 start \n start:", 16, "01");
+	pass(".align 8", ".d8 0x12, 0x34, start \n start:", 16, "123403");
+	
+	pass(".align 8", "start: \n .d8 start, end \n end:", 16, "0002");
+	pass(".align 8", "start: \n .d8 end, start \n end:", 16, "0200");
+	pass(".align 8", "start: \n .d8 start, 0x45, end \n end:", 16, "004503");
+	pass(".align 8", "start: \n .d8 end, 0x45, start \n end:", 16, "034500");
+	
+	pass(".align 8", ".address 0x1234 \n start: \n .d8 start", 16, "34");
+	pass(".align 8", ".address 0x1234 \n start: \n .d16 start", 16, "1234");
+	pass(".align 8", ".d8 start  \n .address 0x1234 \n start:", 16, "34");
+	pass(".align 8", ".d16 start \n .address 0x1234 \n start:", 16, "1234");
 }
 
 
