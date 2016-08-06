@@ -118,10 +118,10 @@ fn parse_production(def: &mut Definition, parser: &mut Parser, rule: &mut Rule) 
 	{
 		let expr = try!(Expression::new_by_parsing_checked(parser, &|name| rule.check_argument_exists(name)));
 		
-		rule.production_bit_num += match expr.get_fixed_bit_num()
+		rule.production_bit_num += match expr.get_explicit_bit_num()
 		{
 			Some(bit_num) => bit_num,
-			None => return Err(Error::new_with_span("expression has no fixed size; use a bit slice", expr.span.clone()))
+			None => return Err(Error::new_with_span("expression has no explicit size; use bit slices", expr.span.clone()))
 		};
 		
 		rule.production_segments.push(expr);

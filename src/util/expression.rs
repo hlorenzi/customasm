@@ -30,17 +30,17 @@ pub enum ExpressionTerm
 }
 
 
+pub enum ExpressionName<'s>
+{
+	GlobalVariable(&'s str),
+	LocalVariable(&'s str)
+}
+
+
 struct ExpressionParser<'p, 'f: 'p, 'tok: 'p>
 {
 	parser: &'p mut Parser<'f, 'tok>,
 	check_var: Option<&'p Fn(&str) -> bool>
-}
-
-
-pub struct ExpressionResolver<'owner, 's: 'owner>
-{
-	get_global: &'owner Fn(&'s str) -> Option<BitVec>,
-	get_local: Option<&'owner Fn(&'s str) -> Option<BitVec>>
 }
 
 
@@ -62,34 +62,31 @@ impl Expression
 	}
 	
 	
-	pub fn can_resolve<'a, 'b>(&'a self, resolver: &ExpressionResolver<'b, 'a>) -> bool
+	pub fn can_resolve<F>(&self, check_name: &F) -> Result<bool, Error>
+	where F: Fn(ExpressionName, &Span) -> Result<bool, Error>
 	{
 		match &self.term
 		{
-			&ExpressionTerm::LiteralUInt(_)           => true,
-			&ExpressionTerm::GlobalVariable(ref name) => (resolver.get_global)(&name).is_some(),
-			&ExpressionTerm::LocalVariable(ref name)  =>
-				if resolver.get_local.is_none()
-					{ false }
-				else
-					{ resolver.get_local.unwrap()(&name).is_some() },
+			&ExpressionTerm::LiteralUInt(_)           => Ok(true),
+			&ExpressionTerm::GlobalVariable(ref name) => check_name(ExpressionName::GlobalVariable(&name), &self.span),
+			&ExpressionTerm::LocalVariable(ref name)  => check_name(ExpressionName::LocalVariable(&name), &self.span),
 			
-			&ExpressionTerm::Add(ref lhs, ref rhs)        => lhs.can_resolve(resolver) && rhs.can_resolve(resolver),
-			&ExpressionTerm::Subtract(ref lhs, ref rhs)   => lhs.can_resolve(resolver) && rhs.can_resolve(resolver),
-			&ExpressionTerm::Multiply(ref lhs, ref rhs)   => lhs.can_resolve(resolver) && rhs.can_resolve(resolver),
-			&ExpressionTerm::Divide(ref lhs, ref rhs)     => lhs.can_resolve(resolver) && rhs.can_resolve(resolver),
-			&ExpressionTerm::ShiftLeft(ref lhs, ref rhs)  => lhs.can_resolve(resolver) && rhs.can_resolve(resolver),
-			&ExpressionTerm::ShiftRight(ref lhs, ref rhs) => lhs.can_resolve(resolver) && rhs.can_resolve(resolver),
-			&ExpressionTerm::And(ref lhs, ref rhs)        => lhs.can_resolve(resolver) && rhs.can_resolve(resolver),
-			&ExpressionTerm::Or(ref lhs, ref rhs)         => lhs.can_resolve(resolver) && rhs.can_resolve(resolver),
-			&ExpressionTerm::Xor(ref lhs, ref rhs)        => lhs.can_resolve(resolver) && rhs.can_resolve(resolver),
+			&ExpressionTerm::Add(ref lhs, ref rhs)        => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
+			&ExpressionTerm::Subtract(ref lhs, ref rhs)   => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
+			&ExpressionTerm::Multiply(ref lhs, ref rhs)   => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
+			&ExpressionTerm::Divide(ref lhs, ref rhs)     => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
+			&ExpressionTerm::ShiftLeft(ref lhs, ref rhs)  => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
+			&ExpressionTerm::ShiftRight(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
+			&ExpressionTerm::And(ref lhs, ref rhs)        => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
+			&ExpressionTerm::Or(ref lhs, ref rhs)         => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
+			&ExpressionTerm::Xor(ref lhs, ref rhs)        => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
 			
-			&ExpressionTerm::Slice(ref expr, _, _) => expr.can_resolve(resolver)
+			&ExpressionTerm::Slice(ref expr, _, _) => expr.can_resolve(check_name)
 		}
 	}
 	
 	
-	pub fn get_fixed_bit_num(&self) -> Option<usize>
+	pub fn get_explicit_bit_num(&self) -> Option<usize>
 	{
 		match &self.term
 		{
@@ -106,103 +103,46 @@ impl Expression
 	}
 	
 	
-	pub fn get_minimum_bit_num<'a, 'b>(&'a self, resolver: &ExpressionResolver<'b, 'a>, undeclared_size: usize) -> usize
+	pub fn get_minimum_bit_num<F>(&self, check_name: &F) -> Result<usize, Error>
+	where F: Fn(ExpressionName, &Span) -> Result<usize, Error>
 	{
 		match &self.term
 		{
-			&ExpressionTerm::LiteralUInt(ref bitvec) => bitvec.len(),
-			
-			&ExpressionTerm::GlobalVariable(ref name) =>
-				match (resolver.get_global)(&name)
-				{
-					Some(bitvec) => bitvec.len(),
-					None => undeclared_size
-				},
-				
-			&ExpressionTerm::LocalVariable(ref name) =>
-				if resolver.get_local.is_none()
-					{ undeclared_size }
-				else
-				{
-					match resolver.get_local.unwrap()(&name)
-					{
-						Some(bitvec) => bitvec.len(),
-						None => undeclared_size
-					}
-				},
+			&ExpressionTerm::LiteralUInt(ref bitvec)  => Ok(bitvec.len()),
+			&ExpressionTerm::GlobalVariable(ref name) => check_name(ExpressionName::GlobalVariable(&name), &self.span),				
+			&ExpressionTerm::LocalVariable(ref name)  => check_name(ExpressionName::LocalVariable(&name), &self.span),
 			
 			&ExpressionTerm::Slice(_, left, right) =>
 				if left > right
-					{ left - right + 1 }
+					{ Ok(left - right + 1) }
 				else
-					{ right - left + 1 },
+					{ Ok(right - left + 1) },
 					
-			_ => undeclared_size
+			_ => Err(Error::new_with_span("unimplemented", self.span.clone()))
 		}
 	}
 	
 	
-	pub fn resolve<'a, 'b>(&'a self, resolver: &ExpressionResolver<'b, 'a>) -> Result<BitVec, Error>
+	pub fn resolve<F>(&self, check_name: &F) -> Result<BitVec, Error>
+	where F: Fn(ExpressionName, &Span) -> Result<BitVec, Error>
 	{
 		match &self.term
 		{
 			&ExpressionTerm::LiteralUInt(ref bitvec)  => Ok(bitvec.clone()),
+			&ExpressionTerm::GlobalVariable(ref name) => check_name(ExpressionName::GlobalVariable(&name), &self.span),				
+			&ExpressionTerm::LocalVariable(ref name)  => check_name(ExpressionName::LocalVariable(&name), &self.span),
 			
-			&ExpressionTerm::GlobalVariable(ref name) =>
-				match (resolver.get_global)(&name)
-				{
-					Some(bitvec) => Ok(bitvec),
-					None => Err(Error::new_with_span(format!("undeclared `{}`", name), self.span.clone()))
-				},
-				
-			&ExpressionTerm::LocalVariable(ref name) =>
-				if resolver.get_local.is_none()
-					{ Err(Error::new_with_span(format!("undeclared local `{}`", name), self.span.clone())) }
-				else
-				{
-					match resolver.get_local.unwrap()(&name)
-					{
-						Some(bitvec) => Ok(bitvec),
-						None => Err(Error::new_with_span(format!("undeclared local `{}`", name), self.span.clone()))
-					}
-				},
+			&ExpressionTerm::Add(ref lhs, _)        => lhs.resolve(check_name),
+			&ExpressionTerm::Subtract(ref lhs, _)   => lhs.resolve(check_name),
+			&ExpressionTerm::Multiply(ref lhs, _)   => lhs.resolve(check_name),
+			&ExpressionTerm::Divide(ref lhs, _)     => lhs.resolve(check_name),
+			&ExpressionTerm::ShiftLeft(ref lhs, _)  => lhs.resolve(check_name),
+			&ExpressionTerm::ShiftRight(ref lhs, _) => lhs.resolve(check_name),
+			&ExpressionTerm::And(ref lhs, _)        => lhs.resolve(check_name),
+			&ExpressionTerm::Or(ref lhs, _)         => lhs.resolve(check_name),
+			&ExpressionTerm::Xor(ref lhs, _)        => lhs.resolve(check_name),
 			
-			&ExpressionTerm::Add(ref lhs, _)        => lhs.resolve(resolver),
-			&ExpressionTerm::Subtract(ref lhs, _)   => lhs.resolve(resolver),
-			&ExpressionTerm::Multiply(ref lhs, _)   => lhs.resolve(resolver),
-			&ExpressionTerm::Divide(ref lhs, _)     => lhs.resolve(resolver),
-			&ExpressionTerm::ShiftLeft(ref lhs, _)  => lhs.resolve(resolver),
-			&ExpressionTerm::ShiftRight(ref lhs, _) => lhs.resolve(resolver),
-			&ExpressionTerm::And(ref lhs, _)        => lhs.resolve(resolver),
-			&ExpressionTerm::Or(ref lhs, _)         => lhs.resolve(resolver),
-			&ExpressionTerm::Xor(ref lhs, _)        => lhs.resolve(resolver),
-			
-			&ExpressionTerm::Slice(ref expr, left, right) => Ok(try!(expr.resolve(resolver)).slice(left, right))
-		}
-	}
-}
-
-
-impl<'owner, 's> ExpressionResolver<'owner, 's>
-{
-	pub fn new(
-		get_global: &'owner Fn(&'s str) -> Option<BitVec>,
-		get_local: &'owner Fn(&'s str) -> Option<BitVec>) -> ExpressionResolver<'owner, 's>
-	{
-		ExpressionResolver
-		{
-			get_global: get_global,
-			get_local: Some(get_local)
-		}
-	}
-	
-	
-	pub fn new_without_locals(get_global: &'owner Fn(&'s str) -> Option<BitVec>) -> ExpressionResolver<'owner, 's>
-	{
-		ExpressionResolver
-		{
-			get_global: get_global,
-			get_local: None
+			&ExpressionTerm::Slice(ref expr, left, right) => Ok(try!(expr.resolve(check_name)).slice(left, right))
 		}
 	}
 }
