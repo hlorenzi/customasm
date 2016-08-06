@@ -2,6 +2,7 @@ use definition;
 use assembler;
 use util::misc;
 use util::error::Error;
+use util::tokenizer::Span;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -65,13 +66,13 @@ pub fn driver_main(opt: &DriverOptions)
 			let mut out_file = match File::create(filename)
 			{
 				Ok(file) => file,
-				Err(err) => misc::error_exit(Error::new_with_file(filename, format!("{}", err)))
+				Err(err) => misc::error_exit(Error::new_with_span(format!("{}", err), Span::new_without_index(filename)))
 			};
 			
 			match out_file.write_all(&output)
 			{
 				Ok(..) => { }
-				Err(err) => misc::error_exit(Error::new_with_file(filename, format!("{}", err)))
+				Err(err) => misc::error_exit(Error::new_with_span(format!("{}", err), Span::new_without_index(filename)))
 			};
 			
 			if !opt.quiet

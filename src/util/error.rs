@@ -4,9 +4,8 @@ use util::tokenizer::Span;
 #[derive(Debug)]
 pub struct Error
 {
-	msg: String,
-	filename: Option<String>,
-	span: Option<Span>
+	pub msg: String,
+	pub span: Option<Span>
 }
 
 
@@ -18,19 +17,6 @@ impl Error
 		Error
 		{
 			msg: msg.into(),
-			filename: None,
-			span: None
-		}
-	}
-	
-	
-	pub fn new_with_file<S, T>(msg: S, filename: T) -> Error
-	where S: Into<String>, T: Into<String>
-	{
-		Error
-		{
-			msg: msg.into(),
-			filename: Some(filename.into()),
 			span: None
 		}
 	}
@@ -42,38 +28,45 @@ impl Error
 		Error
 		{
 			msg: msg.into(),
-			filename: None,
 			span: Some(span)
 		}
 	}
 	
 	
-	pub fn new_with_file_span<S, T>(msg: S, filename: T, span: Span) -> Error
-	where S: Into<String>, T: Into<String>
+	pub fn get_msg(&self) -> &String
 	{
-		Error
+		&self.msg
+	}
+	
+	
+	pub fn get_line(&self) -> usize
+	{
+		match self.span
 		{
-			msg: msg.into(),
-			filename: Some(filename.into()),
-			span: Some(span)
+			Some(ref span) => span.start.line,
+			None => 0
 		}
 	}
 	
 	
-	pub fn set_file<S>(&mut self, filename: S)
-	where S: Into<String>
+	pub fn contains_str(&self, s: &str) -> bool
 	{
-		self.filename = Some(filename.into());
+		self.msg.find(s).is_some()
+	}
+	
+	
+	pub fn line_is(&self, line: usize) -> bool
+	{
+		match self.span
+		{
+			Some(ref span) => span.start.line == line,
+			None => false
+		}
 	}
 	
 	
 	pub fn print(&self)
 	{
-		if let Some(ref filename) = self.filename
-		{
-			print!("{}: ", filename);
-		}
-	
 		if let Some(ref span) = self.span
 		{
 			print!("{}: {}:{}: {}:{} ",

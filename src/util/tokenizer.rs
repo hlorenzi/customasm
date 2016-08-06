@@ -131,6 +131,18 @@ impl Span
 	}
 	
 	
+	pub fn new_without_index<S>(filename: S) -> Span
+	where S: Into<String>
+	{
+		Span
+		{
+			file: Rc::new(filename.into()),
+			start: CharIndex::new(),
+			end: CharIndex::new()
+		}
+	}
+	
+	
 	pub fn join(&self, other: &Span) -> Span
 	{
 		if self.file != other.file
@@ -143,7 +155,7 @@ impl Span
 				{ other.start };
 		
 		let end =
-			if self.end.linear < other.end.linear
+			if self.end.linear > other.end.linear
 				{ self.end }
 			else
 				{ other.end };

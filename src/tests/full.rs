@@ -10,8 +10,51 @@ fn pass(def_str: &str, asm_str: &str, expected_out_radix: usize, expected_out: &
 {
 	let def = definition::parse("test", &def_str.chars().collect::<Vec<char>>()).unwrap();
 	let out = assembler::assemble(&def, "test", &asm_str.chars().collect::<Vec<char>>()).unwrap();
-	assert!(out.compare(&BitVec::new_from_str(expected_out_radix, expected_out).unwrap()),
-		format!("\ntest failed:\n\ndef:\n{}\n\nasm:\n{}\n\nexpected: {}\n     got: {}\n", def_str, asm_str, expected_out, out.get_hex_str()));
+	
+	if !out.compare(&BitVec::new_from_str(expected_out_radix, expected_out).unwrap())
+	{
+		panic!(format!(
+			"\ntest output mismatch:\n\n \
+			def:\n{}\n\n \
+			asm:\n{}\n\n \
+			expected: {}\n \
+			.....got: {}\n",
+			def_str, asm_str,
+			expected_out, out.get_hex_str()));
+	}
+}
+
+
+fn fail(def_str: &str, asm_str: &str, expected_error_line: usize, expect_error_substr: &str)
+{
+	let def = definition::parse("test", &def_str.chars().collect::<Vec<char>>()).unwrap();
+	match assembler::assemble(&def, "test", &asm_str.chars().collect::<Vec<char>>())
+	{
+		Ok(out) => panic!(format!(
+			"\ntest passed but error expected:\n\n \
+			def:\n{}\n\n \
+			asm:\n{}\n\n \
+			expected: error\n \
+			.....got: {}\n",
+			def_str, asm_str,
+			out.get_hex_str())),
+			
+		Err(err) =>
+			if !err.line_is(expected_error_line) || !err.contains_str(expect_error_substr)
+			{
+				panic!(format!(
+					"\ntest error msg mismatch:\n\n \
+					def:\n{}\n\n \
+					asm:\n{}\n\n \
+					.expected error msg: {}\n \
+					......got error msg: {}\n \
+					expected error line: {}\n \
+					.....got error line: {}\n",
+					def_str, asm_str,
+					expect_error_substr, err.get_msg(),
+					expected_error_line, err.get_line()));
+			}
+	}
 }
 
 
@@ -64,6 +107,9 @@ fn test_instructions_simple()
 	pass(DEF_SIMPLE, "sub 0x1234 0x5678", 16, "ee12345678");
 	
 	pass(DEF_SIMPLE, "halt \n halt", 16, "aaaa");
+	
+	fail(DEF_SIMPLE, "unknown", 1, "no match");
+	fail(DEF_SIMPLE, "halt \n unknown", 2, "no match");
 }
 
 
@@ -103,6 +149,14 @@ fn test_literals_simple()
 	pass(".align 8", ".d32 0x12345678, 0x1, 0xabcdef", 16, "123456780000000100abcdef");
 	pass(".align 8", ".d64 0x12345678abcdef00, 0x123", 16, "12345678abcdef000000000000000123");
 	pass(".align 8", ".d128 0x12345678abcdef", 16, "00000000000000000012345678abcdef");
+	
+	fail(".align 3", ".d1 0b1", 1, "aligned");
+	fail(".align 3", ".d2 0b10", 1, "aligned");
+	fail(".align 4", ".d1 0b1", 1, "aligned");
+	fail(".align 4", ".d2 0b10", 1, "aligned");
+	fail(".align 4", ".d3 0b101", 1, "aligned");
+	fail(".align 8", ".d4 0b1010", 1, "aligned");
+	fail(".align 8", ".d8 0x79 \n .d4 0b1010", 2, "aligned");
 }
 
 
@@ -111,18 +165,23 @@ fn test_literals_with_variables()
 {
 	pass(".align 8", "start: \n .d8 start", 16, "00");
 	pass(".align 8", "start: \n .d8 0x12, 0x34, start", 16, "123400");
-	pass(".align 8", ".d8 start \n start:", 16, "01");
+	
+	pass(".align 8", ".d8 start             \n start:", 16, "01");
 	pass(".align 8", ".d8 0x12, 0x34, start \n start:", 16, "123403");
 	
-	pass(".align 8", "start: \n .d8 start, end \n end:", 16, "0002");
-	pass(".align 8", "start: \n .d8 end, start \n end:", 16, "0200");
-	pass(".align 8", "start: \n .d8 start, 0x45, end \n end:", 16, "004503");
-	pass(".align 8", "start: \n .d8 end, 0x45, start \n end:", 16, "034500");
+	pass(".align 8", "start: \n .d8 start,   end        \n end:", 16, "0002");
+	pass(".align 8", "start: \n .d8   end, start        \n end:", 16, "0200");
+	pass(".align 8", "start: \n .d8 start,  0x45,   end \n end:", 16, "004503");
+	pass(".align 8", "start: \n .d8   end,  0x45, start \n end:", 16, "034500");
 	
-	pass(".align 8", ".address 0x1234 \n start: \n .d8 start", 16, "34");
-	pass(".align 8", ".address 0x1234 \n start: \n .d16 start", 16, "1234");
-	pass(".align 8", ".d8 start  \n .address 0x1234 \n start:", 16, "34");
-	pass(".align 8", ".d16 start \n .address 0x1234 \n start:", 16, "1234");
+	pass(".align 8", ".address 0x1234 \n start:          \n .d8 start", 16, "34");
+	pass(".align 8", ".address 0x1234 \n start:          \n .d16 start", 16, "1234");
+	pass(".align 8", ".d8 start       \n .address 0x1234 \n start:", 16, "34");
+	pass(".align 8", ".d16 start      \n .address 0x1234 \n start:", 16, "1234");
+	
+	fail(".align 8", ".d8 unknown", 1, "unknown");
+	fail(".align 8", ".d8 0x12, unknown", 1, "unknown");
+	fail(".align 8", ".d8 0x12 \n .d8 unknown", 2, "unknown");
 }
 
 
@@ -136,4 +195,15 @@ fn test_labels_simple()
 	
 	pass(DEF_SIMPLE, "start: \n 'x: \n jmp 'x \n loop: \n 'x: \n jmp 'x", 16, "ff00ff02");
 	pass(DEF_SIMPLE, "          'x: \n jmp 'x \n loop: \n 'x: \n jmp 'x", 16, "ff00ff02");
+	
+	fail(DEF_SIMPLE, "        jmp  unknown", 1, "unknown");
+	fail(DEF_SIMPLE, "halt \n jmp  unknown", 2, "unknown");
+	fail(DEF_SIMPLE, "        jmp 'unknown", 1, "unknown local");
+	fail(DEF_SIMPLE, "halt \n jmp 'unknown", 2, "unknown local");
+	
+	fail(DEF_SIMPLE, "jmp 'unknown \n start: \n 'unknown: \n halt",         1, "unknown local");
+	fail(DEF_SIMPLE, "jmp 'unknown \n start: \n 'unknown: \n jmp 'unknown", 1, "unknown local");
+	
+	fail(DEF_SIMPLE, "'unknown: \n halt         \n start: \n jmp 'unknown", 4, "unknown local");
+	fail(DEF_SIMPLE, "'unknown: \n jmp 'unknown \n start: \n jmp 'unknown", 4, "unknown local");
 }

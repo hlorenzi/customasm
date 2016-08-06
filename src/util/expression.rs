@@ -268,7 +268,7 @@ impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
 			
 			Ok(Expression
 			{
-				span: self.parser.current().span.clone(),
+				span: token.span.clone(),
 				term: ExpressionTerm::GlobalVariable(ident)
 			})
 		}
@@ -277,10 +277,14 @@ impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
 		{
 			let start_span = self.parser.current().span.clone();
 			self.parser.advance();
+			
+			let token = try!(self.parser.expect_identifier()).clone();
+			let ident = token.identifier().clone();
+			
 			Ok(Expression
 			{
-				span: self.parser.current().span.join(&start_span),
-				term: ExpressionTerm::LocalVariable(try!(self.parser.expect_identifier()).identifier().clone())
+				span: token.span.join(&start_span),
+				term: ExpressionTerm::LocalVariable(ident)
 			})
 		}
 		
