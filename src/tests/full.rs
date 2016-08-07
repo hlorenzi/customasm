@@ -61,30 +61,46 @@ fn fail(def_str: &str, asm_str: &str, expected_error_line: usize, expect_error_s
 static DEF_SIMPLE: &'static str =
 "
 	.align 8
-	.address 8
 	
-	halt                  -> 8'0xaa
-	add {a: u8}           -> 8'0xbb a[ 7:0]
-	add {a: u16}          -> 8'0xcc a[15:0]
-	sub {a: u8}  {b: u8}  -> 8'0xdd a[ 7:0] b[ 7:0]
-	sub {a: u16} {b: u16} -> 8'0xee a[15:0] b[15:0]
-	jmp {a: u8}           -> 8'0xff a[ 7:0]
+	halt        -> 8'0x10
+	add {a}     -> 8'0x11 a[7:0]
+	sub {a} {b} -> 8'0x12 a[7:0] b[7:0]
+	jmp {a}     -> 8'0x13 a[7:0]
 ";
 
 
-static DEF_TRUNC: &'static str =
+static DEF_CONSTRAINT: &'static str =
 "
 	.align 8
-	.address 8
 	
-	trunca {a: u16} -> 8'0x1a a[15:0]
-	truncb {a: u16} -> 8'0x1b a[15:8] a[ 7:0]
-	truncc {a: u16} -> 8'0x1c a[15:8]
-	truncd {a: u16} -> 8'0x1d a[ 7:0]
-	trunce {a: u16} -> 8'0x1e a[ 7:0] a[15:8]
-	truncf {a: u16} -> 8'0x1f a[0:15]
+	load {a: _ <= 0xff}     -> 8'0x10 a[ 7:0]
+	load {a: _ <= 0xffff}   -> 8'0x11 a[15:0]
+	load {a: _ <= 0xffffff} -> 8'0x12 a[23:0]
+	load {a}                -> 8'0x13 a[31:0]
 	
-	trunc0 {a: u16} -> 8'0x10 a[31:0]
+	store {a: _ <=   0xff} {b: _ <=   0xff} -> 8'0x20 a[ 7:0] b[ 7:0]
+	store {a: _ <=   0xff} {b: _ <= 0xffff} -> 8'0x21 a[ 7:0] b[15:0]
+	store {a: _ <= 0xffff} {b: _ <=   0xff} -> 8'0x22 a[15:0] b[ 7:0]
+	store {a: _ <= 0xffff} {b: _ <= 0xffff} -> 8'0x23 a[15:0] b[15:0]
+	store {a} {b}                           -> 8'0x24 a[31:0] b[31:0]
+";
+
+
+static DEF_EXPR: &'static str =
+"
+	.align 8
+	
+	slice0 {a} -> 8'0x10 a[15:0]
+	slice1 {a} -> 8'0x11 a[15:8] a[ 7:0]
+	slice2 {a} -> 8'0x12 a[15:8]
+	slice3 {a} -> 8'0x13 a[ 7:0]
+	slice4 {a} -> 8'0x14 a[ 7:0] a[15:8]
+	slice5 {a} -> 8'0x15 a[0:15]
+	slice6 {a} -> 8'0x16 a[31:0]
+	
+	expr0 {a}  -> 8'0x20 (a + 1)[7:0]
+	expr1 {a}  -> 8'0x21 (a + a)[7:0]
+	expr2 {a}  -> 8'0x22 (a * a)[7:0]
 ";
 
 
@@ -93,36 +109,84 @@ fn test_instructions_simple()
 {	
 	pass("", "", 16, "");
 	pass(DEF_SIMPLE, "", 16, "");
-	pass(DEF_SIMPLE, "halt", 16, "aa");
-	pass(DEF_SIMPLE, "add 0x5", 16, "bb05");
-	pass(DEF_SIMPLE, "add 0x56", 16, "bb56");
-	pass(DEF_SIMPLE, "add 0x567", 16, "cc0567");
-	pass(DEF_SIMPLE, "add 0x5678", 16, "cc5678");
-	pass(DEF_SIMPLE, "sub 0x1 0x5", 16, "dd0105");
-	pass(DEF_SIMPLE, "sub 0x12 0x56", 16, "dd1256");
-	pass(DEF_SIMPLE, "sub 0x12 0x567", 16, "ee00120567");
-	pass(DEF_SIMPLE, "sub 0x12 0x5678", 16, "ee00125678");
-	pass(DEF_SIMPLE, "sub 0x123 0x56", 16, "ee01230056");
-	pass(DEF_SIMPLE, "sub 0x123 0x567", 16, "ee01230567");
-	pass(DEF_SIMPLE, "sub 0x1234 0x5678", 16, "ee12345678");
+	pass(DEF_SIMPLE, "halt", 16, "10");
+	pass(DEF_SIMPLE, "add 0x5", 16, "1105");
+	pass(DEF_SIMPLE, "add 0x56", 16, "1156");
+	pass(DEF_SIMPLE, "sub 0x1 0x5", 16, "120105");
+	pass(DEF_SIMPLE, "sub 0x12 0x56", 16, "121256");
 	
-	pass(DEF_SIMPLE, "halt \n halt", 16, "aaaa");
+	pass(DEF_SIMPLE, "halt \n halt", 16, "1010");
 	
-	fail(DEF_SIMPLE, "unknown", 1, "no match");
-	fail(DEF_SIMPLE, "halt \n unknown", 2, "no match");
+	fail(DEF_SIMPLE, "xyz", 1, "no match");
+	fail(DEF_SIMPLE, "halt \n xyz", 2, "no match");
 }
 
 
 #[test]
-fn test_instructions_arg_slice()
+fn test_instructions_constraints()
+{	
+	pass(DEF_CONSTRAINT, "", 16, "");
+	
+	pass(DEF_CONSTRAINT, "load 0x1", 16, "1001");
+	pass(DEF_CONSTRAINT, "load 0xff", 16, "10ff");
+	pass(DEF_CONSTRAINT, "load 0x100", 16, "110100");
+	pass(DEF_CONSTRAINT, "load 0xffff", 16, "11ffff");
+	pass(DEF_CONSTRAINT, "load 0x10000", 16, "12010000");
+	pass(DEF_CONSTRAINT, "load 0xffffff", 16, "12ffffff");
+	pass(DEF_CONSTRAINT, "load 0x1000000", 16, "1301000000");
+	pass(DEF_CONSTRAINT, "load 0xffffffff", 16, "13ffffffff");
+	
+	pass(DEF_CONSTRAINT, "load start \n start:", 16, "1300000005");
+	
+	pass(DEF_CONSTRAINT, "store 0xff 0xff", 16, "20ffff");
+	pass(DEF_CONSTRAINT, "store 0xff 0xffff", 16, "21ffffff");
+	pass(DEF_CONSTRAINT, "store 0xffff 0xff", 16, "22ffffff");
+	pass(DEF_CONSTRAINT, "store 0xffff 0xffff", 16, "23ffffffff");
+	pass(DEF_CONSTRAINT, "store 0x123456 0x7890ab", 16, "2400123456007890ab");
+	
+	pass(DEF_CONSTRAINT, "store   0x1 start \n start:", 16, "240000000100000009");
+	pass(DEF_CONSTRAINT, "store start   0x1 \n start:", 16, "240000000900000001");
+	pass(DEF_CONSTRAINT, "store start start \n start:", 16, "240000000900000009");
+}
+
+
+#[test]
+fn test_instructions_production_expr()
 {
-	pass(DEF_TRUNC, "trunca 0x1234", 16, "1a1234");
-	pass(DEF_TRUNC, "truncb 0x1234", 16, "1b1234");
-	pass(DEF_TRUNC, "truncc 0x1234", 16, "1c12");
-	pass(DEF_TRUNC, "truncd 0x1234", 16, "1d34");
-	pass(DEF_TRUNC, "trunce 0x1234", 16, "1e3412");
-	pass(DEF_TRUNC, "truncf 0x1234", 16, "1f2c48");
-	pass(DEF_TRUNC, "trunc0 0x1234", 16, "1000001234");
+	pass(DEF_EXPR, "", 16, "");
+	
+	pass(DEF_EXPR, "slice0 0x1234", 16, "101234");
+	pass(DEF_EXPR, "slice1 0x1234", 16, "111234");
+	pass(DEF_EXPR, "slice2 0x1234", 16, "1212");
+	pass(DEF_EXPR, "slice3 0x1234", 16, "1334");
+	pass(DEF_EXPR, "slice4 0x1234", 16, "143412");
+	pass(DEF_EXPR, "slice5 0x1234", 16, "152c48");
+	pass(DEF_EXPR, "slice6 0x1234", 16, "1600001234");
+
+	pass(DEF_EXPR, "expr0 0x08", 16, "2009");
+	pass(DEF_EXPR, "expr1 0x08", 16, "2110");
+	pass(DEF_EXPR, "expr2 0x08", 16, "2240");
+}
+
+
+#[test]
+fn test_instructions_expr()
+{
+	pass(DEF_SIMPLE, "add 2 + 3", 16, "1105");
+	pass(DEF_SIMPLE, "add 0x50 + 0x06", 16, "1156");
+	pass(DEF_SIMPLE, "sub 3 - 2 12 - 7", 16, "120105");
+	pass(DEF_SIMPLE, "sub (0x14 - 0x2) 0x58 - 0x2", 16, "121256");
+	
+	pass(DEF_CONSTRAINT, "load 0x100 - 0xff", 16, "1001");
+	pass(DEF_CONSTRAINT, "load 0x100 - 1", 16, "10ff");
+	pass(DEF_CONSTRAINT, "load 0xff + 1", 16, "110100");
+	pass(DEF_CONSTRAINT, "load 0x10000 - 1", 16, "11ffff");
+	pass(DEF_CONSTRAINT, "load 0xffff + 1", 16, "12010000");
+	pass(DEF_CONSTRAINT, "load 0x1000000 - 1", 16, "12ffffff");
+	pass(DEF_CONSTRAINT, "load 0xffffff + 1", 16, "1301000000");
+	pass(DEF_CONSTRAINT, "load 0x100000000 - 1", 16, "13ffffffff");
+	
+	pass(DEF_CONSTRAINT, "load start + 1 \n start:", 16, "1300000006");
 }
 
 
@@ -161,6 +225,21 @@ fn test_literals_simple()
 
 
 #[test]
+fn test_literals_expr()
+{
+	pass(".align 8", ".d8 (1)", 16, "01");
+	pass(".align 8", ".d8 1 + 1", 16, "02");
+	pass(".align 8", ".d8 1 + 2 + 3", 16, "06");
+	pass(".align 8", ".d8 (1 + 1)", 16, "02");
+	
+	pass(".align 8", ".d8 (1), (2)", 16, "0102");
+	pass(".align 8", ".d8 1 + 1, 1 + 2", 16, "0203");
+	pass(".align 8", ".d8 1 + 2 + 3, 1 + 3 + 6", 16, "060a");
+	pass(".align 8", ".d8 (1 + 1), (2 + 3)", 16, "0205");
+}
+
+
+#[test]
 fn test_literals_with_variables()
 {
 	pass(".align 8", "start: \n .d8 start", 16, "00");
@@ -179,31 +258,31 @@ fn test_literals_with_variables()
 	pass(".align 8", ".d8 start       \n .address 0x1234 \n start:", 16, "34");
 	pass(".align 8", ".d16 start      \n .address 0x1234 \n start:", 16, "1234");
 	
-	fail(".align 8", ".d8 unknown", 1, "unknown");
-	fail(".align 8", ".d8 0x12, unknown", 1, "unknown");
-	fail(".align 8", ".d8 0x12 \n .d8 unknown", 2, "unknown");
+	fail(".align 8", ".d8 xyz", 1, "unknown");
+	fail(".align 8", ".d8 0x12, xyz", 1, "unknown");
+	fail(".align 8", ".d8 0x12 \n .d8 xyz", 2, "unknown");
 }
 
 
 #[test]
 fn test_labels_simple()
 {	
-	pass(DEF_SIMPLE, "start: \n jmp start", 16, "ff00");
+	pass(DEF_SIMPLE, "start: \n jmp start", 16, "1300");
 	
-	pass(DEF_SIMPLE, "jmp loop \n loop: \n halt", 16, "ff02aa");
-	pass(DEF_SIMPLE, "jmp loop \n loop: \n jmp loop", 16, "ff02ff02");
+	pass(DEF_SIMPLE, "jmp loop \n loop: \n halt", 16, "130210");
+	pass(DEF_SIMPLE, "jmp loop \n loop: \n jmp loop", 16, "13021302");
 	
-	pass(DEF_SIMPLE, "start: \n 'x: \n jmp 'x \n loop: \n 'x: \n jmp 'x", 16, "ff00ff02");
-	pass(DEF_SIMPLE, "          'x: \n jmp 'x \n loop: \n 'x: \n jmp 'x", 16, "ff00ff02");
+	pass(DEF_SIMPLE, "start: \n 'x: \n jmp 'x \n loop: \n 'x: \n jmp 'x", 16, "13001302");
+	pass(DEF_SIMPLE, "          'x: \n jmp 'x \n loop: \n 'x: \n jmp 'x", 16, "13001302");
 	
-	fail(DEF_SIMPLE, "        jmp  unknown", 1, "unknown");
-	fail(DEF_SIMPLE, "halt \n jmp  unknown", 2, "unknown");
-	fail(DEF_SIMPLE, "        jmp 'unknown", 1, "unknown local");
-	fail(DEF_SIMPLE, "halt \n jmp 'unknown", 2, "unknown local");
+	fail(DEF_SIMPLE, "        jmp  xyz", 1, "unknown");
+	fail(DEF_SIMPLE, "halt \n jmp  xyz", 2, "unknown");
+	fail(DEF_SIMPLE, "        jmp 'xyz", 1, "unknown local");
+	fail(DEF_SIMPLE, "halt \n jmp 'xyz", 2, "unknown local");
 	
-	fail(DEF_SIMPLE, "jmp 'unknown \n start: \n 'unknown: \n halt",         1, "unknown local");
-	fail(DEF_SIMPLE, "jmp 'unknown \n start: \n 'unknown: \n jmp 'unknown", 1, "unknown local");
+	fail(DEF_SIMPLE, "jmp 'xyz \n start: \n 'xyz: \n halt",     1, "unknown local");
+	fail(DEF_SIMPLE, "jmp 'xyz \n start: \n 'xyz: \n jmp 'xyz", 1, "unknown local");
 	
-	fail(DEF_SIMPLE, "'unknown: \n halt         \n start: \n jmp 'unknown", 4, "unknown local");
-	fail(DEF_SIMPLE, "'unknown: \n jmp 'unknown \n start: \n jmp 'unknown", 4, "unknown local");
+	fail(DEF_SIMPLE, "'xyz: \n halt     \n start: \n jmp 'xyz", 4, "unknown local");
+	fail(DEF_SIMPLE, "'xyz: \n jmp 'xyz \n start: \n jmp 'xyz", 4, "unknown local");
 }

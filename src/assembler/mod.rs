@@ -1,7 +1,7 @@
 use definition::Definition;
 use util::bitvec::BitVec;
 use util::error::Error;
-use util::expression::{Expression, ExpressionName};
+use util::expression::{Expression, ExpressionName, ExpressionValue};
 use util::label::{LabelManager, LabelContext};
 use util::misc;
 use util::parser::Parser;
@@ -119,43 +119,24 @@ impl<'def> Assembler<'def>
 	}
 	
 	
-	pub fn get_expr_minimum_bit_num(&self, expr: &Expression, ctx: LabelContext) -> Result<usize, Error>
-	{
-		expr.get_minimum_bit_num(&|expr, _|
-		{
-			let maybe_bitvec = match expr
-			{
-				ExpressionName::GlobalVariable(name) => self.labels.get_global_value(name),
-				ExpressionName::LocalVariable(name) => self.labels.get_local_value(ctx, name)
-			};
-			
-			match maybe_bitvec
-			{
-				Some(bitvec) => Ok(bitvec.len()),
-				None => Ok(self.def.address_bits)
-			}
-		})
-	}
-	
-	
 	pub fn resolve_production(&self, rule: &Rule, inst: &Instruction, expr: &Expression) -> Result<BitVec, Error>
 	{
-		expr.resolve(&|expr, _|
+		Ok(try!(expr.resolve(&|expr, _|
 		{
 			let argument = match expr
 			{
-				ExpressionName::GlobalVariable(name) => &inst.arguments[rule.get_argument(name).unwrap()],
+				ExpressionName::GlobalVariable(name) => &inst.arguments[rule.get_parameter(name).unwrap()],
 				ExpressionName::LocalVariable(_) => panic!("local variable in production; invalid definition")
 			};
 			
-			self.resolve_expr(argument, inst.label_ctx)
-		})
+			Ok(ExpressionValue::ArbitraryPrecision(try!(self.resolve_expr(argument, inst.label_ctx))))
+		})).as_bitvec())
 	}
 	
 	
 	pub fn resolve_expr(&self, expr: &Expression, ctx: LabelContext) -> Result<BitVec, Error>
 	{
-		expr.resolve(&|expr, span|
+		Ok(try!(expr.resolve(&|expr, span|
 		{
 			let maybe_bitvec = match expr
 			{
@@ -165,7 +146,7 @@ impl<'def> Assembler<'def>
 			
 			match maybe_bitvec
 			{
-				Some(bitvec) => Ok(bitvec.clone()),
+				Some(bitvec) => Ok(ExpressionValue::ArbitraryPrecision(bitvec.clone())),
 				None =>
 				{
 					match expr
@@ -177,7 +158,7 @@ impl<'def> Assembler<'def>
 					}
 				}
 			}
-		})
+		})).as_bitvec())
 	}
 }
 
@@ -409,22 +390,48 @@ fn try_match_rule(assembler: &mut Assembler, parser: &mut Parser, rule_index: us
 					{ return Ok(None); }
 			}
 			
-			&PatternSegment::Argument(arg_index) =>
+			&PatternSegment::Parameter(arg_index) =>
 			{
-				let typ = rule.get_argument_type(arg_index);
+				let expr = try!(Expression::new_by_parsing(parser));
+				let can_resolve = try!(assembler.can_resolve_expr(&expr, assembler.labels.get_cur_context()));
 				
-				match Expression::new_by_parsing(parser)
+				match rule.get_parameter_constraint(arg_index)
 				{
-					Ok(expr) =>
+					&None => inst.arguments.push(expr),
+					
+					&Some(ref constraint) =>
 					{
-						let expr_len = try!(assembler.get_expr_minimum_bit_num(&expr, assembler.labels.get_cur_context()));
-						if expr_len <= typ.bit_num
-							{ inst.arguments.push(expr); }
-						else
+						if !can_resolve
 							{ return Ok(None); }
+							
+						let value = try!(assembler.resolve_expr(&expr, assembler.labels.get_cur_context()));
+						
+						let constraint_check = try!(constraint.resolve(&|expr, _|
+						{
+							match expr
+							{
+								ExpressionName::GlobalVariable(name) =>
+									if name == "_"
+										{ Ok(ExpressionValue::ArbitraryPrecision(value.clone())) }
+									else
+										{ panic!("invalid constraint") },
+										
+								ExpressionName::LocalVariable(_) => panic!("invalid constraint")
+							}
+						}));
+						
+						match constraint_check
+						{
+							ExpressionValue::Boolean(ok) =>
+								if ok
+									{ inst.arguments.push(expr); }
+								else
+									{ return Ok(None); },
+									
+							_ => return Err(Error::new_with_span("constraint does not return a boolean", expr.span.clone()))
+						};
 					}
-					Err(..) => return Ok(None)
-				};
+				}
 			}
 		}
 	}

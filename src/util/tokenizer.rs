@@ -387,7 +387,12 @@ fn try_read_operator(file: &Rc<String>, src: &[char], index: &mut CharIndex) -> 
 		".", "->", ":", ";", ",",
 		"(", ")", "[", "]", "{", "}",
 		"'",
-		"#", "$"
+		"#", "$",
+		"+", "-", "*", "/",
+		"&&", "||",
+		"&", "|", "^",
+		"<<", ">>",
+		"<=", ">=", "<", ">", "==", "!="
 	];
 	
 	let maybe_match = operators.iter().find(|op|

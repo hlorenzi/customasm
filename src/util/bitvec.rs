@@ -56,6 +56,16 @@ impl BitVec
 		
 		bitvec
 	}
+	
+	
+	pub fn new_from_i64(value: i64) -> BitVec
+	{
+		let mut bitvec = BitVec::new();
+		for bit in 0..64
+			{ bitvec.insert_bit(0, value & (1 << bit) != 0); }
+		
+		bitvec
+	}
 
 
 	pub fn new_from_str(radix: usize, value_str: &str) -> Result<BitVec, String>
@@ -121,6 +131,25 @@ impl BitVec
 			
 		bitvec.zero_extend(bit_num);
 		Ok(bitvec)
+	}
+	
+	
+	pub fn to_i64(&self) -> Option<i64>
+	{
+		let mut result: i64 = 0;
+		
+		for bit in 0..self.bits.len()
+		{
+			result = match result.checked_shl(1)
+			{
+				Some(result) => result,
+				None => return None
+			};
+			
+			result |= if self.bits[bit] { 1 } else { 0 };
+		}
+		
+		Some(result)
 	}
 	
 	

@@ -2,13 +2,12 @@ use util::error::Error;
 use util::expression::Expression;
 use util::parser::Parser;
 use util::tokenizer;
-use rule::{Rule, PatternSegment, VariableType};
+use rule::{Rule, PatternSegment};
 
 
 pub struct Definition
 {
 	pub align_bits: usize,
-	pub address_bits: usize,
 	pub rules: Vec<Rule>
 }
 
@@ -18,7 +17,6 @@ pub fn parse(src_filename: &str, src: &[char]) -> Result<Definition, Error>
 	let mut def = Definition
 	{
 		align_bits: 8,
-		address_bits: 8,
 		rules: Vec::new()
 	};
 	
@@ -40,7 +38,6 @@ fn parse_directives(def: &mut Definition, parser: &mut Parser) -> Result<(), Err
 		match directive.identifier().as_ref()
 		{
 			"align" => def.align_bits = try!(parser.expect_number()).number_usize(),
-			"address" => def.address_bits = try!(parser.expect_number()).number_usize(),
 			_ => return Err(parser.make_error(format!("unknown directive `{}`", directive.identifier()), &directive.span))
 		}
 		
@@ -84,14 +81,18 @@ fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 		{
 			let name_token = try!(parser.expect_identifier()).clone();
 			let name = name_token.identifier();
-			try!(parser.expect_operator(":"));
-			let typ = try!(parse_variable_type(parser));
 			
-			if rule.check_argument_exists(&name)
-				{ return Err(parser.make_error(format!("duplicate argument `{}`", name), &name_token.span)); }
+			if rule.check_parameter_exists(&name)
+				{ return Err(parser.make_error(format!("duplicate parameter `{}`", name), &name_token.span)); }
+				
+			let constraint =
+				if parser.match_operator(":")
+					{ Some(try!(Expression::new_by_parsing_checked(parser, &|name| name == "_"))) }
+				else
+					{ None };
 			
-			let arg_index = rule.add_argument(name.clone(), typ);
-			rule.pattern_segments.push(PatternSegment::Argument(arg_index));
+			let param_index = rule.add_parameter(name.clone(), constraint);
+			rule.pattern_segments.push(PatternSegment::Parameter(param_index));
 			
 			try!(parser.expect_operator("}"));
 		}
@@ -116,7 +117,7 @@ fn parse_production(def: &mut Definition, parser: &mut Parser, rule: &mut Rule) 
 	
 	while !parser.current().is_linebreak_or_end()
 	{
-		let expr = try!(Expression::new_by_parsing_checked(parser, &|name| rule.check_argument_exists(name)));
+		let expr = try!(Expression::new_by_parsing_checked(parser, &|name| rule.check_parameter_exists(name)));
 		
 		rule.production_bit_num += match expr.get_explicit_bit_num()
 		{
@@ -134,34 +135,4 @@ fn parse_production(def: &mut Definition, parser: &mut Parser, rule: &mut Rule) 
 	}
 	
 	Ok(())
-}
-
-
-fn parse_variable_type(parser: &mut Parser) -> Result<VariableType, Error>
-{
-	let mut typ = VariableType
-	{
-		bit_num: 0,
-		signed: false
-	};
-	
-	let ident_token = try!(parser.expect_identifier()).clone();
-	let ident = ident_token.identifier();
-	
-	match ident.chars().next().unwrap()
-	{
-		'u' => typ.signed = false,
-		'i' => typ.signed = true,
-		_ =>
-			{ return Err(parser.make_error("invalid type", &ident_token.span)); }
-	}
-	
-	match usize::from_str_radix(&ident[1..], 10)
-	{
-		Ok(bits) => typ.bit_num = bits,
-		Err(..) =>
-			{ return Err(parser.make_error("invalid type", &ident_token.span)); }
-	}
-	
-	Ok(typ)
 }

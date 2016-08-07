@@ -69,7 +69,7 @@ impl Error
 	{
 		if let Some(ref span) = self.span
 		{
-			print!("{}: {}:{}: {}:{} ",
+			print!("{}:{}:{}: {}:{} ",
 				span.file,
 				span.start.line, span.start.column,
 				span.end.line, span.end.column);
