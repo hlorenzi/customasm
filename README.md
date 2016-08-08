@@ -27,7 +27,7 @@ load r2, {value: _ <= 0xff} -> 8'0x12 value[7:0]
 load r3, {value: _ <= 0xff} -> 8'0x13 value[7:0]
 add  r1, r2                 -> 8'0x21
 sub  r3, {value: _ <= 0xff} -> 8'0x33 value[7:0]
-jnz  {address}              -> 8'0x40 address[15:0]
+jnz  {address: _ <= 0xffff} -> 8'0x40 address[15:0]
 ret                         -> 8'0x50
 ```
 

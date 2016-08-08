@@ -85,13 +85,15 @@ fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 			if rule.check_parameter_exists(&name)
 				{ return Err(parser.make_error(format!("duplicate parameter `{}`", name), &name_token.span)); }
 				
+			let allow_unresolved = !parser.match_operator("!");
+			
 			let constraint =
 				if parser.match_operator(":")
 					{ Some(try!(Expression::new_by_parsing_checked(parser, &|name| name == "_"))) }
 				else
 					{ None };
 			
-			let param_index = rule.add_parameter(name.clone(), constraint);
+			let param_index = rule.add_parameter(name.clone(), allow_unresolved, constraint);
 			rule.pattern_segments.push(PatternSegment::Parameter(param_index));
 			
 			try!(parser.expect_operator("}"));

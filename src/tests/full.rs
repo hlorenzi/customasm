@@ -9,7 +9,7 @@ use util::bitvec::BitVec;
 fn pass(def_str: &str, asm_str: &str, expected_out_radix: usize, expected_out: &str)
 {
 	let def = definition::parse("test", &def_str.chars().collect::<Vec<char>>()).unwrap();
-	let out = assembler::assemble(&def, "test", &asm_str.chars().collect::<Vec<char>>()).unwrap();
+	let out = assembler::assemble(&def, asm_str, &asm_str.chars().collect::<Vec<char>>()).unwrap();
 	
 	if !out.compare(&BitVec::new_from_str(expected_out_radix, expected_out).unwrap())
 	{
@@ -73,16 +73,21 @@ static DEF_CONSTRAINT: &'static str =
 "
 	.align 8
 	
-	load {a: _ <= 0xff}     -> 8'0x10 a[ 7:0]
-	load {a: _ <= 0xffff}   -> 8'0x11 a[15:0]
-	load {a: _ <= 0xffffff} -> 8'0x12 a[23:0]
-	load {a}                -> 8'0x13 a[31:0]
+	simple0 {a! : _ <= 0xff}       -> 8'0x00 a[ 7:0]
+	simple0 {a! : _ <= 0xffff}     -> 8'0x01 a[15:0]
+	simple0 {a! : _ <= 0xffffff}   -> 8'0x02 a[23:0]
+	simple0 {a  : _ <= 0xffffffff} -> 8'0x03 a[31:0]
 	
-	store {a: _ <=   0xff} {b: _ <=   0xff} -> 8'0x20 a[ 7:0] b[ 7:0]
-	store {a: _ <=   0xff} {b: _ <= 0xffff} -> 8'0x21 a[ 7:0] b[15:0]
-	store {a: _ <= 0xffff} {b: _ <=   0xff} -> 8'0x22 a[15:0] b[ 7:0]
-	store {a: _ <= 0xffff} {b: _ <= 0xffff} -> 8'0x23 a[15:0] b[15:0]
-	store {a} {b}                           -> 8'0x24 a[31:0] b[31:0]
+	simple1 {a! : _ <= 1 <<  8 - 1} -> 8'0x10 a[ 7:0]
+	simple1 {a! : _ <= 1 << 16 - 1} -> 8'0x11 a[15:0]
+	simple1 {a! : _ <= 1 << 24 - 1} -> 8'0x12 a[23:0]
+	simple1 {a  : _ <= 1 << 32 - 1} -> 8'0x13 a[31:0]
+	
+	multi0 {a! : _ <= 1 <<  8 - 1} {b! : _ <= 1 <<  8 - 1} -> 8'0x20 a[ 7:0] b[ 7:0]
+	multi0 {a! : _ <= 1 <<  8 - 1} {b! : _ <= 1 << 16 - 1} -> 8'0x21 a[ 7:0] b[15:0]
+	multi0 {a! : _ <= 1 << 16 - 1} {b! : _ <= 1 <<  8 - 1} -> 8'0x22 a[15:0] b[ 7:0]
+	multi0 {a! : _ <= 1 << 16 - 1} {b! : _ <= 1 << 16 - 1} -> 8'0x23 a[15:0] b[15:0]
+	multi0 {a  : _ <= 1 << 32 - 1} {b  : _ <= 1 << 32 - 1} -> 8'0x24 a[31:0] b[31:0]
 ";
 
 
@@ -127,26 +132,37 @@ fn test_instructions_constraints()
 {	
 	pass(DEF_CONSTRAINT, "", 16, "");
 	
-	pass(DEF_CONSTRAINT, "load 0x1", 16, "1001");
-	pass(DEF_CONSTRAINT, "load 0xff", 16, "10ff");
-	pass(DEF_CONSTRAINT, "load 0x100", 16, "110100");
-	pass(DEF_CONSTRAINT, "load 0xffff", 16, "11ffff");
-	pass(DEF_CONSTRAINT, "load 0x10000", 16, "12010000");
-	pass(DEF_CONSTRAINT, "load 0xffffff", 16, "12ffffff");
-	pass(DEF_CONSTRAINT, "load 0x1000000", 16, "1301000000");
-	pass(DEF_CONSTRAINT, "load 0xffffffff", 16, "13ffffffff");
+	pass(DEF_CONSTRAINT, "simple0 0x1", 16, "0001");
+	pass(DEF_CONSTRAINT, "simple0 0xff", 16, "00ff");
+	pass(DEF_CONSTRAINT, "simple0 0x100", 16, "010100");
+	pass(DEF_CONSTRAINT, "simple0 0xffff", 16, "01ffff");
+	pass(DEF_CONSTRAINT, "simple0 0x10000", 16, "02010000");
+	pass(DEF_CONSTRAINT, "simple0 0xffffff", 16, "02ffffff");
+	pass(DEF_CONSTRAINT, "simple0 0x1000000", 16, "0301000000");
+	pass(DEF_CONSTRAINT, "simple0 0xffffffff", 16, "03ffffffff");
 	
-	pass(DEF_CONSTRAINT, "load start \n start:", 16, "1300000005");
+	pass(DEF_CONSTRAINT, "simple0 start \n start:", 16, "0300000005");
 	
-	pass(DEF_CONSTRAINT, "store 0xff 0xff", 16, "20ffff");
-	pass(DEF_CONSTRAINT, "store 0xff 0xffff", 16, "21ffffff");
-	pass(DEF_CONSTRAINT, "store 0xffff 0xff", 16, "22ffffff");
-	pass(DEF_CONSTRAINT, "store 0xffff 0xffff", 16, "23ffffffff");
-	pass(DEF_CONSTRAINT, "store 0x123456 0x7890ab", 16, "2400123456007890ab");
+	pass(DEF_CONSTRAINT, "simple1 0x1", 16, "1001");
+	pass(DEF_CONSTRAINT, "simple1 0xff", 16, "10ff");
+	pass(DEF_CONSTRAINT, "simple1 0x100", 16, "110100");
+	pass(DEF_CONSTRAINT, "simple1 0xffff", 16, "11ffff");
+	pass(DEF_CONSTRAINT, "simple1 0x10000", 16, "12010000");
+	pass(DEF_CONSTRAINT, "simple1 0xffffff", 16, "12ffffff");
+	pass(DEF_CONSTRAINT, "simple1 0x1000000", 16, "1301000000");
+	pass(DEF_CONSTRAINT, "simple1 0xffffffff", 16, "13ffffffff");
 	
-	pass(DEF_CONSTRAINT, "store   0x1 start \n start:", 16, "240000000100000009");
-	pass(DEF_CONSTRAINT, "store start   0x1 \n start:", 16, "240000000900000001");
-	pass(DEF_CONSTRAINT, "store start start \n start:", 16, "240000000900000009");
+	pass(DEF_CONSTRAINT, "simple1 start \n start:", 16, "1300000005");
+	
+	pass(DEF_CONSTRAINT, "multi0 0xff 0xff", 16, "20ffff");
+	pass(DEF_CONSTRAINT, "multi0 0xff 0xffff", 16, "21ffffff");
+	pass(DEF_CONSTRAINT, "multi0 0xffff 0xff", 16, "22ffffff");
+	pass(DEF_CONSTRAINT, "multi0 0xffff 0xffff", 16, "23ffffffff");
+	pass(DEF_CONSTRAINT, "multi0 0x123456 0x7890ab", 16, "2400123456007890ab");
+	
+	pass(DEF_CONSTRAINT, "multi0   0x1 start \n start:", 16, "240000000100000009");
+	pass(DEF_CONSTRAINT, "multi0 start   0x1 \n start:", 16, "240000000900000001");
+	pass(DEF_CONSTRAINT, "multi0 start start \n start:", 16, "240000000900000009");
 }
 
 
@@ -177,16 +193,16 @@ fn test_instructions_expr()
 	pass(DEF_SIMPLE, "sub 3 - 2 12 - 7", 16, "120105");
 	pass(DEF_SIMPLE, "sub (0x14 - 0x2) 0x58 - 0x2", 16, "121256");
 	
-	pass(DEF_CONSTRAINT, "load 0x100 - 0xff", 16, "1001");
-	pass(DEF_CONSTRAINT, "load 0x100 - 1", 16, "10ff");
-	pass(DEF_CONSTRAINT, "load 0xff + 1", 16, "110100");
-	pass(DEF_CONSTRAINT, "load 0x10000 - 1", 16, "11ffff");
-	pass(DEF_CONSTRAINT, "load 0xffff + 1", 16, "12010000");
-	pass(DEF_CONSTRAINT, "load 0x1000000 - 1", 16, "12ffffff");
-	pass(DEF_CONSTRAINT, "load 0xffffff + 1", 16, "1301000000");
-	pass(DEF_CONSTRAINT, "load 0x100000000 - 1", 16, "13ffffffff");
+	pass(DEF_CONSTRAINT, "simple1 0x100 - 0xff", 16, "1001");
+	pass(DEF_CONSTRAINT, "simple1 0x100 - 1", 16, "10ff");
+	pass(DEF_CONSTRAINT, "simple1 0xff + 1", 16, "110100");
+	pass(DEF_CONSTRAINT, "simple1 0x10000 - 1", 16, "11ffff");
+	pass(DEF_CONSTRAINT, "simple1 0xffff + 1", 16, "12010000");
+	pass(DEF_CONSTRAINT, "simple1 0x1000000 - 1", 16, "12ffffff");
+	pass(DEF_CONSTRAINT, "simple1 0xffffff + 1", 16, "1301000000");
+	pass(DEF_CONSTRAINT, "simple1 0x100000000 - 1", 16, "13ffffffff");
 	
-	pass(DEF_CONSTRAINT, "load start + 1 \n start:", 16, "1300000006");
+	pass(DEF_CONSTRAINT, "simple1 start + 1 \n start:", 16, "1300000006");
 }
 
 

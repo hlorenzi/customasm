@@ -119,6 +119,30 @@ impl<'def> Assembler<'def>
 	}
 	
 	
+	pub fn check_constraint(&self, constraint: &Expression, argument: &BitVec) -> Result<bool, Error>
+	{
+		let result = try!(constraint.resolve(&|expr, _|
+		{
+			match expr
+			{
+				ExpressionName::GlobalVariable(name) =>
+					if name == "_"
+						{ Ok(ExpressionValue::ArbitraryPrecision(argument.clone())) }
+					else
+						{ panic!("invalid constraint") },
+						
+				ExpressionName::LocalVariable(_) => panic!("invalid constraint")
+			}
+		}));
+		
+		match result
+		{
+			ExpressionValue::Boolean(b) => Ok(b),					
+			_ => Err(Error::new_with_span("constraint does not return a boolean", constraint.span.clone()))
+		}
+	}
+	
+	
 	pub fn resolve_production(&self, rule: &Rule, inst: &Instruction, expr: &Expression) -> Result<BitVec, Error>
 	{
 		Ok(try!(expr.resolve(&|expr, _|
@@ -390,48 +414,32 @@ fn try_match_rule(assembler: &mut Assembler, parser: &mut Parser, rule_index: us
 					{ return Ok(None); }
 			}
 			
-			&PatternSegment::Parameter(arg_index) =>
+			&PatternSegment::Parameter(param_index) =>
 			{
 				let expr = try!(Expression::new_by_parsing(parser));
-				let can_resolve = try!(assembler.can_resolve_expr(&expr, assembler.labels.get_cur_context()));
 				
-				match rule.get_parameter_constraint(arg_index)
+				if !rule.get_parameter_allow_unresolved(param_index)
 				{
-					&None => inst.arguments.push(expr),
+					let label_ctx = assembler.labels.get_cur_context();
 					
-					&Some(ref constraint) =>
+					if !try!(assembler.can_resolve_expr(&expr, label_ctx))
+						{ return Ok(None); }
+					
+					match rule.get_parameter_constraint(param_index)
 					{
-						if !can_resolve
-							{ return Ok(None); }
+						&None => { },
+						
+						&Some(ref constraint) =>
+						{
+							let value = try!(assembler.resolve_expr(&expr, label_ctx));
 							
-						let value = try!(assembler.resolve_expr(&expr, assembler.labels.get_cur_context()));
-						
-						let constraint_check = try!(constraint.resolve(&|expr, _|
-						{
-							match expr
-							{
-								ExpressionName::GlobalVariable(name) =>
-									if name == "_"
-										{ Ok(ExpressionValue::ArbitraryPrecision(value.clone())) }
-									else
-										{ panic!("invalid constraint") },
-										
-								ExpressionName::LocalVariable(_) => panic!("invalid constraint")
-							}
-						}));
-						
-						match constraint_check
-						{
-							ExpressionValue::Boolean(ok) =>
-								if ok
-									{ inst.arguments.push(expr); }
-								else
-									{ return Ok(None); },
-									
-							_ => return Err(Error::new_with_span("constraint does not return a boolean", expr.span.clone()))
-						};
+							if !try!(assembler.check_constraint(&constraint, &value))
+								{ return Ok(None); }
+						}
 					}
 				}
+				
+				inst.arguments.push(expr);
 			}
 		}
 	}

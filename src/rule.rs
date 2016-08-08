@@ -20,6 +20,7 @@ pub enum PatternSegment
 pub struct Parameter
 {
 	name: String,
+	allow_unresolved: bool,
 	constraint: Option<Expression>
 }
 
@@ -38,10 +39,17 @@ impl Rule
 	}
 	
 	
-	pub fn add_parameter(&mut self, name: String, constraint: Option<Expression>) -> usize
+	pub fn add_parameter(&mut self, name: String, allow_unresolved: bool, constraint: Option<Expression>) -> usize
 	{
-		assert!(!self.check_parameter_exists(&name));
-		self.pattern_params.push(Parameter { name: name, constraint: constraint });
+		debug_assert!(!self.check_parameter_exists(&name));
+		
+		self.pattern_params.push(Parameter
+		{
+			name: name,
+			allow_unresolved: allow_unresolved,
+			constraint: constraint
+		});
+		
 		self.pattern_params.len() - 1
 	}
 	
@@ -59,6 +67,12 @@ impl Rule
 	pub fn check_parameter_exists(&self, name: &str) -> bool
 	{
 		self.get_parameter(name).is_some()
+	}
+	
+	
+	pub fn get_parameter_allow_unresolved(&self, index: usize) -> bool
+	{
+		self.pattern_params[index].allow_unresolved
 	}
 	
 	
