@@ -141,6 +141,7 @@ fn test_instructions_constraints()
 	pass(DEF_CONSTRAINT, "simple0 0x1000000", 16, "0301000000");
 	pass(DEF_CONSTRAINT, "simple0 0xffffffff", 16, "03ffffffff");
 	
+	pass(DEF_CONSTRAINT, "start: \n simple0 start", 16, "0000");
 	pass(DEF_CONSTRAINT, "simple0 start \n start:", 16, "0300000005");
 	
 	pass(DEF_CONSTRAINT, "simple1 0x1", 16, "1001");
@@ -152,6 +153,7 @@ fn test_instructions_constraints()
 	pass(DEF_CONSTRAINT, "simple1 0x1000000", 16, "1301000000");
 	pass(DEF_CONSTRAINT, "simple1 0xffffffff", 16, "13ffffffff");
 	
+	pass(DEF_CONSTRAINT, "start: \n simple1 start", 16, "1000");
 	pass(DEF_CONSTRAINT, "simple1 start \n start:", 16, "1300000005");
 	
 	pass(DEF_CONSTRAINT, "multi0 0xff 0xff", 16, "20ffff");
@@ -160,9 +162,16 @@ fn test_instructions_constraints()
 	pass(DEF_CONSTRAINT, "multi0 0xffff 0xffff", 16, "23ffffffff");
 	pass(DEF_CONSTRAINT, "multi0 0x123456 0x7890ab", 16, "2400123456007890ab");
 	
+	pass(DEF_CONSTRAINT, "start: \n multi0   0x1 start", 16, "200100");
+	pass(DEF_CONSTRAINT, "start: \n multi0 start   0x1", 16, "200001");
+	pass(DEF_CONSTRAINT, "start: \n multi0 start start", 16, "200000");
 	pass(DEF_CONSTRAINT, "multi0   0x1 start \n start:", 16, "240000000100000009");
 	pass(DEF_CONSTRAINT, "multi0 start   0x1 \n start:", 16, "240000000900000001");
 	pass(DEF_CONSTRAINT, "multi0 start start \n start:", 16, "240000000900000009");
+	
+	fail(DEF_CONSTRAINT, "simple0 start      \n .address 0x100110011 \n start:", 1, "not satisfied");
+	fail(DEF_CONSTRAINT, "simple1 start      \n .address 0x100110011 \n start:", 1, "not satisfied");
+	fail(DEF_CONSTRAINT, "multi0 start start \n .address 0x100110011 \n start:", 1, "not satisfied");
 }
 
 

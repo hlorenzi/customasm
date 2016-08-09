@@ -145,15 +145,34 @@ impl<'def> Assembler<'def>
 	
 	pub fn resolve_production(&self, rule: &Rule, inst: &Instruction, expr: &Expression) -> Result<BitVec, Error>
 	{
-		Ok(try!(expr.resolve(&|expr, _|
+		Ok(try!(expr.resolve(&|param_expr, _|
 		{
-			let argument = match expr
+			let param_index;
+			
+			let argument = match param_expr
 			{
-				ExpressionName::GlobalVariable(name) => &inst.arguments[rule.get_parameter(name).unwrap()],
+				ExpressionName::GlobalVariable(name) =>
+				{
+					param_index = rule.get_parameter(name).unwrap();
+					&inst.arguments[param_index]
+				}
 				ExpressionName::LocalVariable(_) => panic!("local variable in production; invalid definition")
 			};
 			
-			Ok(ExpressionValue::ArbitraryPrecision(try!(self.resolve_expr(argument, inst.label_ctx))))
+			let value = try!(self.resolve_expr(argument, inst.label_ctx));
+			
+			match rule.get_parameter_constraint(param_index)
+			{
+				&None => { },
+				
+				&Some(ref constraint) =>
+				{
+					if !try!(self.check_constraint(&constraint, &value))
+						{ return Err(Error::new_with_span("parameter constraint not satisfied", argument.span.clone())); }
+				}
+			}
+			
+			Ok(ExpressionValue::ArbitraryPrecision(value))
 		})).as_bitvec())
 	}
 	
