@@ -33,12 +33,13 @@ fn parse_directives(def: &mut Definition, parser: &mut Parser) -> Result<(), Err
 {
 	while parser.match_operator(".")
 	{
-		let directive = try!(parser.expect_identifier()).clone();
+		let (directive, directive_span) = try!(parser.expect_identifier());
 		
-		match directive.identifier().as_ref()
+		match directive.as_ref()
 		{
-			"align" => def.align_bits = try!(parser.expect_number()).number_usize(),
-			_ => return Err(parser.make_error(format!("unknown directive `{}`", directive.identifier()), &directive.span))
+			"align" => def.align_bits = try!(parser.expect_number()).0,
+			
+			_ => return Err(Error::new_with_span(format!("unknown directive `{}`", directive), directive_span))
 		}
 		
 		try!(parser.expect_separator_linebreak());
@@ -73,27 +74,29 @@ fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 	{
 		if parser.current().is_identifier()
 		{
-			let ident = try!(parser.expect_identifier());
-			rule.pattern_segments.push(PatternSegment::Exact(ident.identifier().clone()));
+			let (ident, _) = try!(parser.expect_identifier());
+			rule.pattern_segments.push(PatternSegment::Exact(ident));
 		}
 		
 		else if parser.match_operator("{")
 		{
-			let name_token = try!(parser.expect_identifier()).clone();
-			let name = name_token.identifier();
+			let (name, name_span) = try!(parser.expect_identifier());
 			
+			if name == "pc"
+				{ return Err(Error::new_with_span("reserved parameter name `pc`", name_span)); }
+				
 			if rule.check_parameter_exists(&name)
-				{ return Err(parser.make_error(format!("duplicate parameter `{}`", name), &name_token.span)); }
+				{ return Err(Error::new_with_span(format!("duplicate parameter `{}`", name), name_span)); }
 				
 			let allow_unresolved = !parser.match_operator("!");
 			
 			let constraint =
 				if parser.match_operator(":")
-					{ Some(try!(Expression::new_by_parsing_checked(parser, &|name| name == "_"))) }
+					{ Some(try!(Expression::new_by_parsing_checked(parser, &|name| name == "_" || name == "pc"))) }
 				else
 					{ None };
 			
-			let param_index = rule.add_parameter(name.clone(), allow_unresolved, constraint);
+			let param_index = rule.add_parameter(name, allow_unresolved, constraint);
 			rule.pattern_segments.push(PatternSegment::Parameter(param_index));
 			
 			try!(parser.expect_operator("}"));
@@ -101,12 +104,12 @@ fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 		
 		else if parser.current().is_any_operator()
 		{
-			let op = try!(parser.expect_any_operator());
-			rule.pattern_segments.push(PatternSegment::Exact(op.operator().to_string()));
+			let (op, _) = try!(parser.expect_any_operator());
+			rule.pattern_segments.push(PatternSegment::Exact(op.to_string()));
 		}
 		
 		else
-			{ return Err(parser.make_error("expected pattern", &parser.current().span)); }
+			{ return Err(Error::new_with_span("expected pattern", parser.current().span.clone())); }
 	}
 	
 	Ok(())
@@ -119,7 +122,8 @@ fn parse_production(def: &mut Definition, parser: &mut Parser, rule: &mut Rule) 
 	
 	while !parser.current().is_linebreak_or_end()
 	{
-		let expr = try!(Expression::new_by_parsing_checked(parser, &|name| rule.check_parameter_exists(name)));
+		let expr = try!(Expression::new_by_parsing_checked(parser,
+			&|name| name == "pc" || rule.check_parameter_exists(name)));
 		
 		rule.production_bit_num += match expr.get_explicit_bit_num()
 		{

@@ -56,13 +56,6 @@ impl<'f, 'tok> Parser<'f, 'tok>
 	}
 	
 	
-	pub fn make_error<S>(&self, msg: S, span: &Span) -> Error
-	where S: Into<String>
-	{
-		Error::new_with_span(msg.into(), span.clone())
-	}
-	
-	
 	pub fn current(&self) -> &Token
 	{
 		self.next(0)
@@ -111,7 +104,7 @@ impl<'f, 'tok> Parser<'f, 'tok>
 		if self.current().is_linebreak()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected line break", &self.current().span)) }
+			{ Err(Error::new_with_span("expected line break", self.current().span.clone())) }
 	}
 	
 	
@@ -120,25 +113,49 @@ impl<'f, 'tok> Parser<'f, 'tok>
 		if self.current().is_linebreak() || self.index >= self.tokens.len()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected line break", &self.current().span)) }
+			{ Err(Error::new_with_span("expected line break", self.current().span.clone())) }
 	}
 	
 	
-	pub fn expect_identifier(&mut self) -> Result<&Token, Error>
+	pub fn expect_identifier(&mut self) -> Result<(String, Span), Error>
 	{
 		if self.current().is_identifier()
-			{ Ok(self.advance()) }
+		{
+			let token = self.advance();
+			let ident = token.identifier().clone();
+			let span = token.span.clone();
+			Ok((ident, span))
+		}
 		else
-			{ Err(self.make_error("expected identifier", &self.current().span)) }
+			{ Err(Error::new_with_span("expected identifier", self.current().span.clone())) }
 	}
 	
 	
-	pub fn expect_number(&mut self) -> Result<&Token, Error>
+	pub fn expect_number(&mut self) -> Result<(usize, Span), Error>
 	{
 		if self.current().is_number()
-			{ Ok(self.advance()) }
+		{
+			let token = self.advance();
+			let value = token.number_value();
+			let span = token.span.clone();
+			Ok((value, span))
+		}
 		else
-			{ Err(self.make_error("expected number", &self.current().span)) }
+			{ Err(Error::new_with_span("expected number", self.current().span.clone())) }
+	}
+	
+	
+	pub fn expect_number_str(&mut self) -> Result<(usize, &String, Span), Error>
+	{
+		if self.current().is_number()
+		{
+			let token = self.advance();
+			let (radix, value_str) = token.number();
+			let span = token.span.clone();
+			Ok((radix, value_str, span))
+		}
+		else
+			{ Err(Error::new_with_span("expected number", self.current().span.clone())) }
 	}
 	
 	
@@ -147,16 +164,21 @@ impl<'f, 'tok> Parser<'f, 'tok>
 		if self.current().is_string()
 			{ Ok(self.advance()) }
 		else
-			{ Err(self.make_error("expected string", &self.current().span)) }
+			{ Err(Error::new_with_span("expected string", self.current().span.clone())) }
 	}
 	
 	
-	pub fn expect_any_operator(&mut self) -> Result<&Token, Error>
+	pub fn expect_any_operator(&mut self) -> Result<(&'static str, Span), Error>
 	{
 		if self.current().is_any_operator()
-			{ Ok(self.advance()) }
+		{
+			let token = self.advance();
+			let op = token.operator();
+			let span = token.span.clone();
+			Ok((op, span))
+		}
 		else
-			{ Err(self.make_error("expected operator", &self.current().span)) }
+			{ Err(Error::new_with_span("expected operator", self.current().span.clone())) }
 	}
 	
 	
@@ -168,6 +190,6 @@ impl<'f, 'tok> Parser<'f, 'tok>
 			Ok(())
 		}
 		else
-			{ Err(self.make_error(format!("expected `{}`", op), &self.current().span)) }
+			{ Err(Error::new_with_span(format!("expected `{}`", op), self.current().span.clone())) }
 	}
 }

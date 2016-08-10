@@ -88,6 +88,8 @@ static DEF_CONSTRAINT: &'static str =
 	multi0 {a! : _ <= 1 << 16 - 1} {b! : _ <= 1 <<  8 - 1} -> 8'0x22 a[15:0] b[ 7:0]
 	multi0 {a! : _ <= 1 << 16 - 1} {b! : _ <= 1 << 16 - 1} -> 8'0x23 a[15:0] b[15:0]
 	multi0 {a  : _ <= 1 << 32 - 1} {b  : _ <= 1 << 32 - 1} -> 8'0x24 a[31:0] b[31:0]
+	
+	pc0 {a: _ + pc <= 0xff} -> 8'0x30 (a + pc)[7:0]
 ";
 
 
@@ -106,6 +108,9 @@ static DEF_EXPR: &'static str =
 	expr0 {a}  -> 8'0x20 (a + 1)[7:0]
 	expr1 {a}  -> 8'0x21 (a + a)[7:0]
 	expr2 {a}  -> 8'0x22 (a * a)[7:0]
+	
+	pc0        -> 8'0x30 pc[7:0]
+	pc1 {a}    -> 8'0x31 (pc + a)[7:0]
 ";
 
 
@@ -169,9 +174,12 @@ fn test_instructions_constraints()
 	pass(DEF_CONSTRAINT, "multi0 start   0x1 \n start:", 16, "240000000900000001");
 	pass(DEF_CONSTRAINT, "multi0 start start \n start:", 16, "240000000900000009");
 	
+	pass(DEF_CONSTRAINT, "pc0 0xff", 16, "30ff");
+	
 	fail(DEF_CONSTRAINT, "simple0 start      \n .address 0x100110011 \n start:", 1, "not satisfied");
 	fail(DEF_CONSTRAINT, "simple1 start      \n .address 0x100110011 \n start:", 1, "not satisfied");
 	fail(DEF_CONSTRAINT, "multi0 start start \n .address 0x100110011 \n start:", 1, "not satisfied");
+	fail(DEF_CONSTRAINT, ".d8 0xdd \n pc0 0xff", 2, "not satisfied");
 }
 
 
@@ -191,6 +199,11 @@ fn test_instructions_production_expr()
 	pass(DEF_EXPR, "expr0 0x08", 16, "2009");
 	pass(DEF_EXPR, "expr1 0x08", 16, "2110");
 	pass(DEF_EXPR, "expr2 0x08", 16, "2240");
+	
+	pass(DEF_EXPR, "pc0", 16, "3000");
+	pass(DEF_EXPR, "pc1 0x08", 16, "3108");
+	pass(DEF_EXPR, ".d8 0xff \n pc0", 16, "ff3001");
+	pass(DEF_EXPR, ".d8 0xff \n pc1 0x08", 16, "ff3109");
 }
 
 

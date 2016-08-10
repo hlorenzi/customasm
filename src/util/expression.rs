@@ -78,6 +78,16 @@ impl Expression
 	}
 	
 	
+	pub fn new_literal_integer(value: usize, span: Span) -> Expression
+	{
+		Expression
+		{
+			span: span,
+			term: ExpressionTerm::LiteralUInt(BitVec::new_from_usize(value))
+		}
+	}
+	
+	
 	pub fn can_resolve<F>(&self, check_name: &F) -> Result<bool, Error>
 	where F: Fn(ExpressionName, &Span) -> Result<bool, Error>
 	{
@@ -513,9 +523,9 @@ impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
 		if self.parser.current().is_operator("[")
 		{
 			self.parser.advance();
-			let leftmost_bit = try!(self.parser.expect_number()).number_usize();
+			let (leftmost_bit, _) = try!(self.parser.expect_number());
 			try!(self.parser.expect_operator(":"));
-			let rightmost_bit = try!(self.parser.expect_number()).number_usize();
+			let (rightmost_bit, _) = try!(self.parser.expect_number());
 			try!(self.parser.expect_operator("]"));
 			
 			Ok(Expression
@@ -541,18 +551,17 @@ impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
 	
 		else if self.parser.current().is_identifier()
 		{
-			let token = try!(self.parser.expect_identifier()).clone();
-			let ident = token.identifier().clone();
+			let (ident, ident_span) = try!(self.parser.expect_identifier());
 			
 			if let Some(check_var) = self.check_var
 			{
 				if !check_var(&ident)
-					{ return Err(Error::new_with_span(format!("unknown variable `{}`", ident), token.span.clone())); }
+					{ return Err(Error::new_with_span(format!("unknown variable `{}`", ident), ident_span)); }
 			}
 			
 			Ok(Expression
 			{
-				span: token.span.clone(),
+				span: ident_span,
 				term: ExpressionTerm::GlobalVariable(ident)
 			})
 		}
@@ -562,47 +571,45 @@ impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
 			let start_span = self.parser.current().span.clone();
 			self.parser.advance();
 			
-			let token = try!(self.parser.expect_identifier()).clone();
-			let ident = token.identifier().clone();
+			let (ident, ident_span) = try!(self.parser.expect_identifier());
 			
 			Ok(Expression
 			{
-				span: token.span.join(&start_span),
+				span: ident_span.join(&start_span),
 				term: ExpressionTerm::LocalVariable(ident)
 			})
 		}
 		
 		else if self.parser.current().is_number()
 		{
-			let size = 
+			let data_width = 
 				if self.parser.next(1).is_operator("'")
 				{
-					let size = try!(self.parser.expect_number()).number_usize();
+					let (data_width, _) = try!(self.parser.expect_number());
 					try!(self.parser.expect_operator("'"));
-					size
+					data_width
 				}
 				else
 					{ 0 };
 					
-			let token = try!(self.parser.expect_number()).clone();
-			let (radix, value_str) = token.number();
+			let (radix, value_str, value_span) = try!(self.parser.expect_number_str());
 			
 			match BitVec::new_from_str_trimmed(radix, value_str)
 			{
-				Err(msg) => Err(self.parser.make_error(msg, &token.span)),
+				Err(msg) => Err(Error::new_with_span(msg, value_span)),
 				Ok(mut bitvec) =>
 				{
-					if size != 0
+					if data_width != 0
 					{
-						if bitvec.len() > size
-							{ return Err(Error::new_with_span("value does not fit given size", token.span.clone())); }
+						if bitvec.len() > data_width
+							{ return Err(Error::new_with_span("value does not fit given width", value_span)); }
 					
-						bitvec.zero_extend(size);
+						bitvec.zero_extend(data_width);
 					}
 				
 					Ok(Expression
 					{
-						span: token.span.clone(),
+						span: value_span,
 						term: ExpressionTerm::LiteralUInt(bitvec)
 					})
 				}
@@ -610,6 +617,6 @@ impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
 		}
 		
 		else
-			{ Err(self.parser.make_error("expected expression", &self.parser.current().span)) }
+			{ Err(Error::new_with_span("expected expression", self.parser.current().span.clone())) }
 	}
 }

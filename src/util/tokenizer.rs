@@ -143,6 +143,17 @@ impl Span
 	}
 	
 	
+	pub fn new_null() -> Span
+	{
+		Span
+		{
+			file: Rc::new(String::new()),
+			start: CharIndex::new(),
+			end: CharIndex::new()
+		}
+	}
+	
+	
 	pub fn join(&self, other: &Span) -> Span
 	{
 		if self.file != other.file
@@ -228,7 +239,7 @@ impl Token
 	}
 	
 	
-	pub fn number_usize(&self) -> usize
+	pub fn number_value(&self) -> usize
 	{
 		match self.kind
 		{
