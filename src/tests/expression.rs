@@ -25,7 +25,7 @@ fn pass(expr_str: &str, expected_result: i64)
 
 
 #[test]
-fn test_expr()
+fn test_simple()
 {
 	pass("2 + 2", 4);
 	pass("2 - 2", 0);

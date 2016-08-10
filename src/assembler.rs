@@ -188,7 +188,7 @@ impl<'def> Assembler<'def>
 			_ => return Err(Error::new_with_span(format!("unknown directive `{}`", directive), directive_span))
 		}
 		
-		try!(parser.expect_separator_linebreak());
+		try!(parser.expect_linebreak_or_end());
 		Ok(())
 	}
 
@@ -206,7 +206,7 @@ impl<'def> Assembler<'def>
 				{ break; }
 		}
 		
-		try!(parser.expect_separator_linebreak());
+		try!(parser.expect_linebreak_or_end());
 		Ok(())
 	}
 
@@ -225,7 +225,7 @@ impl<'def> Assembler<'def>
 			label,
 			BitVec::new_from_usize(self.cur_address));
 		
-		try!(parser.expect_separator_linebreak());
+		try!(parser.expect_linebreak_or_end());
 		Ok(())
 	}
 
@@ -248,7 +248,7 @@ impl<'def> Assembler<'def>
 			label,
 			BitVec::new_from_usize(self.cur_address));
 		
-		try!(parser.expect_separator_linebreak());
+		try!(parser.expect_linebreak_or_end());
 		Ok(())
 	}
 
@@ -298,7 +298,7 @@ impl<'def> Assembler<'def>
 			None => return Err(Error::new_with_span("no match found for instruction", instr_span))
 		}
 		
-		try!(parser.expect_separator_linebreak());
+		try!(parser.expect_linebreak_or_end());
 		Ok(())
 	}
 

@@ -42,7 +42,7 @@ fn parse_directives(def: &mut Definition, parser: &mut Parser) -> Result<(), Err
 			_ => return Err(Error::new_with_span(format!("unknown directive `{}`", directive), directive_span))
 		}
 		
-		try!(parser.expect_separator_linebreak());
+		try!(parser.expect_linebreak_or_end());
 	}
 	
 	Ok(())
@@ -61,7 +61,7 @@ fn parse_rules(def: &mut Definition, parser: &mut Parser) -> Result<(), Error>
 		
 		def.rules.push(rule);
 		
-		try!(parser.expect_separator_linebreak());
+		try!(parser.expect_linebreak_or_end());
 	}
 	
 	Ok(())
@@ -70,7 +70,7 @@ fn parse_rules(def: &mut Definition, parser: &mut Parser) -> Result<(), Error>
 
 fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 {
-	while !parser.current().is_operator("->")
+	loop
 	{
 		if parser.current().is_identifier()
 		{
@@ -110,6 +110,10 @@ fn parse_pattern(parser: &mut Parser, rule: &mut Rule) -> Result<(), Error>
 		
 		else
 			{ return Err(Error::new_with_span("expected pattern", parser.current().span.clone())); }
+		
+		
+		if parser.current().is_operator("->")
+			{ break; }
 	}
 	
 	Ok(())
@@ -120,7 +124,7 @@ fn parse_production(def: &mut Definition, parser: &mut Parser, rule: &mut Rule) 
 {
 	let begin_span = parser.current().span.clone();
 	
-	while !parser.current().is_linebreak_or_end()
+	loop
 	{
 		let expr = try!(Expression::new_by_parsing_checked(parser,
 			&|name| name == "pc" || rule.check_parameter_exists(name)));
@@ -132,6 +136,9 @@ fn parse_production(def: &mut Definition, parser: &mut Parser, rule: &mut Rule) 
 		};
 		
 		rule.production_segments.push(expr);
+		
+		if parser.current().is_linebreak_or_end()
+			{ break; }
 	}
 	
 	if rule.production_bit_num % def.align_bits != 0

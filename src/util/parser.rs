@@ -108,7 +108,7 @@ impl<'f, 'tok> Parser<'f, 'tok>
 	}
 	
 	
-	pub fn expect_separator_linebreak(&mut self) -> Result<&Token, Error>
+	pub fn expect_linebreak_or_end(&mut self) -> Result<&Token, Error>
 	{
 		if self.current().is_linebreak() || self.index >= self.tokens.len()
 			{ Ok(self.advance()) }

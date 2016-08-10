@@ -274,6 +274,9 @@ fn test_literals_expr()
 	pass(".align 8", ".d8 1 + 1, 1 + 2", 16, "0203");
 	pass(".align 8", ".d8 1 + 2 + 3, 1 + 3 + 6", 16, "060a");
 	pass(".align 8", ".d8 (1 + 1), (2 + 3)", 16, "0205");
+	
+	pass(".align 8", ".d8 pc", 16, "00");
+	pass(".align 8", ".d8 0x12, pc", 16, "1201");
 }
 
 

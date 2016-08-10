@@ -1,0 +1,71 @@
+#![cfg(test)]
+
+
+use definition;
+
+
+fn pass(def_str: &str)
+{
+	definition::parse("test", &def_str.chars().collect::<Vec<char>>()).unwrap();
+}
+
+
+fn fail(def_str: &str, expected_error_line: usize, expect_error_substr: &str)
+{
+	match definition::parse("test", &def_str.chars().collect::<Vec<char>>())
+	{
+		Ok(_) => panic!(format!(
+			"\ntest passed but error expected:\n\n \
+			def:\n{}\n\n \
+			expected: error\n",
+			def_str)),
+			
+		Err(err) =>
+			if !err.line_is(expected_error_line) || !err.contains_str(expect_error_substr)
+			{
+				panic!(format!(
+					"\ntest error msg mismatch:\n\n \
+					def:\n{}\n\n \
+					.expected error msg: {}\n \
+					......got error msg: {}\n \
+					expected error line: {}\n \
+					.....got error line: {}\n",
+					def_str,
+					expect_error_substr, err.get_msg(),
+					expected_error_line, err.get_line()));
+			}
+	}
+}
+
+
+#[test]
+fn test_simple()
+{	
+	pass("");
+	pass(".align 8");
+	pass(".align 8 \n halt -> 8'0");
+	pass(".align 8 \n halt -> 8'0x33");
+	pass(".align 8 \n halt -> 4'0xd 4'0xa");
+	
+	pass(".align 8 \n halt         -> pc[7:0]");
+	pass(".align 8 \n halt {a}     ->  a[7:0]");
+	pass(".align 8 \n halt {a}     ->  a[15:0]");
+	pass(".align 8 \n halt {a}     ->  a[3:0] a[3:0]");
+	pass(".align 8 \n halt {a} {b} ->  a[7:0] b[7:0]");
+	pass(".align 8 \n halt {a} {b} ->  a[3:0] b[3:0]");
+	pass(".align 8 \n halt {a} {b} ->  a[7:0] a[7:0]");
+	pass(".align 8 \n halt {a} {b} ->  b[7:0] a[7:0]");
+	pass(".align 8 \n halt {a} {b} ->  b[7:0] b[7:0]");
+	
+	pass(".align 8 \n halt {a}     -> 8'0x45 a[7:0]");
+	pass(".align 8 \n halt {a}     -> 4'0x7  a[7:0] 4'0x7");
+	
+	fail(".xyz 8", 1, "directive");
+	fail(".align 8 \n -> 8'0", 2, "expected pattern");
+	fail(".align 8 \n halt ->", 2, "expected expression");
+	fail(".align 8 \n halt -> 4'0xd", 2, "aligned");
+	fail(".align 8 \n halt -> xyz", 2, "unknown");
+	fail(".align 8 \n halt -> xyz[7:0]", 2, "unknown");
+	fail(".align 8 \n halt {a} -> a", 2, "explicit size");
+	fail(".align 8 \n halt {a} -> a[3:0]", 2, "aligned");
+}
