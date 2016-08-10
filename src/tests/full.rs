@@ -78,18 +78,21 @@ static DEF_CONSTRAINT: &'static str =
 	simple0 {a! : _ <= 0xffffff}   -> 8'0x02 a[23:0]
 	simple0 {a  : _ <= 0xffffffff} -> 8'0x03 a[31:0]
 	
-	simple1 {a! : _ <= 1 <<  8 - 1} -> 8'0x10 a[ 7:0]
-	simple1 {a! : _ <= 1 << 16 - 1} -> 8'0x11 a[15:0]
-	simple1 {a! : _ <= 1 << 24 - 1} -> 8'0x12 a[23:0]
-	simple1 {a  : _ <= 1 << 32 - 1} -> 8'0x13 a[31:0]
+	simple1 {a! : _ <= (1 <<  8) - 1} -> 8'0x10 a[ 7:0]
+	simple1 {a! : _ <= (1 << 16) - 1} -> 8'0x11 a[15:0]
+	simple1 {a! : _ <= (1 << 24) - 1} -> 8'0x12 a[23:0]
+	simple1 {a  : _ <= (1 << 32) - 1} -> 8'0x13 a[31:0]
 	
-	multi0 {a! : _ <= 1 <<  8 - 1} {b! : _ <= 1 <<  8 - 1} -> 8'0x20 a[ 7:0] b[ 7:0]
-	multi0 {a! : _ <= 1 <<  8 - 1} {b! : _ <= 1 << 16 - 1} -> 8'0x21 a[ 7:0] b[15:0]
-	multi0 {a! : _ <= 1 << 16 - 1} {b! : _ <= 1 <<  8 - 1} -> 8'0x22 a[15:0] b[ 7:0]
-	multi0 {a! : _ <= 1 << 16 - 1} {b! : _ <= 1 << 16 - 1} -> 8'0x23 a[15:0] b[15:0]
-	multi0 {a  : _ <= 1 << 32 - 1} {b  : _ <= 1 << 32 - 1} -> 8'0x24 a[31:0] b[31:0]
+	multi0 {a! : _ <= (1 <<  8) - 1} {b! : _ <= (1 <<  8) - 1} -> 8'0x20 a[ 7:0] b[ 7:0]
+	multi0 {a! : _ <= (1 <<  8) - 1} {b! : _ <= (1 << 16) - 1} -> 8'0x21 a[ 7:0] b[15:0]
+	multi0 {a! : _ <= (1 << 16) - 1} {b! : _ <= (1 <<  8) - 1} -> 8'0x22 a[15:0] b[ 7:0]
+	multi0 {a! : _ <= (1 << 16) - 1} {b! : _ <= (1 << 16) - 1} -> 8'0x23 a[15:0] b[15:0]
+	multi0 {a  : _ <= (1 << 32) - 1} {b  : _ <= (1 << 32) - 1} -> 8'0x24 a[31:0] b[31:0]
 	
 	pc0 {a: _ + pc <= 0xff} -> 8'0x30 (a + pc)[7:0]
+	
+	range0 {a: _ >= 0x80 && _ <= 0x90} -> 8'0x40 a[7:0]
+	range1 {a: _ <  0x80 || _ >  0x90} -> 8'0x41 a[7:0]
 ";
 
 
@@ -176,10 +179,25 @@ fn test_instructions_constraints()
 	
 	pass(DEF_CONSTRAINT, "pc0 0xff", 16, "30ff");
 	
+	pass(DEF_CONSTRAINT, "range0 0x80", 16, "4080");
+	pass(DEF_CONSTRAINT, "range0 0x88", 16, "4088");
+	pass(DEF_CONSTRAINT, "range0 0x90", 16, "4090");
+	pass(DEF_CONSTRAINT, "range1 0x60", 16, "4160");
+	pass(DEF_CONSTRAINT, "range1 0x7f", 16, "417f");
+	pass(DEF_CONSTRAINT, "range1 0x91", 16, "4191");
+	pass(DEF_CONSTRAINT, "range1 0xa0", 16, "41a0");
+	
 	fail(DEF_CONSTRAINT, "simple0 start      \n .address 0x100110011 \n start:", 1, "not satisfied");
 	fail(DEF_CONSTRAINT, "simple1 start      \n .address 0x100110011 \n start:", 1, "not satisfied");
 	fail(DEF_CONSTRAINT, "multi0 start start \n .address 0x100110011 \n start:", 1, "not satisfied");
 	fail(DEF_CONSTRAINT, ".d8 0xdd \n pc0 0xff", 2, "not satisfied");
+	fail(DEF_CONSTRAINT, "range0 0x70", 1, "not satisfied");
+	fail(DEF_CONSTRAINT, "range0 0x7f", 1, "not satisfied");
+	fail(DEF_CONSTRAINT, "range0 0x91", 1, "not satisfied");
+	fail(DEF_CONSTRAINT, "range0 0xa0", 1, "not satisfied");
+	fail(DEF_CONSTRAINT, "range1 0x80", 1, "not satisfied");
+	fail(DEF_CONSTRAINT, "range1 0x88", 1, "not satisfied");
+	fail(DEF_CONSTRAINT, "range1 0x90", 1, "not satisfied");
 }
 
 
