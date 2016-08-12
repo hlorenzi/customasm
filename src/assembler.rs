@@ -40,7 +40,7 @@ struct Instruction
 }
 
 
-/// Represents an unresolved expression in a literal
+/// Represents an unresolved expression in a data
 /// directive. Includes the context in which it 
 /// appeared in the source-code.
 struct UnresolvedExpression
@@ -116,6 +116,9 @@ impl<'def> Assembler<'def>
 			if parser.current().is_operator(".")
 				{ try!(self.parse_directive(&mut parser)); }
 				
+			else if parser.current().is_identifier() && parser.next(1).is_operator("=")
+				{ try!(self.parse_global_constant(&mut parser)); }
+				
 			else if parser.current().is_identifier() && parser.next(1).is_operator(":")
 				{ try!(self.parse_global_label(&mut parser)); }
 				
@@ -175,9 +178,19 @@ impl<'def> Assembler<'def>
 		// Parse text-only directives.
 		match directive.as_ref()
 		{
-			"address" => self.cur_address = try!(parser.expect_number()).0,
+			"address" =>
+			{
+				let expr = try!(Expression::new_by_parsing(parser));
+				let value = try!(self.resolve_expr_current(&expr));
+				self.cur_address = try!(self.extract_integer(value, &expr.span));
+			}
 			
-			"output" => self.cur_output = try!(parser.expect_number()).0,
+			"output" => 
+			{
+				let expr = try!(Expression::new_by_parsing(parser));
+				let value = try!(self.resolve_expr_current(&expr));
+				self.cur_output = try!(self.extract_integer(value, &expr.span));
+			}
 			
 			"include" =>
 			{
@@ -217,6 +230,27 @@ impl<'def> Assembler<'def>
 			if !parser.match_operator(",")
 				{ break; }
 		}
+		
+		try!(parser.expect_linebreak_or_end());
+		Ok(())
+	}
+
+
+	fn parse_global_constant(&mut self, parser: &mut Parser) -> Result<(), Error>
+	{
+		let (label, label_span) = try!(parser.expect_identifier());
+		try!(parser.expect_operator("="));
+		
+		// Check for duplicate global labels.
+		if self.labels.does_global_exist(&label)
+			{ return Err(Error::new_with_span(format!("duplicate global label `{}`", label), label_span)); }
+		
+		// Resolve constant value.
+		let expr = try!(Expression::new_by_parsing(parser));
+		let value = try!(self.resolve_expr_current(&expr));
+		
+		// Store it.
+		self.labels.add_global(label, value);
 		
 		try!(parser.expect_linebreak_or_end());
 		Ok(())
@@ -282,17 +316,12 @@ impl<'def> Assembler<'def>
 			{
 				Some(instr) =>
 				{
-					if try!(self.can_resolve_instruction(&instr))
-					{
-						maybe_match = Some(instr);
-						*parser = rule_parser;
-						break;
-					}
-					else
-					{
-						maybe_match = Some(instr);
-						*parser = rule_parser;
-					}
+					let can_resolve = try!(self.can_resolve_instruction(&instr));
+					
+					maybe_match = Some((instr, rule_parser));
+					
+					if can_resolve
+						{ break; }
 				}
 				
 				None =>
@@ -303,10 +332,15 @@ impl<'def> Assembler<'def>
 			}
 		}
 		
-		// Check whether a rule was matched.
+		// Check whether there was a rule match.
 		match maybe_match
 		{
-			Some(instr) => try!(self.output_instruction(instr)),		
+			Some((instr, new_parser)) =>
+			{
+				*parser = new_parser;
+				try!(self.output_instruction(instr));
+			}
+			
 			None => return Err(Error::new_with_span("no match found for instruction", instr_span))
 		}
 		
@@ -328,7 +362,7 @@ impl<'def> Assembler<'def>
 			arguments: Vec::new()
 		};
 		
-		// Try matching every segment in the rule pattern.
+		// Try matching against every segment in the rule pattern.
 		for segment in rule.pattern_segments.iter()
 		{
 			match segment
@@ -379,7 +413,7 @@ impl<'def> Assembler<'def>
 	}
 
 
-	pub fn advance_address(&mut self, bit_num: usize)
+	fn advance_address(&mut self, bit_num: usize)
 	{
 		assert!(bit_num % self.def.align_bits == 0);
 		let address_inc = bit_num / self.def.align_bits;
@@ -388,7 +422,7 @@ impl<'def> Assembler<'def>
 	}
 	
 
-	pub fn output_aligned(&mut self, value: &Integer)
+	fn output_aligned(&mut self, value: &Integer)
 	{
 		let aligned_index = self.cur_output * self.def.align_bits;
 		self.output_bits.set(aligned_index, value);
@@ -396,14 +430,14 @@ impl<'def> Assembler<'def>
 	}
 	
 	
-	pub fn output_aligned_at(&mut self, index: usize, value: &Integer)
+	fn output_aligned_at(&mut self, index: usize, value: &Integer)
 	{
 		let aligned_index = index * self.def.align_bits;
 		self.output_bits.set(aligned_index, value);
 	}
 	
 	
-	pub fn output_expression(&mut self, expr: Expression, data_width: usize) -> Result<(), Error>
+	fn output_expression(&mut self, expr: Expression, data_width: usize) -> Result<(), Error>
 	{
 		let label_ctx = self.labels.get_cur_context();
 		
@@ -439,7 +473,7 @@ impl<'def> Assembler<'def>
 	}
 	
 	
-	pub fn output_instruction(&mut self, instr: Instruction) -> Result<(), Error>
+	fn output_instruction(&mut self, instr: Instruction) -> Result<(), Error>
 	{
 		let rule = &self.def.rules[instr.rule_index];
 		
@@ -482,7 +516,6 @@ impl<'def> Assembler<'def>
 				ExpressionValue::Integer(integer) =>
 				{
 					self.output_aligned_at(instr.output + width, &integer);
-					println!("advance production by {}", integer.get_width()); 
 					width += integer.get_width() / self.def.align_bits;
 				}
 				
@@ -494,7 +527,7 @@ impl<'def> Assembler<'def>
 	}
 	
 	
-	pub fn can_resolve_expr(&self, expr: &Expression, ctx: LabelContext) -> Result<bool, Error>
+	fn can_resolve_expr(&self, expr: &Expression, ctx: LabelContext) -> Result<bool, Error>
 	{
 		expr.can_resolve(&|expr, _|
 		{
@@ -507,7 +540,7 @@ impl<'def> Assembler<'def>
 	}
 	
 	
-	pub fn check_constraint(&self, constraint: &Expression, argument: &ExpressionValue, address: usize) -> Result<bool, Error>
+	fn check_constraint(&self, constraint: &Expression, argument: &ExpressionValue, address: usize) -> Result<bool, Error>
 	{
 		let result = try!(constraint.resolve(&|expr, _|
 		{
@@ -533,7 +566,7 @@ impl<'def> Assembler<'def>
 	}
 	
 	
-	pub fn resolve_production(&self, rule: &Rule, instr: &Instruction, expr: &Expression) -> Result<ExpressionValue, Error>
+	fn resolve_production(&self, rule: &Rule, instr: &Instruction, expr: &Expression) -> Result<ExpressionValue, Error>
 	{
 		Ok(try!(expr.resolve(&|param_expr, _|
 		{
@@ -575,7 +608,16 @@ impl<'def> Assembler<'def>
 	}
 	
 	
-	pub fn resolve_expr(&self, expr: &Expression, ctx: LabelContext, address: usize) -> Result<ExpressionValue, Error>
+	fn resolve_expr_current(&self, expr: &Expression) -> Result<ExpressionValue, Error>
+	{
+		let label_ctx = self.labels.get_cur_context();
+		let address = self.cur_address;
+		
+		self.resolve_expr(expr, label_ctx, address)
+	}
+	
+	
+	fn resolve_expr(&self, expr: &Expression, ctx: LabelContext, address: usize) -> Result<ExpressionValue, Error>
 	{
 		Ok(try!(expr.resolve(&|expr, span|
 		{
@@ -607,5 +649,15 @@ impl<'def> Assembler<'def>
 				}
 			}
 		})))
+	}
+	
+	
+	fn extract_integer(&self, value: ExpressionValue, span: &Span) -> Result<usize, Error>
+	{
+		match value
+		{
+			ExpressionValue::Integer(integer) => Ok(integer.value as usize),
+			_ => Err(Error::new_with_span("expected integer value", span.clone()))
+		}
 	}
 }

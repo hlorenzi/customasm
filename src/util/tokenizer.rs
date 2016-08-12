@@ -395,7 +395,7 @@ fn try_read_operator(file: &Rc<String>, src: &[char], index: &mut CharIndex) -> 
 {
 	let operators =
 	[
-		".", "->", ":", ";", ",",
+		".", "->", ":", ";", ",", "=",
 		"(", ")", "[", "]", "{", "}",
 		"'", "?", "#", "$",
 		"+", "-", "*", "/",

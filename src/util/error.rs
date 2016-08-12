@@ -9,6 +9,20 @@ pub struct Error
 }
 
 
+pub fn with_span<T>(span: &Span, result: Result<T, Error>) -> Result<T, Error>
+{
+	match result
+	{
+		Ok(value) => Ok(value),
+		Err(mut err) =>
+		{
+			err.span = Some(span.clone());
+			Err(err)
+		}
+	}
+}
+
+
 impl Error
 {
 	pub fn new<S>(msg: S) -> Error

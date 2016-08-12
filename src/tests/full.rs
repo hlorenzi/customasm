@@ -117,7 +117,7 @@ static DEF_EXPR: &'static str =
 
 
 #[test]
-fn test_instructions_simple()
+fn test_rules_simple()
 {	
 	pass("", "", 16, "");
 	pass(DEF_SIMPLE, "", 16, "");
@@ -135,7 +135,7 @@ fn test_instructions_simple()
 
 
 #[test]
-fn test_instructions_constraints()
+fn test_rules_constraints()
 {	
 	pass(DEF_CONSTRAINT, "", 16, "");
 	
@@ -201,7 +201,7 @@ fn test_instructions_constraints()
 
 
 #[test]
-fn test_instructions_production_expr()
+fn test_rules_with_production_expressions()
 {
 	pass(DEF_EXPR, "", 16, "");
 	
@@ -224,7 +224,7 @@ fn test_instructions_production_expr()
 
 
 #[test]
-fn test_instructions_expr()
+fn test_rules_with_argument_expressions()
 {
 	pass(DEF_SIMPLE, "add 2 + 3", 16, "1105");
 	pass(DEF_SIMPLE, "add 0x50 + 0x06", 16, "1156");
@@ -245,7 +245,7 @@ fn test_instructions_expr()
 
 
 #[test]
-fn test_literals_simple()
+fn test_data_directive_simple()
 {
 	pass(".align 1", ".d1 1, 0, 1, 0", 2, "1010");
 	pass(".align 1", ".d1 1, 0, 1, 0", 16, "a");
@@ -283,7 +283,7 @@ fn test_literals_simple()
 
 
 #[test]
-fn test_literals_expr()
+fn test_data_directive_with_expressions()
 {
 	pass(".align 8", ".d8 (1)", 16, "01");
 	pass(".align 8", ".d8 1 + 1", 16, "02");
@@ -294,15 +294,15 @@ fn test_literals_expr()
 	pass(".align 8", ".d8 1 + 1, 1 + 2", 16, "0203");
 	pass(".align 8", ".d8 1 + 2 + 3, 1 + 3 + 6", 16, "060a");
 	pass(".align 8", ".d8 (1 + 1), (2 + 3)", 16, "0205");
-	
-	pass(".align 8", ".d8 pc", 16, "00");
-	pass(".align 8", ".d8 0x12, pc", 16, "1201");
 }
 
 
 #[test]
-fn test_literals_with_variables()
+fn test_data_directive_with_variables()
 {
+	pass(".align 8", ".d8 pc", 16, "00");
+	pass(".align 8", ".d8 0x12, pc", 16, "1201");
+	
 	pass(".align 8", "start: \n .d8 start", 16, "00");
 	pass(".align 8", "start: \n .d8 0x12, 0x34, start", 16, "123400");
 	
@@ -322,6 +322,22 @@ fn test_literals_with_variables()
 	fail(".align 8", ".d8 xyz", 1, "unknown");
 	fail(".align 8", ".d8 0x12, xyz", 1, "unknown");
 	fail(".align 8", ".d8 0x12 \n .d8 xyz", 2, "unknown");
+}
+
+
+#[test]
+fn test_constants()
+{
+	pass(DEF_SIMPLE, "a = 0x12 \n jmp a", 16, "1312");
+	pass(DEF_SIMPLE, "jmp a    \n a = 0x12", 16, "1312");
+	
+	pass(DEF_SIMPLE, "a = 0x34 \n b = a    \n jmp a", 16, "1334");
+	pass(DEF_SIMPLE, "a = 0x34 \n b = a    \n jmp b", 16, "1334");
+	pass(DEF_SIMPLE, "a = 0x34 \n jmp b    \n b = a", 16, "1334");
+	pass(DEF_SIMPLE, "jmp b    \n a = 0x34 \n b = a", 16, "1334");
+	
+	fail(DEF_SIMPLE, "b = a", 1, "unknown");
+	fail(DEF_SIMPLE, "b = a \n a = 0x56", 1, "unknown");
 }
 
 
