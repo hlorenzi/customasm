@@ -3,6 +3,7 @@ use rule::{Rule, PatternSegment};
 use util::bitvec::BitVec;
 use util::error::Error;
 use util::expression::{Expression, ExpressionName, ExpressionValue};
+use util::integer::Integer;
 use util::label::{LabelManager, LabelContext};
 use util::misc;
 use util::parser::Parser;
@@ -80,16 +81,20 @@ pub fn assemble(def: &Definition, src_filename: &str, src: &[char]) -> Result<Bi
 	let instrs: Vec<_> = assembler.unresolved_instructions.drain(..).collect();
 	for instr in instrs
 	{
-		let value = try!(assembler.resolve_instruction(&instr));
-		assembler.output_aligned_at(instr.output, &value);
+		try!(assembler.resolve_instruction(&instr));
 	}
 	
 	// Resolve remaining expressions in literals.
 	let exprs: Vec<_> = assembler.unresolved_expressions.drain(..).collect();
 	for expr in exprs
 	{
-		let value = try!(assembler.resolve_expr(&expr.expr, expr.label_ctx, expr.address));
-		assembler.output_aligned_at(expr.output, &value.slice(expr.data_width - 1, 0));
+		match try!(assembler.resolve_expr(&expr.expr, expr.label_ctx, expr.address))
+		{
+			ExpressionValue::Integer(ref integer) =>
+				assembler.output_aligned_at(expr.output, &integer.slice(expr.data_width - 1, 0)),
+				
+			_ => return Err(Error::new_with_span("invalid expression", expr.expr.span.clone()))
+		}
 	}
 	
 	// Return output bits.
@@ -140,7 +145,7 @@ impl<'def> Assembler<'def>
 				Ok(data_width) =>
 				{
 					// If there was a valid number after the 'd',
-					// check for address alignment, and then
+					// check for validity, and then
 					// call a more specialized function.
 					if data_width % self.def.align_bits != 0
 					{
@@ -149,6 +154,13 @@ impl<'def> Assembler<'def>
 							directive_span));
 					}
 				
+					if data_width > 63
+					{
+						return Err(Error::new_with_span(
+							"data directive bit width is currently not supported",
+							directive_span));
+					}
+					
 					return self.parse_data_directive(parser, data_width);
 				}
 				
@@ -181,8 +193,8 @@ impl<'def> Assembler<'def>
 				let include_filename = try!(parser.expect_string()).string().clone();
 				let mut cur_path = PathBuf::from(parser.get_filename());
 				cur_path.set_file_name(&include_filename);
-				let include_bitvec = BitVec::new_from_bytes(&misc::read_file_bytes(&cur_path));
-				self.output_aligned(&include_bitvec);
+				//let include_bitvec = BitVec::new_from_bytes(&misc::read_file_bytes(&cur_path));
+				//self.output_aligned(&include_bitvec);
 			}
 			
 			_ => return Err(Error::new_with_span(format!("unknown directive `{}`", directive), directive_span))
@@ -223,7 +235,7 @@ impl<'def> Assembler<'def>
 		// Store as current address.
 		self.labels.add_global(
 			label,
-			BitVec::new_from_usize(self.cur_address));
+			ExpressionValue::Integer(Integer::new(self.cur_address as i64)));
 		
 		try!(parser.expect_linebreak_or_end());
 		Ok(())
@@ -246,7 +258,7 @@ impl<'def> Assembler<'def>
 		self.labels.add_local(
 			local_ctx,
 			label,
-			BitVec::new_from_usize(self.cur_address));
+			ExpressionValue::Integer(Integer::new(self.cur_address as i64)));
 		
 		try!(parser.expect_linebreak_or_end());
 		Ok(())
@@ -376,18 +388,18 @@ impl<'def> Assembler<'def>
 	}
 	
 
-	pub fn output_aligned(&mut self, bitvec: &BitVec)
+	pub fn output_aligned(&mut self, value: &Integer)
 	{
 		let aligned_index = self.cur_output * self.def.align_bits;
-		self.output_bits.set(aligned_index, bitvec);
-		self.advance_address(bitvec.len());
+		self.output_bits.set(aligned_index, value);
+		self.advance_address(value.get_width());
 	}
 	
 	
-	pub fn output_aligned_at(&mut self, index: usize, bitvec: &BitVec)
+	pub fn output_aligned_at(&mut self, index: usize, value: &Integer)
 	{
 		let aligned_index = index * self.def.align_bits;
-		self.output_bits.set(aligned_index, bitvec);
+		self.output_bits.set(aligned_index, value);
 	}
 	
 	
@@ -398,8 +410,13 @@ impl<'def> Assembler<'def>
 		// Try resolving the expression immediately.
 		if try!(self.can_resolve_expr(&expr, label_ctx))
 		{
-			let bits = try!(self.resolve_expr(&expr, label_ctx, self.cur_address));			
-			self.output_aligned(&bits.slice(data_width - 1, 0));
+			match try!(self.resolve_expr(&expr, label_ctx, self.cur_address))		
+			{
+				ExpressionValue::Integer(integer) =>
+					self.output_aligned(&integer.slice(data_width - 1, 0)),
+				
+				_ => return Err(Error::new_with_span("invalid expression type", expr.span.clone()))
+			}
 		}
 		
 		// If unresolvable now, store it to be resolved
@@ -430,10 +447,7 @@ impl<'def> Assembler<'def>
 		
 		// Try resolving the instruction's arguments immediately.
 		if try!(self.can_resolve_instruction(&instr))
-		{
-			let value = try!(self.resolve_instruction(&instr));
-			self.output_aligned_at(instr.output, &value);
-		}
+			{ try!(self.resolve_instruction(&instr)); }
 		
 		// If unresolvable now, store it to be resolved
 		// on the second-pass.
@@ -456,15 +470,27 @@ impl<'def> Assembler<'def>
 	}
 
 
-	fn resolve_instruction(&self, instr: &Instruction) -> Result<BitVec, Error>
+	fn resolve_instruction(&mut self, instr: &Instruction) -> Result<(), Error>
 	{
-		let mut bitvec = BitVec::new();
 		let rule = &self.def.rules[instr.rule_index];
 		
+		let mut width = 0;
 		for expr in rule.production_segments.iter()
-			{ bitvec.push(&try!(self.resolve_production(rule, instr, expr))); }
+		{
+			match try!(self.resolve_production(rule, instr, expr))
+			{
+				ExpressionValue::Integer(integer) =>
+				{
+					self.output_aligned_at(instr.output + width, &integer);
+					println!("advance production by {}", integer.get_width()); 
+					width += integer.get_width() / self.def.align_bits;
+				}
+				
+				_ => return Err(Error::new_with_span("invalid expression type", expr.span.clone()))
+			}
+		}
 		
-		Ok(bitvec)
+		Ok(())
 	}
 	
 	
@@ -481,19 +507,17 @@ impl<'def> Assembler<'def>
 	}
 	
 	
-	pub fn check_constraint(&self, constraint: &Expression, argument: &BitVec, address: usize) -> Result<bool, Error>
+	pub fn check_constraint(&self, constraint: &Expression, argument: &ExpressionValue, address: usize) -> Result<bool, Error>
 	{
-		let address_bitvec = BitVec::new_from_usize(address);
-		
 		let result = try!(constraint.resolve(&|expr, _|
 		{
 			match expr
 			{
 				ExpressionName::GlobalVariable(name) =>
 					if name == "_"
-						{ Ok(ExpressionValue::ArbitraryPrecision(argument.clone())) }
+						{ Ok(argument.clone()) }
 					else if name == "pc"
-						{ Ok(ExpressionValue::ArbitraryPrecision(address_bitvec.clone())) }
+						{ Ok(ExpressionValue::Integer(Integer::new(address as i64))) }
 					else
 						{ panic!("invalid constraint") },
 						
@@ -504,16 +528,16 @@ impl<'def> Assembler<'def>
 		match result
 		{
 			ExpressionValue::Boolean(b) => Ok(b),					
-			_ => Err(Error::new_with_span("constraint does not return a boolean", constraint.span.clone()))
+			_ => panic!("invalid constraint")
 		}
 	}
 	
 	
-	pub fn resolve_production(&self, rule: &Rule, instr: &Instruction, expr: &Expression) -> Result<BitVec, Error>
+	pub fn resolve_production(&self, rule: &Rule, instr: &Instruction, expr: &Expression) -> Result<ExpressionValue, Error>
 	{
 		Ok(try!(expr.resolve(&|param_expr, _|
 		{
-			let pc_expr = Expression::new_literal_integer(instr.address, Span::new_null());
+			let pc_expr = Expression::new_literal_integer(instr.address as i64, Span::new_null());
 			
 			let (argument, param_index) = match param_expr
 			{
@@ -546,31 +570,31 @@ impl<'def> Assembler<'def>
 				}
 			}
 			
-			Ok(ExpressionValue::ArbitraryPrecision(value))
-		})).as_bitvec())
+			Ok(value)
+		})))
 	}
 	
 	
-	pub fn resolve_expr(&self, expr: &Expression, ctx: LabelContext, address: usize) -> Result<BitVec, Error>
+	pub fn resolve_expr(&self, expr: &Expression, ctx: LabelContext, address: usize) -> Result<ExpressionValue, Error>
 	{
-		let address_bitvec = BitVec::new_from_usize(address);
-		
 		Ok(try!(expr.resolve(&|expr, span|
 		{
-			let maybe_bitvec = match expr
+			let integer_address = ExpressionValue::Integer(Integer::new(address as i64));
+			
+			let maybe_value = match expr
 			{
 				ExpressionName::GlobalVariable(name) =>
 					if name == "pc"
-						{ Some(&address_bitvec) }
+						{ Some(&integer_address) }
 					else
 						{ self.labels.get_global_value(name) },
 						
 				ExpressionName::LocalVariable(name) => self.labels.get_local_value(ctx, name)
 			};
 			
-			match maybe_bitvec
+			match maybe_value
 			{
-				Some(bitvec) => Ok(ExpressionValue::ArbitraryPrecision(bitvec.clone())),
+				Some(value) => Ok(value.clone()),
 				None =>
 				{
 					match expr
@@ -582,6 +606,6 @@ impl<'def> Assembler<'def>
 					}
 				}
 			}
-		})).as_bitvec())
+		})))
 	}
 }

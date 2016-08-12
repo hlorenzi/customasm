@@ -25,7 +25,7 @@ fn pass(def_str: &str, asm_str: &str, expected_out_radix: usize, expected_out: &
 }
 
 
-fn fail(def_str: &str, asm_str: &str, expected_error_line: usize, expect_error_substr: &str)
+fn fail(def_str: &str, asm_str: &str, expected_error_line: usize, expected_error_substr: &str)
 {
 	let def = definition::parse("test", &def_str.chars().collect::<Vec<char>>()).unwrap();
 	match assembler::assemble(&def, "test", &asm_str.chars().collect::<Vec<char>>())
@@ -40,7 +40,7 @@ fn fail(def_str: &str, asm_str: &str, expected_error_line: usize, expect_error_s
 			out.get_hex_str())),
 			
 		Err(err) =>
-			if !err.line_is(expected_error_line) || !err.contains_str(expect_error_substr)
+			if !err.line_is(expected_error_line) || !err.contains_str(expected_error_substr)
 			{
 				panic!(format!(
 					"\ntest error msg mismatch:\n\n \
@@ -51,7 +51,7 @@ fn fail(def_str: &str, asm_str: &str, expected_error_line: usize, expect_error_s
 					expected error line: {}\n \
 					.....got error line: {}\n",
 					def_str, asm_str,
-					expect_error_substr, err.get_msg(),
+					expected_error_substr, err.get_msg(),
 					expected_error_line, err.get_line()));
 			}
 	}
@@ -105,8 +105,7 @@ static DEF_EXPR: &'static str =
 	slice2 {a} -> 8'0x12 a[15:8]
 	slice3 {a} -> 8'0x13 a[ 7:0]
 	slice4 {a} -> 8'0x14 a[ 7:0] a[15:8]
-	slice5 {a} -> 8'0x15 a[0:15]
-	slice6 {a} -> 8'0x16 a[31:0]
+	slice5 {a} -> 8'0x15 a[31:0]
 	
 	expr0 {a}  -> 8'0x20 (a + 1)[7:0]
 	expr1 {a}  -> 8'0x21 (a + a)[7:0]
@@ -211,8 +210,7 @@ fn test_instructions_production_expr()
 	pass(DEF_EXPR, "slice2 0x1234", 16, "1212");
 	pass(DEF_EXPR, "slice3 0x1234", 16, "1334");
 	pass(DEF_EXPR, "slice4 0x1234", 16, "143412");
-	pass(DEF_EXPR, "slice5 0x1234", 16, "152c48");
-	pass(DEF_EXPR, "slice6 0x1234", 16, "1600001234");
+	pass(DEF_EXPR, "slice5 0x1234", 16, "1500001234");
 
 	pass(DEF_EXPR, "expr0 0x08", 16, "2009");
 	pass(DEF_EXPR, "expr1 0x08", 16, "2110");
@@ -267,8 +265,12 @@ fn test_literals_simple()
 	pass(".align 8", ".d8 0xab, 0xcd, 0xef", 16, "abcdef");
 	pass(".align 8", ".d16 0xabcd, 0xcdef, 0xefab", 16, "abcdcdefefab");
 	pass(".align 8", ".d32 0x12345678, 0x1, 0xabcdef", 16, "123456780000000100abcdef");
-	pass(".align 8", ".d64 0x12345678abcdef00, 0x123", 16, "12345678abcdef000000000000000123");
-	pass(".align 8", ".d128 0x12345678abcdef", 16, "00000000000000000012345678abcdef");
+	
+	// Big integers currently not supported.
+	//pass(".align 8", ".d64 0x12345678abcdef00, 0x123", 16, "12345678abcdef000000000000000123");
+	//pass(".align 8", ".d128 0x12345678abcdef", 16, "00000000000000000012345678abcdef");
+	fail(".align 8", ".d64 0x12345678abcdef00, 0x123", 1, "not supported");
+	fail(".align 8", ".d128 0x12345678abcdef", 1, "not supported");
 	
 	fail(".align 3", ".d1 0b1", 1, "aligned");
 	fail(".align 3", ".d2 0b10", 1, "aligned");

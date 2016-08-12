@@ -1,5 +1,6 @@
 use util::bitvec::BitVec;
 use util::error::Error;
+use util::integer::Integer;
 use util::parser::Parser;
 use util::tokenizer::Span;
 
@@ -13,7 +14,7 @@ pub struct Expression
 
 pub enum ExpressionTerm
 {
-	LiteralUInt(BitVec),
+	LiteralInteger(Integer),
 	GlobalVariable(String),
 	LocalVariable(String),
 	
@@ -48,10 +49,10 @@ pub enum ExpressionName<'s>
 }
 
 
+#[derive(Clone)]
 pub enum ExpressionValue
 {
-	ArbitraryPrecision(BitVec),
-	MachinePrecision(i64),
+	Integer(Integer),
 	Boolean(bool)
 }
 
@@ -81,12 +82,12 @@ impl Expression
 	}
 	
 	
-	pub fn new_literal_integer(value: usize, span: Span) -> Expression
+	pub fn new_literal_integer(value: i64, span: Span) -> Expression
 	{
 		Expression
 		{
 			span: span,
-			term: ExpressionTerm::LiteralUInt(BitVec::new_from_usize(value))
+			term: ExpressionTerm::LiteralInteger(Integer::new(value))
 		}
 	}
 	
@@ -96,7 +97,7 @@ impl Expression
 	{
 		match &self.term
 		{
-			&ExpressionTerm::LiteralUInt(_)           => Ok(true),
+			&ExpressionTerm::LiteralInteger(_)        => Ok(true),
 			&ExpressionTerm::GlobalVariable(ref name) => check_name(ExpressionName::GlobalVariable(&name), &self.span),
 			&ExpressionTerm::LocalVariable(ref name)  => check_name(ExpressionName::LocalVariable(&name), &self.span),
 			
@@ -129,7 +130,7 @@ impl Expression
 	{
 		match &self.term
 		{
-			&ExpressionTerm::LiteralUInt(ref bitvec) => Some(bitvec.len()),
+			&ExpressionTerm::LiteralInteger(ref integer) => integer.explicit_width,
 			
 			&ExpressionTerm::Slice(_, left, right) =>
 				if left > right
@@ -147,7 +148,7 @@ impl Expression
 	{
 		match &self.term
 		{
-			&ExpressionTerm::LiteralUInt(ref bitvec)  => Ok(Some(bitvec.len())),
+			&ExpressionTerm::LiteralInteger(ref integer)  => Ok(Some(integer.get_minimum_width())),
 			&ExpressionTerm::GlobalVariable(ref name) => check_name(ExpressionName::GlobalVariable(&name), &self.span),				
 			&ExpressionTerm::LocalVariable(ref name)  => check_name(ExpressionName::LocalVariable(&name), &self.span),
 			
@@ -167,35 +168,35 @@ impl Expression
 	{
 		match &self.term
 		{
-			&ExpressionTerm::LiteralUInt(ref bitvec)  => Ok(ExpressionValue::ArbitraryPrecision(bitvec.clone())),
+			&ExpressionTerm::LiteralInteger(ref integer)  => Ok(ExpressionValue::Integer(integer.clone())),
 			&ExpressionTerm::GlobalVariable(ref name) => check_name(ExpressionName::GlobalVariable(&name), &self.span),				
 			&ExpressionTerm::LocalVariable(ref name)  => check_name(ExpressionName::LocalVariable(&name), &self.span),
 			
-			&ExpressionTerm::Add(ref lhs, ref rhs) => ExpressionValue::perform_arith(|a, b| a.checked_add(b),
+			&ExpressionTerm::Add(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.checked_add(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 			
-			&ExpressionTerm::Sub(ref lhs, ref rhs) => ExpressionValue::perform_arith(|a, b| a.checked_sub(b),
+			&ExpressionTerm::Sub(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.checked_sub(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 				
-			&ExpressionTerm::Mul(ref lhs, ref rhs) => ExpressionValue::perform_arith(|a, b| a.checked_mul(b),
+			&ExpressionTerm::Mul(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.checked_mul(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 				
-			&ExpressionTerm::Div(ref lhs, ref rhs) => ExpressionValue::perform_arith(|a, b| a.checked_div(b),
+			&ExpressionTerm::Div(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.checked_div(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 				
-			&ExpressionTerm::Shl(ref lhs, ref rhs) => ExpressionValue::perform_arith(|a, b| a.checked_shl(b as u32),
+			&ExpressionTerm::Shl(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.checked_shl(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 				
-			&ExpressionTerm::Shr(ref lhs, ref rhs) => ExpressionValue::perform_arith(|a, b| a.checked_shr(b as u32),
+			&ExpressionTerm::Shr(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.checked_shr(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 				
-			&ExpressionTerm::BitAnd(ref lhs, ref rhs) => ExpressionValue::perform_arith(|a, b| Some(a & b),
+			&ExpressionTerm::BitAnd(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.bit_and(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 				
-			&ExpressionTerm::BitOr(ref lhs, ref rhs)  => ExpressionValue::perform_arith(|a, b| Some(a | b),
+			&ExpressionTerm::BitOr(ref lhs, ref rhs)  => ExpressionValue::perform_binary_arith(|a, b| a.bit_or(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 				
-			&ExpressionTerm::BitXor(ref lhs, ref rhs) => ExpressionValue::perform_arith(|a, b| Some(a ^ b),
+			&ExpressionTerm::BitXor(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.bit_xor(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 				
 				
@@ -206,26 +207,26 @@ impl Expression
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 			
 			
-			&ExpressionTerm::Eq(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a == b,
+			&ExpressionTerm::Eq(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a.eq(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 			
-			&ExpressionTerm::Ne(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a != b,
+			&ExpressionTerm::Ne(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a.ne(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 			
-			&ExpressionTerm::Lt(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a < b,
+			&ExpressionTerm::Lt(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a.lt(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 			
-			&ExpressionTerm::Gt(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a > b,
+			&ExpressionTerm::Gt(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a.gt(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 			
-			&ExpressionTerm::Le(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a <= b,
+			&ExpressionTerm::Le(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a.le(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 			
-			&ExpressionTerm::Ge(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a >= b,
+			&ExpressionTerm::Ge(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a.ge(b),
 				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
 			
-			&ExpressionTerm::Slice(ref expr, left, right) =>
-				Ok(ExpressionValue::ArbitraryPrecision(try!(expr.resolve(check_name)).as_bitvec().slice(left, right)))
+			&ExpressionTerm::Slice(ref expr, left, right) => ExpressionValue::perform_unary_arith(|a| Some(a.slice(left, right)),
+				&try!(expr.resolve(check_name)), &self.span)
 		}
 	}
 }
@@ -237,20 +238,18 @@ impl ExpressionValue
 	{
 		match self
 		{
-			&ExpressionValue::MachinePrecision(value) => BitVec::new_from_i64(value),
-			&ExpressionValue::ArbitraryPrecision(ref bitvec) => bitvec.clone(),
+			&ExpressionValue::Integer(ref integer) => BitVec::new_from_i64(integer.value),
 			&ExpressionValue::Boolean(value) => BitVec::new_from_vec(vec![value])
 		}
 	}
 	
 	
-	pub fn as_i64(&self) -> Option<i64>
+	pub fn as_integer(&self) -> Option<Integer>
 	{
 		match self
 		{
-			&ExpressionValue::MachinePrecision(value) => Some(value),
-			&ExpressionValue::ArbitraryPrecision(ref bitvec) => bitvec.to_i64(),
-			&ExpressionValue::Boolean(_) => None
+			&ExpressionValue::Integer(ref value) => Some(value.clone()),
+			_ => None
 		}
 	}
 	
@@ -265,17 +264,33 @@ impl ExpressionValue
 	}
 	
 
-	pub fn perform_arith<F>(op: F, a: &ExpressionValue, b: &ExpressionValue, span: &Span) -> Result<ExpressionValue, Error>
-	where F: Fn(i64, i64) -> Option<i64>
+	pub fn perform_unary_arith<F>(op: F, a: &ExpressionValue, span: &Span) -> Result<ExpressionValue, Error>
+	where F: Fn(&Integer) -> Option<Integer>
 	{
-		if let Some(ma) = a.as_i64()
+		if let Some(ma) = a.as_integer()
 		{
-			if let Some(mb) = b.as_i64()
+			match op(&ma)
 			{
-				match op(ma, mb)
+				Some(value) => return Ok(ExpressionValue::Integer(value)),
+				None => return Err(Error::new_with_span("integer overflow", span.clone()))
+			}
+		}
+		
+		Err(Error::new_with_span("invalid operands", span.clone()))
+	}
+	
+
+	pub fn perform_binary_arith<F>(op: F, a: &ExpressionValue, b: &ExpressionValue, span: &Span) -> Result<ExpressionValue, Error>
+	where F: Fn(&Integer, &Integer) -> Option<Integer>
+	{
+		if let Some(ma) = a.as_integer()
+		{
+			if let Some(mb) = b.as_integer()
+			{
+				match op(&ma, &mb)
 				{
-					Some(value) => return Ok(ExpressionValue::MachinePrecision(value)),
-					None => return Err(Error::new_with_span("machine-precision overflow", span.clone()))
+					Some(value) => return Ok(ExpressionValue::Integer(value)),
+					None => return Err(Error::new_with_span("integer overflow", span.clone()))
 				}
 			}
 		}
@@ -285,12 +300,12 @@ impl ExpressionValue
 	
 
 	pub fn perform_rel<F>(op: F, a: &ExpressionValue, b: &ExpressionValue, span: &Span) -> Result<ExpressionValue, Error>
-	where F: Fn(i64, i64) -> bool
+	where F: Fn(&Integer, &Integer) -> bool
 	{
-		if let Some(ma) = a.as_i64()
+		if let Some(ma) = a.as_integer()
 		{
-			if let Some(mb) = b.as_i64()
-				{ return Ok(ExpressionValue::Boolean(op(ma, mb))); }
+			if let Some(mb) = b.as_integer()
+				{ return Ok(ExpressionValue::Boolean(op(&ma, &mb))); }
 		}
 		
 		Err(Error::new_with_span("invalid operands", span.clone()))
@@ -395,10 +410,19 @@ impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
 		if self.parser.current().is_operator("[")
 		{
 			self.parser.advance();
-			let (leftmost_bit, _) = try!(self.parser.expect_number());
+			let (leftmost_bit, leftmost_span) = try!(self.parser.expect_number());
 			try!(self.parser.expect_operator(":"));
-			let (rightmost_bit, _) = try!(self.parser.expect_number());
+			let (rightmost_bit, rightmost_span) = try!(self.parser.expect_number());
 			try!(self.parser.expect_operator("]"));
+			
+			if leftmost_bit < rightmost_bit
+				{ return Err(Error::new_with_span("invalid slice", leftmost_span.join(&rightmost_span))); }
+			
+			if leftmost_bit > 63
+				{ return Err(Error::new_with_span("big slice index is currently not supported", leftmost_span.clone())); }
+				
+			if rightmost_bit > 63
+				{ return Err(Error::new_with_span("big slice index is currently not supported", rightmost_span.clone())); }
 			
 			Ok(Expression
 			{
@@ -466,23 +490,23 @@ impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
 					
 			let (radix, value_str, value_span) = try!(self.parser.expect_number_str());
 			
-			match BitVec::new_from_str_trimmed(radix, value_str)
+			match Integer::new_from_str(radix, value_str)
 			{
-				Err(msg) => Err(Error::new_with_span(msg, value_span)),
-				Ok(mut bitvec) =>
+				None => Err(Error::new_with_span("invalid value", value_span)),
+				Some(mut integer) =>
 				{
 					if data_width != 0
 					{
-						if bitvec.len() > data_width
+						integer = Integer::new_with_explicit_width(integer.value, data_width);
+						
+						if integer.get_minimum_width() > data_width
 							{ return Err(Error::new_with_span("value does not fit given width", value_span)); }
-					
-						bitvec.zero_extend(data_width);
 					}
 				
 					Ok(Expression
 					{
 						span: value_span,
-						term: ExpressionTerm::LiteralUInt(bitvec)
+						term: ExpressionTerm::LiteralInteger(integer)
 					})
 				}
 			}

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use util::bitvec::BitVec;
+use util::expression::ExpressionValue;
+use util::integer::Integer;
 
 
 pub struct LabelManager
@@ -9,7 +10,7 @@ pub struct LabelManager
 }
 
 
-pub type LabelValue = BitVec;
+pub type LabelValue = ExpressionValue;
 pub type LabelContext = usize;
 
 
@@ -30,7 +31,7 @@ impl LabelManager
 			name_to_index_map: HashMap::new()
 		};
 		
-		list.add_global("".to_string(), BitVec::new());
+		list.add_global("".to_string(), ExpressionValue::Integer(Integer::new(0)));
 		list
 	}
 	
