@@ -60,7 +60,7 @@ impl LabelManager
 	}
 	
 	
-	pub fn get_global_value(&self, name: &str) -> Option<&LabelValue>
+	pub fn get_global(&self, name: &str) -> Option<&LabelValue>
 	{
 		match self.name_to_index_map.get(name)
 		{
@@ -70,7 +70,7 @@ impl LabelManager
 	}
 	
 	
-	pub fn get_local_value(&self, ctx: LabelContext, name: &str) -> Option<&LabelValue>
+	pub fn get_local(&self, ctx: LabelContext, name: &str) -> Option<&LabelValue>
 	{
 		match self.global_labels[ctx as usize].local_labels.get(name)
 		{

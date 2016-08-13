@@ -192,6 +192,14 @@ impl<'def> Assembler<'def>
 				self.cur_output = try!(self.extract_integer(value, &expr.span));
 			}
 			
+			"res" => 
+			{
+				let expr = try!(Expression::new_by_parsing(parser));
+				let value = try!(self.resolve_expr_current(&expr));
+				let bits = self.def.align_bits * try!(self.extract_integer(value, &expr.span));
+				self.advance_address(bits);
+			}
+			
 			"include" =>
 			{
 				let include_filename = try!(parser.expect_string()).string().clone();
@@ -519,7 +527,7 @@ impl<'def> Assembler<'def>
 					width += integer.get_width() / self.def.align_bits;
 				}
 				
-				_ => return Err(Error::new_with_span("invalid expression type", expr.span.clone()))
+				_ => return Err(Error::new_with_span("invalid production expression type", expr.span.clone()))
 			}
 		}
 		
@@ -529,82 +537,41 @@ impl<'def> Assembler<'def>
 	
 	fn can_resolve_expr(&self, expr: &Expression, ctx: LabelContext) -> Result<bool, Error>
 	{
-		expr.can_resolve(&|expr, _|
+		expr.can_resolve(&|expr_name, _|
 		{
-			match expr
+			match expr_name
 			{
-				ExpressionName::GlobalVariable(name) => Ok(self.labels.does_global_exist(name)),
+				ExpressionName::GlobalVariable(name) => Ok(name == "pc" || self.labels.does_global_exist(name)),
 				ExpressionName::LocalVariable(name) => Ok(self.labels.does_local_exist(ctx, name))
 			}
 		})
 	}
 	
 	
-	fn check_constraint(&self, constraint: &Expression, argument: &ExpressionValue, address: usize) -> Result<bool, Error>
+	fn resolve_expr(&self, expr: &Expression, ctx: LabelContext, pc: usize) -> Result<ExpressionValue, Error>
 	{
-		let result = try!(constraint.resolve(&|expr, _|
+		expr.resolve(&|name_kind, name_span|
 		{
-			match expr
+			match name_kind
 			{
-				ExpressionName::GlobalVariable(name) =>
-					if name == "_"
-						{ Ok(argument.clone()) }
-					else if name == "pc"
-						{ Ok(ExpressionValue::Integer(Integer::new(address as i64))) }
-					else
-						{ panic!("invalid constraint") },
-						
-				ExpressionName::LocalVariable(_) => panic!("invalid constraint")
-			}
-		}));
-		
-		match result
-		{
-			ExpressionValue::Boolean(b) => Ok(b),					
-			_ => panic!("invalid constraint")
-		}
-	}
-	
-	
-	fn resolve_production(&self, rule: &Rule, instr: &Instruction, expr: &Expression) -> Result<ExpressionValue, Error>
-	{
-		Ok(try!(expr.resolve(&|param_expr, _|
-		{
-			let pc_expr = Expression::new_literal_integer(instr.address as i64, Span::new_null());
-			
-			let (argument, param_index) = match param_expr
-			{
-				ExpressionName::GlobalVariable(name) =>
+				ExpressionName::GlobalVariable(name) => match name
 				{
-					if name == "pc"
-						{ (&pc_expr, None) }
-					else
-					{
-						let param_index = rule.get_parameter(name).unwrap();
-						(&instr.arguments[param_index], Some(param_index))
-					}
-				}
-				ExpressionName::LocalVariable(_) => panic!("local variable in production; invalid definition")
-			};
-			
-			let value = try!(self.resolve_expr(argument, instr.label_ctx, instr.address));
-			
-			if param_index.is_some()
-			{
-				match rule.get_parameter_constraint(param_index.unwrap())
-				{
-					&None => { },
+					"pc" => Ok(ExpressionValue::Integer(Integer::new(pc as i64))),
 					
-					&Some(ref constraint) =>
+					name => match self.labels.get_global(name)
 					{
-						if !try!(self.check_constraint(&constraint, &value, instr.address))
-							{ return Err(Error::new_with_span("parameter constraint not satisfied", argument.span.clone())); }
+						Some(value) => Ok(value.clone()),
+						None => Err(Error::new_with_span(format!("unknown `{}`", name), name_span.clone()))
 					}
+				},
+				
+				ExpressionName::LocalVariable(name) => match self.labels.get_local(ctx, name)
+				{
+					Some(value) => Ok(value.clone()),
+					None => Err(Error::new_with_span(format!("unknown local `{}`", name), name_span.clone()))
 				}
 			}
-			
-			Ok(value)
-		})))
+		})
 	}
 	
 	
@@ -617,38 +584,68 @@ impl<'def> Assembler<'def>
 	}
 	
 	
-	fn resolve_expr(&self, expr: &Expression, ctx: LabelContext, address: usize) -> Result<ExpressionValue, Error>
+	fn resolve_production(&self, rule: &Rule, instr: &Instruction, expr: &Expression) -> Result<ExpressionValue, Error>
 	{
-		Ok(try!(expr.resolve(&|expr, span|
+		expr.resolve(&|param_kind, _|
 		{
-			let integer_address = ExpressionValue::Integer(Integer::new(address as i64));
-			
-			let maybe_value = match expr
+			match param_kind
 			{
-				ExpressionName::GlobalVariable(name) =>
-					if name == "pc"
-						{ Some(&integer_address) }
-					else
-						{ self.labels.get_global_value(name) },
-						
-				ExpressionName::LocalVariable(name) => self.labels.get_local_value(ctx, name)
-			};
-			
-			match maybe_value
-			{
-				Some(value) => Ok(value.clone()),
-				None =>
+				ExpressionName::GlobalVariable(name) => match name
 				{
-					match expr
+					"pc" => Ok(ExpressionValue::Integer(Integer::new(instr.address as i64))),
+					
+					name =>
 					{
-						ExpressionName::GlobalVariable(name) =>
-							Err(Error::new_with_span(format!("unknown `{}`", name), span.clone())),
-						ExpressionName::LocalVariable(name) =>
-							Err(Error::new_with_span(format!("unknown local `{}`", name), span.clone())),
+						let param_index = rule.get_parameter(name).unwrap();
+						let arg_expr = &instr.arguments[param_index];
+						
+						let arg_value = try!(self.resolve_expr(arg_expr, instr.label_ctx, instr.address));
+						
+						match rule.get_parameter_constraint(param_index)
+						{
+							&None => { },
+							
+							&Some(ref constraint_expr) =>
+							{
+								if !try!(self.check_constraint(&constraint_expr, &arg_value, instr.address))
+									{ return Err(Error::new_with_span("parameter constraint not satisfied", arg_expr.span.clone())); }
+							}
+						}
+						
+						Ok(arg_value)
 					}
-				}
+				},
+				
+				_ => unreachable!()
 			}
-		})))
+		})
+	}
+	
+	
+	fn check_constraint(&self, constraint: &Expression, argument: &ExpressionValue, address: usize) -> Result<bool, Error>
+	{
+		let constraint_result = try!(constraint.resolve(&|expr_name, _|
+		{
+			match expr_name
+			{
+				ExpressionName::GlobalVariable(name) => match name
+				{
+					"_" => Ok(argument.clone()),
+					
+					"pc" => Ok(ExpressionValue::Integer(Integer::new(address as i64))),
+					
+					_ => unreachable!()
+				},
+						
+				_ => unreachable!()
+			}
+		}));
+		
+		match constraint_result
+		{
+			ExpressionValue::Boolean(b) => Ok(b),					
+			_ => Err(Error::new_with_span("invalid constraint expression type", constraint.span.clone()))
+		}
 	}
 	
 	

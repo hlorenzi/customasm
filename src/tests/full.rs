@@ -245,6 +245,20 @@ fn test_rules_with_argument_expressions()
 
 
 #[test]
+fn test_address_directive()
+{
+	pass(DEF_SIMPLE, ".address 0x80        \n a:    \n jmp a", 16, "1380");
+	pass(DEF_SIMPLE, ".address 0x80        \n jmp a \n a:",    16, "1382");
+	pass(DEF_SIMPLE, ".address 0x40 + 0x40 \n jmp a \n a:",    16, "1382");
+
+	pass(DEF_SIMPLE, ".address pc        \n a: \n jmp a", 16, "1300");
+	pass(DEF_SIMPLE, ".address pc + 0x80 \n a: \n jmp a", 16, "1380");
+	
+	pass(DEF_SIMPLE, ".address pc + 0x80 \n jmp a \n .address pc + 0x10 \n a:", 16, "1392");
+}
+
+
+#[test]
 fn test_data_directive_simple()
 {
 	pass(".align 1", ".d1 1, 0, 1, 0", 2, "1010");
@@ -322,6 +336,18 @@ fn test_data_directive_with_variables()
 	fail(".align 8", ".d8 xyz", 1, "unknown");
 	fail(".align 8", ".d8 0x12, xyz", 1, "unknown");
 	fail(".align 8", ".d8 0x12 \n .d8 xyz", 2, "unknown");
+}
+
+
+#[test]
+fn test_reserve_directive()
+{
+	pass(DEF_SIMPLE, ".res 1     \n halt", 16, "0010");
+	pass(DEF_SIMPLE, ".res 3     \n halt", 16, "00000010");
+	pass(DEF_SIMPLE, ".res 1 + 2 \n halt", 16, "00000010");
+	
+	pass(DEF_SIMPLE, "a: \n .res 1 \n b: \n .res 1 \n jmp a", 16, "00001300");
+	pass(DEF_SIMPLE, "a: \n .res 1 \n b: \n .res 1 \n jmp b", 16, "00001301");
 }
 
 
