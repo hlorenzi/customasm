@@ -9,17 +9,33 @@ pub struct Error
 }
 
 
-pub fn with_span<T>(span: &Span, result: Result<T, Error>) -> Result<T, Error>
+pub fn handle_opt_span<T, S>(option: Option<T>, msg: S, span: &Span) -> Result<T, Error>
+where S: Into<String>
 {
-	match result
+    match option
 	{
-		Ok(value) => Ok(value),
-		Err(mut err) =>
+        Some(val) => Ok(val),
+		
+        None =>
+            return Err(Error::new_with_span(msg.into(), span.clone()))
+    }
+}
+
+
+pub fn handle_result_span<T>(result: Result<T, Error>, span: &Span) -> Result<T, Error>
+{
+    match result
+	{
+        Ok(val) => Ok(val),
+		
+        Err(mut err) =>
 		{
-			err.span = Some(span.clone());
-			Err(err)
+			if err.span.is_none()
+				{ err.span = Some(span.clone()); }
+				
+            return Err(err);
 		}
-	}
+    }
 }
 
 
@@ -53,6 +69,16 @@ impl Error
 	}
 	
 	
+	pub fn get_file(&self) -> &str
+	{
+		match self.span
+		{
+			Some(ref span) => span.file.as_ref(),
+			None => panic!("no filename")
+		}
+	}
+	
+	
 	pub fn get_line(&self) -> usize
 	{
 		match self.span
@@ -66,6 +92,16 @@ impl Error
 	pub fn contains_str(&self, s: &str) -> bool
 	{
 		self.msg.find(s).is_some()
+	}
+	
+	
+	pub fn file_is(&self, file: &str) -> bool
+	{
+		match self.span
+		{
+			Some(ref span) => span.file.as_ref() == file,
+			None => false
+		}
 	}
 	
 	

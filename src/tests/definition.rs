@@ -14,25 +14,16 @@ fn fail(def_str: &str, expected_error_line: usize, expected_error_substr: &str)
 {
 	match definition::parse("test", &def_str.chars().collect::<Vec<char>>())
 	{
-		Ok(_) => panic!(format!(
-			"\ntest passed but error expected:\n\n \
-			def:\n{}\n\n \
-			expected: error\n",
-			def_str)),
+		Ok(_) => panic!("test passed but error expected"),
 			
 		Err(err) =>
 			if !err.line_is(expected_error_line) || !err.contains_str(expected_error_substr)
 			{
-				panic!(format!(
-					"\ntest error msg mismatch:\n\n \
-					def:\n{}\n\n \
-					.expected error msg: {}\n \
-					......got error msg: {}\n \
-					expected error line: {}\n \
-					.....got error line: {}\n",
-					def_str,
-					expected_error_substr, err.get_msg(),
-					expected_error_line, err.get_line()));
+				println!(" expected error msg: {}", expected_error_substr);
+				println!("      got error msg: {}", err.get_msg());
+				println!("expected error line: {}", expected_error_line);
+				println!("     got error line: {}", err.get_line());
+				panic!("test error mismatch");
 			}
 	}
 }

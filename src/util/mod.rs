@@ -1,6 +1,7 @@
 pub mod bitvec;
 pub mod error;
 pub mod expression;
+pub mod filehandler;
 pub mod integer;
 pub mod label;
 pub mod misc;

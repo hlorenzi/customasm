@@ -20,15 +20,6 @@ impl BitVec
 	}
 	
 	
-	pub fn new_from_vec(bits: Vec<bool>) -> BitVec
-	{
-		BitVec
-		{
-			bits: bits
-		}
-	}
-	
-	
 	pub fn new_from_bytes(bytes: &[u8]) -> BitVec
 	{
 		let mut bitvec = BitVec::new();
@@ -41,29 +32,6 @@ impl BitVec
 				byte <<= 1;
 			}
 		}
-		
-		bitvec
-	}
-	
-	
-	pub fn new_from_usize(mut value: usize) -> BitVec
-	{
-		let mut bitvec = BitVec::new();
-		while value != 0
-		{
-			bitvec.insert_bit(0, value & 1 != 0);
-			value >>= 1;
-		}
-		
-		bitvec
-	}
-	
-	
-	pub fn new_from_i64(value: i64) -> BitVec
-	{
-		let mut bitvec = BitVec::new();
-		for bit in 0..64
-			{ bitvec.insert_bit(0, value & (1 << bit) != 0); }
 		
 		bitvec
 	}
@@ -113,26 +81,6 @@ impl BitVec
 		
 		Ok(bitvec)
 	}
-
-
-	pub fn new_from_str_trimmed(radix: usize, value_str: &str) -> Result<BitVec, String>
-	{	
-		let mut bitvec = try!(BitVec::new_from_str(radix, value_str));
-		bitvec.trim();
-		Ok(bitvec)
-	}
-
-
-	pub fn new_from_str_sized(bit_num: usize, radix: usize, value_str: &str) -> Result<BitVec, String>
-	{
-		let mut bitvec = try!(BitVec::new_from_str_trimmed(radix, value_str));
-		
-		if bitvec.len() > bit_num
-			{ return Err(format!("value `{}` does not fit given size of `{}`", value_str, bit_num)); }
-			
-		bitvec.zero_extend(bit_num);
-		Ok(bitvec)
-	}
 	
 	
 	pub fn to_i64(&self) -> Option<i64>
@@ -166,12 +114,6 @@ impl BitVec
 	}
 	
 	
-	pub fn get_vec(&self) -> &Vec<bool>
-	{
-		&self.bits
-	}
-	
-	
 	pub fn get_bit(&self, index: usize) -> bool
 	{
 		if index >= self.bits.len()
@@ -187,25 +129,6 @@ impl BitVec
 			{ false }
 		else
 			{ self.bits[self.bits.len() - 1 - index] }
-	}
-	
-	
-	pub fn slice(&self, left: usize, right: usize) -> BitVec
-	{
-		let mut result = BitVec::new();
-		
-		if right < left
-		{
-			for i in right..(left + 1)
-				{ result.insert_bit(0, self.get_bit_rev(i)); }
-		}
-		else
-		{
-			for i in left..(right + 1)
-				{ result.push_bit(self.get_bit_rev(i)); }
-		}
-		
-		result
 	}
 	
 	
@@ -230,30 +153,17 @@ impl BitVec
 	}
 	
 	
-	pub fn remove_bit(&mut self, index: usize)
-	{
-		self.bits.remove(index);
-	}
-	
-	
-	pub fn trim(&mut self)
-	{
-		while self.len() > 1 && !self.get_bit(0)
-			{ self.remove_bit(0); }
-	}
-	
-	
-	pub fn zero_extend(&mut self, final_bit_num: usize)
-	{
-		while self.bits.len() < final_bit_num
-			{ self.bits.insert(0, false); }
-	}
-	
-	
 	pub fn set(&mut self, index: usize, value: &Integer)
 	{
 		for i in 0..value.get_width()
 			{ self.set_bit(index + i, value.get_bit(value.get_width() - 1 - i)); }
+	}
+	
+	
+	pub fn set_bitvec(&mut self, index: usize, bitvec: &BitVec)
+	{
+		for i in 0..bitvec.len()
+			{ self.set_bit(index + i, bitvec.get_bit(i)); }
 	}
 	
 	

@@ -3,34 +3,38 @@ use util::tokenizer::{Token, TokenKind, CharIndex, Span};
 use std::rc::Rc;
 
 
-pub struct Parser<'f, 'tok>
+pub struct Parser<'tok>
 {
-	filename: &'f str,
 	tokens: &'tok [Token],
 	index: usize,
 	end_token: Token
 }
 
 
-impl<'f, 'tok> Parser<'f, 'tok>
+impl<'tok> Parser<'tok>
 {
-	pub fn new_from_index(filename: &'f str, tokens: &'tok [Token], start_index: usize) -> Parser<'f, 'tok>
+	pub fn new_from_index(tokens: &'tok [Token], start_index: usize) -> Parser<'tok>
 	{
 		let end_index =
 			if tokens.len() > 0
 				{ tokens[tokens.len() - 1].span.end }
 			else
 				{ CharIndex::new() };
-				
+			
+		let end_filename =
+			if tokens.len() > 0
+				{ tokens[0].span.file.as_ref() }
+			else
+				{ "<unknown>" };
+			
 		let end_token = Token
 		{
-			span: Span::new(Rc::new(filename.to_string()), end_index, end_index),
+			span: Span::new(Rc::new(end_filename.to_string()), end_index, end_index),
 			kind: TokenKind::End
 		};
 		
 		Parser
 		{
-			filename: filename,
 			tokens: tokens,
 			index: start_index,
 			end_token: end_token
@@ -38,21 +42,24 @@ impl<'f, 'tok> Parser<'f, 'tok>
 	}
 	
 	
-	pub fn new(filename: &'f str, tokens: &'tok [Token]) -> Parser<'f, 'tok>
+	pub fn new(tokens: &'tok [Token]) -> Parser<'tok>
 	{
-		Parser::new_from_index(filename, tokens, 0)
+		Parser::new_from_index(tokens, 0)
 	}
 	
 	
-	pub fn clone_from_current(&self) -> Parser<'f, 'tok>
+	pub fn clone_from_current(&self) -> Parser<'tok>
 	{
-		Parser::new_from_index(self.filename, self.tokens, self.index)
+		Parser::new_from_index(self.tokens, self.index)
 	}
 	
 	
-	pub fn get_filename(&self) -> &'f str
+	pub fn get_filename(&self) -> &str
 	{
-		self.filename
+		if self.tokens.len() > 0
+			{ self.tokens[0].span.file.as_ref() }
+		else
+			{ panic!("no token in parser") }
 	}
 	
 	
@@ -159,10 +166,15 @@ impl<'f, 'tok> Parser<'f, 'tok>
 	}
 	
 	
-	pub fn expect_string(&mut self) -> Result<&Token, Error>
+	pub fn expect_string(&mut self) -> Result<(String, Span), Error>
 	{
 		if self.current().is_string()
-			{ Ok(self.advance()) }
+		{
+			let token = self.advance();
+			let string = token.string().clone();
+			let span = token.span.clone();
+			Ok((string, span))
+		}
 		else
 			{ Err(Error::new_with_span("expected string", self.current().span.clone())) }
 	}

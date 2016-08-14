@@ -2,6 +2,7 @@ use definition;
 use assembler;
 use util::misc;
 use util::error::Error;
+use util::filehandler::{RealFileHandler};
 use util::tokenizer::Span;
 use std::fs::File;
 use std::io::Write;
@@ -43,8 +44,7 @@ pub fn driver_main(opt: &DriverOptions)
 	if !opt.quiet
 		{ println!("assembling..."); }
 	
-	let asm_chars = misc::read_file(&PathBuf::from(opt.asm_file));
-	let output_bitvec = match assembler::assemble(&def, &opt.asm_file, &asm_chars)
+	let output_bitvec = match assembler::assemble(&def, &RealFileHandler, &PathBuf::from(opt.asm_file))
 	{
 		Ok(output_bitvec) => output_bitvec,
 		Err(err) => misc::error_exit(err)

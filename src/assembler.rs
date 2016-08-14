@@ -1,21 +1,23 @@
 use definition::Definition;
 use rule::{Rule, PatternSegment};
 use util::bitvec::BitVec;
-use util::error::Error;
+use util::error::{Error, handle_opt_span, handle_result_span};
 use util::expression::{Expression, ExpressionName, ExpressionValue};
+use util::filehandler::{FileHandler, CustomFileHandler};
 use util::integer::Integer;
 use util::label::{LabelManager, LabelContext};
-use util::misc;
 use util::parser::Parser;
 use util::tokenizer;
 use util::tokenizer::Span;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 
 /// Holds intermediate information during assembly.
-struct Assembler<'def>
+struct Assembler<'a>
 {
-	def: &'def Definition,
+	def: &'a Definition,
+	filehandler: &'a FileHandler,
+	
 	cur_address: usize,
 	cur_output: usize,
 	labels: LabelManager,
@@ -53,18 +55,32 @@ struct UnresolvedExpression
 }
 
 
+/// Convenience interface to the assembly process.
+pub fn assemble_single(def: &Definition, src: &str) -> Result<BitVec, Error>
+{
+	let mut filehandler = CustomFileHandler::new();
+	filehandler.add("main", src);
+	
+	assemble(def, &filehandler, &PathBuf::from("main"))
+}
+
+
+
 /// Main interface to the assembly process.
-pub fn assemble(def: &Definition, src_filename: &str, src: &[char]) -> Result<BitVec, Error>
+pub fn assemble(def: &Definition, filehandler: &FileHandler, main_filename: &Path) -> Result<BitVec, Error>
 {
 	// Prepare an assembler state.
 	let mut assembler = Assembler
 	{
 		def: def,
+		filehandler: filehandler,
+		
 		cur_address: 0,
 		cur_output: 0,
 		labels: LabelManager::new(),
 		unresolved_instructions: Vec::new(),
 		unresolved_expressions: Vec::new(),
+		
 		output_bits: BitVec::new()
 	};
 	
@@ -72,7 +88,7 @@ pub fn assemble(def: &Definition, src_filename: &str, src: &[char]) -> Result<Bi
 	// == First-pass ==
 	
 	// Parse the main file.
-	try!(assembler.parse_file(src_filename, src));	
+	try!(assembler.parse_file(main_filename));	
 	
 	
 	// == Second-pass ==
@@ -91,7 +107,7 @@ pub fn assemble(def: &Definition, src_filename: &str, src: &[char]) -> Result<Bi
 		match try!(assembler.resolve_expr(&expr.expr, expr.label_ctx, expr.address))
 		{
 			ExpressionValue::Integer(ref integer) =>
-				assembler.output_aligned_at(expr.output, &integer.slice(expr.data_width - 1, 0)),
+				assembler.output_integer_at(expr.output, &integer.slice(expr.data_width - 1, 0)),
 				
 			_ => return Err(Error::new_with_span("invalid expression", expr.expr.span.clone()))
 		}
@@ -106,15 +122,16 @@ impl<'def> Assembler<'def>
 {
 	/// Main parsing function.
 	/// Reads source-code lines and decides how to decode them.
-	fn parse_file(&mut self, src_filename: &str, src: &[char]) -> Result<(), Error>
+	fn parse_file(&mut self, filename: &Path) -> Result<(), Error>
 	{
-		let tokens = tokenizer::tokenize(src_filename, src);
-		let mut parser = Parser::new(src_filename, &tokens);
+		let chars = try!(self.filehandler.read_chars(filename));
+		let tokens = tokenizer::tokenize(filename.to_string_lossy().into_owned(), &chars);
+		let mut parser = Parser::new(&tokens);
 		
 		while !parser.is_over()
 		{
 			if parser.current().is_operator(".")
-				{ try!(self.parse_directive(&mut parser)); }
+				{ try!(self.parse_directive(&mut parser, filename)); }
 				
 			else if parser.current().is_identifier() && parser.next(1).is_operator("=")
 				{ try!(self.parse_global_constant(&mut parser)); }
@@ -133,7 +150,7 @@ impl<'def> Assembler<'def>
 	}
 
 
-	fn parse_directive(&mut self, parser: &mut Parser) -> Result<(), Error>
+	fn parse_directive(&mut self, parser: &mut Parser, cur_path: &Path) -> Result<(), Error>
 	{
 		try!(parser.expect_operator("."));
 		let (directive, directive_span) = try!(parser.expect_identifier());
@@ -179,43 +196,41 @@ impl<'def> Assembler<'def>
 		match directive.as_ref()
 		{
 			"address" =>
-			{
-				let expr = try!(Expression::new_by_parsing(parser));
-				let value = try!(self.resolve_expr_current(&expr));
-				self.cur_address = try!(self.extract_integer(value, &expr.span));
-			}
+				self.cur_address = try!(self.parse_integer(parser)).value as usize,
 			
 			"output" => 
-			{
-				let expr = try!(Expression::new_by_parsing(parser));
-				let value = try!(self.resolve_expr_current(&expr));
-				self.cur_output = try!(self.extract_integer(value, &expr.span));
-			}
+				self.cur_output = try!(self.parse_integer(parser)).value as usize,
 			
 			"res" => 
 			{
-				let expr = try!(Expression::new_by_parsing(parser));
-				let value = try!(self.resolve_expr_current(&expr));
-				let bits = self.def.align_bits * try!(self.extract_integer(value, &expr.span));
+				let bits = self.def.align_bits * try!(self.parse_integer(parser)).value as usize;
 				self.advance_address(bits);
 			}
 			
 			"include" =>
 			{
-				let include_filename = try!(parser.expect_string()).string().clone();
-				let mut cur_path = PathBuf::from(parser.get_filename());
-				cur_path.set_file_name(&include_filename);
-				let include_chars = misc::read_file(&cur_path);
-				try!(self.parse_file(&cur_path.to_string_lossy().into_owned(), &include_chars));
+				let (new_path, span) = try!(self.parse_relative_filename(parser, cur_path));
+				
+				try!(handle_result_span(
+					self.parse_file(&new_path), &span));
 			}
 			
 			"includebin" => 
 			{
-				let include_filename = try!(parser.expect_string()).string().clone();
-				let mut cur_path = PathBuf::from(parser.get_filename());
-				cur_path.set_file_name(&include_filename);
-				//let include_bitvec = BitVec::new_from_bytes(&misc::read_file_bytes(&cur_path));
-				//self.output_aligned(&include_bitvec);
+				let (new_path, span) = try!(self.parse_relative_filename(parser, cur_path));
+				
+				let bytes = try!(handle_result_span(
+					self.filehandler.read_bytes(&new_path), &span));
+					
+				let bitvec = BitVec::new_from_bytes(&bytes);
+				
+				if bitvec.len() % self.def.align_bits != 0
+				{
+					return Err(Error::new_with_span(
+						format!("included file size is not aligned to `{}` bits", self.def.align_bits), span));
+				}
+				
+				self.output_bitvec(&bitvec);
 			}
 			
 			_ => return Err(Error::new_with_span(format!("unknown directive `{}`", directive), directive_span))
@@ -307,7 +322,7 @@ impl<'def> Assembler<'def>
 	}
 
 
-	fn parse_instruction<'p, 'f, 'tok>(&mut self, parser: &'p mut Parser<'f, 'tok>) -> Result<(), Error>
+	fn parse_instruction<'p, 'tok>(&mut self, parser: &'p mut Parser<'tok>) -> Result<(), Error>
 	{
 		let mut maybe_match = None;
 		let instr_span = parser.current().span.clone();
@@ -429,8 +444,16 @@ impl<'def> Assembler<'def>
 		self.cur_address += address_inc;
 	}
 	
+	
+	fn output_bitvec(&mut self, bitvec: &BitVec)
+	{
+		let aligned_index = self.cur_output * self.def.align_bits;
+		self.output_bits.set_bitvec(aligned_index, bitvec);
+		self.advance_address(bitvec.len());
+	}
+	
 
-	fn output_aligned(&mut self, value: &Integer)
+	fn output_integer(&mut self, value: &Integer)
 	{
 		let aligned_index = self.cur_output * self.def.align_bits;
 		self.output_bits.set(aligned_index, value);
@@ -438,7 +461,7 @@ impl<'def> Assembler<'def>
 	}
 	
 	
-	fn output_aligned_at(&mut self, index: usize, value: &Integer)
+	fn output_integer_at(&mut self, index: usize, value: &Integer)
 	{
 		let aligned_index = index * self.def.align_bits;
 		self.output_bits.set(aligned_index, value);
@@ -455,7 +478,7 @@ impl<'def> Assembler<'def>
 			match try!(self.resolve_expr(&expr, label_ctx, self.cur_address))		
 			{
 				ExpressionValue::Integer(integer) =>
-					self.output_aligned(&integer.slice(data_width - 1, 0)),
+					self.output_integer(&integer.slice(data_width - 1, 0)),
 				
 				_ => return Err(Error::new_with_span("invalid expression type", expr.span.clone()))
 			}
@@ -498,6 +521,27 @@ impl<'def> Assembler<'def>
 			
 		Ok(())
 	}
+	
+		
+	fn parse_integer(&self, parser: &mut Parser) -> Result<Integer, Error>
+	{
+		let expr = try!(Expression::new_by_parsing(parser));
+		let value = try!(self.resolve_expr_current(&expr));
+		
+		handle_opt_span(
+			value.as_integer(), "expected integer", &expr.span)
+	}
+	
+		
+	fn parse_relative_filename(&self, parser: &mut Parser, cur_path: &Path) -> Result<(PathBuf, Span), Error>
+	{
+		let (filename, span) = try!(parser.expect_string());
+		
+		let mut new_path = PathBuf::from(cur_path);
+		new_path.set_file_name(&filename);
+		
+		Ok((new_path, span))
+	}
 
 
 	fn can_resolve_instruction(&self, instr: &Instruction) -> Result<bool, Error>
@@ -523,7 +567,7 @@ impl<'def> Assembler<'def>
 			{
 				ExpressionValue::Integer(integer) =>
 				{
-					self.output_aligned_at(instr.output + width, &integer);
+					self.output_integer_at(instr.output + width, &integer);
 					width += integer.get_width() / self.def.align_bits;
 				}
 				
@@ -645,16 +689,6 @@ impl<'def> Assembler<'def>
 		{
 			ExpressionValue::Boolean(b) => Ok(b),					
 			_ => Err(Error::new_with_span("invalid constraint expression type", constraint.span.clone()))
-		}
-	}
-	
-	
-	fn extract_integer(&self, value: ExpressionValue, span: &Span) -> Result<usize, Error>
-	{
-		match value
-		{
-			ExpressionValue::Integer(integer) => Ok(integer.value as usize),
-			_ => Err(Error::new_with_span("expected integer value", span.clone()))
 		}
 	}
 }

@@ -21,7 +21,7 @@ pub fn parse(src_filename: &str, src: &[char]) -> Result<Definition, Error>
 	};
 	
 	let tokens = tokenizer::tokenize(src_filename, src);
-	let mut parser = Parser::new(src_filename, &tokens);
+	let mut parser = Parser::new(&tokens);
 	try!(parse_directives(&mut def, &mut parser));
 	try!(parse_rules(&mut def, &mut parser));
 	

@@ -4,55 +4,80 @@
 use definition;
 use assembler;
 use util::bitvec::BitVec;
+use util::filehandler::{FileHandler, CustomFileHandler};
+use std::path::PathBuf;
 
 
-fn pass(def_str: &str, asm_str: &str, expected_out_radix: usize, expected_out: &str)
+fn pass(
+	def_str: &str,
+	asm_str: &str,
+	expected_out_radix: usize,
+	expected_out: &str)
+{
+	let mut filehandler = CustomFileHandler::new();
+	filehandler.add("test", asm_str);
+	
+	pass_filehandler(def_str, &filehandler, "test", expected_out_radix, expected_out);
+}
+
+
+fn pass_filehandler(
+	def_str: &str,
+	filehandler: &FileHandler,
+	main_filename: &str,
+	expected_out_radix: usize,
+	expected_out: &str)
 {
 	let def = definition::parse("test", &def_str.chars().collect::<Vec<char>>()).unwrap();
-	let out = assembler::assemble(&def, asm_str, &asm_str.chars().collect::<Vec<char>>()).unwrap();
+	let out = assembler::assemble(&def, filehandler, &PathBuf::from(main_filename)).unwrap();
 	
 	if !out.compare(&BitVec::new_from_str(expected_out_radix, expected_out).unwrap())
 	{
-		panic!(format!(
-			"\ntest output mismatch:\n\n \
-			def:\n{}\n\n \
-			asm:\n{}\n\n \
-			expected: {}\n \
-			.....got: {}\n",
-			def_str, asm_str,
-			expected_out, out.get_hex_str()));
+		println!("expected: {}", expected_out);
+		println!("     got: {}", out.get_hex_str());
+		panic!("test failed but expected to pass");
 	}
 }
 
 
-fn fail(def_str: &str, asm_str: &str, expected_error_line: usize, expected_error_substr: &str)
+fn fail(
+	def_str: &str,
+	asm_str: &str,
+	expected_error_line: usize,
+	expected_error_substr: &str)
+{
+	let mut filehandler = CustomFileHandler::new();
+	filehandler.add("test", asm_str);
+	
+	fail_filehandler(def_str, &filehandler, "test", "test", expected_error_line, expected_error_substr);
+}
+
+
+fn fail_filehandler(
+	def_str: &str,
+	filehandler: &FileHandler,
+	main_filename: &str,
+	expected_error_file: &str,
+	expected_error_line: usize,
+	expected_error_substr: &str)
 {
 	let def = definition::parse("test", &def_str.chars().collect::<Vec<char>>()).unwrap();
-	match assembler::assemble(&def, "test", &asm_str.chars().collect::<Vec<char>>())
+	match assembler::assemble(&def, filehandler, &PathBuf::from(main_filename))
 	{
-		Ok(out) => panic!(format!(
-			"\ntest passed but error expected:\n\n \
-			def:\n{}\n\n \
-			asm:\n{}\n\n \
-			expected: error\n \
-			.....got: {}\n",
-			def_str, asm_str,
-			out.get_hex_str())),
+		Ok(_) => panic!("test passed but error expected"),
 			
 		Err(err) =>
-			if !err.line_is(expected_error_line) || !err.contains_str(expected_error_substr)
+			if !err.file_is(expected_error_file) ||
+				!err.line_is(expected_error_line) ||
+				!err.contains_str(expected_error_substr)
 			{
-				panic!(format!(
-					"\ntest error msg mismatch:\n\n \
-					def:\n{}\n\n \
-					asm:\n{}\n\n \
-					.expected error msg: {}\n \
-					......got error msg: {}\n \
-					expected error line: {}\n \
-					.....got error line: {}\n",
-					def_str, asm_str,
-					expected_error_substr, err.get_msg(),
-					expected_error_line, err.get_line()));
+				println!(" expected error msg: {}", expected_error_substr);
+				println!("      got error msg: {}", err.get_msg());
+				println!("expected error file: {}", expected_error_file);
+				println!("     got error file: {}", err.get_file());
+				println!("expected error line: {}", expected_error_line);
+				println!("     got error line: {}", err.get_line());
+				panic!("test error mismatch");
 			}
 	}
 }
@@ -378,6 +403,9 @@ fn test_labels_simple()
 	pass(DEF_SIMPLE, "start: \n 'x: \n jmp 'x \n loop: \n 'x: \n jmp 'x", 16, "13001302");
 	pass(DEF_SIMPLE, "          'x: \n jmp 'x \n loop: \n 'x: \n jmp 'x", 16, "13001302");
 	
+	fail(DEF_SIMPLE, "start: \n jmp start \n start:", 3, "duplicate");
+	fail(DEF_SIMPLE, "'xyz:  \n jmp 'xyz  \n 'xyz:", 3, "duplicate local");
+	
 	fail(DEF_SIMPLE, "        jmp  xyz", 1, "unknown");
 	fail(DEF_SIMPLE, "halt \n jmp  xyz", 2, "unknown");
 	fail(DEF_SIMPLE, "        jmp 'xyz", 1, "unknown local");
@@ -388,4 +416,37 @@ fn test_labels_simple()
 	
 	fail(DEF_SIMPLE, "'xyz: \n halt     \n start: \n jmp 'xyz", 4, "unknown local");
 	fail(DEF_SIMPLE, "'xyz: \n jmp 'xyz \n start: \n jmp 'xyz", 4, "unknown local");
+}
+
+
+#[test]
+fn test_include_directive()
+{
+	let mut filehandler = CustomFileHandler::new();
+	filehandler.add("simple",      "halt \n add 0x45");
+	filehandler.add("def_global",  "start: \n halt \n add 0x45");
+	filehandler.add("use_global",  "jmp start");
+	filehandler.add("sub/simple",  "halt \n add 0x67");
+	filehandler.add("sub/include", "halt \n add 0x89 \n .include \"other\"");
+	filehandler.add("sub/other",   "halt \n add 0xab");
+	
+	filehandler.add("pass1", ".include \"simple\"");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass1", 16, "101145");
+	
+	filehandler.add("pass2", ".include \"def_global\"");
+	filehandler.add("pass3", ".include \"def_global\" \n .include \"use_global\"");
+	filehandler.add("pass4", ".include \"use_global\" \n .include \"def_global\"");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass2", 16, "101145");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass3", 16, "1011451300");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass4", 16, "1302101145");
+	
+	filehandler.add("pass5", ".include \"sub/simple\"");
+	filehandler.add("pass6", ".include \"sub/include\"");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass5", 16, "101167");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass6", 16, "1011891011ab");
+	
+	filehandler.add("fail1", ".include \"xyz\"");
+	filehandler.add("fail2", ".include \"use_global\"");
+	fail_filehandler(DEF_SIMPLE, &filehandler, "fail1", "fail1", 1, "not exist");
+	fail_filehandler(DEF_SIMPLE, &filehandler, "fail2", "use_global", 1, "unknown");
 }

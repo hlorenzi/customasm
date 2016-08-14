@@ -9,7 +9,7 @@ use util::tokenizer::tokenize;
 fn pass(expr_str: &str, expected_result: i64)
 {
 	let tokens = tokenize("test", &expr_str.chars().collect::<Vec<char>>());
-	let mut parser = Parser::new("test", &tokens);
+	let mut parser = Parser::new(&tokens);
 	let expr = Expression::new_by_parsing(&mut parser).unwrap();
 	let result = expr.resolve(&|_, _| panic!("invalid test")).unwrap().as_integer().unwrap();
 	
@@ -27,7 +27,7 @@ fn pass(expr_str: &str, expected_result: i64)
 fn parse_fail(expr_str: &str, expected_error_substr: &str)
 {
 	let tokens = tokenize("test", &expr_str.chars().collect::<Vec<char>>());
-	let mut parser = Parser::new("test", &tokens);
+	let mut parser = Parser::new(&tokens);
 	match Expression::new_by_parsing(&mut parser)
 	{
 		Ok(_) => panic!(format!(

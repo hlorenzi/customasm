@@ -1,4 +1,3 @@
-use util::bitvec::BitVec;
 use util::error::Error;
 use util::integer::Integer;
 use util::parser::Parser;
@@ -57,24 +56,24 @@ pub enum ExpressionValue
 }
 
 
-struct ExpressionParser<'p, 'f: 'p, 'tok: 'p>
+struct ExpressionParser<'p, 'tok: 'p>
 {
-	parser: &'p mut Parser<'f, 'tok>,
+	parser: &'p mut Parser<'tok>,
 	check_var: Option<&'p Fn(&str) -> bool>
 }
 
 
 impl Expression
 {
-	pub fn new_by_parsing<'p, 'f: 'p, 'tok: 'p>(parser: &'p mut Parser<'f, 'tok>) -> Result<Expression, Error>
+	pub fn new_by_parsing<'p, 'tok: 'p>(parser: &'p mut Parser<'tok>) -> Result<Expression, Error>
 	{
 		let mut expr_parser = ExpressionParser { parser: parser, check_var: None };
 		expr_parser.parse()
 	}
 	
 	
-	pub fn new_by_parsing_checked<'p, 'f: 'p, 'tok: 'p>(
-		parser: &'p mut Parser<'f, 'tok>,
+	pub fn new_by_parsing_checked<'p, 'tok: 'p>(
+		parser: &'p mut Parser<'tok>,
 		check_var: &Fn(&str) -> bool) -> Result<Expression, Error>
 	{
 		let mut expr_parser = ExpressionParser { parser: parser, check_var: Some(check_var) };
@@ -234,16 +233,6 @@ impl Expression
 
 impl ExpressionValue
 {
-	pub fn as_bitvec(&self) -> BitVec
-	{
-		match self
-		{
-			&ExpressionValue::Integer(ref integer) => BitVec::new_from_i64(integer.value),
-			&ExpressionValue::Boolean(value) => BitVec::new_from_vec(vec![value])
-		}
-	}
-	
-	
 	pub fn as_integer(&self) -> Option<Integer>
 	{
 		match self
@@ -326,7 +315,7 @@ impl ExpressionValue
 }
 
 	
-impl<'p, 'f, 'tok> ExpressionParser<'p, 'f, 'tok>
+impl<'p, 'tok> ExpressionParser<'p, 'tok>
 {
 	pub fn parse(&mut self) -> Result<Expression, Error>
 	{
