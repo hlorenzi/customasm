@@ -13,13 +13,13 @@ fn pass(expr_str: &str, expected_result: i64)
 	let expr = Expression::new_by_parsing(&mut parser).unwrap();
 	let result = expr.resolve(&|_, _| panic!("invalid test")).unwrap().as_integer().unwrap();
 	
-	if result.value != expected_result
+	let result_i64 = result.to_i64().unwrap();
+	
+	if result_i64 != expected_result
 	{
-		panic!(format!(
-			"\nexpression result mismatch: {}\n\n \
-			expected: {}\n \
-			.....got: {}\n",
-			expr_str, expected_result, result.value));
+		println!("expected: {}", expected_result);
+		println!("     got: {}", result_i64);
+		panic!("expression failed but expected to pass");
 	}
 }
 
@@ -30,19 +30,14 @@ fn parse_fail(expr_str: &str, expected_error_substr: &str)
 	let mut parser = Parser::new(&tokens);
 	match Expression::new_by_parsing(&mut parser)
 	{
-		Ok(_) => panic!(format!(
-			"\nexpression passed but error expected: {}\n",
-			expr_str)),
+		Ok(_) => panic!("expression passed but error expected: {}", expr_str),
 			
 		Err(err) =>
 			if !err.contains_str(expected_error_substr)
 			{
-				panic!(format!(
-					"\nexpression error msg mismatch: {}\n\n \
-					.expected error msg: {}\n \
-					......got error msg: {}\n",
-					expr_str,
-					expected_error_substr, err.get_msg()));
+				println!(" expected error msg: {}", expected_error_substr);
+				println!("      got error msg: {}", err.get_msg());
+				panic!("expression error mismatch");
 			}
 	}
 }

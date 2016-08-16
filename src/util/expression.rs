@@ -1,5 +1,5 @@
+use util::bigint::BigInt;
 use util::error::Error;
-use util::integer::Integer;
 use util::parser::Parser;
 use util::tokenizer::Span;
 
@@ -11,48 +11,42 @@ pub struct Expression
 }
 
 
+#[derive(Clone)]
+pub enum ExpressionValue
+{
+	Integer(BigInt),
+	Boolean(bool)
+}
+
+
+pub enum ExpressionVariable
+{
+	Global(String),
+	Local(String)
+}
+
+
 pub enum ExpressionTerm
 {
-	LiteralInteger(Integer),
-	GlobalVariable(String),
-	LocalVariable(String),
-	
-	Add(Box<Expression>, Box<Expression>),
-	Sub(Box<Expression>, Box<Expression>),
-	Mul(Box<Expression>, Box<Expression>),
-	Div(Box<Expression>, Box<Expression>),
-	Shl(Box<Expression>, Box<Expression>),
-	Shr(Box<Expression>, Box<Expression>),
-	BitAnd(Box<Expression>, Box<Expression>),
-	BitOr(Box<Expression>, Box<Expression>),
-	BitXor(Box<Expression>, Box<Expression>),
-	
-	And(Box<Expression>, Box<Expression>),
-	Or(Box<Expression>, Box<Expression>),
-	
-	Eq(Box<Expression>, Box<Expression>),
-	Ne(Box<Expression>, Box<Expression>),
-	Lt(Box<Expression>, Box<Expression>),
-	Gt(Box<Expression>, Box<Expression>),
-	Le(Box<Expression>, Box<Expression>),
-	Ge(Box<Expression>, Box<Expression>),
-	
+	Literal(ExpressionValue),
+	Variable(ExpressionVariable),
+	Binary(Box<Expression>, Box<Expression>, BinaryOp),	
 	Slice(Box<Expression>, usize, usize)
 }
 
 
-pub enum ExpressionName<'s>
+#[derive(Copy, Clone)]
+pub enum BinaryOp
 {
-	GlobalVariable(&'s str),
-	LocalVariable(&'s str)
-}
-
-
-#[derive(Clone)]
-pub enum ExpressionValue
-{
-	Integer(Integer),
-	Boolean(bool)
+	Add, Sub, Mul, Div,
+	Shl, Shr,
+	BitAnd, BitOr, BitXor,
+	
+	And, Or,
+	
+	Eq, Ne,
+	Lt, Gt,
+	Le, Ge
 }
 
 
@@ -86,41 +80,23 @@ impl Expression
 		Expression
 		{
 			span: span,
-			term: ExpressionTerm::LiteralInteger(Integer::new(value))
+			term: ExpressionTerm::Literal(ExpressionValue::Integer(BigInt::from_i64(value)))
 		}
 	}
 	
 	
-	pub fn can_resolve<F>(&self, check_name: &F) -> Result<bool, Error>
-	where F: Fn(ExpressionName, &Span) -> Result<bool, Error>
+	pub fn can_resolve<F>(&self, handle_var: &F) -> Result<bool, Error>
+	where F: Fn(&ExpressionVariable, &Span) -> Result<bool, Error>
 	{
 		match &self.term
 		{
-			&ExpressionTerm::LiteralInteger(_)        => Ok(true),
-			&ExpressionTerm::GlobalVariable(ref name) => check_name(ExpressionName::GlobalVariable(&name), &self.span),
-			&ExpressionTerm::LocalVariable(ref name)  => check_name(ExpressionName::LocalVariable(&name), &self.span),
+			&ExpressionTerm::Literal(_)      => Ok(true),
+			&ExpressionTerm::Variable(ref v) => handle_var(&v, &self.span),
 			
-			&ExpressionTerm::Add(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::Sub(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::Mul(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::Div(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::Shl(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::Shr(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::BitAnd(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::BitOr(ref lhs, ref rhs)  => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::BitXor(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			
-			&ExpressionTerm::And(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::Or(ref lhs, ref rhs)  => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			
-			&ExpressionTerm::Eq(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::Ne(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::Lt(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::Gt(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::Le(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			&ExpressionTerm::Ge(ref lhs, ref rhs) => Ok(try!(lhs.can_resolve(check_name)) && try!(rhs.can_resolve(check_name))),
-			
-			&ExpressionTerm::Slice(ref expr, _, _) => expr.can_resolve(check_name)
+			&ExpressionTerm::Binary(ref lhs, ref rhs, _) =>
+				Ok(try!(lhs.can_resolve(handle_var)) && try!(rhs.can_resolve(handle_var))),
+				
+			&ExpressionTerm::Slice(ref expr, _, _) => expr.can_resolve(handle_var)
 		}
 	}
 	
@@ -129,103 +105,73 @@ impl Expression
 	{
 		match &self.term
 		{
-			&ExpressionTerm::LiteralInteger(ref integer) => integer.explicit_width,
-			
-			&ExpressionTerm::Slice(_, left, right) =>
-				if left > right
-					{ Some(left - right + 1) }
-				else
-					{ Some(right - left + 1) },
+			&ExpressionTerm::Slice(_, left, right) => Some(left - right + 1),
 					
 			_ => None
 		}
 	}
 	
 	
-	pub fn get_minimum_bit_num<F>(&self, check_name: &F) -> Result<Option<usize>, Error>
-	where F: Fn(ExpressionName, &Span) -> Result<Option<usize>, Error>
+	pub fn get_minimum_bit_num<F>(&self, handle_var: &F) -> Result<Option<usize>, Error>
+	where F: Fn(&ExpressionVariable, &Span) -> Result<Option<usize>, Error>
 	{
 		match &self.term
 		{
-			&ExpressionTerm::LiteralInteger(ref integer)  => Ok(Some(integer.get_minimum_width())),
-			&ExpressionTerm::GlobalVariable(ref name) => check_name(ExpressionName::GlobalVariable(&name), &self.span),				
-			&ExpressionTerm::LocalVariable(ref name)  => check_name(ExpressionName::LocalVariable(&name), &self.span),
+			&ExpressionTerm::Literal(ref v) => match v
+			{
+				&ExpressionValue::Integer(ref bigint) => Ok(Some(bigint.width())),
+				_ => Ok(None)
+			},
 			
-			&ExpressionTerm::Slice(_, left, right) =>
-				if left > right
-					{ Ok(Some(left - right + 1)) }
-				else
-					{ Ok(Some(right - left + 1)) },
+			&ExpressionTerm::Variable(ref v) => handle_var(&v, &self.span),				
+			
+			&ExpressionTerm::Slice(_, left, right) => Ok(Some(left - right + 1)),
 					
 			_ => Ok(None)
 		}
 	}
 	
 	
-	pub fn resolve<F>(&self, check_name: &F) -> Result<ExpressionValue, Error>
-	where F: Fn(ExpressionName, &Span) -> Result<ExpressionValue, Error>
+	pub fn resolve<F>(&self, handle_var: &F) -> Result<ExpressionValue, Error>
+	where F: Fn(&ExpressionVariable, &Span) -> Result<ExpressionValue, Error>
 	{
 		match &self.term
 		{
-			&ExpressionTerm::LiteralInteger(ref integer)  => Ok(ExpressionValue::Integer(integer.clone())),
-			&ExpressionTerm::GlobalVariable(ref name) => check_name(ExpressionName::GlobalVariable(&name), &self.span),				
-			&ExpressionTerm::LocalVariable(ref name)  => check_name(ExpressionName::LocalVariable(&name), &self.span),
+			&ExpressionTerm::Literal(ref v)  => Ok(v.clone()),
+			&ExpressionTerm::Variable(ref v) => handle_var(&v, &self.span),			
 			
-			&ExpressionTerm::Add(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.checked_add(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
+			&ExpressionTerm::Binary(ref lhs, ref rhs, op) =>
+			{
+				let lhs_value = try!(lhs.resolve(handle_var));
+				let rhs_value = try!(rhs.resolve(handle_var));
+				
+				match op
+				{
+					BinaryOp::Add => ExpressionValue::perform_binary_arith(|a, b| a.checked_add(b),  &lhs_value, &rhs_value, &self.span),
+					BinaryOp::Sub => ExpressionValue::perform_binary_arith(|a, b| a.checked_sub(b),  &lhs_value, &rhs_value, &self.span),
+					BinaryOp::Mul => ExpressionValue::perform_binary_arith(|a, b| a.checked_mul(b),  &lhs_value, &rhs_value, &self.span),
+					BinaryOp::Div => ExpressionValue::perform_binary_arith(|a, b| a.checked_div(b),  &lhs_value, &rhs_value, &self.span),
+					BinaryOp::Shl => ExpressionValue::perform_binary_arith(|a, b| a.checked_shl(b), &lhs_value, &rhs_value, &self.span),
+					BinaryOp::Shr => ExpressionValue::perform_binary_arith(|a, b| a.checked_shr(b), &lhs_value, &rhs_value, &self.span),
+					
+					BinaryOp::BitAnd => ExpressionValue::perform_binary_arith(|a, b| a.bit_and(b), &lhs_value, &rhs_value, &self.span),
+					BinaryOp::BitOr  => ExpressionValue::perform_binary_arith(|a, b| a.bit_or(b),  &lhs_value, &rhs_value, &self.span),
+					BinaryOp::BitXor => ExpressionValue::perform_binary_arith(|a, b| a.bit_xor(b), &lhs_value, &rhs_value, &self.span),
+					
+					BinaryOp::And => ExpressionValue::perform_bool(|a, b| a & b, &lhs_value, &rhs_value, &self.span),
+					BinaryOp::Or  => ExpressionValue::perform_bool(|a, b| a | b, &lhs_value, &rhs_value, &self.span),
+					
+					BinaryOp::Eq => ExpressionValue::perform_rel(|a, b| a.eq(b), &lhs_value, &rhs_value, &self.span),
+					BinaryOp::Ne => ExpressionValue::perform_rel(|a, b| a.ne(b), &lhs_value, &rhs_value, &self.span),
+					BinaryOp::Lt => ExpressionValue::perform_rel(|a, b| a.lt(b), &lhs_value, &rhs_value, &self.span),
+					BinaryOp::Gt => ExpressionValue::perform_rel(|a, b| a.gt(b), &lhs_value, &rhs_value, &self.span),
+					BinaryOp::Le => ExpressionValue::perform_rel(|a, b| a.le(b), &lhs_value, &rhs_value, &self.span),
+					BinaryOp::Ge => ExpressionValue::perform_rel(|a, b| a.ge(b), &lhs_value, &rhs_value, &self.span),
+				}
+			}
 			
-			&ExpressionTerm::Sub(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.checked_sub(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-				
-			&ExpressionTerm::Mul(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.checked_mul(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-				
-			&ExpressionTerm::Div(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.checked_div(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-				
-			&ExpressionTerm::Shl(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.checked_shl(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-				
-			&ExpressionTerm::Shr(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.checked_shr(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-				
-			&ExpressionTerm::BitAnd(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.bit_and(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-				
-			&ExpressionTerm::BitOr(ref lhs, ref rhs)  => ExpressionValue::perform_binary_arith(|a, b| a.bit_or(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-				
-			&ExpressionTerm::BitXor(ref lhs, ref rhs) => ExpressionValue::perform_binary_arith(|a, b| a.bit_xor(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-				
-				
-			&ExpressionTerm::And(ref lhs, ref rhs) => ExpressionValue::perform_bool(|a, b| a && b,
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-				
-			&ExpressionTerm::Or(ref lhs, ref rhs)  => ExpressionValue::perform_bool(|a, b| a || b,
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-			
-			
-			&ExpressionTerm::Eq(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a.eq(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-			
-			&ExpressionTerm::Ne(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a.ne(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-			
-			&ExpressionTerm::Lt(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a.lt(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-			
-			&ExpressionTerm::Gt(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a.gt(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-			
-			&ExpressionTerm::Le(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a.le(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-			
-			&ExpressionTerm::Ge(ref lhs, ref rhs) => ExpressionValue::perform_rel(|a, b| a.ge(b),
-				&try!(lhs.resolve(check_name)), &try!(rhs.resolve(check_name)), &self.span),
-			
-			&ExpressionTerm::Slice(ref expr, left, right) => ExpressionValue::perform_unary_arith(|a| Some(a.slice(left, right)),
-				&try!(expr.resolve(check_name)), &self.span)
+			&ExpressionTerm::Slice(ref expr, left, right) => ExpressionValue::perform_unary_arith(
+				|a| a.slice(left, right), &try!(expr.resolve(handle_var)), &self.span)
 		}
 	}
 }
@@ -233,11 +179,11 @@ impl Expression
 
 impl ExpressionValue
 {
-	pub fn as_integer(&self) -> Option<Integer>
+	pub fn as_integer(&self) -> Option<BigInt>
 	{
 		match self
 		{
-			&ExpressionValue::Integer(ref value) => Some(value.clone()),
+			&ExpressionValue::Integer(ref bigint) => Some(bigint.clone()),
 			_ => None
 		}
 	}
@@ -254,7 +200,7 @@ impl ExpressionValue
 	
 
 	pub fn perform_unary_arith<F>(op: F, a: &ExpressionValue, span: &Span) -> Result<ExpressionValue, Error>
-	where F: Fn(&Integer) -> Option<Integer>
+	where F: Fn(&BigInt) -> Option<BigInt>
 	{
 		if let Some(ma) = a.as_integer()
 		{
@@ -270,7 +216,7 @@ impl ExpressionValue
 	
 
 	pub fn perform_binary_arith<F>(op: F, a: &ExpressionValue, b: &ExpressionValue, span: &Span) -> Result<ExpressionValue, Error>
-	where F: Fn(&Integer, &Integer) -> Option<Integer>
+	where F: Fn(&BigInt, &BigInt) -> Option<BigInt>
 	{
 		if let Some(ma) = a.as_integer()
 		{
@@ -289,7 +235,7 @@ impl ExpressionValue
 	
 
 	pub fn perform_rel<F>(op: F, a: &ExpressionValue, b: &ExpressionValue, span: &Span) -> Result<ExpressionValue, Error>
-	where F: Fn(&Integer, &Integer) -> bool
+	where F: Fn(&BigInt, &BigInt) -> bool
 	{
 		if let Some(ma) = a.as_integer()
 		{
@@ -325,32 +271,32 @@ impl<'p, 'tok> ExpressionParser<'p, 'tok>
 	
 	fn parse_binary_op_term(&mut self, level: usize) -> Result<Expression, Error>
 	{	
-		let binary_ops: &[&[(&str, &Fn(Box<Expression>, Box<Expression>) -> ExpressionTerm)]] =
+		let binary_ops: &[&[(&str, BinaryOp)]] =
 		&[
-			&[("||", &ExpressionTerm::Or)],
-			&[("&&", &ExpressionTerm::And)],
+			&[("||", BinaryOp::Or)],
+			&[("&&", BinaryOp::And)],
 			&[
-				("==", &ExpressionTerm::Eq),
-				("!=", &ExpressionTerm::Ne),
-				("<",  &ExpressionTerm::Lt),
-				(">",  &ExpressionTerm::Gt),
-				("<=", &ExpressionTerm::Le),
-				(">=", &ExpressionTerm::Ge)
+				("==", BinaryOp::Eq),
+				("!=", BinaryOp::Ne),
+				("<",  BinaryOp::Lt),
+				(">",  BinaryOp::Gt),
+				("<=", BinaryOp::Le),
+				(">=", BinaryOp::Ge)
 			],
-			&[("|",  &ExpressionTerm::BitOr)],
-			&[("^",  &ExpressionTerm::BitXor)],
-			&[("&",  &ExpressionTerm::BitAnd)],
+			&[("|",  BinaryOp::BitOr)],
+			&[("^",  BinaryOp::BitXor)],
+			&[("&",  BinaryOp::BitAnd)],
 			&[
-				("<<", &ExpressionTerm::Shl),
-				(">>", &ExpressionTerm::Shr)
-			],
-			&[
-				("+",  &ExpressionTerm::Add),
-				("-",  &ExpressionTerm::Sub)
+				("<<", BinaryOp::Shl),
+				(">>", BinaryOp::Shr)
 			],
 			&[
-				("*",  &ExpressionTerm::Mul),
-				("/",  &ExpressionTerm::Div)
+				("+",  BinaryOp::Add),
+				("-",  BinaryOp::Sub)
+			],
+			&[
+				("*",  BinaryOp::Mul),
+				("/",  BinaryOp::Div)
 			],
 		];
 		
@@ -379,7 +325,7 @@ impl<'p, 'tok> ExpressionParser<'p, 'tok>
 			let rhs = try!(self.parse_binary_op_term(level + 1));
 			
 			let span = lhs.span.join(&rhs.span);
-			let term = (op_match.unwrap().1)(Box::new(lhs), Box::new(rhs));
+			let term = ExpressionTerm::Binary(Box::new(lhs), Box::new(rhs), op_match.unwrap().1);
 			
 			lhs = Expression
 			{
@@ -447,7 +393,7 @@ impl<'p, 'tok> ExpressionParser<'p, 'tok>
 			Ok(Expression
 			{
 				span: ident_span,
-				term: ExpressionTerm::GlobalVariable(ident)
+				term: ExpressionTerm::Variable(ExpressionVariable::Global(ident))
 			})
 		}
 		
@@ -461,42 +407,53 @@ impl<'p, 'tok> ExpressionParser<'p, 'tok>
 			Ok(Expression
 			{
 				span: ident_span.join(&start_span),
-				term: ExpressionTerm::LocalVariable(ident)
+				term: ExpressionTerm::Variable(ExpressionVariable::Local(ident))
 			})
 		}
 		
 		else if self.parser.current().is_number()
 		{
-			let data_width = 
+			let maybe_data_width = 
 				if self.parser.next(1).is_operator("'")
 				{
 					let (data_width, _) = try!(self.parser.expect_number());
 					try!(self.parser.expect_operator("'"));
-					data_width
+					Some(data_width)
 				}
 				else
-					{ 0 };
+					{ None };
 					
 			let (radix, value_str, value_span) = try!(self.parser.expect_number_str());
 			
-			match Integer::new_from_str(radix, value_str)
+			match BigInt::from_str_radix(radix, value_str)
 			{
 				None => Err(Error::new_with_span("invalid value", value_span)),
-				Some(mut integer) =>
+				Some(bigint) =>
 				{
-					if data_width != 0
+					let integer_width = bigint.width();
+					
+					let literal_expr = Expression
 					{
-						integer = Integer::new_with_explicit_width(integer.value, data_width);
+						span: value_span.clone(),
+						term: ExpressionTerm::Literal(ExpressionValue::Integer(bigint))
+					};
+					
+					match maybe_data_width
+					{
+						None => Ok(literal_expr),
 						
-						if integer.get_minimum_width() > data_width
-							{ return Err(Error::new_with_span("value does not fit given width", value_span)); }
+						Some(data_width) =>
+						{
+							if integer_width > data_width
+								{ return Err(Error::new_with_span("value does not fit given width", value_span)); }
+							
+							Ok(Expression
+							{
+								span: value_span.clone(),
+								term: ExpressionTerm::Slice(Box::new(literal_expr), data_width - 1, 0)
+							})
+						}
 					}
-				
-					Ok(Expression
-					{
-						span: value_span,
-						term: ExpressionTerm::LiteralInteger(integer)
-					})
 				}
 			}
 		}

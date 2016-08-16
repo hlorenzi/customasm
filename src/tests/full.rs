@@ -35,7 +35,7 @@ fn pass_filehandler(
 	{
 		println!("expected: {}", expected_out);
 		println!("     got: {}", out.get_hex_str());
-		panic!("test failed but expected to pass");
+		panic!("full test failed but expected to pass");
 	}
 }
 
@@ -64,7 +64,7 @@ fn fail_filehandler(
 	let def = definition::parse("test", &def_str.chars().collect::<Vec<char>>()).unwrap();
 	match assembler::assemble(&def, filehandler, &PathBuf::from(main_filename))
 	{
-		Ok(_) => panic!("test passed but error expected"),
+		Ok(_) => panic!("full test passed but error expected"),
 			
 		Err(err) =>
 			if !err.file_is(expected_error_file) ||
@@ -77,7 +77,7 @@ fn fail_filehandler(
 				println!("     got error file: {}", err.get_file());
 				println!("expected error line: {}", expected_error_line);
 				println!("     got error line: {}", err.get_line());
-				panic!("test error mismatch");
+				panic!("full test error mismatch");
 			}
 	}
 }

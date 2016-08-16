@@ -1,10 +1,10 @@
 use definition::Definition;
 use rule::{Rule, PatternSegment};
+use util::bigint::BigInt;
 use util::bitvec::BitVec;
 use util::error::{Error, handle_opt_span, handle_result_span};
-use util::expression::{Expression, ExpressionName, ExpressionValue};
+use util::expression::{Expression, ExpressionVariable, ExpressionValue};
 use util::filehandler::{FileHandler, CustomFileHandler};
-use util::integer::Integer;
 use util::label::{LabelManager, LabelContext};
 use util::parser::Parser;
 use util::tokenizer;
@@ -106,8 +106,8 @@ pub fn assemble(def: &Definition, filehandler: &FileHandler, main_filename: &Pat
 	{
 		match try!(assembler.resolve_expr(&expr.expr, expr.label_ctx, expr.address))
 		{
-			ExpressionValue::Integer(ref integer) =>
-				assembler.output_integer_at(expr.output, &integer.slice(expr.data_width - 1, 0)),
+			ExpressionValue::Integer(ref bigint) =>
+				assembler.output_integer_at(expr.output, expr.data_width, &bigint),
 				
 			_ => return Err(Error::new_with_span("invalid expression", expr.expr.span.clone()))
 		}
@@ -196,14 +196,14 @@ impl<'def> Assembler<'def>
 		match directive.as_ref()
 		{
 			"address" =>
-				self.cur_address = try!(self.parse_integer(parser)).value as usize,
+				self.cur_address = try!(self.parse_integer(parser)),
 			
 			"output" => 
-				self.cur_output = try!(self.parse_integer(parser)).value as usize,
+				self.cur_output = try!(self.parse_integer(parser)),
 			
 			"res" => 
 			{
-				let bits = self.def.align_bits * try!(self.parse_integer(parser)).value as usize;
+				let bits = self.def.align_bits * try!(self.parse_integer(parser));
 				self.advance_address(bits);
 			}
 			
@@ -292,7 +292,7 @@ impl<'def> Assembler<'def>
 		// Store as current address.
 		self.labels.add_global(
 			label,
-			ExpressionValue::Integer(Integer::new(self.cur_address as i64)));
+			ExpressionValue::Integer(BigInt::from_usize(self.cur_address)));
 		
 		try!(parser.expect_linebreak_or_end());
 		Ok(())
@@ -315,7 +315,7 @@ impl<'def> Assembler<'def>
 		self.labels.add_local(
 			local_ctx,
 			label,
-			ExpressionValue::Integer(Integer::new(self.cur_address as i64)));
+			ExpressionValue::Integer(BigInt::from_usize(self.cur_address)));
 		
 		try!(parser.expect_linebreak_or_end());
 		Ok(())
@@ -453,18 +453,18 @@ impl<'def> Assembler<'def>
 	}
 	
 
-	fn output_integer(&mut self, value: &Integer)
+	fn output_integer(&mut self, width: usize, value: &BigInt)
 	{
 		let aligned_index = self.cur_output * self.def.align_bits;
-		self.output_bits.set(aligned_index, value);
-		self.advance_address(value.get_width());
+		self.output_bits.set(aligned_index, width, value);
+		self.advance_address(width);
 	}
 	
 	
-	fn output_integer_at(&mut self, index: usize, value: &Integer)
+	fn output_integer_at(&mut self, index: usize, width: usize, value: &BigInt)
 	{
 		let aligned_index = index * self.def.align_bits;
-		self.output_bits.set(aligned_index, value);
+		self.output_bits.set(aligned_index, width, value);
 	}
 	
 	
@@ -477,8 +477,8 @@ impl<'def> Assembler<'def>
 		{
 			match try!(self.resolve_expr(&expr, label_ctx, self.cur_address))		
 			{
-				ExpressionValue::Integer(integer) =>
-					self.output_integer(&integer.slice(data_width - 1, 0)),
+				ExpressionValue::Integer(bigint) =>
+					self.output_integer(data_width, &bigint),
 				
 				_ => return Err(Error::new_with_span("invalid expression type", expr.span.clone()))
 			}
@@ -523,13 +523,16 @@ impl<'def> Assembler<'def>
 	}
 	
 		
-	fn parse_integer(&self, parser: &mut Parser) -> Result<Integer, Error>
+	fn parse_integer(&self, parser: &mut Parser) -> Result<usize, Error>
 	{
 		let expr = try!(Expression::new_by_parsing(parser));
 		let value = try!(self.resolve_expr_current(&expr));
 		
+		let bigint = try!(handle_opt_span(
+			value.as_integer(), "expected integer", &expr.span));
+			
 		handle_opt_span(
-			value.as_integer(), "expected integer", &expr.span)
+			bigint.to_usize(), "invalid value", &expr.span)
 	}
 	
 		
@@ -560,15 +563,19 @@ impl<'def> Assembler<'def>
 	{
 		let rule = &self.def.rules[instr.rule_index];
 		
-		let mut width = 0;
+		let mut cur_output = instr.output;
 		for expr in rule.production_segments.iter()
 		{
 			match try!(self.resolve_production(rule, instr, expr))
 			{
 				ExpressionValue::Integer(integer) =>
 				{
-					self.output_integer_at(instr.output + width, &integer);
-					width += integer.get_width() / self.def.align_bits;
+					let width = expr.get_explicit_bit_num().unwrap();
+					assert!(width % self.def.align_bits == 0);
+					
+					self.output_integer_at(cur_output, width, &integer);
+					
+					cur_output += width / self.def.align_bits;
 				}
 				
 				_ => return Err(Error::new_with_span("invalid production expression type", expr.span.clone()))
@@ -585,8 +592,8 @@ impl<'def> Assembler<'def>
 		{
 			match expr_name
 			{
-				ExpressionName::GlobalVariable(name) => Ok(name == "pc" || self.labels.does_global_exist(name)),
-				ExpressionName::LocalVariable(name) => Ok(self.labels.does_local_exist(ctx, name))
+				&ExpressionVariable::Global(ref name) => Ok(name == "pc" || self.labels.does_global_exist(name)),
+				&ExpressionVariable::Local(ref name)  => Ok(self.labels.does_local_exist(ctx, name))
 			}
 		})
 	}
@@ -598,9 +605,9 @@ impl<'def> Assembler<'def>
 		{
 			match name_kind
 			{
-				ExpressionName::GlobalVariable(name) => match name
+				&ExpressionVariable::Global(ref name) => match name.as_ref()
 				{
-					"pc" => Ok(ExpressionValue::Integer(Integer::new(pc as i64))),
+					"pc" => Ok(ExpressionValue::Integer(BigInt::from_usize(pc))),
 					
 					name => match self.labels.get_global(name)
 					{
@@ -609,7 +616,7 @@ impl<'def> Assembler<'def>
 					}
 				},
 				
-				ExpressionName::LocalVariable(name) => match self.labels.get_local(ctx, name)
+				&ExpressionVariable::Local(ref name) => match self.labels.get_local(ctx, name)
 				{
 					Some(value) => Ok(value.clone()),
 					None => Err(Error::new_with_span(format!("unknown local `{}`", name), name_span.clone()))
@@ -634,9 +641,9 @@ impl<'def> Assembler<'def>
 		{
 			match param_kind
 			{
-				ExpressionName::GlobalVariable(name) => match name
+				&ExpressionVariable::Global(ref name) => match name.as_ref()
 				{
-					"pc" => Ok(ExpressionValue::Integer(Integer::new(instr.address as i64))),
+					"pc" => Ok(ExpressionValue::Integer(BigInt::from_usize(instr.address))),
 					
 					name =>
 					{
@@ -666,17 +673,17 @@ impl<'def> Assembler<'def>
 	}
 	
 	
-	fn check_constraint(&self, constraint: &Expression, argument: &ExpressionValue, address: usize) -> Result<bool, Error>
+	fn check_constraint(&self, constraint: &Expression, argument: &ExpressionValue, pc: usize) -> Result<bool, Error>
 	{
 		let constraint_result = try!(constraint.resolve(&|expr_name, _|
 		{
 			match expr_name
 			{
-				ExpressionName::GlobalVariable(name) => match name
+				&ExpressionVariable::Global(ref name) => match name.as_ref()
 				{
 					"_" => Ok(argument.clone()),
 					
-					"pc" => Ok(ExpressionValue::Integer(Integer::new(address as i64))),
+					"pc" => Ok(ExpressionValue::Integer(BigInt::from_usize(pc))),
 					
 					_ => unreachable!()
 				},

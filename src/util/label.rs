@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use util::bigint::BigInt;
 use util::expression::ExpressionValue;
-use util::integer::Integer;
+use std::collections::HashMap;
 
 
 pub struct LabelManager
@@ -10,14 +10,13 @@ pub struct LabelManager
 }
 
 
-pub type LabelValue = ExpressionValue;
 pub type LabelContext = usize;
 
 
 pub struct GlobalLabel
 {
-	value: LabelValue,
-	local_labels: HashMap<String, LabelValue>
+	value: ExpressionValue,
+	local_labels: HashMap<String, ExpressionValue>
 }
 
 
@@ -31,12 +30,12 @@ impl LabelManager
 			name_to_index_map: HashMap::new()
 		};
 		
-		list.add_global("".to_string(), ExpressionValue::Integer(Integer::new(0)));
+		list.add_global("".to_string(), ExpressionValue::Integer(BigInt::from_usize(0)));
 		list
 	}
 	
 	
-	pub fn add_global(&mut self, name: String, value: LabelValue)
+	pub fn add_global(&mut self, name: String, value: ExpressionValue)
 	{
 		self.name_to_index_map.insert(name, self.global_labels.len());
 		self.global_labels.push(GlobalLabel
@@ -47,7 +46,7 @@ impl LabelManager
 	}
 	
 	
-	pub fn add_local(&mut self, ctx: LabelContext, name: String, value: LabelValue)
+	pub fn add_local(&mut self, ctx: LabelContext, name: String, value: ExpressionValue)
 	{
 		let global_label = &mut self.global_labels[ctx as usize];
 		global_label.local_labels.insert(name, value);
@@ -60,7 +59,7 @@ impl LabelManager
 	}
 	
 	
-	pub fn get_global(&self, name: &str) -> Option<&LabelValue>
+	pub fn get_global(&self, name: &str) -> Option<&ExpressionValue>
 	{
 		match self.name_to_index_map.get(name)
 		{
@@ -70,7 +69,7 @@ impl LabelManager
 	}
 	
 	
-	pub fn get_local(&self, ctx: LabelContext, name: &str) -> Option<&LabelValue>
+	pub fn get_local(&self, ctx: LabelContext, name: &str) -> Option<&ExpressionValue>
 	{
 		match self.global_labels[ctx as usize].local_labels.get(name)
 		{

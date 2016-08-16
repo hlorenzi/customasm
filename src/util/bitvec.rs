@@ -1,5 +1,5 @@
+use util::bigint::BigInt;
 use std::fmt;
-use util::integer::Integer;
 
 
 #[derive(Clone)]
@@ -153,10 +153,10 @@ impl BitVec
 	}
 	
 	
-	pub fn set(&mut self, index: usize, value: &Integer)
+	pub fn set(&mut self, index: usize, width: usize, value: &BigInt)
 	{
-		for i in 0..value.get_width()
-			{ self.set_bit(index + i, value.get_bit(value.get_width() - 1 - i)); }
+		for i in 0..width
+			{ self.set_bit(index + width - 1 - i, value.bit_at(i)); }
 	}
 	
 	
@@ -167,10 +167,10 @@ impl BitVec
 	}
 	
 	
-	pub fn push(&mut self, value: &Integer)
+	pub fn push(&mut self, width: usize, value: &BigInt)
 	{
-		for i in 0..value.get_width()
-			{ self.push_bit(value.get_bit(value.get_width() - 1 - i)); }
+		let index = self.len();
+		self.set(index, width, value);
 	}
 	
 	

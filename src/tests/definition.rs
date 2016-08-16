@@ -6,7 +6,11 @@ use definition;
 
 fn pass(def_str: &str)
 {
-	definition::parse("test", &def_str.chars().collect::<Vec<char>>()).unwrap();
+	match definition::parse("test", &def_str.chars().collect::<Vec<char>>())
+	{
+		Ok(_) => { }
+		Err(_) => panic!("definition failed but expected to pass")
+	}
 }
 
 
@@ -14,7 +18,7 @@ fn fail(def_str: &str, expected_error_line: usize, expected_error_substr: &str)
 {
 	match definition::parse("test", &def_str.chars().collect::<Vec<char>>())
 	{
-		Ok(_) => panic!("test passed but error expected"),
+		Ok(_) => panic!("definition passed but error expected"),
 			
 		Err(err) =>
 			if !err.line_is(expected_error_line) || !err.contains_str(expected_error_substr)
@@ -23,7 +27,7 @@ fn fail(def_str: &str, expected_error_line: usize, expected_error_substr: &str)
 				println!("      got error msg: {}", err.get_msg());
 				println!("expected error line: {}", expected_error_line);
 				println!("     got error line: {}", err.get_line());
-				panic!("test error mismatch");
+				panic!("definition error mismatch");
 			}
 	}
 }
@@ -35,8 +39,15 @@ fn test_simple()
 	pass("");
 	pass(".align 8");
 	pass(".align 8 \n halt -> 8'0");
+	pass(".align 8 \n halt -> 8'0x3");
 	pass(".align 8 \n halt -> 8'0x33");
 	pass(".align 8 \n halt -> 4'0xd 4'0xa");
+	
+	pass("\n .align 8 \n    halt -> 8'0x3 \n    nop -> 8'0x6");
+	pass("   .align 8 \n \n halt -> 8'0x3 \n    nop -> 8'0x6");
+	pass("   .align 8 \n    halt -> 8'0x3 \n \n nop -> 8'0x6");
+	pass("   .align 8 \n    halt -> 8'0x3 \n    nop -> 8'0x6 \n");
+	pass("\n .align 8 \n \n halt -> 8'0x3 \n \n nop -> 8'0x6 \n");
 	
 	pass(".align 8 \n halt         -> pc[7:0]");
 	pass(".align 8 \n halt {a}     ->  a[7:0]");
@@ -54,9 +65,9 @@ fn test_simple()
 	fail(".xyz 8", 1, "directive");
 	fail(".align 8 \n -> 8'0", 2, "expected pattern");
 	fail(".align 8 \n halt ->", 2, "expected expression");
+	fail(".align 8 \n halt -> 64'0xff00ff00ff00ff00", 2, "invalid");
 	fail(".align 8 \n halt -> 0x12", 2, "explicit size");
 	fail(".align 8 \n halt -> 8'0xfff", 2, "not fit");
-	fail(".align 8 \n halt -> 64'0xff00ff00ff00ff00", 2, "invalid");
 	fail(".align 8 \n halt -> 4'0xd", 2, "aligned");
 	fail(".align 8 \n halt -> xyz", 2, "unknown");
 	fail(".align 8 \n halt -> xyz[7:0]", 2, "unknown");
