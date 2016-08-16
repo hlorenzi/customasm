@@ -49,6 +49,19 @@ fn test_simple()
 	pass("   .align 8 \n    halt -> 8'0x3 \n    nop -> 8'0x6 \n");
 	pass("\n .align 8 \n \n halt -> 8'0x3 \n \n nop -> 8'0x6 \n");
 	
+	pass("; comment \n    .align 8           \n    halt -> 8'0x3           \n    nop -> 8'0x6");
+	pass("                .align 8 ; comment \n    halt -> 8'0x3           \n    nop -> 8'0x6");
+	pass("                .align 8           \n    halt -> 8'0x3 ; comment \n    nop -> 8'0x6");
+	pass("                .align 8           \n    halt -> 8'0x3           \n    nop -> 8'0x6 ; comment");
+	pass("; comment \n    .align 8 ; comment \n    halt -> 8'0x3 ; comment \n    nop -> 8'0x6 ; comment");
+	
+	pass("; comment \n \n .align 8           \n    halt -> 8'0x3           \n    nop -> 8'0x6");
+	pass("                .align 8 ; comment \n \n halt -> 8'0x3           \n    nop -> 8'0x6");
+	pass("                .align 8           \n    halt -> 8'0x3 ; comment \n \n nop -> 8'0x6");
+	pass("                .align 8           \n    halt -> 8'0x3           \n    nop -> 8'0x6 ; comment \n");
+	pass("                .align 8           \n    halt -> 8'0x3           \n    nop -> 8'0x6 ; comment \n");
+	pass("; comment \n \n .align 8 ; comment \n \n halt -> 8'0x3 ; comment \n \n nop -> 8'0x6 ; comment \n");
+	
 	pass(".align 8 \n halt         -> pc[7:0]");
 	pass(".align 8 \n halt {a}     ->  a[7:0]");
 	pass(".align 8 \n halt {a}     ->  a[15:0]");
@@ -63,8 +76,10 @@ fn test_simple()
 	pass(".align 8 \n halt {a}     -> 4'0x7  a[7:0] 4'0x7");
 	
 	fail(".xyz 8", 1, "directive");
+	fail(".align 8 .align 8", 1, "expected line break");
 	fail(".align 8 \n -> 8'0", 2, "expected pattern");
 	fail(".align 8 \n halt ->", 2, "expected expression");
+	fail(".align 8 \n halt -> ; 8'0x3", 2, "expected expression");
 	fail(".align 8 \n halt -> 64'0xff00ff00ff00ff00", 2, "invalid");
 	fail(".align 8 \n halt -> 0x12", 2, "explicit size");
 	fail(".align 8 \n halt -> 8'0xfff", 2, "not fit");

@@ -55,6 +55,14 @@ where S: Into<String>
 			index.advance();
 			continue;
 		}
+		else if src[index.linear] == ';'
+		{
+			index.advance();
+			while index.linear < src.len() && src[index.linear] != '\n'
+				{ index.advance(); }
+			
+			continue;
+		}
 		else if last_was_linebreak && src[index.linear] == '\n'
 		{
 			index.advance_line();
@@ -395,7 +403,7 @@ fn try_read_operator(file: &Rc<String>, src: &[char], index: &mut CharIndex) -> 
 {
 	let operators =
 	[
-		".", "->", ":", ";", ",", "=",
+		".", "->", ":", ",", "=",
 		"(", ")", "[", "]", "{", "}",
 		"'", "?", "#", "$",
 		"+", "-", "*", "/",

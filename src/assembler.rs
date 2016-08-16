@@ -404,7 +404,11 @@ impl<'def> Assembler<'def>
 				
 				&PatternSegment::Parameter(param_index) =>
 				{
-					let expr = try!(Expression::new_by_parsing(parser));
+					let expr = match Expression::new_by_parsing(parser)
+					{
+						Ok(expr) => expr,
+						Err(_) => return Ok(None)
+					};
 					
 					if !rule.get_parameter_allow_unresolved(param_index)
 					{

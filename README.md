@@ -1,6 +1,6 @@
 # customasm
-This is an assembler that takes custom machine instruction definitions,
-and assembles files based on them.  
+This is an assembler that takes custom instruction set definitions,
+and assembles files based on that.  
 This can be useful if you'd like to test out a new virtual machine's bytecode,
 or even if you're eager to write programs for the new processor architecture 
 you just implemented in FPGA!  

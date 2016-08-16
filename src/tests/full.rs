@@ -94,6 +94,25 @@ static DEF_SIMPLE: &'static str =
 ";
 
 
+static DEF_WHITESPACE: &'static str =
+"
+
+	.align 8 ; comment
+	
+	; comment
+	
+	halt        -> 8  ' 0x10 ; comment
+	; comment
+	
+	add {a}     -> 8'0x11 a [ 7 : 0 ] ; comment
+	sub {a} {b} -> 8'0x12 a[7:0] ; comment b[7:0]
+	
+	jmp { a }   -> 8'0x13 a[7:0]
+	;xyz {a}    -> 8'0x14 a[7:0]
+	
+";
+
+
 static DEF_CONSTRAINT: &'static str =
 "
 	.align 8
@@ -156,6 +175,38 @@ fn test_rules_simple()
 	
 	fail(DEF_SIMPLE, "xyz", 1, "no match");
 	fail(DEF_SIMPLE, "halt \n xyz", 2, "no match");
+	fail(DEF_SIMPLE, "add", 1, "no match");
+	fail(DEF_SIMPLE, "sub 0x1", 1, "no match");
+}
+
+
+#[test]
+fn test_whitespace()
+{
+	pass(DEF_WHITESPACE, "", 16, "");
+	pass(DEF_WHITESPACE, "halt", 16, "10");
+	pass(DEF_WHITESPACE, "add 0x5", 16, "1105");
+	pass(DEF_WHITESPACE, "add 0x56", 16, "1156");
+	pass(DEF_WHITESPACE, "sub 0x1 0x5", 16, "1201");
+	pass(DEF_WHITESPACE, "sub 0x12 0x56", 16, "1212");
+	
+	pass(DEF_WHITESPACE, "halt \n halt", 16, "1010");
+	
+	pass(DEF_WHITESPACE, "", 16, "");
+	pass(DEF_WHITESPACE, "halt ; comment", 16, "10");
+	pass(DEF_WHITESPACE, "add 0x5 ; comment", 16, "1105");
+	pass(DEF_WHITESPACE, "add 0x56 ; comment", 16, "1156");
+	pass(DEF_WHITESPACE, "sub 0x1 0x5 ; comment", 16, "1201");
+	pass(DEF_WHITESPACE, "sub 0x12 0x56 ; comment", 16, "1212");
+	
+	pass(DEF_WHITESPACE, "   ; comment halt           \n    halt", 16, "10");
+	pass(DEF_WHITESPACE, "\n           halt           \n    halt", 16, "1010");
+	pass(DEF_WHITESPACE, "             halt ; comment \n    halt", 16, "1010");
+	pass(DEF_WHITESPACE, "             halt           \n \n halt", 16, "1010");
+	
+	fail(DEF_WHITESPACE, "xyz", 1, "no match");
+	fail(DEF_WHITESPACE, "halt \n xyz", 2, "no match");
+	fail(DEF_WHITESPACE, "add ; 0x5 comment", 1, "no match");
 }
 
 
