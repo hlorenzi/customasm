@@ -2,7 +2,7 @@ use definition::Definition;
 use rule::{Rule, PatternSegment};
 use util::bigint::BigInt;
 use util::bitvec::BitVec;
-use util::error::{Error, handle_opt_span, handle_result_span};
+use util::error::{Error, handle_opt_span, handle_result_span, handle_result_msg_span};
 use util::expression::{Expression, ExpressionVariable, ExpressionValue};
 use util::filehandler::{FileHandler, CustomFileHandler};
 use util::label::{LabelManager, LabelContext};
@@ -223,6 +223,44 @@ impl<'def> Assembler<'def>
 					self.filehandler.read_bytes(&new_path), &span));
 					
 				let bitvec = BitVec::new_from_bytes(&bytes);
+				
+				if bitvec.len() % self.def.align_bits != 0
+				{
+					return Err(Error::new_with_span(
+						format!("included file size is not aligned to `{}` bits", self.def.align_bits), span));
+				}
+				
+				self.output_bitvec(&bitvec);
+			}
+			
+			"includebinstr" => 
+			{
+				let (new_path, span) = try!(self.parse_relative_filename(parser, cur_path));
+				
+				let s = try!(handle_result_span(
+					self.filehandler.read_str(&new_path), &span));
+					
+				let bitvec = try!(handle_result_msg_span(
+					BitVec::new_from_str(2, &s), "invalid binary digit in included file", &span));
+				
+				if bitvec.len() % self.def.align_bits != 0
+				{
+					return Err(Error::new_with_span(
+						format!("included file size is not aligned to `{}` bits", self.def.align_bits), span));
+				}
+				
+				self.output_bitvec(&bitvec);
+			}
+			
+			"includehexstr" => 
+			{
+				let (new_path, span) = try!(self.parse_relative_filename(parser, cur_path));
+				
+				let s = try!(handle_result_span(
+					self.filehandler.read_str(&new_path), &span));
+				
+				let bitvec = try!(handle_result_msg_span(
+					BitVec::new_from_str(16, &s), "invalid hexadecimal digit in included file", &span));
 				
 				if bitvec.len() % self.def.align_bits != 0
 				{

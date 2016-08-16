@@ -1,4 +1,5 @@
 use util::bigint::BigInt;
+use util::error::Error;
 use std::fmt;
 
 
@@ -37,7 +38,7 @@ impl BitVec
 	}
 
 
-	pub fn new_from_str(radix: usize, value_str: &str) -> Result<BitVec, String>
+	pub fn new_from_str(radix: usize, value_str: &str) -> Result<BitVec, Error>
 	{	
 		let mut bitvec = BitVec::new();
 		match radix
@@ -47,7 +48,7 @@ impl BitVec
 				let mut value = match value_str.parse::<u64>()
 				{
 					Ok(x) => x,
-					Err(_) => return Err(format!("decimal value `{}` is too large", value_str))
+					Err(_) => return Err(Error::new(format!("decimal value `{}` is too large", value_str)))
 				};
 				
 				while value != 0
@@ -61,11 +62,16 @@ impl BitVec
 			{
 				for c in value_str.chars()
 				{
-					let mut nibble = c.to_digit(16).unwrap();
-					for _ in 0..4
+					match c.to_digit(16)
 					{
-						bitvec.push_bit(nibble & 0b1000 != 0);
-						nibble <<= 1;
+						Some(mut nibble) =>
+							for _ in 0..4
+							{
+								bitvec.push_bit(nibble & 0b1000 != 0);
+								nibble <<= 1;
+							},
+						
+						None => return Err(Error::new("invalid digit"))
 					}
 				}
 			}
@@ -73,7 +79,13 @@ impl BitVec
 			2 =>
 			{
 				for c in value_str.chars()
-					{ bitvec.push_bit(c == '1'); }
+				{
+					match c.to_digit(2)
+					{
+						Some(digit) => bitvec.push_bit(digit != 0),
+						None => return Err(Error::new("invalid digit"))
+					}
+				}
 			}
 			
 			_ => unreachable!()

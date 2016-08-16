@@ -10,6 +10,13 @@ pub trait FileHandler
 	fn read_bytes(&self, filename: &Path) -> Result<Vec<u8>, Error>;
 	
 	
+	fn read_str(&self, filename: &Path) -> Result<String, Error>
+	{
+		let bytes = try!(self.read_bytes(filename));
+		Ok(String::from_utf8_lossy(&bytes).into_owned())
+	}
+	
+	
 	fn read_chars(&self, filename: &Path) -> Result<Vec<char>, Error>
 	{
 		let bytes = try!(self.read_bytes(filename));

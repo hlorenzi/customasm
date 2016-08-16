@@ -501,3 +501,131 @@ fn test_include_directive()
 	fail_filehandler(DEF_SIMPLE, &filehandler, "fail1", "fail1", 1, "not exist");
 	fail_filehandler(DEF_SIMPLE, &filehandler, "fail2", "use_global", 1, "unknown");
 }
+
+
+#[test]
+fn test_includebin_directive()
+{
+	let mut filehandler = CustomFileHandler::new();
+	filehandler.add("8bits",  vec![0xd0]);
+	filehandler.add("24bits", vec![0x12, 0x34, 0xe0]);
+	filehandler.add("32bits", vec![0x12, 0x00, 0x56, 0xf0]);
+	
+	filehandler.add("pass1", ".includebin \"8bits\"");
+	filehandler.add("pass2", ".includebin \"24bits\"");
+	filehandler.add("pass3", ".includebin \"32bits\"");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass1", 16, "d0");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass2", 16, "1234e0");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass3", 16, "120056f0");
+	
+	filehandler.add("pass4", "halt \n .includebin \"8bits\"  \n halt");
+	filehandler.add("pass5", "halt \n .includebin \"24bits\" \n halt");
+	filehandler.add("pass6", "halt \n .includebin \"32bits\" \n halt");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass4", 16, "10d010");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass5", 16, "101234e010");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass6", 16, "10120056f010");
+	
+	filehandler.add("fail1", ".includebin \"xyz\"");
+	fail_filehandler(DEF_SIMPLE, &filehandler, "fail1", "fail1", 1, "not exist");
+	
+	filehandler.add("fail2", ".includebin \"24bits\"");
+	fail_filehandler(".align 16", &filehandler, "fail2", "fail2", 1, "not aligned");
+}
+
+
+#[test]
+fn test_includebinstr_directive()
+{
+	let mut filehandler = CustomFileHandler::new();
+	filehandler.add("empty",   "");
+	filehandler.add("1bit",    "1");
+	filehandler.add("2bits",   "10");
+	filehandler.add("8bits",   "11101010");
+	filehandler.add("16bits",  "1110101010001100");
+	filehandler.add("invalid", "1110101010021100");
+	
+	filehandler.add("pass1", ".includebinstr \"empty\"");
+	filehandler.add("pass2", ".includebinstr \"1bit\"");
+	filehandler.add("pass3", ".includebinstr \"2bits\"");
+	filehandler.add("pass4", ".includebinstr \"8bits\"");
+	filehandler.add("pass5", ".includebinstr \"16bits\"");
+	pass_filehandler(".align 1",  &filehandler, "pass1", 2, "");
+	pass_filehandler(".align 2",  &filehandler, "pass1", 2, "");
+	pass_filehandler(".align 8",  &filehandler, "pass1", 2, "");
+	pass_filehandler(".align 16", &filehandler, "pass1", 2, "");
+	pass_filehandler(".align 1",  &filehandler, "pass2", 2, "1");
+	pass_filehandler(".align 1",  &filehandler, "pass3", 2, "10");
+	pass_filehandler(".align 2",  &filehandler, "pass3", 2, "10");
+	pass_filehandler(".align 1",  &filehandler, "pass4", 2, "11101010");
+	pass_filehandler(".align 2",  &filehandler, "pass4", 2, "11101010");
+	pass_filehandler(".align 4",  &filehandler, "pass4", 2, "11101010");
+	pass_filehandler(".align 8",  &filehandler, "pass4", 2, "11101010");
+	pass_filehandler(".align 1",  &filehandler, "pass5", 2, "1110101010001100");
+	pass_filehandler(".align 8",  &filehandler, "pass5", 2, "1110101010001100");
+	pass_filehandler(".align 16", &filehandler, "pass5", 2, "1110101010001100");
+	
+	filehandler.add("pass6", "halt \n .includebinstr \"8bits\"  \n halt");
+	filehandler.add("pass7", "halt \n .includebinstr \"16bits\" \n halt");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass6", 2, "000100001110101000010000");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass7", 2, "00010000111010101000110000010000");
+	
+	filehandler.add("fail1", ".includebinstr \"xyz\"");
+	fail_filehandler(DEF_SIMPLE, &filehandler, "fail1", "fail1", 1, "not exist");
+	
+	filehandler.add("fail2", ".includebinstr \"1bit\"");
+	filehandler.add("fail3", ".includebinstr \"2bits\"");
+	filehandler.add("fail4", ".includebinstr \"8bits\"");
+	fail_filehandler(".align 2", &filehandler, "fail2", "fail2", 1, "not aligned");
+	fail_filehandler(".align 3", &filehandler, "fail3", "fail3", 1, "not aligned");
+	fail_filehandler(".align 3", &filehandler, "fail4", "fail4", 1, "not aligned");
+	
+	filehandler.add("fail5", ".includebinstr \"invalid\"");
+	fail_filehandler(".align 8", &filehandler, "fail5", "fail5", 1, "invalid");
+}
+
+
+#[test]
+fn test_includehexstr_directive()
+{
+	let mut filehandler = CustomFileHandler::new();
+	filehandler.add("empty",   "");
+	filehandler.add("4bits",   "c");
+	filehandler.add("8bits",   "de");
+	filehandler.add("16bits",  "ca5f");
+	filehandler.add("invalid", "8z3d");
+	
+	filehandler.add("pass1", ".includehexstr \"empty\"");
+	filehandler.add("pass2", ".includehexstr \"4bits\"");
+	filehandler.add("pass3", ".includehexstr \"8bits\"");
+	filehandler.add("pass4", ".includehexstr \"16bits\"");
+	pass_filehandler(".align 1",  &filehandler, "pass1", 16, "");
+	pass_filehandler(".align 2",  &filehandler, "pass1", 16, "");
+	pass_filehandler(".align 8",  &filehandler, "pass1", 16, "");
+	pass_filehandler(".align 16", &filehandler, "pass1", 16, "");
+	pass_filehandler(".align 1",  &filehandler, "pass2", 16, "c");
+	pass_filehandler(".align 2",  &filehandler, "pass2", 16, "c");
+	pass_filehandler(".align 4",  &filehandler, "pass2", 16, "c");
+	pass_filehandler(".align 4",  &filehandler, "pass3", 16, "de");
+	pass_filehandler(".align 8",  &filehandler, "pass3", 16, "de");
+	pass_filehandler(".align 4",  &filehandler, "pass4", 16, "ca5f");
+	pass_filehandler(".align 8",  &filehandler, "pass4", 16, "ca5f");
+	pass_filehandler(".align 16", &filehandler, "pass4", 16, "ca5f");
+	
+	filehandler.add("pass5", "halt \n .includehexstr \"8bits\"  \n halt");
+	filehandler.add("pass6", "halt \n .includehexstr \"16bits\" \n halt");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass5", 16, "10de10");
+	pass_filehandler(DEF_SIMPLE, &filehandler, "pass6", 16, "10ca5f10");
+	
+	filehandler.add("fail1", ".includehexstr \"xyz\"");
+	fail_filehandler(DEF_SIMPLE, &filehandler, "fail1", "fail1", 1, "not exist");
+	
+	filehandler.add("fail2", ".includehexstr \"4bits\"");
+	filehandler.add("fail3", ".includehexstr \"8bits\"");
+	filehandler.add("fail4", ".includehexstr \"16bits\"");
+	fail_filehandler(".align 8", &filehandler, "fail2", "fail2", 1, "not aligned");
+	fail_filehandler(".align 3", &filehandler, "fail3", "fail3", 1, "not aligned");
+	fail_filehandler(".align 3", &filehandler, "fail4", "fail4", 1, "not aligned");
+	
+	filehandler.add("fail5", ".includehexstr \"invalid\"");
+	fail_filehandler(".align 8", &filehandler, "fail5", "fail5", 1, "invalid");
+}

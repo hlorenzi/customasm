@@ -39,6 +39,26 @@ pub fn handle_result_span<T>(result: Result<T, Error>, span: &Span) -> Result<T,
 }
 
 
+pub fn handle_result_msg_span<T, S>(result: Result<T, Error>, msg: S, span: &Span) -> Result<T, Error>
+where S: Into<String>
+{
+    match result
+	{
+        Ok(val) => Ok(val),
+		
+        Err(mut err) =>
+		{
+			err.msg = msg.into();
+		
+			if err.span.is_none()
+				{ err.span = Some(span.clone()); }
+				
+            return Err(err);
+		}
+    }
+}
+
+
 impl Error
 {
 	pub fn new<S>(msg: S) -> Error
