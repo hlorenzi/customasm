@@ -1,12 +1,12 @@
 #![cfg(test)]
 
 
-use definition;
+use definition::Definition;
 
 
 fn pass(def_str: &str)
 {
-	match definition::parse("test", &def_str.chars().collect::<Vec<char>>())
+	match Definition::from_str(def_str)
 	{
 		Ok(_) => { }
 		Err(_) => panic!("definition failed but expected to pass")
@@ -16,7 +16,7 @@ fn pass(def_str: &str)
 
 fn fail(def_str: &str, expected_error_line: usize, expected_error_substr: &str)
 {
-	match definition::parse("test", &def_str.chars().collect::<Vec<char>>())
+	match Definition::from_str(def_str)
 	{
 		Ok(_) => panic!("definition passed but error expected"),
 			
@@ -65,6 +65,7 @@ fn test_simple()
 	pass(".align 8 \n halt         -> pc[7:0]");
 	pass(".align 8 \n halt {a}     ->  a[7:0]");
 	pass(".align 8 \n halt {a}     ->  a[15:0]");
+	pass(".align 8 \n halt {a}     ->  (a + 3)[7:0]");
 	pass(".align 8 \n halt {a}     ->  a[3:0] a[3:0]");
 	pass(".align 8 \n halt {a} {b} ->  a[7:0] b[7:0]");
 	pass(".align 8 \n halt {a} {b} ->  a[3:0] b[3:0]");
@@ -75,6 +76,11 @@ fn test_simple()
 	pass(".align 8 \n halt {a}     -> 8'0x45 a[7:0]");
 	pass(".align 8 \n halt {a}     -> 4'0x7  a[7:0] 4'0x7");
 	
+	pass(".align 8 \n halt {a:  _      <= 0xff} -> 8'0x45 a[7:0]");
+	pass(".align 8 \n halt {a!: _      <= 0xff} -> 8'0x45 a[7:0]");
+	pass(".align 8 \n halt {a:  pc     <= 0xff} -> 8'0x45 a[7:0] pc[7:0]");
+	pass(".align 8 \n halt {a:  pc + _ <= 0xff} -> 8'0x45 a[7:0] pc[7:0]");
+	
 	fail(".xyz 8", 1, "directive");
 	fail(".align 8 .align 8", 1, "expected line break");
 	fail(".align 8 \n -> 8'0", 2, "expected pattern");
@@ -84,11 +90,16 @@ fn test_simple()
 	fail(".align 8 \n halt -> 0x12", 2, "explicit size");
 	fail(".align 8 \n halt -> 8'0xfff", 2, "not fit");
 	fail(".align 8 \n halt -> 4'0xd", 2, "aligned");
-	fail(".align 8 \n halt -> xyz", 2, "unknown");
-	fail(".align 8 \n halt -> xyz[7:0]", 2, "unknown");
 	fail(".align 8 \n halt {a} -> a", 2, "explicit size");
 	fail(".align 8 \n halt {a} -> a[3:0]", 2, "aligned");
 	fail(".align 8 \n halt {a} -> a[0:3]", 2, "invalid slice");
 	fail(".align 8 \n halt {a} -> a[64:3]", 2, "big slice");
 	fail(".align 8 \n halt {a} -> a[65:64]", 2, "big slice");
+	fail(".align 8 \n halt {a: a   <= 0xff} ->  a[7:0]", 2, "invalid variable");
+	fail(".align 8 \n halt {a: xyz <= 0xff} ->  a[7:0]", 2, "invalid variable");
+	fail(".align 8 \n halt {a: 'a  <= 0xff} ->  a[7:0]", 2, "invalid variable");
+	fail(".align 8 \n halt {a: _   <= 0xff} -> 'a[7:0]", 2, "invalid variable");
+	fail(".align 8 \n halt                  ->  xyz",    2, "unknown parameter");
+	fail(".align 8 \n halt {a: _   <= 0xff} ->  _[7:0]", 2, "unknown parameter");
+	fail(".align 8 \n halt {a: _   <= 0xff} ->  b[7:0]", 2, "unknown parameter");
 }

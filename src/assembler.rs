@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 
 /// Holds intermediate information during assembly.
-struct Assembler<'a>
+pub struct Assembler<'a>
 {
 	def: &'a Definition,
 	filehandler: &'a FileHandler,
@@ -55,71 +55,70 @@ struct UnresolvedExpression
 }
 
 
-/// Convenience interface to the assembly process.
-pub fn assemble_single(def: &Definition, src: &str) -> Result<BitVec, Error>
-{
-	let mut filehandler = CustomFileHandler::new();
-	filehandler.add("main", src);
-	
-	assemble(def, &filehandler, &PathBuf::from("main"))
-}
-
-
-
-/// Main interface to the assembly process.
-pub fn assemble(def: &Definition, filehandler: &FileHandler, main_filename: &Path) -> Result<BitVec, Error>
-{
-	// Prepare an assembler state.
-	let mut assembler = Assembler
-	{
-		def: def,
-		filehandler: filehandler,
-		
-		cur_address: 0,
-		cur_output: 0,
-		labels: LabelManager::new(),
-		unresolved_instructions: Vec::new(),
-		unresolved_expressions: Vec::new(),
-		
-		output_bits: BitVec::new()
-	};
-	
-	
-	// == First-pass ==
-	
-	// Parse the main file.
-	try!(assembler.parse_file(main_filename));	
-	
-	
-	// == Second-pass ==
-	
-	// Resolve remaining instructions.
-	let instrs: Vec<_> = assembler.unresolved_instructions.drain(..).collect();
-	for instr in instrs
-	{
-		try!(assembler.resolve_instruction(&instr));
-	}
-	
-	// Resolve remaining expressions in literals.
-	let exprs: Vec<_> = assembler.unresolved_expressions.drain(..).collect();
-	for expr in exprs
-	{
-		match try!(assembler.resolve_expr(&expr.expr, expr.label_ctx, expr.address))
-		{
-			ExpressionValue::Integer(ref bigint) =>
-				assembler.output_integer_at(expr.output, expr.data_width, &bigint),
-				
-			_ => return Err(Error::new_with_span("invalid expression", expr.expr.span.clone()))
-		}
-	}
-	
-	// Return output bits.
-	Ok(assembler.output_bits)
-}
-
-
 impl<'def> Assembler<'def>
 {
+	/// Main interface to the assembly process.
+	pub fn assemble_file(def: &Definition, filehandler: &FileHandler, main_filename: &Path) -> Result<BitVec, Error>
+	{
+		// Prepare an assembler state.
+		let mut assembler = Assembler
+		{
+			def: def,
+			filehandler: filehandler,
+			
+			cur_address: 0,
+			cur_output: 0,
+			labels: LabelManager::new(),
+			unresolved_instructions: Vec::new(),
+			unresolved_expressions: Vec::new(),
+			
+			output_bits: BitVec::new()
+		};
+		
+		
+		// == First-pass ==
+		
+		// Parse the main file.
+		try!(assembler.parse_file(main_filename));	
+		
+		
+		// == Second-pass ==
+		
+		// Resolve remaining instructions.
+		let instrs: Vec<_> = assembler.unresolved_instructions.drain(..).collect();
+		for instr in instrs
+		{
+			try!(assembler.resolve_instruction(&instr));
+		}
+		
+		// Resolve remaining expressions in literals.
+		let exprs: Vec<_> = assembler.unresolved_expressions.drain(..).collect();
+		for expr in exprs
+		{
+			match try!(assembler.resolve_expr(&expr.expr, expr.label_ctx, expr.address))
+			{
+				ExpressionValue::Integer(ref bigint) =>
+					assembler.output_integer_at(expr.output, expr.data_width, &bigint),
+					
+				_ => return Err(Error::new_with_span("invalid expression", expr.expr.span.clone()))
+			}
+		}
+		
+		// Return output bits.
+		Ok(assembler.output_bits)
+	}
+	
+	
+	/// Convenience interface to the assembly process.
+	pub fn assemble_str(def: &Definition, src: &str) -> Result<BitVec, Error>
+	{
+		let mut filehandler = CustomFileHandler::new();
+		filehandler.add("<assembly string>", src);
+		
+		Assembler::assemble_file(def, &filehandler, &Path::new("<assembly string>"))
+	}
+
+
 	/// Main parsing function.
 	/// Reads source-code lines and decides how to decode them.
 	fn parse_file(&mut self, filename: &Path) -> Result<(), Error>
@@ -360,7 +359,7 @@ impl<'def> Assembler<'def>
 	}
 
 
-	fn parse_instruction<'p, 'tok>(&mut self, parser: &'p mut Parser<'tok>) -> Result<(), Error>
+	fn parse_instruction(&mut self, parser: &mut Parser) -> Result<(), Error>
 	{
 		let mut maybe_match = None;
 		let instr_span = parser.current().span.clone();
@@ -480,7 +479,7 @@ impl<'def> Assembler<'def>
 
 	fn advance_address(&mut self, bit_num: usize)
 	{
-		assert!(bit_num % self.def.align_bits == 0);
+		debug_assert!(bit_num % self.def.align_bits == 0);
 		let address_inc = bit_num / self.def.align_bits;
 		self.cur_output += address_inc;
 		self.cur_address += address_inc;

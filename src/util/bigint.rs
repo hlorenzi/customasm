@@ -34,7 +34,10 @@ impl BigInt
 	
 	pub fn to_usize(&self) -> Option<usize>
 	{
-		Some(self.value as usize)
+		if self.value < 0 || self.value > 0xff_ffff_ffff_ffff
+			{ None }
+		else
+			{ Some(self.value as usize) }
 	}
 	
 	

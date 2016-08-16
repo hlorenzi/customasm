@@ -1,13 +1,14 @@
 use util::error::Error;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 
 pub trait FileHandler
 {
 	fn read_bytes(&self, filename: &Path) -> Result<Vec<u8>, Error>;
+	fn write_bytes(&mut self, filename: &Path, contents: &[u8]) -> Result<(), Error>;
 	
 	
 	fn read_str(&self, filename: &Path) -> Result<String, Error>
@@ -59,6 +60,13 @@ impl FileHandler for CustomFileHandler
 		else
 			{ Ok(self.files[filename].clone()) }
 	}
+	
+	
+	fn write_bytes(&mut self, filename: &Path, contents: &[u8]) -> Result<(), Error>
+	{
+		self.add(filename, contents);
+		Ok(())
+	}
 }
 
 
@@ -97,6 +105,24 @@ impl FileHandler for RealFileHandler
 			Ok(..) => Ok(vec),
 			Err(err) =>
 				Err(Error::new(format!("could not read file `{}`: {}", filename.to_string_lossy(), err)))
+		}
+	}
+	
+	
+	fn write_bytes(&mut self, filename: &Path, contents: &[u8]) -> Result<(), Error>
+	{
+		let mut file = match File::create(filename)
+		{
+			Ok(file) => file,
+			Err(err) => return
+				Err(Error::new(format!("could not create file `{}`: {}", filename.to_string_lossy(), err)))
+		};
+
+		match file.write_all(contents)
+		{
+			Ok(..) => Ok(()),
+			Err(err) =>
+				Err(Error::new(format!("could not write to file `{}`: {}", filename.to_string_lossy(), err)))
 		}
 	}
 }

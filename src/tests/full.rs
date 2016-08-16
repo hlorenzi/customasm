@@ -1,11 +1,11 @@
 #![cfg(test)]
 
 
-use definition;
-use assembler;
+use assembler::Assembler;
+use definition::Definition;
 use util::bitvec::BitVec;
 use util::filehandler::{FileHandler, CustomFileHandler};
-use std::path::PathBuf;
+use std::path::Path;
 
 
 fn pass(
@@ -28,8 +28,8 @@ fn pass_filehandler(
 	expected_out_radix: usize,
 	expected_out: &str)
 {
-	let def = definition::parse("test", &def_str.chars().collect::<Vec<char>>()).unwrap();
-	let out = assembler::assemble(&def, filehandler, &PathBuf::from(main_filename)).unwrap();
+	let def = Definition::from_str(def_str).unwrap();
+	let out = Assembler::assemble_file(&def, filehandler, &Path::new(main_filename)).unwrap();
 	
 	if !out.compare(&BitVec::new_from_str(expected_out_radix, expected_out).unwrap())
 	{
@@ -61,8 +61,8 @@ fn fail_filehandler(
 	expected_error_line: usize,
 	expected_error_substr: &str)
 {
-	let def = definition::parse("test", &def_str.chars().collect::<Vec<char>>()).unwrap();
-	match assembler::assemble(&def, filehandler, &PathBuf::from(main_filename))
+	let def = Definition::from_str(def_str).unwrap();
+	match Assembler::assemble_file(&def, filehandler, &Path::new(main_filename))
 	{
 		Ok(_) => panic!("full test passed but error expected"),
 			
@@ -122,16 +122,11 @@ static DEF_CONSTRAINT: &'static str =
 	simple0 {a! : _ <= 0xffffff}   -> 8'0x02 a[23:0]
 	simple0 {a  : _ <= 0xffffffff} -> 8'0x03 a[31:0]
 	
-	simple1 {a! : _ <= (1 <<  8) - 1} -> 8'0x10 a[ 7:0]
-	simple1 {a! : _ <= (1 << 16) - 1} -> 8'0x11 a[15:0]
-	simple1 {a! : _ <= (1 << 24) - 1} -> 8'0x12 a[23:0]
-	simple1 {a  : _ <= (1 << 32) - 1} -> 8'0x13 a[31:0]
-	
-	multi0 {a! : _ <= (1 <<  8) - 1} {b! : _ <= (1 <<  8) - 1} -> 8'0x20 a[ 7:0] b[ 7:0]
-	multi0 {a! : _ <= (1 <<  8) - 1} {b! : _ <= (1 << 16) - 1} -> 8'0x21 a[ 7:0] b[15:0]
-	multi0 {a! : _ <= (1 << 16) - 1} {b! : _ <= (1 <<  8) - 1} -> 8'0x22 a[15:0] b[ 7:0]
-	multi0 {a! : _ <= (1 << 16) - 1} {b! : _ <= (1 << 16) - 1} -> 8'0x23 a[15:0] b[15:0]
-	multi0 {a  : _ <= (1 << 32) - 1} {b  : _ <= (1 << 32) - 1} -> 8'0x24 a[31:0] b[31:0]
+	multi0 {a! : _ <=       0xff} {b! : _ <=       0xff} -> 8'0x20 a[ 7:0] b[ 7:0]
+	multi0 {a! : _ <=       0xff} {b! : _ <=     0xffff} -> 8'0x21 a[ 7:0] b[15:0]
+	multi0 {a! : _ <=     0xffff} {b! : _ <=       0xff} -> 8'0x22 a[15:0] b[ 7:0]
+	multi0 {a! : _ <=     0xffff} {b! : _ <=     0xffff} -> 8'0x23 a[15:0] b[15:0]
+	multi0 {a  : _ <= 0xffffffff} {b  : _ <= 0xffffffff} -> 8'0x24 a[31:0] b[31:0]
 	
 	pc0 {a: _ + pc <= 0xff} -> 8'0x30 (a + pc)[7:0]
 	
@@ -227,18 +222,6 @@ fn test_rules_constraints()
 	pass(DEF_CONSTRAINT, "start: \n simple0 start", 16, "0000");
 	pass(DEF_CONSTRAINT, "simple0 start \n start:", 16, "0300000005");
 	
-	pass(DEF_CONSTRAINT, "simple1 0x1", 16, "1001");
-	pass(DEF_CONSTRAINT, "simple1 0xff", 16, "10ff");
-	pass(DEF_CONSTRAINT, "simple1 0x100", 16, "110100");
-	pass(DEF_CONSTRAINT, "simple1 0xffff", 16, "11ffff");
-	pass(DEF_CONSTRAINT, "simple1 0x10000", 16, "12010000");
-	pass(DEF_CONSTRAINT, "simple1 0xffffff", 16, "12ffffff");
-	pass(DEF_CONSTRAINT, "simple1 0x1000000", 16, "1301000000");
-	pass(DEF_CONSTRAINT, "simple1 0xffffffff", 16, "13ffffffff");
-	
-	pass(DEF_CONSTRAINT, "start: \n simple1 start", 16, "1000");
-	pass(DEF_CONSTRAINT, "simple1 start \n start:", 16, "1300000005");
-	
 	pass(DEF_CONSTRAINT, "multi0 0xff 0xff", 16, "20ffff");
 	pass(DEF_CONSTRAINT, "multi0 0xff 0xffff", 16, "21ffffff");
 	pass(DEF_CONSTRAINT, "multi0 0xffff 0xff", 16, "22ffffff");
@@ -263,7 +246,6 @@ fn test_rules_constraints()
 	pass(DEF_CONSTRAINT, "range1 0xa0", 16, "41a0");
 	
 	fail(DEF_CONSTRAINT, "simple0 start      \n .address 0x100110011 \n start:", 1, "not satisfied");
-	fail(DEF_CONSTRAINT, "simple1 start      \n .address 0x100110011 \n start:", 1, "not satisfied");
 	fail(DEF_CONSTRAINT, "multi0 start start \n .address 0x100110011 \n start:", 1, "not satisfied");
 	fail(DEF_CONSTRAINT, ".d8 0xdd \n pc0 0xff", 2, "not satisfied");
 	fail(DEF_CONSTRAINT, "range0 0x70", 1, "not satisfied");
@@ -307,16 +289,16 @@ fn test_rules_with_argument_expressions()
 	pass(DEF_SIMPLE, "sub 3 - 2 12 - 7", 16, "120105");
 	pass(DEF_SIMPLE, "sub (0x14 - 0x2) 0x58 - 0x2", 16, "121256");
 	
-	pass(DEF_CONSTRAINT, "simple1 0x100 - 0xff", 16, "1001");
-	pass(DEF_CONSTRAINT, "simple1 0x100 - 1", 16, "10ff");
-	pass(DEF_CONSTRAINT, "simple1 0xff + 1", 16, "110100");
-	pass(DEF_CONSTRAINT, "simple1 0x10000 - 1", 16, "11ffff");
-	pass(DEF_CONSTRAINT, "simple1 0xffff + 1", 16, "12010000");
-	pass(DEF_CONSTRAINT, "simple1 0x1000000 - 1", 16, "12ffffff");
-	pass(DEF_CONSTRAINT, "simple1 0xffffff + 1", 16, "1301000000");
-	pass(DEF_CONSTRAINT, "simple1 0x100000000 - 1", 16, "13ffffffff");
+	pass(DEF_CONSTRAINT, "simple0 0x100 - 0xff", 16, "0001");
+	pass(DEF_CONSTRAINT, "simple0 0x100 - 1", 16, "00ff");
+	pass(DEF_CONSTRAINT, "simple0 0xff + 1", 16, "010100");
+	pass(DEF_CONSTRAINT, "simple0 0x10000 - 1", 16, "01ffff");
+	pass(DEF_CONSTRAINT, "simple0 0xffff + 1", 16, "02010000");
+	pass(DEF_CONSTRAINT, "simple0 0x1000000 - 1", 16, "02ffffff");
+	pass(DEF_CONSTRAINT, "simple0 0xffffff + 1", 16, "0301000000");
+	pass(DEF_CONSTRAINT, "simple0 0x100000000 - 1", 16, "03ffffffff");
 	
-	pass(DEF_CONSTRAINT, "simple1 start + 1 \n start:", 16, "1300000006");
+	pass(DEF_CONSTRAINT, "simple0 start + 1 \n start:", 16, "0300000006");
 }
 
 
@@ -331,6 +313,25 @@ fn test_address_directive()
 	pass(DEF_SIMPLE, ".address pc + 0x80 \n a: \n jmp a", 16, "1380");
 	
 	pass(DEF_SIMPLE, ".address pc + 0x80 \n jmp a \n .address pc + 0x10 \n a:", 16, "1392");
+	
+	fail(DEF_SIMPLE, ".address  0 - 0x80 \n a: \n jmp a", 1, "invalid");
+	fail(DEF_SIMPLE, ".address pc - 0x80 \n a: \n jmp a", 1, "invalid");
+}
+
+
+#[test]
+fn test_output_directive()
+{
+	pass(DEF_SIMPLE, ".output 0x00        \n a:    \n jmp a", 16, "1300");
+	pass(DEF_SIMPLE, ".output 0x01        \n a:    \n jmp a", 16, "001300");
+	pass(DEF_SIMPLE, ".output 0x01 + 0x01 \n jmp a \n a:",    16, "00001302");
+
+	pass(DEF_SIMPLE, ".output pc                  \n a:    \n jmp a", 16, "1300");
+	pass(DEF_SIMPLE, ".address 0x02 \n .output pc \n a:    \n jmp a", 16, "00001302");
+	pass(DEF_SIMPLE, ".address 0x02 \n .output pc \n jmp a \n a:",    16, "00001304");
+	
+	fail(DEF_SIMPLE, ".output  0 - 0x80 \n a: \n jmp a", 1, "invalid");
+	fail(DEF_SIMPLE, ".output pc - 0x80 \n a: \n jmp a", 1, "invalid");
 }
 
 
@@ -359,8 +360,8 @@ fn test_data_directive_simple()
 	// Big integers currently not supported.
 	//pass(".align 8", ".d64 0x12345678abcdef00, 0x123", 16, "12345678abcdef000000000000000123");
 	//pass(".align 8", ".d128 0x12345678abcdef", 16, "00000000000000000012345678abcdef");
-	fail(".align 8", ".d64 0x12345678abcdef00, 0x123", 1, "not supported");
-	fail(".align 8", ".d128 0x12345678abcdef", 1, "not supported");
+	fail(".align 8", ".d64 0x123", 1, "not supported");
+	fail(".align 8", ".d128 0x123", 1, "not supported");
 	
 	fail(".align 3", ".d1 0b1", 1, "aligned");
 	fail(".align 3", ".d2 0b10", 1, "aligned");

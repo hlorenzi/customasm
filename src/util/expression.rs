@@ -53,7 +53,7 @@ pub enum BinaryOp
 struct ExpressionParser<'p, 'tok: 'p>
 {
 	parser: &'p mut Parser<'tok>,
-	check_var: Option<&'p Fn(&str) -> bool>
+	check_var: Option<&'p Fn(&ExpressionVariable, &Span) -> Result<(), Error>>
 }
 
 
@@ -68,7 +68,8 @@ impl Expression
 	
 	pub fn new_by_parsing_checked<'p, 'tok: 'p>(
 		parser: &'p mut Parser<'tok>,
-		check_var: &Fn(&str) -> bool) -> Result<Expression, Error>
+		check_var: &'p Fn(&ExpressionVariable, &Span) -> Result<(), Error>)
+		-> Result<Expression, Error>
 	{
 		let mut expr_parser = ExpressionParser { parser: parser, check_var: Some(check_var) };
 		expr_parser.parse()
@@ -271,7 +272,7 @@ impl<'p, 'tok> ExpressionParser<'p, 'tok>
 	
 	fn parse_binary_op_term(&mut self, level: usize) -> Result<Expression, Error>
 	{	
-		let binary_ops: &[&[(&str, BinaryOp)]] =
+		static BINARY_OPS: &'static [&'static [(&'static str, BinaryOp)]] =
 		&[
 			&[("||", BinaryOp::Or)],
 			&[("&&", BinaryOp::And)],
@@ -300,7 +301,7 @@ impl<'p, 'tok> ExpressionParser<'p, 'tok>
 			],
 		];
 		
-		if level >= binary_ops.len()
+		if level >= BINARY_OPS.len()
 			{ return self.parse_slice_term(); }
 	
 		let mut lhs = try!(self.parse_binary_op_term(level + 1));
@@ -308,7 +309,7 @@ impl<'p, 'tok> ExpressionParser<'p, 'tok>
 		loop
 		{
 			let mut op_match = None;
-			for op in binary_ops[level]
+			for op in BINARY_OPS[level]
 			{
 				if self.parser.current().is_operator(op.0)
 				{
@@ -384,16 +385,15 @@ impl<'p, 'tok> ExpressionParser<'p, 'tok>
 		{
 			let (ident, ident_span) = try!(self.parser.expect_identifier());
 			
+			let var = ExpressionVariable::Global(ident);
+			
 			if let Some(check_var) = self.check_var
-			{
-				if !check_var(&ident)
-					{ return Err(Error::new_with_span(format!("unknown variable `{}`", ident), ident_span)); }
-			}
+				{ try!(check_var(&var, &ident_span)); }
 			
 			Ok(Expression
 			{
 				span: ident_span,
-				term: ExpressionTerm::Variable(ExpressionVariable::Global(ident))
+				term: ExpressionTerm::Variable(var)
 			})
 		}
 		
@@ -404,10 +404,15 @@ impl<'p, 'tok> ExpressionParser<'p, 'tok>
 			
 			let (ident, ident_span) = try!(self.parser.expect_identifier());
 			
+			let var = ExpressionVariable::Local(ident);
+			
+			if let Some(check_var) = self.check_var
+				{ try!(check_var(&var, &ident_span)); }
+			
 			Ok(Expression
 			{
 				span: ident_span.join(&start_span),
-				term: ExpressionTerm::Variable(ExpressionVariable::Local(ident))
+				term: ExpressionTerm::Variable(var)
 			})
 		}
 		
