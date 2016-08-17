@@ -4,21 +4,21 @@ and assembles files based on that.
 This can be useful if you'd like to test out a new virtual machine's bytecode,
 or even if you're eager to write programs for the new processor architecture 
 you just implemented in FPGA!  
-Check out the wiki for usage instructions.
+Check out the Releases section for pre-built binaries.  
+Check out the Wiki for usage instructions.
 
 ```
 Usage:
 	customasm [options] <def_file> <asm_file> [<out_file>]
-	customasm -v | --version
-	customasm -h | --help
+	customasm -v | -h
 	
 Options:
+	-h, --help                      Display this information.
+	-v, --version                   Display version information.
 	-q, --quiet                     Do not print progress to stdout.
 	-f <format>, --format=<format>  The format of the output file. Can be one of:
 	                                    binary, binstr, hexstr, bindump, hexdump.
 	                                    [default: hexdump]
-	-v, --version                   Display version information.
-	-h, --help                      Display help.
 ```
 
 The idea is that, given this definition file:

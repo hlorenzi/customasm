@@ -10,16 +10,15 @@ use std::process::exit;
 const USAGE: &'static str = "
 Usage:
 	customasm [options] <def_file> <asm_file> [<out_file>]
-	customasm -v | --version
-	customasm -h | --help
+	customasm -v | -h
 	
 Options:
+	-h, --help                      Display this information.
+	-v, --version                   Display version information.
 	-q, --quiet                     Do not print progress to stdout.
 	-f <format>, --format=<format>  The format of the output file. Can be one of:
 	                                    binary, binstr, hexstr, bindump, hexdump.
 	                                    [default: hexdump]
-	-v, --version                   Display version information.
-	-h, --help                      Display help.
 ";
 
 
@@ -37,7 +36,7 @@ fn main()
 {
 	let args = docopt::Docopt::new(USAGE)
 		.map(|d| d.help(true))
-		.map(|d| d.version(Some(format!("customasm v{}", env!("CARGO_PKG_VERSION")))))
+		.map(|d| d.version(Some(format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")))))
 		.and_then(|d| d.parse())
 		.unwrap_or_else(|e| e.exit());
 	
