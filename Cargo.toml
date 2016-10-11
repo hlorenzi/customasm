@@ -1,6 +1,6 @@
 [package]
 name = "customasm"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Henrique Lorenzi <hlorenzi12@gmail.com>"]
 
 [lib]
@@ -12,4 +12,4 @@ name = "customasm"
 path = "src/main.rs"
 
 [dependencies]
-docopt = "0.6"
+getopts = "0.2.14"

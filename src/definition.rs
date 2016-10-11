@@ -119,7 +119,7 @@ impl Definition
 									else
 									{
 										Err(Error::new_with_span(
-											"invalid variable; use `_` as a the argument stand-in",
+											"invalid variable; use `_` as the argument stand-in",
 											span.clone()))
 									},
 										

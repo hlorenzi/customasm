@@ -1,25 +1,10 @@
 extern crate customasm;
-extern crate docopt;
+extern crate getopts;
 
 
 use customasm::FileHandler;
 use std::path::Path;
 use std::process::exit;
-
-
-const USAGE: &'static str = "
-Usage:
-	customasm [options] <def_file> <asm_file> [<out_file>]
-	customasm -v | -h
-	
-Options:
-	-h, --help                      Display this information.
-	-v, --version                   Display version information.
-	-q, --quiet                     Do not print progress to stdout.
-	-f <format>, --format=<format>  The format of the output file. Can be one of:
-	                                    binary, binstr, hexstr, bindump, hexdump.
-	                                    [default: hexdump]
-";
 
 
 enum OutputFormat
@@ -34,32 +19,64 @@ enum OutputFormat
 
 fn main()
 {
-	let args = docopt::Docopt::new(USAGE)
-		.map(|d| d.help(true))
-		.map(|d| d.version(Some(format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")))))
-		.and_then(|d| d.parse())
-		.unwrap_or_else(|e| e.exit());
+    let args: Vec<String> = std::env::args().collect();
+    
+    let mut opts = getopts::Options::new();
+    opts.optflag("h", "help", "Display this information.");
+    opts.optflag("v", "version", "Display version information.");
+    opts.optflag("q", "quiet", "Suppress diagnostics and progress reports.");
+    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, binstr, hexstr, bindump, hexdump", "FORMAT");
 	
-	let quiet = args.get_bool("--quiet");
-	
-	let out_format = match args.get_str("--format")
+    let matches = match opts.parse(&args[1..])
 	{
-		"binary" =>  OutputFormat::Binary,
-		"binstr" =>  OutputFormat::BinStr,
-		"hexstr" =>  OutputFormat::HexStr,
-		"bindump" => OutputFormat::BinDump,
-		"hexdump" => OutputFormat::HexDump,
-		_ => error_exit(customasm::Error::new("invalid output format"))
+        Ok(m) => m,
+        Err(f) => print_usage(true, &opts, Some(&format!("{}", f)))
+    };
+	
+	if matches.opt_present("h")
+	{
+		print_usage(false, &opts, None);
+	}
+	
+	if matches.opt_present("v")
+	{
+		println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+		return;
+	}
+	
+	let quiet = matches.opt_present("q");
+	
+	let out_format = match matches.opt_str("f").as_ref().map(|s| s.as_ref())
+	{
+		Some("binary") => OutputFormat::Binary,
+		Some("binstr") => OutputFormat::BinStr,
+		Some("hexstr") => OutputFormat::HexStr,
+		Some("bindump") => OutputFormat::BinDump,
+		Some("hexdump") |
+		None => OutputFormat::HexDump,
+		Some(_) => print_usage(true, &opts, Some("Invalid output format."))
 	};
 	
-	let def_file = Path::new(args.get_str("<def_file>"));
-	let asm_file = Path::new(args.get_str("<asm_file>"));
-	let out_file = match args.get_str("<out_file>")
+	let (def_file, asm_file, out_file) =
 	{
-		"" => None,
-		f => Some(Path::new(f))
+		if matches.free.len() == 3
+		{
+			(Path::new(&matches.free[0]),
+			Path::new(&matches.free[1]),
+			Some(Path::new(&matches.free[2])))
+		}
+			
+		else if matches.free.len() == 2
+		{
+			(Path::new(&matches.free[0]),
+			Path::new(&matches.free[1]),
+			None)
+		}
+		
+		else
+			{ print_usage(true, &opts, None) }
 	};
-
+	
 	
 	let mut filehandler = customasm::RealFileHandler::new();
 	
@@ -118,6 +135,19 @@ fn main()
 				{ println!(""); }
 		}
 	};
+}
+
+
+fn print_usage(error: bool, opts: &getopts::Options, msg: Option<&str>) -> !
+{
+	if let Some(msg) = msg
+	{
+		println!("{}", msg); 
+		println!("");
+	}
+	
+	println!("{}", opts.usage(&format!("Usage: customasm [options] <def-file> <asm-file> [<out-file>]")));
+	exit(if error { 1 } else { 0 });
 }
 
 
