@@ -5,26 +5,25 @@ This can be useful if you'd like to test out a new virtual machine's bytecode,
 or even if you're eager to write programs for the new processor architecture 
 you just implemented in FPGA!  
 Check out the Releases section for pre-built binaries.  
-Check out the Wiki for usage instructions.
+  
+Check out the documentation for usage instructions:
+- [Definition File Format](/doc/def.md)
 
 ```
-Usage:
-	customasm [options] <def_file> <asm_file> [<out_file>]
-	customasm -v | -h
-	
+Usage: customasm [options] <def-file> <asm-file> [<out-file>]
+
 Options:
-	-h, --help                      Display this information.
-	-v, --version                   Display version information.
-	-q, --quiet                     Do not print progress to stdout.
-	-f <format>, --format=<format>  The format of the output file. Can be one of:
-	                                    binary, binstr, hexstr, bindump, hexdump.
-	                                    [default: hexdump]
+    -h, --help          Display this information.
+    -v, --version       Display version information.
+    -q, --quiet         Suppress progress reports.
+    -f, --format FORMAT The format of the output file. Possible formats:
+                        binary, binstr, hexstr, bindump, hexdump
 ```
 
 The idea is that, given this definition file:
 
 ```
-.align 8
+#align 8
 
 load r1, {value: _ <= 0xff} -> 8'0x11 value[7:0]
 load r2, {value: _ <= 0xff} -> 8'0x12 value[7:0]
@@ -38,17 +37,17 @@ ret                         -> 8'0x50
 ...the assembler would take this file:
 
 ```
-.address 0x8000
+#address 0x8000
 
 multiply3x4:
 	load r1, 0
 	load r2, 3
 	load r3, 4
 	
-	'loop:
+	.loop:
 		add r1, r2
 		sub r3, 1
-		jnz 'loop
+		jnz .loop
 	
 	ret
 ```

@@ -129,7 +129,7 @@ impl<'def> Assembler<'def>
 		
 		while !parser.is_over()
 		{
-			if parser.current().is_operator(".")
+			if parser.current().is_operator("#")
 				{ try!(self.parse_directive(&mut parser, filename)); }
 				
 			else if parser.current().is_identifier() && parser.next(1).is_operator("=")
@@ -138,7 +138,7 @@ impl<'def> Assembler<'def>
 			else if parser.current().is_identifier() && parser.next(1).is_operator(":")
 				{ try!(self.parse_global_label(&mut parser)); }
 				
-			else if parser.current().is_operator("'") && parser.next(1).is_identifier() && parser.next(2).is_operator(":")
+			else if parser.current().is_operator(".") && parser.next(1).is_identifier() && parser.next(2).is_operator(":")
 				{ try!(self.parse_local_label(&mut parser)); }
 				
 			else
@@ -151,7 +151,7 @@ impl<'def> Assembler<'def>
 
 	fn parse_directive(&mut self, parser: &mut Parser, cur_path: &Path) -> Result<(), Error>
 	{
-		try!(parser.expect_operator("."));
+		try!(parser.expect_operator("#"));
 		let (directive, directive_span) = try!(parser.expect_identifier());
 		
 		// If the directive starts with a 'd', it might
@@ -338,7 +338,7 @@ impl<'def> Assembler<'def>
 
 	fn parse_local_label(&mut self, parser: &mut Parser) -> Result<(), Error>
 	{
-		try!(parser.expect_operator("'"));
+		try!(parser.expect_operator("."));
 		let (label, label_span) = try!(parser.expect_identifier());
 		try!(parser.expect_operator(":"));
 		

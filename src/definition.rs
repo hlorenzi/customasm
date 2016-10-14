@@ -47,7 +47,7 @@ impl Definition
 
 	fn parse_directives(&mut self, parser: &mut Parser) -> Result<(), Error>
 	{
-		while parser.match_operator(".")
+		while parser.match_operator("#")
 		{
 			let (directive, directive_span) = try!(parser.expect_identifier());
 			

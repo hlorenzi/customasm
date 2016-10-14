@@ -397,7 +397,7 @@ impl<'p, 'tok> ExpressionParser<'p, 'tok>
 			})
 		}
 		
-		else if self.parser.current().is_operator("'") && self.parser.next(1).is_identifier()
+		else if self.parser.current().is_operator(".") && self.parser.next(1).is_identifier()
 		{
 			let start_span = self.parser.current().span.clone();
 			self.parser.advance();

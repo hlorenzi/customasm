@@ -24,7 +24,7 @@ fn main()
     let mut opts = getopts::Options::new();
     opts.optflag("h", "help", "Display this information.");
     opts.optflag("v", "version", "Display version information.");
-    opts.optflag("q", "quiet", "Suppress diagnostics and progress reports.");
+    opts.optflag("q", "quiet", "Suppress progress reports.");
     opts.optopt("f", "format", "The format of the output file. Possible formats: binary, binstr, hexstr, bindump, hexdump", "FORMAT");
 	
     let matches = match opts.parse(&args[1..])
