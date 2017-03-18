@@ -1,13 +1,16 @@
 # Definition File Format
 
+This file controls settings for the target machine, and
+defines mnemonics for its instruction set.
+
 ## Directives
 
 The file starts with a list of configuration directives, one per line.
 The currently available directives are:
 
-- ```#align <bit_num>```  
+- `#align <bit_num>`  
 Sets the number of bits in a byte for the target machine.  
-For example, ```#align 8``` is the usual configuration for
+For example, `#align 8` is the usual configuration for
 most modern CPUs.  
 Memory addresses are counted in bytes, so, with 8-bit bytes,
 address 0x01 actually refers to the bits 8 through 15 in
@@ -18,10 +21,10 @@ instruction sizes are 8 bits, 16 bits, 24 bits, and so on.
 
 ## Rules
 
-The first line not starting with a ```#``` begins the list of rules.  
+The first line not starting with a `#` begins the list of rules.  
 A rule defines a valid mnemonic for the target machine, and its
 respective binary representation.
-Rules are written as ```pattern -> production```, one per line.
+Rules are written as `pattern -> production`, one per line.
 
 ### Pattern
 
@@ -30,16 +33,16 @@ text, punctuation, and/or argument expressions (that will be
 specified by the programmer when invoking the mnemonic).  
 The pattern is written as a sequence of tokens separated by spaces.  
 - For text and punctuation, just write it out verbatim.
-- For argument expressions, write it as ```{x}```, with ```x```
+- For argument expressions, write it as `{x}`, with `x`
 substituted for any other desired name. If there is more than one
 argument, give each one a unique name. This name will be used
 in the rule's binary representation to refer to its value.
 - Arguments can be given a constraint that, if not
 satisfied, will produce an error and abort assembly. Specify it
 by adding a colon followed by the constraint after the argument
-name, like ```{x: constraint}```. Use ```_``` for the argument's
+name, like `{x: constraint}`. Use `_` for the argument's
 value, and make sure the constraint expression returns a boolean,
-like ```{x: _ >= 0 && _ <= 0xff}```. You may use [predefined
+like `{x: _ >= 0 && _ <= 0xff}`. You may use [predefined
 variables](#predefined-variables) in the constraint expression.
 
 ### Production
@@ -48,24 +51,24 @@ The production part of a rule defines its binary representation.
 It consists of a sequence of expressions separated by spaces.  
 The binary representation must have a fixed number of bits.  
 - For literals (like fixed opcodes), use explicitly-sized literals:
-the size in bits, followed by a single quote, followed by the value, like ```8'0x05```.
-- For user-entered expressions, use a bit slice:
-the expression name followed by two numbers inside brackets, like ```abc[y:x]```.
-```x``` and ```y``` define the rightmost and the leftmost 0-based bit index
+the size in bits, followed by a single quote, followed by the value, like `8'0x05`.
+- For argument values, use a bit slice:
+the argument name followed by two numbers inside brackets, like `abc[y:x]`.
+`x` and `y` define the rightmost and the leftmost 0-based bit index
 of the value that will be selected, counting from the least significant bit.
-For example, if ```abc = 0xbbaa```, then ```abc[7:0] = 0xaa``` and ```abc[15:8] = 0xbb```.
+For example, if `abc = 0xbbaa`, then `abc[7:0] = 0xaa` and `abc[15:8] = 0xbb`.
 - More complex expressions can also be evaluated; just end it off with an
-explicit bit slice, like ```(abc + 0xff)[7:0]```.
+explicit bit slice, like `(abc + 0xff)[7:0]`.
 - You may use [predefined variables](#predefined-variables) in expressions.
 
 ### Predefined Variables
 
 The following predefined variables can be used in either argument constraints
 or production expressions:
-- ```pc```  
+- `pc`  
 The address of the current instruction, or, in other words, the
 value of the program counter when it reaches the current instruction.
-Use it like ```{x: _ + pc <= 0xff}``` or ```(x - pc + 1)[7:0]```.
+Use it like `{x: _ + pc <= 0xff}` or `(x - pc + 1)[7:0]`.
 
 ### Rule Cascading
 
@@ -108,7 +111,7 @@ mov {value : _ <= 0xffffff} -> 8'0x12 value[23:0]
 
 ### Rule Examples
 
-With ```#align 8```:
+With `#align 8`:
 
 Rule | Used as | Output
 -----|---------|--------
