@@ -378,14 +378,59 @@ fn try_read_string(file: &Rc<String>, src: &[char], index: &mut CharIndex) -> Op
 	index.advance();
 
 	let mut s = String::new();
-	while index.linear < src.len() && src[index.linear] != '\"' // "
+	while index.linear + 1 < src.len() && src[index.linear] != '\"' // "
 	{
-		s.push(src[index.linear]);
-		
-		if src[index.linear] == '\n'
-			{ index.advance_line(); }
+		// Parse escape sequences.
+		if src[index.linear] == '\\' && index.linear + 2 < src.len()
+		{
+			index.advance();
+			
+			match src[index.linear]
+			{
+				'\\' => { s.push('\\'); index.advance(); }
+				'\"' => { s.push('\"'); index.advance(); } // "
+				'0'  => { s.push('\0'); index.advance(); }
+				't'  => { s.push('\t'); index.advance(); }
+				'n'  => { s.push('\n'); index.advance(); }
+				'r'  => { s.push('\r'); index.advance(); }
+				'x'  =>
+				{
+					index.advance();
+					
+					if index.linear + 2 < src.len()
+					{
+						let hex1 = src[index.linear + 0].to_digit(16);
+						let hex2 = src[index.linear + 1].to_digit(16);
+						
+						if hex1.is_some() && hex2.is_some()
+						{
+							index.advance();
+							index.advance();
+							
+							s.push(((hex1.unwrap() << 4) | hex2.unwrap()) as u8 as char);
+						}
+						// FIXME: Should return an error.
+						else
+							{ s.push('\\'); }
+					}
+					// FIXME: Should return an error.
+					else
+						{ s.push('\\'); }
+				}
+				
+				// FIXME: Should return an error.
+				_ => { s.push('\\'); }
+			}
+		}
 		else
-			{ index.advance(); }
+		{
+			s.push(src[index.linear]);
+			
+			if src[index.linear] == '\n'
+				{ index.advance_line(); }
+			else
+				{ index.advance(); }
+		}
 	}
 	
 	if src[index.linear] == '\"' // "

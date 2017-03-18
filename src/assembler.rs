@@ -206,6 +206,12 @@ impl<'def> Assembler<'def>
 				self.advance_address(bits);
 			}
 			
+			"str" =>
+				return self.parse_str_directive(parser),
+			
+			"strl" =>
+				return self.parse_strl_directive(parser),
+			
 			"include" =>
 			{
 				let (new_path, span) = try!(self.parse_relative_filename(parser, cur_path));
@@ -291,6 +297,52 @@ impl<'def> Assembler<'def>
 				{ break; }
 		}
 		
+		try!(parser.expect_linebreak_or_end());
+		Ok(())
+	}
+
+
+	fn parse_str_directive(&mut self, parser: &mut Parser) -> Result<(), Error>
+	{
+		let (string, _) = try!(parser.expect_string());
+		let mut bitvec = BitVec::new();
+		
+		for c in string.bytes()
+			{ bitvec.push(8, &BigInt::from_u8(c)); }
+		
+		while bitvec.len() % self.def.align_bits != 0
+			{ bitvec.push_bit(false); }
+		
+		self.output_bitvec(&bitvec);		
+		try!(parser.expect_linebreak_or_end());
+		Ok(())
+	}
+
+
+	fn parse_strl_directive(&mut self, parser: &mut Parser) -> Result<(), Error>
+	{
+		let size_span = parser.current().span.clone();
+		let size = try!(self.parse_integer(parser));
+		if size % self.def.align_bits != 0
+			{ return Err(Error::new_with_span(format!("string length is not aligned"), size_span)); }
+			
+		try!(parser.expect_operator(","));
+		
+		let (string, _) = try!(parser.expect_string());
+		let mut bitvec = BitVec::new();
+		
+		for c in string.bytes()
+			{ bitvec.push(8, &BigInt::from_u8(c)); }
+		
+		while bitvec.len() % self.def.align_bits != 0
+			{ bitvec.push_bit(false); }
+			
+		let strlen = BigInt::from_usize(string.len());
+		if strlen.width() > size
+			{ return Err(Error::new_with_span(format!("string length (`{}`) does not fit given width", string.len()), size_span)); }
+		self.output_integer(size, &strlen);
+		
+		self.output_bitvec(&bitvec);		
 		try!(parser.expect_linebreak_or_end());
 		Ok(())
 	}

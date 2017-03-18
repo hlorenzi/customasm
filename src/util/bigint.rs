@@ -7,12 +7,21 @@ pub struct BigInt
 
 
 impl BigInt
-{
+{	
 	pub fn from_i64(value: i64) -> BigInt
 	{
 		BigInt
 		{
 			value: value
+		}
+	}
+	
+	
+	pub fn from_u8(value: u8) -> BigInt
+	{
+		BigInt
+		{
+			value: value as i64
 		}
 	}
 	

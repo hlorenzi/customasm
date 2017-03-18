@@ -266,6 +266,49 @@ lda 0x77
 Note that the `#d32` directive's arguments, `0x1234, 0x5678`, were
 extended with zeroes to match the directive's bit-size.
 
+### String Directive
+
+This directive copies the UTF-8 representation of a string to
+the output. The representation is extended with zeroes at the end
+until it matches the machine's alignment. Escape sequences and 
+Unicode characters are available. For example:
+
+```
+#str "abcd"
+#str "\n\r\0"
+#str "\x12\x34"
+#str "木"
+```
+
+...would be assembled into:
+
+```
+0x61 0x62 0x63 0x64
+0x0a 0x0d 0x00
+0x12 0x34
+0xe6 0x9c 0xa8
+```
+
+### String with Length Directive
+
+Works like the previous directive, but prepends the output with
+the string length in bytes, expressed in the given number of bits.
+For example:
+
+```
+#strl 8,  "abcd"
+#strl 16, "abcd"
+#strl 32, "abcd"
+```
+
+...would be assembled into:
+
+```
+0x04 0x61 0x62 0x63 0x64
+0x00 0x04 0x61 0x62 0x63 0x64
+0x00 0x00 0x00 0x04 0x61 0x62 0x63 0x64
+```
+
 ### Reserve Directive
 
 This directive advances the instruction *and* output addresses by

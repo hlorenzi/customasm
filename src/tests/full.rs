@@ -417,6 +417,131 @@ fn test_data_directive_with_variables()
 
 
 #[test]
+fn test_str_directive_simple()
+{
+	pass("#align 1",  "#str \"abcd\"", 16, "61626364");
+	pass("#align 2",  "#str \"abcd\"", 16, "61626364");
+	pass("#align 4",  "#str \"abcd\"", 16, "61626364");
+	pass("#align 8",  "#str \"abcd\"", 16, "61626364");
+	pass("#align 16", "#str \"abcd\"", 16, "61626364");
+	pass("#align 32", "#str \"abcd\"", 16, "61626364");
+	pass("#align 64", "#str \"abcd\"", 16, "6162636400000000");
+	
+	pass("#align 1",  "#str \"hello\"", 16, "68656c6c6f");
+	pass("#align 2",  "#str \"hello\"", 16, "68656c6c6f");
+	pass("#align 4",  "#str \"hello\"", 16, "68656c6c6f");
+	pass("#align 8",  "#str \"hello\"", 16, "68656c6c6f");
+	pass("#align 16", "#str \"hello\"", 16, "68656c6c6f00");
+	pass("#align 32", "#str \"hello\"", 16, "68656c6c6f000000");
+	pass("#align 64", "#str \"hello\"", 16, "68656c6c6f000000");
+	
+	pass("#align 3", "#str \"abcd\"", 2, "011000010110001001100011011001000");
+	pass("#align 5", "#str \"abcd\"", 2, "01100001011000100110001101100100000");
+	pass("#align 7", "#str \"abcd\"", 2, "01100001011000100110001101100100000");
+	pass("#align 9", "#str \"abcd\"", 2, "011000010110001001100011011001000000");
+}
+
+
+#[test]
+fn test_str_directive_utf8()
+{
+	pass("#align 1",  "#str \"木\"", 16, "e69ca8");
+	pass("#align 2",  "#str \"木\"", 16, "e69ca8");
+	pass("#align 4",  "#str \"木\"", 16, "e69ca8");
+	pass("#align 8",  "#str \"木\"", 16, "e69ca8");
+	pass("#align 16", "#str \"木\"", 16, "e69ca800");
+	pass("#align 32", "#str \"木\"", 16, "e69ca800");
+	pass("#align 64", "#str \"木\"", 16, "e69ca80000000000");
+	
+	pass("#align 1",  "#str \"ab木cd\"", 16, "6162e69ca86364");
+	pass("#align 2",  "#str \"ab木cd\"", 16, "6162e69ca86364");
+	pass("#align 4",  "#str \"ab木cd\"", 16, "6162e69ca86364");
+	pass("#align 8",  "#str \"ab木cd\"", 16, "6162e69ca86364");
+	pass("#align 16", "#str \"ab木cd\"", 16, "6162e69ca8636400");
+	pass("#align 32", "#str \"ab木cd\"", 16, "6162e69ca8636400");
+	pass("#align 64", "#str \"ab木cd\"", 16, "6162e69ca8636400");
+}
+
+
+#[test]
+fn test_str_directive_escape()
+{
+	pass("#align 8", "#str \"\0\"",   16, "00");
+	pass("#align 8", "#str \"\t\"",   16, "09");
+	pass("#align 8", "#str \"\n\"",   16, "0a");
+	pass("#align 8", "#str \"\r\"",   16, "0d");
+	pass("#align 8", "#str \"\\\\\"", 16, "5c");
+	pass("#align 8", "#str \"\\\"\"", 16, "22");
+	
+	pass("#align 8", "#str \"\\\"",   16, "5c");
+	
+	pass("#align 8", "#str \"\\x00\"",   16, "00");
+	pass("#align 8", "#str \"\\x12\"",   16, "12");
+	pass("#align 8", "#str \"\\x7f\"",   16, "7f");
+	pass("#align 8", "#str \"\\x80\"",   16, "c280");
+	pass("#align 8", "#str \"\\xab\"",   16, "c2ab");
+	pass("#align 8", "#str \"\\xAB\"",   16, "c2ab");
+	pass("#align 8", "#str \"\\xabcd\"", 16, "c2ab6364");
+	pass("#align 8", "#str \"ab\\xcd\"", 16, "6162c38d");
+	
+	pass("#align 8", "#str \"\\x\"",  16, "5c");
+	pass("#align 8", "#str \"\\x0\"", 16, "5c30");
+	
+	fail("#align 8", "#str 0",    1, "string");
+	fail("#align 8", "#str \"0",  1, "line break");
+	fail("#align 8", "#str \"\\", 1, "line break");
+}
+
+
+#[test]
+fn test_strl_directive_simple()
+{
+	pass("#align 8",  "#strl 8,  \"abcd\"", 16, "0461626364");
+	pass("#align 8",  "#strl 16, \"abcd\"", 16, "000461626364");
+	pass("#align 8",  "#strl 24, \"abcd\"", 16, "00000461626364");
+	pass("#align 8",  "#strl 32, \"abcd\"", 16, "0000000461626364");
+	pass("#align 8",  "#strl 64, \"abcd\"", 16, "000000000000000461626364");
+	pass("#align 16", "#strl 16, \"abcd\"", 16, "000461626364");
+	pass("#align 16", "#strl 32, \"abcd\"", 16, "0000000461626364");
+	pass("#align 16", "#strl 64, \"abcd\"", 16, "000000000000000461626364");
+	pass("#align 32", "#strl 32, \"abcd\"", 16, "0000000461626364");
+	pass("#align 32", "#strl 64, \"abcd\"", 16, "000000000000000461626364");
+	pass("#align 64", "#strl 64, \"abcd\"", 16, "00000000000000046162636400000000");
+
+	pass("#align 8",  "#strl 8,  \"\"",        16, "00");
+	pass("#align 8",  "#strl 8,  \"a\"",       16, "0161");
+	pass("#align 8",  "#strl 8,  \"ab\"",      16, "026162");
+	pass("#align 8",  "#strl 8,  \"abc\"",     16, "03616263");
+	pass("#align 8",  "#strl 8,  \"abcde\"",   16, "056162636465");
+	pass("#align 8",  "#strl 8,  \"abcdef\"",  16, "06616263646566");
+	pass("#align 8",  "#strl 8,  \"abcdefg\"", 16, "0761626364656667");
+	
+	fail("#align 8",  "#strl \"abcd\"",   1, "expected");
+	fail("#align 8",  "#strl 8 \"abcd\"", 1, "expected");
+	
+	pass("#align 4",  "#strl 4, \"0123456789abcde\"",  16, "f303132333435363738396162636465");
+	fail("#align 4",  "#strl 4, \"0123456789abcdef\"", 1,  "does not fit");
+	
+	fail("#align 8",  "#strl 1, \"abcd\"", 1, "string length");
+	fail("#align 8",  "#strl 2, \"abcd\"", 1, "string length");
+	fail("#align 8",  "#strl 3, \"abcd\"", 1, "string length");
+	fail("#align 8",  "#strl 4, \"abcd\"", 1, "string length");
+	fail("#align 8",  "#strl 5, \"abcd\"", 1, "string length");
+	fail("#align 8",  "#strl 6, \"abcd\"", 1, "string length");
+	fail("#align 8",  "#strl 7, \"abcd\"", 1, "string length");
+	fail("#align 8",  "#strl 9, \"abcd\"", 1, "string length");
+}
+
+
+#[test]
+fn test_strl_directive_utf8()
+{
+	pass("#align 8", "#strl 8, \"木\"", 16, "03e69ca8");
+	pass("#align 8", "#strl 8, \"ab木cd\"", 16, "076162e69ca86364");
+}
+
+
+#[test]
 fn test_reserve_directive()
 {
 	pass(DEF_SIMPLE, "#res 1     \n halt", 16, "0010");
