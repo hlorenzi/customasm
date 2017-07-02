@@ -1,0 +1,12 @@
+[package]
+name = "customasm"
+version = "0.4.0"
+authors = ["Henrique Lorenzi <hlorenzi12@gmail.com>"]
+
+[lib]
+name = "customasm"
+path = "src/lib.rs"
+
+[[bin]]
+name = "customasm"
+path = "src/main.rs"
