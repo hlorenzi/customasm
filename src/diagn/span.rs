@@ -21,6 +21,42 @@ impl Span
 	}
 	
 	
+	pub fn before(&self) -> Span
+	{
+		if self.location.is_none()
+			{ self.clone() }
+		
+		else
+		{
+			let start = self.location.unwrap().0;
+			
+			Span
+			{
+				file: self.file.clone(),
+				location: Some((start, start))
+			}
+		}
+	}
+	
+	
+	pub fn after(&self) -> Span
+	{
+		if self.location.is_none()
+			{ self.clone() }
+		
+		else
+		{
+			let end = self.location.unwrap().1;
+			
+			Span
+			{
+				file: self.file.clone(),
+				location: Some((end, end))
+			}
+		}
+	}
+	
+	
 	pub fn join(&self, other: &Span) -> Span
 	{
 		assert!(self.file == other.file, "joining spans from different files");

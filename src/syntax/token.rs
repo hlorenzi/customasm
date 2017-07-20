@@ -64,6 +64,60 @@ impl TokenKind
 		self == TokenKind::Number ||
 		self == TokenKind::String
 	}
+	
+	
+	pub fn ignorable(self) -> bool
+	{
+		self == TokenKind::Whitespace ||
+		self == TokenKind::Comment ||
+		self == TokenKind::LineBreak
+	}
+	
+	
+	pub fn printable(self) -> &'static str
+	{
+		match self
+		{
+			TokenKind::End => "end",
+			TokenKind::Error => "error",
+			TokenKind::Whitespace => "whitespace",
+			TokenKind::Comment => "comment",
+			TokenKind::LineBreak => "line break",
+			TokenKind::Identifier => "identifier",
+			TokenKind::Number => "number",
+			TokenKind::String => "string",
+			TokenKind::ParenOpen => "`(`",
+			TokenKind::ParenClose => "`)`",
+			TokenKind::BracketOpen => "`[`",
+			TokenKind::BracketClose => "`]`",
+			TokenKind::BraceOpen => "`{`",
+			TokenKind::BraceClose => "`}`",
+			TokenKind::Dot => "`.`",
+			TokenKind::Comma => "`,`",
+			TokenKind::Colon => "`:`",
+			TokenKind::Arrow => "`->`",
+			TokenKind::Hash => "`#`",
+			TokenKind::Equal => "`=`",
+			TokenKind::Plus => "`+`",
+			TokenKind::Minus => "`-`",
+			TokenKind::Asterisk => "`*`",
+			TokenKind::Slash => "`/`",
+			TokenKind::Percent => "`%`",
+			TokenKind::Exclamation => "`!`",
+			TokenKind::Ampersand => "`&`",
+			TokenKind::VerticalBar => "`|`",
+			TokenKind::Circumflex => "`^`",
+			TokenKind::Tilde => "`~`",
+			TokenKind::AmpersandAmpersand => "`&&`",
+			TokenKind::VerticalBarVerticalBar => "`||`",
+			TokenKind::EqualEqual => "`==`",
+			TokenKind::ExclamationEqual => "`!=`",
+			TokenKind::LessThan => "`<`",
+			TokenKind::LessThanEqual => "`<=`",
+			TokenKind::GreaterThan => "`>`",
+			TokenKind::GreaterThanEqual => "`>=`"
+		}
+	}
 }
 
 
