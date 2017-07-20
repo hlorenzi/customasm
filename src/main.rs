@@ -15,6 +15,9 @@ fn main()
 	
 	let chars = src.chars().collect::<Vec<_>>();
 	
-	let tokens = customasm::syntax::tokenize("test", &chars);
-	println!("{:#?}", tokens);
+	let mut reporter = customasm::diagn::Reporter::new();
+	let tokens = customasm::syntax::tokenize(&mut reporter, "test", &chars);
+	//println!("{:#?}", tokens);
+	
+	reporter.print();
 }

@@ -1,4 +1,5 @@
 use diagn::Span;
+use diagn::Reporter;
 use std::rc::Rc;
 
 
@@ -66,7 +67,7 @@ impl TokenKind
 }
 
 
-pub fn tokenize<S>(src_filename: S, src: &[char]) -> Vec<Token>
+pub fn tokenize<S>(reporter: &mut Reporter, src_filename: S, src: &[char]) -> Vec<Token>
 where S: Into<String>
 {
 	let filename = Rc::new(src_filename.into());
@@ -85,6 +86,8 @@ where S: Into<String>
 			check_for_fixed     (&src[index..]).unwrap_or_else(||
 			(TokenKind::Error, 1)))))));
 		
+		let span = Span::new(filename.clone(), index, index + length);
+		
 		// Get the source excerpt for variable tokens (e.g. identifiers).
 		let excerpt = match kind.needs_excerpt()
 		{
@@ -92,8 +95,11 @@ where S: Into<String>
 			false => None
 		};
 		
-		let span = Span::new(filename.clone(), index, index + length);
+		// Report unexpected characters.
+		if kind == TokenKind::Error
+			{ reporter.error_span("unexpected character", &span); }
 		
+		// Add to the token list.
 		let token = Token
 		{
 			span: span,
