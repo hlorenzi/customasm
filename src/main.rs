@@ -3,7 +3,8 @@ extern crate customasm;
 
 fn main()
 {
-	let src =
+	let mut fileserver = customasm::util::FileServerMock::new();
+	fileserver.add("test",
 	"
 		#align 8
 		
@@ -11,15 +12,13 @@ fn main()
 		jmp {addr!}  -> ; 8'0x10 addr[15:0]
 		load {addr}  -> ; 8'0x20 addr[15:0]
 		store {addr} -> ; 8'0x30 addr[15:0]
-	";
-	
-	let chars = src.chars().collect::<Vec<_>>();
+		err {a}, {a} -> ;
+	");
 	
 	let mut reporter = customasm::diagn::Reporter::new();
-	let tokens = customasm::syntax::tokenize(&mut reporter, "test", &chars);
-	let instrset = customasm::InstrSet::from_tokens(&mut reporter, &tokens);
+	let instrset = customasm::InstrSet::from_src(&mut reporter, &fileserver, "test");
 	
 	println!("{:#?}", instrset);
 	
-	reporter.print();
+	reporter.print_all(&fileserver);
 }

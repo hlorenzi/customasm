@@ -1,5 +1,6 @@
 use diagn::Reporter;
-use syntax::Token;
+use syntax::tokenize;
+use util::FileServer;
 use super::InstrSetParser;
 use instrset::Rule;
 
@@ -14,17 +15,25 @@ pub struct InstrSet
 
 impl InstrSet
 {
-	pub fn from_tokens(reporter: &mut Reporter, tokens: &[Token]) -> Option<InstrSet>
+	pub fn from_src<S>(reporter: &mut Reporter, fileserver: &FileServer, filename: S) -> Option<InstrSet>
+	where S: Into<String>
 	{
-		let mut instrset = InstrSet
+		let filename_owned = filename.into();
+		let chars = match fileserver.get_chars(&filename_owned)
 		{
-			align: 8,
-			rules: Vec::new()
+			Ok(chars) => chars,
+			Err(msg) =>
+			{
+				reporter.message(msg);
+				return None;
+			}
 		};
 		
-		match InstrSetParser::new(reporter, tokens, &mut instrset).parse()
+		let tokens = tokenize(reporter, filename_owned, &chars);
+		
+		match InstrSetParser::new(reporter, &tokens).parse()
 		{
-			Ok(()) => Some(instrset),
+			Ok(instrset) => Some(instrset),
 			Err(msg) => 
 			{
 				reporter.message(msg);

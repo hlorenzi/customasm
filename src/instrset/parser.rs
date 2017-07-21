@@ -7,7 +7,7 @@ use instrset::Rule;
 
 pub struct InstrSetParser<'a, 't>
 {
-	instrset: &'a mut InstrSet,
+	pub instrset: InstrSet,
 	
 	reporter: &'a mut Reporter,
 	parser: Parser<'t>,
@@ -18,8 +18,14 @@ pub struct InstrSetParser<'a, 't>
 
 impl<'a, 't> InstrSetParser<'a, 't>
 {
-	pub fn new(reporter: &'a mut Reporter, tokens: &'t [Token], instrset: &'a mut InstrSet) -> InstrSetParser<'a, 't>
+	pub fn new(reporter: &'a mut Reporter, tokens: &'t [Token]) -> InstrSetParser<'a, 't>
 	{
+		let instrset = InstrSet
+		{
+			align: 8,
+			rules: Vec::new()
+		};
+		
 		InstrSetParser
 		{
 			instrset: instrset,
@@ -32,10 +38,11 @@ impl<'a, 't> InstrSetParser<'a, 't>
 	}
 	
 
-	pub fn parse(&mut self) -> Result<(), Message>
+	pub fn parse(mut self) -> Result<InstrSet, Message>
 	{
 		self.parse_directives()?;
-		self.parse_rules()
+		self.parse_rules()?;
+		Ok(self.instrset)
 	}
 	
 
@@ -110,7 +117,7 @@ impl<'a, 't> InstrSetParser<'a, 't>
 			if rule.pattern_parts.len() == 0
 			{
 				if tk.kind != TokenKind::Identifier
-					{ return Err(Message::error_span("expected identifier as first pattern token", &tk.span.before())); }
+					{ return Err(Message::error_span("expected identifier as first pattern token", &tk.span)); }
 					
 				rule.pattern_add_exact(&tk);
 			}
