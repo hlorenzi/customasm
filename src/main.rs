@@ -17,7 +17,7 @@ fn main()
 	
 	let mut reporter = customasm::diagn::Reporter::new();
 	let tokens = customasm::syntax::tokenize(&mut reporter, "test", &chars);
-	//println!("{:#?}", tokens);
+	let instrset = customasm::InstrSet::from_tokens(&mut reporter, &tokens);
 	
 	reporter.print();
 }
