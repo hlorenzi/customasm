@@ -15,6 +15,8 @@ impl<'t> Parser<'t>
 {
 	pub fn new(tokens: &'t [Token]) -> Parser<'t>
 	{
+		assert!(tokens[tokens.len() - 1].kind == TokenKind::End);
+	
 		let mut parser = Parser
 		{
 			tokens: tokens,
@@ -25,6 +27,12 @@ impl<'t> Parser<'t>
 		
 		parser.skip_ignorable();
 		parser
+	}
+	
+	
+	pub fn is_over(&self) -> bool
+	{
+		self.index >= self.tokens.len() - 1
 	}
 	
 	
@@ -102,7 +110,10 @@ impl<'t> Parser<'t>
 	pub fn expect_linebreak(&mut self) -> Result<(), Message>
 	{
 		if self.read_linebreak
-			{ Ok(()) }
+		{
+			self.read_linebreak = false;
+			Ok(())
+		}
 		else
 			{ Err(Message::error_span("expected line break", &self.tokens[self.index_prev].span.after())) }
 	}

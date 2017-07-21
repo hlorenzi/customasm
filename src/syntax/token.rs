@@ -74,6 +74,40 @@ impl TokenKind
 	}
 	
 	
+	pub fn is_allowed_pattern_token(self) -> bool
+	{
+		self == TokenKind::Identifier ||
+		self == TokenKind::Number ||
+		self == TokenKind::ParenOpen ||
+		self == TokenKind::ParenClose ||
+		self == TokenKind::BracketOpen ||
+		self == TokenKind::BracketClose ||
+		self == TokenKind::Dot ||
+		self == TokenKind::Comma ||
+		self == TokenKind::Hash ||
+		self == TokenKind::Plus ||
+		self == TokenKind::Minus ||
+		self == TokenKind::Asterisk ||
+		self == TokenKind::Slash ||
+		self == TokenKind::Percent ||
+		self == TokenKind::Exclamation ||
+		self == TokenKind::Ampersand ||
+		self == TokenKind::VerticalBar ||
+		self == TokenKind::Circumflex ||
+		self == TokenKind::Tilde ||
+		self == TokenKind::LessThan ||
+		self == TokenKind::GreaterThan
+	}
+	
+	
+	pub fn is_allowed_after_pattern_parameter(self) -> bool
+	{
+		self == TokenKind::ParenClose ||
+		self == TokenKind::BracketClose ||
+		self == TokenKind::Comma
+	}
+	
+	
 	pub fn printable(self) -> &'static str
 	{
 		match self
