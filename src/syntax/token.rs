@@ -50,8 +50,11 @@ pub enum TokenKind
 	EqualEqual,
 	ExclamationEqual,
 	LessThan,
+	LessThanLessThan,
 	LessThanEqual,
 	GreaterThan,
+	GreaterThanGreaterThan,
+	GreaterThanGreaterThanGreaterThan,
 	GreaterThanEqual
 }
 
@@ -147,8 +150,11 @@ impl TokenKind
 			TokenKind::EqualEqual => "`==`",
 			TokenKind::ExclamationEqual => "`!=`",
 			TokenKind::LessThan => "`<`",
+			TokenKind::LessThanLessThan => "`<<`",
 			TokenKind::LessThanEqual => "`<=`",
 			TokenKind::GreaterThan => "`>`",
+			TokenKind::GreaterThanGreaterThan => "`>>`",
+			TokenKind::GreaterThanGreaterThanGreaterThan => "`>>>`",
 			TokenKind::GreaterThanEqual => "`>=`"
 		}
 	}
@@ -294,39 +300,42 @@ fn check_for_string(src: &[char]) -> Option<(TokenKind, usize)>
 
 fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 {
-	static OPERATORS: [(&str, TokenKind); 31] =
+	static OPERATORS: [(&str, TokenKind); 34] =
 	[
-		("\n", TokenKind::LineBreak),
-		("(",  TokenKind::ParenOpen),
-		(")",  TokenKind::ParenClose),
-		("[",  TokenKind::BracketOpen),
-		("]",  TokenKind::BracketClose),
-		("{",  TokenKind::BraceOpen),
-		("}",  TokenKind::BraceClose),
-		(".",  TokenKind::Dot),
-		(",",  TokenKind::Comma),
-		(":",  TokenKind::Colon),
-		("->", TokenKind::Arrow),
-		("#",  TokenKind::Hash),
-		("+",  TokenKind::Plus),
-		("-",  TokenKind::Minus),
-		("*",  TokenKind::Asterisk),
-		("/",  TokenKind::Slash),
-		("%",  TokenKind::Percent),
-		("^",  TokenKind::Circumflex),
-		("~",  TokenKind::Tilde),
-		("&&", TokenKind::AmpersandAmpersand),
-		("&",  TokenKind::Ampersand),
-		("||", TokenKind::VerticalBarVerticalBar),
-		("|",  TokenKind::VerticalBar),
-		("==", TokenKind::EqualEqual),
-		("=",  TokenKind::Equal),
-		("!=", TokenKind::ExclamationEqual),
-		("!",  TokenKind::Exclamation),
-		("<=", TokenKind::LessThanEqual),
-		("<",  TokenKind::LessThan),
-		(">=", TokenKind::GreaterThanEqual),
-		(">",  TokenKind::GreaterThan)
+		("\n",  TokenKind::LineBreak),
+		("(",   TokenKind::ParenOpen),
+		(")",   TokenKind::ParenClose),
+		("[",   TokenKind::BracketOpen),
+		("]",   TokenKind::BracketClose),
+		("{",   TokenKind::BraceOpen),
+		("}",   TokenKind::BraceClose),
+		(".",   TokenKind::Dot),
+		(",",   TokenKind::Comma),
+		(":",   TokenKind::Colon),
+		("->",  TokenKind::Arrow),
+		("#",   TokenKind::Hash),
+		("+",   TokenKind::Plus),
+		("-",   TokenKind::Minus),
+		("*",   TokenKind::Asterisk),
+		("/",   TokenKind::Slash),
+		("%",   TokenKind::Percent),
+		("^",   TokenKind::Circumflex),
+		("~",   TokenKind::Tilde),
+		("&&",  TokenKind::AmpersandAmpersand),
+		("&",   TokenKind::Ampersand),
+		("||",  TokenKind::VerticalBarVerticalBar),
+		("|",   TokenKind::VerticalBar),
+		("==",  TokenKind::EqualEqual),
+		("=",   TokenKind::Equal),
+		("!=",  TokenKind::ExclamationEqual),
+		("!",   TokenKind::Exclamation),
+		("<=",  TokenKind::LessThanEqual),
+		("<<",  TokenKind::LessThanLessThan),
+		("<",   TokenKind::LessThan),
+		(">=",  TokenKind::GreaterThanEqual),
+		(">>>", TokenKind::GreaterThanGreaterThanGreaterThan),
+		(">>",  TokenKind::GreaterThanGreaterThan),
+		(">",   TokenKind::GreaterThan)
 	];
 	
 	let maybe_match = OPERATORS.iter().find(|op|

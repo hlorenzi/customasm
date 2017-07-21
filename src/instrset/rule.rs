@@ -1,11 +1,13 @@
 use syntax::{Token, TokenKind};
+use ::Expression;
 
 
 #[derive(Debug)]
 pub struct Rule
 {
 	pub pattern_parts: Vec<RulePatternPart>,
-	pub params: Vec<RuleParameter>
+	pub params: Vec<RuleParameter>,
+	pub production_parts: Vec<Expression>
 }
 
 
@@ -32,7 +34,8 @@ impl Rule
 		Rule
 		{
 			pattern_parts: Vec::new(),
-			params: Vec::new()
+			params: Vec::new(),
+			production_parts: Vec::new()
 		}
 	}
 	

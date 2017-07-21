@@ -10,3 +10,6 @@ path = "src/lib.rs"
 [[bin]]
 name = "customasm"
 path = "src/main.rs"
+
+[dependencies]
+num-bigint = "0.1"

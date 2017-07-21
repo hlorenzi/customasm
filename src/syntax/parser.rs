@@ -64,6 +64,18 @@ impl<'t> Parser<'t>
 	}
 	
 	
+	pub fn next(&self) -> Token
+	{
+		self.tokens[self.index].clone()
+	}
+	
+	
+	pub fn prev(&self) -> Token
+	{
+		self.tokens[self.index_prev].clone()
+	}
+	
+	
 	pub fn next_is(&self, nth: usize, kind: TokenKind) -> bool
 	{
 		if self.index + nth >= self.tokens.len()
@@ -107,13 +119,28 @@ impl<'t> Parser<'t>
 	}
 	
 	
-	pub fn expect_linebreak(&mut self) -> Result<(), Message>
+	pub fn next_is_linebreak(&self) -> bool
 	{
-		if self.read_linebreak
+		self.read_linebreak
+	}
+	
+	
+	pub fn maybe_expect_linebreak(&mut self) -> Option<()>
+	{
+		if self.next_is_linebreak()
 		{
 			self.read_linebreak = false;
-			Ok(())
+			Some(())
 		}
+		else
+			{ None }
+	}
+	
+	
+	pub fn expect_linebreak(&mut self) -> Result<(), Message>
+	{
+		if self.maybe_expect_linebreak().is_some()
+			{ Ok(()) }
 		else
 			{ Err(Message::error_span("expected line break", &self.tokens[self.index_prev].span.after())) }
 	}

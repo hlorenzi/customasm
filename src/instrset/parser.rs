@@ -1,6 +1,8 @@
-use diagn::{Message, Reporter};
+use diagn::{Span, Message, Reporter};
 use syntax::{Token, TokenKind, Parser};
 use syntax::excerpt_as_usize;
+use ::ExpressionType;
+use expr::ExpressionParser;
 use ::InstrSet;
 use instrset::Rule;
 
@@ -9,7 +11,7 @@ pub struct InstrSetParser<'a, 't>
 {
 	pub instrset: InstrSet,
 	
-	reporter: &'a mut Reporter,
+	_reporter: &'a mut Reporter,
 	parser: Parser<'t>,
 	
 	align_was_set: bool
@@ -30,7 +32,7 @@ impl<'a, 't> InstrSetParser<'a, 't>
 		{
 			instrset: instrset,
 			
-			reporter: reporter,
+			_reporter: reporter,
 			parser: Parser::new(tokens),
 			
 			align_was_set: false
@@ -97,6 +99,11 @@ impl<'a, 't> InstrSetParser<'a, 't>
 		
 		self.parse_rule_pattern(&mut rule)?;
 		self.parser.expect(TokenKind::Arrow)?;
+		
+		if self.parser.next_is_linebreak()
+			{ return Err(Message::error_span("expected production before line break", &self.parser.prev().span.after())); }
+		
+		self.parse_rule_production(&mut rule)?;
 		
 		self.instrset.rules.push(rule);
 		
@@ -169,4 +176,49 @@ impl<'a, 't> InstrSetParser<'a, 't>
 		
 		Ok(())
 	}
+	
+
+	fn parse_rule_production(&mut self, rule: &mut Rule) -> Result<(), Message>
+	{
+		let mut total_span = self.parser.next().span;
+		let mut total_width = 0;
+		
+		loop
+		{
+			let expr = ExpressionParser::new(&mut self.parser).parse()?;
+			
+			expr.check_vars(&|name, span| expr_check_var(rule, name, span))?;
+			
+			if expr.eval_type(&|_| ExpressionType::Integer)? != ExpressionType::Integer
+				{ return Err(Message::error_span("expected integer expression for production", &expr.span())) }
+				
+			match expr.width()
+			{
+				Some(w) => total_width += w,
+				None => return Err(Message::error_span("width of expression not known; use a bit slice", &expr.span()))
+			}
+			
+			total_span = total_span.join(&expr.span());
+			
+			rule.production_parts.push(expr);
+			
+			if self.parser.maybe_expect(TokenKind::Comma).is_none()
+				{ break; }
+		}
+		
+		if total_width % self.instrset.align != 0
+			{ return Err(Message::error_span(format!("production (width = {}) does not align with a word boundary", total_width), &total_span)); }
+		
+		Ok(())
+	}
+}
+	
+	
+fn expr_check_var(rule: &Rule, name: &str, span: &Span) -> Result<(), Message>
+{
+	if rule.param_exists(name)
+		{ Ok(()) }
+	else
+		{ Err(Message::error_span("unknown variable", span)) }
+	
 }
