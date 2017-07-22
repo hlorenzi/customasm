@@ -32,6 +32,7 @@ pub enum TokenKind
 	Dot,
 	Comma,
 	Colon,
+	ColonColon,
 	Arrow,
 	Hash,
 	Equal,
@@ -132,6 +133,7 @@ impl TokenKind
 			TokenKind::Dot => "`.`",
 			TokenKind::Comma => "`,`",
 			TokenKind::Colon => "`:`",
+			TokenKind::ColonColon => "`::`",
 			TokenKind::Arrow => "`->`",
 			TokenKind::Hash => "`#`",
 			TokenKind::Equal => "`=`",
@@ -294,13 +296,15 @@ fn check_for_string(src: &[char]) -> Option<(TokenKind, usize)>
 	if src[length] != '\"' // "
 		{ return None; }
 		
+	length += 1;
+		
 	Some((TokenKind::String, length))
 }
 
 
 fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 {
-	static OPERATORS: [(&str, TokenKind); 34] =
+	static OPERATORS: [(&str, TokenKind); 35] =
 	[
 		("\n",  TokenKind::LineBreak),
 		("(",   TokenKind::ParenOpen),
@@ -311,6 +315,7 @@ fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 		("}",   TokenKind::BraceClose),
 		(".",   TokenKind::Dot),
 		(",",   TokenKind::Comma),
+		("::",  TokenKind::ColonColon),
 		(":",   TokenKind::Colon),
 		("->",  TokenKind::Arrow),
 		("#",   TokenKind::Hash),

@@ -10,10 +10,16 @@ fn main()
 		
 		halt         ->  8'0x00 ; stop the machine
 		jmp {addr!}  -> 16'0x10
-		load {addr}  -> 16'0x20, addr[ 7:0]
+		
 		store {addr} -> 16'0x30, addr[15:0]
 		
-		hllwrld {h}, {w} -> (h + w * 123)[15:0]
+		load {addr}
+			:: addr % 2 == 0, \"addr is not even\"
+			:: addr % 3 == 0, \"addr is not multiple of 3\"
+			:: addr > 0x10 ; no description
+			-> 16'0xffff, addr[7:0]
+		
+		hllwrld {h}, {w} -> (h + pc * 123)[15:0]
 	");
 	
 	let mut reporter = customasm::diagn::Reporter::new();

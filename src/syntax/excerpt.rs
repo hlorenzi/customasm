@@ -2,6 +2,16 @@ use diagn::{Span, Message};
 use num_bigint::{BigInt, Sign};
 
 
+pub fn excerpt_as_string_contents(excerpt: &str, _span: &Span) -> Result<String, Message>
+{
+	let chars: Vec<char> = excerpt.chars().collect();
+	assert!(chars.len() >= 2);
+	
+	Ok(chars[1..(chars.len() - 1)].iter().collect())
+}
+
+
+
 pub fn excerpt_as_usize(excerpt: &str, span: &Span) -> Result<usize, Message>
 {
 	let chars: Vec<char> = excerpt.chars().collect();
@@ -66,6 +76,12 @@ pub fn excerpt_as_bigint(excerpt: &str, span: &Span) -> Result<(BigInt, Option<u
 		
 		value = value * radix;
 		value = value + digit;
+	}
+	
+	if let Some(width) = width
+	{
+		if value.bits() > width
+			{ return Err(Message::error_span(format!("value (width = {}) is larger than specified", value.bits()), span)); }
 	}
 	
 	Ok((value, width))

@@ -7,6 +7,7 @@ pub struct Rule
 {
 	pub pattern_parts: Vec<RulePatternPart>,
 	pub params: Vec<RuleParameter>,
+	pub constraints: Vec<RuleConstraint>,
 	pub production_parts: Vec<Expression>
 }
 
@@ -27,6 +28,14 @@ pub struct RuleParameter
 }
 
 
+#[derive(Debug)]
+pub struct RuleConstraint
+{
+	pub expr: Expression,
+	pub descr: Option<String>
+}
+
+
 impl Rule
 {
 	pub fn new() -> Rule
@@ -35,6 +44,7 @@ impl Rule
 		{
 			pattern_parts: Vec::new(),
 			params: Vec::new(),
+			constraints: Vec::new(),
 			production_parts: Vec::new()
 		}
 	}
@@ -71,5 +81,17 @@ impl Rule
 	pub fn param_exists(&self, name: &str) -> bool
 	{
 		self.params.iter().any(|p| p.name == name)
+	}
+	
+	
+	pub fn constraint_add(&mut self, expr: Expression, descr: Option<String>)
+	{
+		let constr = RuleConstraint
+		{
+			expr: expr,
+			descr: descr
+		};
+		
+		self.constraints.push(constr);
 	}
 }

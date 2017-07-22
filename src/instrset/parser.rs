@@ -1,6 +1,6 @@
 use diagn::{Span, Message, Reporter};
 use syntax::{Token, TokenKind, Parser};
-use syntax::excerpt_as_usize;
+use syntax::{excerpt_as_string_contents, excerpt_as_usize};
 use ::ExpressionType;
 use expr::ExpressionParser;
 use ::InstrSet;
@@ -98,11 +98,11 @@ impl<'a, 't> InstrSetParser<'a, 't>
 		let mut rule = Rule::new();
 		
 		self.parse_rule_pattern(&mut rule)?;
+		
+		while self.parser.maybe_expect(TokenKind::ColonColon).is_some()
+			{ self.parse_rule_constraint(&mut rule)?; }
+		
 		self.parser.expect(TokenKind::Arrow)?;
-		
-		if self.parser.next_is_linebreak()
-			{ return Err(Message::error_span("expected production before line break", &self.parser.prev().span.after())); }
-		
 		self.parse_rule_production(&mut rule)?;
 		
 		self.instrset.rules.push(rule);
@@ -116,7 +116,7 @@ impl<'a, 't> InstrSetParser<'a, 't>
 		let mut prev_was_parameter = false;
 		
 		
-		while !self.parser.next_is(0, TokenKind::Arrow)
+		while !self.parser.next_is(0, TokenKind::Arrow) && !self.parser.next_is(0, TokenKind::ColonColon)
 		{
 			let tk = self.parser.advance();
 			
@@ -167,6 +167,9 @@ impl<'a, 't> InstrSetParser<'a, 't>
 		
 		let name = tk_name.excerpt.unwrap().clone();
 		
+		if is_reserved_var(&name)
+			{ return Err(Message::error_span("reserved variable name", &tk_name.span)); }
+		
 		if rule.param_exists(&name)
 			{ return Err(Message::error_span("duplicate parameter name", &tk_name.span)); }
 			
@@ -174,6 +177,28 @@ impl<'a, 't> InstrSetParser<'a, 't>
 		
 		self.parser.expect(TokenKind::BraceClose)?;
 		
+		Ok(())
+	}
+	
+
+	fn parse_rule_constraint(&mut self, rule: &mut Rule) -> Result<(), Message>
+	{
+		let expr = ExpressionParser::new(&mut self.parser).parse()?;
+		
+		expr.check_vars(&|name, span| expr_check_var(rule, name, span))?;
+		
+		if expr.eval_type(&|name| expr_get_var_type(rule, name))? != ExpressionType::Bool
+			{ return Err(Message::error_span("expected bool expression for constraint", &expr.span())) }
+			
+		let descr = if self.parser.maybe_expect(TokenKind::Comma).is_some()
+		{
+			let tk_descr = self.parser.expect(TokenKind::String)?;
+			Some(excerpt_as_string_contents(&tk_descr.excerpt.unwrap(), &tk_descr.span)?)
+		}
+		else
+			{ None };
+			
+		rule.constraint_add(expr, descr);
 		Ok(())
 	}
 	
@@ -189,7 +214,7 @@ impl<'a, 't> InstrSetParser<'a, 't>
 			
 			expr.check_vars(&|name, span| expr_check_var(rule, name, span))?;
 			
-			if expr.eval_type(&|_| ExpressionType::Integer)? != ExpressionType::Integer
+			if expr.eval_type(&|name| expr_get_var_type(rule, name))? != ExpressionType::Integer
 				{ return Err(Message::error_span("expected integer expression for production", &expr.span())) }
 				
 			match expr.width()
@@ -212,13 +237,25 @@ impl<'a, 't> InstrSetParser<'a, 't>
 		Ok(())
 	}
 }
-	
+
+
+fn is_reserved_var(name: &str) -> bool
+{
+	name == "pc"
+}
+
 	
 fn expr_check_var(rule: &Rule, name: &str, span: &Span) -> Result<(), Message>
 {
-	if rule.param_exists(name)
+	if rule.param_exists(name) || is_reserved_var(name)
 		{ Ok(()) }
 	else
 		{ Err(Message::error_span("unknown variable", span)) }
+}
 	
+	
+fn expr_get_var_type(_rule: &Rule, _name: &str) -> ExpressionType
+{
+	// All variables are integer type for now.
+	ExpressionType::Integer
 }
