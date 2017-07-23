@@ -18,7 +18,6 @@ pub fn assemble<S>(reporter: &mut Reporter, instrset: &InstrSet, fileserver: &Fi
 where S: Into<String>
 {
 	let pattern_matcher = RulePatternMatcher::new(&instrset.rules);
-	println!("{:#?}", pattern_matcher);
 	
 	let mut state = AssemblerState
 	{

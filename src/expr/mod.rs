@@ -1,6 +1,7 @@
 mod expression;
 mod parser;
 mod inspect;
+mod eval;
 
 
 pub use self::expression::Expression;

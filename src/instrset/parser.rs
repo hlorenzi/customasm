@@ -195,7 +195,7 @@ impl<'a, 't> InstrSetParser<'a, 't>
 		}
 		else
 			{ None };
-			
+		
 		rule.constraint_add(expr, descr);
 		Ok(())
 	}

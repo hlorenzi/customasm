@@ -1,4 +1,4 @@
-extern crate num_bigint;
+extern crate num;
 
 
 mod diagn;

@@ -40,7 +40,7 @@ fn main()
 		
 		if let Some(assembled) = customasm::assemble(&mut reporter, &instrset, &fileserver, "code")
 		{
-			println!("{:#?}", assembled);
+			//println!("{:#?}", assembled);
 		}
 	}
 	

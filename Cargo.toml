@@ -12,4 +12,4 @@ name = "customasm"
 path = "src/main.rs"
 
 [dependencies]
-num-bigint = "0.1"
+num = "0.1"

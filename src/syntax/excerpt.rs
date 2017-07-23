@@ -1,5 +1,6 @@
 use diagn::{Span, Message};
-use num_bigint::{BigInt, Sign};
+use num::BigInt;
+use num::Zero;
 
 
 pub fn excerpt_as_string_contents(excerpt: &str, _span: &Span) -> Result<String, Message>
@@ -59,7 +60,7 @@ pub fn excerpt_as_bigint(excerpt: &str, span: &Span) -> Result<(BigInt, Option<u
 	let (width,     index) = parse_width(&chars, span)?;
 	let (radix, mut index) = parse_radix(&chars, index);
 	
-	let mut value = BigInt::new(Sign::NoSign, Vec::new());
+	let mut value = BigInt::zero();
 	while index < chars.len()
 	{
 		let c = chars[index];
