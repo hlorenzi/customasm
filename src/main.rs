@@ -3,8 +3,8 @@ extern crate customasm;
 
 fn main()
 {
-	let mut fileserver = customasm::util::FileServerMock::new();
-	fileserver.add("test",
+	let mut fileserver = customasm::FileServerMock::new();
+	fileserver.add("instrset",
 	"
 		#align 8
 		
@@ -19,13 +19,30 @@ fn main()
 			:: addr > 0x10 ; no description
 			-> 16'0xffff, addr[7:0]
 		
-		hllwrld {h}, {w} -> (h + pc * 123)[15:0]
+		load {h}, {w} -> (h + pc * 123)[15:0]
 	");
 	
-	let mut reporter = customasm::diagn::Reporter::new();
-	let instrset = customasm::InstrSet::from_src(&mut reporter, &fileserver, "test");
+	fileserver.add("code",
+	"
+		halt
+		jmp 0xab
+		store 0xcd
+		load 0xef + 0xfe * (0xcc - 0xbb)
+		load 0x12, 0x34
+		load 0x33, 0x44, 0x55
+	");
 	
-	println!("{:#?}", instrset);
+	let mut reporter = customasm::Reporter::new();
+	
+	if let Some(instrset) = customasm::read_instrset(&mut reporter, &fileserver, "instrset")
+	{
+		//println!("{:#?}", instrset);
+		
+		if let Some(assembled) = customasm::assemble(&mut reporter, &instrset, &fileserver, "code")
+		{
+			println!("{:#?}", assembled);
+		}
+	}
 	
 	reporter.print_all(&fileserver);
 }

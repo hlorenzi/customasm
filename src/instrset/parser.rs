@@ -1,10 +1,8 @@
 use diagn::{Span, Message, Reporter};
 use syntax::{Token, TokenKind, Parser};
 use syntax::{excerpt_as_string_contents, excerpt_as_usize};
-use ::ExpressionType;
-use expr::ExpressionParser;
-use ::InstrSet;
-use instrset::Rule;
+use expr::{ExpressionType, ExpressionParser};
+use instrset::{InstrSet, Rule};
 
 
 pub struct InstrSetParser<'a, 't>

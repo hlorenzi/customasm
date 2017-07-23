@@ -1,14 +1,16 @@
 extern crate num_bigint;
 
 
-pub mod diagn;
-pub mod syntax;
-pub mod expr;
-pub mod instrset;
-pub mod util;
+mod diagn;
+mod syntax;
+mod expr;
+mod instrset;
+mod asm;
+mod util;
 
 
-pub use self::expr::Expression;
-pub use self::expr::ExpressionValue;
-pub use self::expr::ExpressionType;
-pub use self::instrset::InstrSet;
+pub use self::diagn::Reporter;
+pub use self::instrset::read_instrset;
+pub use self::asm::assemble;
+pub use self::util::FileServer;
+pub use self::util::FileServerMock;

@@ -2,6 +2,7 @@ use diagn::Message;
 use syntax::{Token, TokenKind};
 
 
+#[derive(Clone)]
 pub struct Parser<'t>
 {
 	tokens: &'t [Token],
@@ -64,6 +65,13 @@ impl<'t> Parser<'t>
 	}
 	
 	
+	pub fn skip_until_linebreak(&mut self)
+	{
+		while !self.is_over() && !self.next_is_linebreak()
+			{ self.advance(); }
+	}
+	
+	
 	pub fn next(&self) -> Token
 	{
 		self.tokens[self.index].clone()
@@ -73,6 +81,12 @@ impl<'t> Parser<'t>
 	pub fn prev(&self) -> Token
 	{
 		self.tokens[self.index_prev].clone()
+	}
+	
+	
+	pub fn clear_linebreak(&mut self)
+	{
+		self.read_linebreak = false;
 	}
 	
 	

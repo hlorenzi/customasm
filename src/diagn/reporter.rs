@@ -72,6 +72,12 @@ impl Reporter
 	}
 	
 	
+	pub fn has_errors(&self) -> bool
+	{
+		self.messages.len() != 0
+	}
+	
+	
 	pub fn print_all(&self, fileserver: &FileServer)
 	{
 		enable_windows_ansi_support();

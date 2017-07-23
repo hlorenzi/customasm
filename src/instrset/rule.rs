@@ -1,5 +1,5 @@
 use syntax::{Token, TokenKind};
-use ::Expression;
+use expr::Expression;
 
 
 #[derive(Debug)]
@@ -12,7 +12,7 @@ pub struct Rule
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 pub enum RulePatternPart
 {
 	Exact(TokenKind, Option<String>),
