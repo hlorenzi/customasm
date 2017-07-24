@@ -20,7 +20,7 @@ impl Expression
 			
 			&Expression::Variable(_, ref name) => Ok(eval_var(&name)),
 			
-			&Expression::UnaryOp(_, ref op_span, op, ref inner_expr) =>
+			&Expression::UnaryOp(_, _, op, ref inner_expr) =>
 			{
 				match inner_expr.eval(eval_var)?
 				{
@@ -111,9 +111,13 @@ impl Expression
 				}
 			}
 			
-			&Expression::BitSlice(_, ref op_span, _, _, ref inner) =>
+			&Expression::BitSlice(_, _, left, right, ref inner) =>
 			{
-				inner.eval(eval_var)
+				match inner.eval(eval_var)?
+				{
+					ExpressionValue::Integer(x) => Ok(ExpressionValue::Integer(bigint_slice(x, left, right))),
+					_ => unreachable!()
+				}
 			}
 		}
 	}
@@ -147,25 +151,31 @@ fn bigint_ushr(lhs: BigInt, rhs: BigInt) -> Option<BigInt>
 }
 
 
-fn bigint_not(x: BigInt) -> BigInt
+fn bigint_not(_x: BigInt) -> BigInt
 {
 	unimplemented!()
 }
 
 
-fn bigint_and(lhs: BigInt, rhs: BigInt) -> BigInt
+fn bigint_and(_lhs: BigInt, _rhs: BigInt) -> BigInt
 {
 	unimplemented!()
 }
 
 
-fn bigint_or(lhs: BigInt, rhs: BigInt) -> BigInt
+fn bigint_or(_lhs: BigInt, _rhs: BigInt) -> BigInt
 {
 	unimplemented!()
 }
 
 
-fn bigint_xor(lhs: BigInt, rhs: BigInt) -> BigInt
+fn bigint_xor(_lhs: BigInt, _rhs: BigInt) -> BigInt
+{
+	unimplemented!()
+}
+
+
+fn bigint_slice(_x: BigInt, _left: usize, _right: usize) -> BigInt
 {
 	unimplemented!()
 }

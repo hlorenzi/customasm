@@ -7,8 +7,7 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct RulePatternMatcher
 {
-	root_step: MatchStep,
-	empty_match: [usize; 0]
+	root_step: MatchStep
 }
 
 
@@ -20,21 +19,20 @@ struct MatchStep
 	children_param: HashMap<MatchStepParameter, MatchStep>
 }
 
-
-#[derive(Debug)]
-pub struct Match<'a>
-{
-	rule_indices: &'a [usize],
-	exprs: Vec<Expression>
-}
-
-
 #[derive(Debug, Eq, PartialEq, Hash)]
 struct MatchStepExact(TokenKind, Option<String>);
 
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 struct MatchStepParameter;
+
+
+#[derive(Debug)]
+pub struct Match
+{
+	pub rule_indices: Vec<usize>,
+	pub exprs: Vec<Expression>
+}
 
 
 impl RulePatternMatcher
@@ -49,8 +47,7 @@ impl RulePatternMatcher
 		
 		RulePatternMatcher
 		{
-			root_step: root_step,
-			empty_match: [0; 0]
+			root_step: root_step
 		}
 	}
 	
@@ -99,7 +96,7 @@ impl RulePatternMatcher
 	}
 	
 	
-	pub fn parse_match<'a, 'p>(&'a self, mut parser: Parser<'p>) -> Option<(Match<'a>, Parser<'p>)>
+	pub fn parse_match<'a, 'p>(&'a self, mut parser: Parser<'p>) -> Option<(Match, Parser<'p>)>
 	{
 		parser.clear_linebreak();
 		
@@ -111,7 +108,7 @@ impl RulePatternMatcher
 			{
 				let result = Match
 				{
-					rule_indices: indices,
+					rule_indices: indices.iter().cloned().collect(),
 					exprs: exprs
 				};
 				

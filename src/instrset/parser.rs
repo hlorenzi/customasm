@@ -161,7 +161,6 @@ impl<'a, 't> InstrSetParser<'a, 't>
 	fn parse_rule_parameter(&mut self, rule: &mut Rule) -> Result<(), Message>
 	{
 		let tk_name = self.parser.expect(TokenKind::Identifier)?;
-		let cascadable = self.parser.maybe_expect(TokenKind::Exclamation).is_some();
 		
 		let name = tk_name.excerpt.unwrap().clone();
 		
@@ -171,7 +170,7 @@ impl<'a, 't> InstrSetParser<'a, 't>
 		if rule.param_exists(&name)
 			{ return Err(Message::error_span("duplicate parameter name", &tk_name.span)); }
 			
-		rule.pattern_add_param(name, cascadable);
+		rule.pattern_add_param(name);
 		
 		self.parser.expect(TokenKind::BraceClose)?;
 		

@@ -23,8 +23,7 @@ pub enum RulePatternPart
 #[derive(Debug)]
 pub struct RuleParameter
 {
-	pub name: String,
-	pub cascadable: bool
+	pub name: String
 }
 
 
@@ -57,7 +56,7 @@ impl Rule
 	}
 	
 	
-	pub fn pattern_add_param<S>(&mut self, name: S, cascadable: bool)
+	pub fn pattern_add_param<S>(&mut self, name: S)
 	where S: Into<String>
 	{
 		let name_owned = name.into();
@@ -68,9 +67,9 @@ impl Rule
 		
 		let param = RuleParameter
 		{
-			name: name_owned,
-			cascadable: cascadable
+			name: name_owned
 		};
+		
 		self.params.push(param);
 		
 		let part = RulePatternPart::Parameter(param_index);
@@ -84,6 +83,12 @@ impl Rule
 	}
 	
 	
+	pub fn param_index(&self, name: &str) -> usize
+	{
+		self.params.iter().enumerate().find(|p| p.1.name == name).unwrap().0
+	}
+	
+	
 	pub fn constraint_add(&mut self, expr: Expression, descr: Option<String>)
 	{
 		let constr = RuleConstraint
@@ -93,5 +98,16 @@ impl Rule
 		};
 		
 		self.constraints.push(constr);
+	}
+	
+	
+	pub fn production_width(&self) -> usize
+	{
+		let mut width = 0;
+		
+		for expr in &self.production_parts
+			{ width += expr.width().unwrap(); }
+			
+		width
 	}
 }
