@@ -93,6 +93,24 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
+	pub fn output_advance(&mut self, bytes: usize, span: &Span) -> Result<(), Message>
+	{
+		match self.cur_address.checked_add(bytes)
+		{
+			Some(addr) => self.cur_address = addr,
+			None => return Err(Message::error_span("address overflowed valid range", span))
+		}
+		
+		match self.cur_writehead.checked_add(bytes)
+		{
+			Some(addr) => self.cur_writehead = addr,
+			None => return Err(Message::error_span("write pointer overflowed valid range", span))
+		}
+		
+		Ok(())
+	}
+	
+	
 	pub fn output_instr(&mut self, instr: &mut ParsedInstruction) -> Result<(), ()>
 	{
 		// Resolve remaining arguments, and report errors.
@@ -123,7 +141,8 @@ impl<'a> AssemblerState<'a>
 		
 		println!("");
 		println!("output rule {}", instr.rule_index);
-		println!("address 0x{:x}", instr.ctx.address);
+		println!("addr  0x{:x}", instr.ctx.address);
+		println!("write 0x{:x}", instr.ctx.writehead);
 		println!("args:");
 		for expr in &instr.exprs
 		{

@@ -24,6 +24,13 @@ fn main()
 	
 	fileserver.add("code",
 	"
+		#addr 16
+		#write 24
+		#res 255
+		
+		#addr 0xfffffffffffffffe
+		#res 2
+	
 		halt
 		jmp 0x01
 		jmp 0x01
