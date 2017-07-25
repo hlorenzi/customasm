@@ -24,7 +24,7 @@ fn main()
 	
 	fileserver.add("code",
 	"
-		#addr 16
+		#addr 16 + 16 + 16
 		#write 24
 		#res 255
 		

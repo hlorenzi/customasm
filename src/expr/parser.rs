@@ -51,20 +51,30 @@ impl<'a, 't> ExpressionParser<'a, 't>
 	fn parse_binary_ops<F>(&mut self, ops: &[(TokenKind, BinaryOp)], parse_inner: F) -> Result<Expression, Message>
 	where F: Fn(&mut ExpressionParser<'a, 't>) -> Result<Expression, Message>
 	{
-		let lhs = parse_inner(self)?;
+		let mut lhs = parse_inner(self)?;
 		
-		for op in ops
+		loop
 		{
-			let tk = match self.parser.maybe_expect(op.0)
+			let mut op_match = None;
+			
+			for op in ops
 			{
-				Some(tk) => tk,
-				None => continue
-			};
+				if let Some(tk) = self.parser.maybe_expect(op.0)
+				{
+					op_match = Some((tk, op.1));
+					break;
+				}
+			}
 			
-			let rhs = parse_inner(self)?;
-			let span = lhs.span().join(&rhs.span());
-			
-			return Ok(Expression::BinaryOp(span, tk.span.clone(), op.1, Box::new(lhs), Box::new(rhs)));
+			if let Some(op_match) = op_match
+			{				
+				let rhs = parse_inner(self)?;
+				let span = lhs.span().join(&rhs.span());
+				
+				lhs = Expression::BinaryOp(span, op_match.0.span.clone(), op_match.1, Box::new(lhs), Box::new(rhs));
+			}
+			else
+				{ break; }
 		}
 		
 		Ok(lhs)
