@@ -1,5 +1,4 @@
-use diagn::Span;
-use diagn::Reporter;
+use diagn::{Span, Report};
 use std::rc::Rc;
 
 
@@ -163,7 +162,7 @@ impl TokenKind
 }
 
 
-pub fn tokenize<S>(reporter: &mut Reporter, src_filename: S, src: &[char]) -> Vec<Token>
+pub fn tokenize<S>(report: &mut Report, src_filename: S, src: &[char]) -> Result<Vec<Token>, ()>
 where S: Into<String>
 {
 	let filename = Rc::new(src_filename.into());
@@ -193,7 +192,7 @@ where S: Into<String>
 		
 		// Report unexpected characters.
 		if kind == TokenKind::Error
-			{ reporter.error_span("unexpected character", &span); }
+			{ report.error_span("unexpected character", &span); }
 		
 		// Add to the token list.
 		let token = Token
@@ -218,7 +217,7 @@ where S: Into<String>
 	
 	tokens.push(end_token);
 	
-	tokens
+	Ok(tokens)
 }
 
 

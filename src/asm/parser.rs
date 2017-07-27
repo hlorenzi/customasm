@@ -1,6 +1,6 @@
-use diagn::Message;
+use diagn::Report;
 use syntax::{Token, TokenKind, tokenize, Parser};
-use expr::{ExpressionValue, ExpressionParser};
+use expr::{Expression, ExpressionValue};
 use asm::{AssemblerState, ParsedInstruction, ExpressionContext};
 use num::ToPrimitive;
 
@@ -15,24 +15,24 @@ where 'b: 'a
 	
 impl<'a, 'b> AssemblerParser<'a, 'b>
 {
-	pub fn parse_file<S>(state: &mut AssemblerState, filename: S) -> Result<(), Message>
+	pub fn parse_file<S>(report: &mut Report, state: &mut AssemblerState, filename: S) -> Result<(), ()>
 	where S: Into<String>
 	{
 		let filename_owned = filename.into();
-		let chars = state.fileserver.get_chars(&filename_owned)?;
-		let tokens = tokenize(state.reporter, filename_owned, &chars);
+		let chars = state.fileserver.get_chars(report, &filename_owned)?;
+		let tokens = tokenize(report, filename_owned, &chars)?;
 		
 		let mut parser = AssemblerParser
 		{
 			state: state,
-			parser: Parser::new(&tokens)
+			parser: Parser::new(report, &tokens)
 		};
 		
 		parser.parse()
 	}
 	
 	
-	fn parse(&mut self) -> Result<(), Message>
+	fn parse(&mut self) -> Result<(), ()>
 	{
 		while !self.parser.is_over()
 		{
@@ -44,7 +44,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	}
 	
 	
-	fn parse_line(&mut self) -> Result<(), Message>
+	fn parse_line(&mut self) -> Result<(), ()>
 	{
 		if self.parser.next_is(0, TokenKind::Hash)
 			{ self.parse_directive() }
@@ -54,7 +54,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	}
 	
 	
-	fn parse_directive(&mut self) -> Result<(), Message>
+	fn parse_directive(&mut self) -> Result<(), ()>
 	{
 		self.parser.expect(TokenKind::Hash)?;
 		
@@ -66,51 +66,52 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			"addr"  => self.parse_directive_addr(),
 			"write" => self.parse_directive_write(),
 			"res"   => self.parse_directive_res(&tk_name),
-			_ => Err(Message::error_span("unknown directive", &tk_name.span))
+			_ => Err(self.parser.report.error_span("unknown directive", &tk_name.span))
 		}
 	}
 	
 	
-	fn parse_directive_addr(&mut self) -> Result<(), Message>
+	fn parse_directive_addr(&mut self) -> Result<(), ()>
 	{
 		self.state.cur_address = self.parse_usize()?;
 		Ok(())
 	}
 	
 	
-	fn parse_directive_write(&mut self) -> Result<(), Message>
+	fn parse_directive_write(&mut self) -> Result<(), ()>
 	{
 		self.state.cur_writehead = self.parse_usize()?;
 		Ok(())
 	}
 	
 	
-	fn parse_directive_res(&mut self, tk_name: &Token) -> Result<(), Message>
+	fn parse_directive_res(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
 		let bytes = self.parse_usize()?;
-		self.state.output_advance(bytes, &tk_name.span)
+		self.state.output_advance(self.parser.report, bytes, &tk_name.span)
 	}
 	
 	
-	fn parse_instruction(&mut self) -> Result<(), Message>
+	fn parse_instruction(&mut self) -> Result<(), ()>
 	{
 		let instr_span_start = self.parser.next().span;
 		
 		// Find matching rule patterns.
-		let (instr_match, new_parser) = match self.state.pattern_matcher.parse_match(self.parser.clone())
+		self.parser.clear_linebreak();
+		let instr_match = match self.state.pattern_matcher.parse_match(&mut self.parser)
 		{
-			Some((instr_match, new_parser)) => (instr_match, new_parser),
+			Some(m) => m,
 			None =>
 			{
+				// Just skip instruction and continue parsing ahead.
 				self.parser.skip_until_linebreak();
 				let instr_span = instr_span_start.join(&self.parser.prev().span);
 				
-				self.state.reporter.error_span("no match for instruction found", &instr_span);
+				self.parser.report.error_span("no match for instruction found", &instr_span);
 				return Ok(());
 			}
 		};
 		
-		self.parser = new_parser;
 		let instr_span = instr_span_start.join(&self.parser.prev().span);
 		
 		let ctx = ExpressionContext
@@ -124,7 +125,11 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let mut args: Vec<Option<ExpressionValue>> = Vec::new();
 		
 		for expr in &instr_match.exprs
-			{ args.push(self.state.expr_eval(&ctx, expr).ok()); }
+		{
+			// Do not report or propagate errors now.
+			let mut dummy_report = Report::new();
+			args.push(self.state.expr_eval(&mut dummy_report, &ctx, expr).ok());
+		}
 		
 		// If there is more than one match, find best suited match.
 		let best_match =
@@ -136,7 +141,8 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 				// be resolved now, of if it fails, just skip this rule without an error.
 				let rule = &self.state.instrset.rules[instr_match.rule_indices[best_match]];
 				let get_arg = |i: usize| args[i].clone();
-				if self.state.rule_check_all_constraints_satisfied(rule, &get_arg, &ctx, &instr_span).ok().is_some()
+				let mut dummy_report = Report::new();
+				if self.state.rule_check_all_constraints_satisfied(&mut dummy_report, rule, &get_arg, &ctx, &instr_span).ok().is_some()
 					{ break; }
 					
 				best_match += 1;
@@ -151,7 +157,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let rule = &self.state.instrset.rules[instr_match.rule_indices[best_match]];
 		
 		let instr_width = rule.production_width();
-		self.state.output_advance(instr_width, &instr_span)?;
+		self.state.output_advance(self.parser.report, instr_width, &instr_span)?;
 		
 		let parsed_instr = ParsedInstruction
 		{
@@ -168,7 +174,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	}
 	
 	
-	fn parse_usize(&mut self) -> Result<usize, Message>
+	fn parse_usize(&mut self) -> Result<usize, ()>
 	{
 		let ctx = ExpressionContext
 		{
@@ -177,19 +183,19 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			writehead: self.state.cur_writehead
 		};
 		
-		let expr = ExpressionParser::new(&mut self.parser).parse()?;
+		let expr = Expression::parse(&mut self.parser)?;
 		
-		let value = match self.state.expr_eval(&ctx, &expr)
+		let value = match self.state.expr_eval(self.parser.report, &ctx, &expr)
 		{
 			Ok(ExpressionValue::Integer(value)) => value,
-			Ok(_) => return Err(Message::error_span("expected integer value", &expr.span())),
-			Err(msg) => return Err(msg)
+			Ok(_) => return Err(self.parser.report.error_span("expected integer value", &expr.span())),
+			Err(()) => return Err(())
 		};
 		
 		match value.to_usize()
 		{
 			Some(x) => Ok(x),
-			None => Err(Message::error_span("value is too large", &expr.span()))
+			None => Err(self.parser.report.error_span("value is too large", &expr.span()))
 		}
 	}
 }

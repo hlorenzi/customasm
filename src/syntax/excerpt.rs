@@ -1,19 +1,19 @@
-use diagn::{Span, Message};
+use diagn::{Span, Report};
 use num::BigInt;
 use num::Zero;
 
 
-pub fn excerpt_as_string_contents(excerpt: &str, _span: &Span) -> Result<String, Message>
+pub fn excerpt_as_string_contents(excerpt: &str) -> String
 {
 	let chars: Vec<char> = excerpt.chars().collect();
 	assert!(chars.len() >= 2);
 	
-	Ok(chars[1..(chars.len() - 1)].iter().collect())
+	chars[1..(chars.len() - 1)].iter().collect()
 }
 
 
 
-pub fn excerpt_as_usize(excerpt: &str, span: &Span) -> Result<usize, Message>
+pub fn excerpt_as_usize(report: &mut Report, excerpt: &str, span: &Span) -> Result<usize, ()>
 {
 	let chars: Vec<char> = excerpt.chars().collect();
 	assert!(chars.len() >= 1);
@@ -32,19 +32,19 @@ pub fn excerpt_as_usize(excerpt: &str, span: &Span) -> Result<usize, Message>
 		let digit = match c.to_digit(radix as u32)
 		{
 			Some(d) => d,
-			None => return Err(Message::error_span("invalid digits", span))
+			None => return Err(report.error_span("invalid digits", span))
 		};
 		
 		value = match value.checked_mul(radix)
 		{
 			Some(v) => v,
-			None => return Err(Message::error_span("value is too large", span))
+			None => return Err(report.error_span("value is too large", span))
 		};
 		
 		value = match value.checked_add(digit as usize)
 		{
 			Some(v) => v,
-			None => return Err(Message::error_span("value is too large", span))
+			None => return Err(report.error_span("value is too large", span))
 		};
 	}
 	
@@ -52,12 +52,12 @@ pub fn excerpt_as_usize(excerpt: &str, span: &Span) -> Result<usize, Message>
 }
 
 
-pub fn excerpt_as_bigint(excerpt: &str, span: &Span) -> Result<(BigInt, Option<usize>), Message>
+pub fn excerpt_as_bigint(report: &mut Report, excerpt: &str, span: &Span) -> Result<(BigInt, Option<usize>), ()>
 {
 	let chars: Vec<char> = excerpt.chars().collect();
 	assert!(chars.len() >= 1);
 
-	let (width,     index) = parse_width(&chars, span)?;
+	let (width,     index) = parse_width(report, &chars, span)?;
 	let (radix, mut index) = parse_radix(&chars, index);
 	
 	let mut value = BigInt::zero();
@@ -72,7 +72,7 @@ pub fn excerpt_as_bigint(excerpt: &str, span: &Span) -> Result<(BigInt, Option<u
 		let digit = match c.to_digit(radix as u32)
 		{
 			Some(d) => d,
-			None => return Err(Message::error_span("invalid digits", span))
+			None => return Err(report.error_span("invalid digits", span))
 		};
 		
 		value = value * radix;
@@ -82,14 +82,14 @@ pub fn excerpt_as_bigint(excerpt: &str, span: &Span) -> Result<(BigInt, Option<u
 	if let Some(width) = width
 	{
 		if value.bits() > width
-			{ return Err(Message::error_span(format!("value (width = {}) is larger than specified", value.bits()), span)); }
+			{ return Err(report.error_span(format!("value (width = {}) is larger than specified", value.bits()), span)); }
 	}
 	
 	Ok((value, width))
 }
 
 
-fn parse_width(chars: &[char], span: &Span) -> Result<(Option<usize>, usize), Message>
+fn parse_width(report: &mut Report, chars: &[char], span: &Span) -> Result<(Option<usize>, usize), ()>
 {
 	if !chars.iter().any(|c| *c == '\'')
 		{ return Ok((None, 0)); }
@@ -110,24 +110,24 @@ fn parse_width(chars: &[char], span: &Span) -> Result<(Option<usize>, usize), Me
 		let digit = match c.to_digit(10)
 		{
 			Some(d) => d,
-			None => return Err(Message::error_span("invalid digits in width specifier", span))
+			None => return Err(report.error_span("invalid digits in width specifier", span))
 		};
 		
 		width = match width.checked_mul(10)
 		{
 			Some(v) => v,
-			None => return Err(Message::error_span("width specifier is too large", span))
+			None => return Err(report.error_span("width specifier is too large", span))
 		};
 		
 		width = match width.checked_add(digit as usize)
 		{
 			Some(v) => v,
-			None => return Err(Message::error_span("width specifier is too large", span))
+			None => return Err(report.error_span("width specifier is too large", span))
 		};
 	}
 	
 	if width == 0
-		{ return Err(Message::error_span("invalid width specifier", span)); }
+		{ return Err(report.error_span("invalid width specifier", span)); }
 	
 	Ok((Some(width), index))
 }

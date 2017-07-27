@@ -1,4 +1,4 @@
-use diagn::{Span, Message};
+use diagn::{Span, Report};
 use super::Expression;
 use super::ExpressionValue;
 use super::ExpressionType;
@@ -18,8 +18,8 @@ impl Expression
 	}
 
 
-	pub fn check_vars<F>(&self, check_var: &F) -> Result<(), Message>
-	where F: Fn(&str, &Span) -> Result<(), Message>
+	pub fn check_vars<F>(&self, check_var: &mut F) -> Result<(), ()>
+	where F: FnMut(&str, &Span) -> Result<(), ()>
 	{
 		match self
 		{
@@ -40,7 +40,7 @@ impl Expression
 	}
 
 
-	pub fn eval_type<F>(&self, get_var_type: &F) -> Result<ExpressionType, Message>
+	pub fn eval_type<F>(&self, report: &mut Report, get_var_type: &F) -> Result<ExpressionType, ()>
 	where F: Fn(&str) -> ExpressionType
 	{
 		match self
@@ -55,19 +55,19 @@ impl Expression
 			
 			&Expression::UnaryOp(_, ref op_span, op, ref inner) =>
 			{
-				let inner_type = inner.eval_type(get_var_type)?;
+				let inner_type = inner.eval_type(report, get_var_type)?;
 				
 				match op
 				{
-					UnaryOp::Neg => ensure_unary_int_to_int(inner_type, &op_span),
+					UnaryOp::Neg => ensure_unary_int_to_int(report, inner_type, &op_span),
 					UnaryOp::Not => ensure_unary_any_to_same(inner_type)
 				}
 			}
 			
 			&Expression::BinaryOp(_, ref op_span, op, ref lhs, ref rhs) =>
 			{
-				let lhs_type = lhs.eval_type(get_var_type)?;
-				let rhs_type = rhs.eval_type(get_var_type)?;
+				let lhs_type = lhs.eval_type(report, get_var_type)?;
+				let rhs_type = rhs.eval_type(report, get_var_type)?;
 				
 				match op
 				{
@@ -78,84 +78,84 @@ impl Expression
 					BinaryOp::Mod |
 					BinaryOp::Shl |
 					BinaryOp::Shr |
-					BinaryOp::UShr => ensure_binary_int_to_int(lhs_type, rhs_type, &op_span),
+					BinaryOp::UShr => ensure_binary_int_to_int(report, lhs_type, rhs_type, &op_span),
 					
 					BinaryOp::And |
 					BinaryOp::Or |
-					BinaryOp::Xor => ensure_binary_any_to_same(lhs_type, rhs_type, &op_span),
+					BinaryOp::Xor => ensure_binary_any_to_same(report, lhs_type, rhs_type, &op_span),
 					
 					BinaryOp::Eq |
 					BinaryOp::Ne |
 					BinaryOp::Lt |
 					BinaryOp::Le |
 					BinaryOp::Gt |
-					BinaryOp::Ge => ensure_binary_any_to_bool(lhs_type, rhs_type, &op_span),
+					BinaryOp::Ge => ensure_binary_any_to_bool(report, lhs_type, rhs_type, &op_span),
 					
 					BinaryOp::LazyAnd |
-					BinaryOp::LazyOr => ensure_binary_bool_to_bool(lhs_type, rhs_type, &op_span)
+					BinaryOp::LazyOr => ensure_binary_bool_to_bool(report, lhs_type, rhs_type, &op_span)
 				}
 			}
 			
 			&Expression::BitSlice(_, ref op_span, _, _, ref inner) =>
 			{
-				let inner_type = inner.eval_type(get_var_type)?;
+				let inner_type = inner.eval_type(report, get_var_type)?;
 				
 				if inner_type == ExpressionType::Integer
 					{ Ok(ExpressionType::Integer) }
 				else
-					{ Err(Message::error_span("expected integer argument to bit slice", &op_span)) }
+					{ Err(report.error_span("expected integer argument to bit slice", &op_span)) }
 			}
 		}
 	}
 }
 
 
-fn ensure_unary_any_to_same(inner_type: ExpressionType) -> Result<ExpressionType, Message>
+fn ensure_unary_any_to_same(inner_type: ExpressionType) -> Result<ExpressionType, ()>
 {
 	Ok(inner_type)
 }
 
 
-fn ensure_unary_int_to_int(inner_type: ExpressionType, span: &Span) -> Result<ExpressionType, Message>
+fn ensure_unary_int_to_int(report: &mut Report, inner_type: ExpressionType, span: &Span) -> Result<ExpressionType, ()>
 {
 	if inner_type == ExpressionType::Integer
 		{ Ok(ExpressionType::Integer) }
 	else
-		{ Err(Message::error_span("expected integer argument to unary op", span)) }
+		{ Err(report.error_span("expected integer argument to unary op", span)) }
 }
 
 
-fn ensure_binary_int_to_int(lhs_type: ExpressionType, rhs_type: ExpressionType, span: &Span) -> Result<ExpressionType, Message>
+fn ensure_binary_int_to_int(report: &mut Report, lhs_type: ExpressionType, rhs_type: ExpressionType, span: &Span) -> Result<ExpressionType, ()>
 {
 	if lhs_type == ExpressionType::Integer && rhs_type == ExpressionType::Integer
 		{ Ok(ExpressionType::Integer) }
 	else
-		{ Err(Message::error_span("expected integer arguments to binary op", span)) }
+		{ Err(report.error_span("expected integer arguments to binary op", span)) }
 }
 
 
-fn ensure_binary_bool_to_bool(lhs_type: ExpressionType, rhs_type: ExpressionType, span: &Span) -> Result<ExpressionType, Message>
+fn ensure_binary_bool_to_bool(report: &mut Report, lhs_type: ExpressionType, rhs_type: ExpressionType, span: &Span) -> Result<ExpressionType, ()>
 {
 	if lhs_type == ExpressionType::Bool && rhs_type == ExpressionType::Bool
 		{ Ok(ExpressionType::Bool) }
 	else
-		{ Err(Message::error_span("expected bool arguments to binary op", span)) }
+		{ Err(report.error_span("expected bool arguments to binary op", span)) }
 }
 
 
-fn ensure_binary_any_to_bool(lhs_type: ExpressionType, rhs_type: ExpressionType, span: &Span) -> Result<ExpressionType, Message>
+fn ensure_binary_any_to_bool(report: &mut Report, lhs_type: ExpressionType, rhs_type: ExpressionType, span: &Span) -> Result<ExpressionType, ()>
 {
 	if lhs_type == rhs_type
 		{ Ok(ExpressionType::Bool) }
 	else
-		{ Err(Message::error_span("expected arguments of the same type to binary op", span)) }
+		{ Err(report.error_span("expected arguments of the same type to binary op", span)) }
 }
 
 
-fn ensure_binary_any_to_same(lhs_type: ExpressionType, rhs_type: ExpressionType, span: &Span) -> Result<ExpressionType, Message>
+fn ensure_binary_any_to_same(report: &mut Report, lhs_type: ExpressionType, rhs_type: ExpressionType, span: &Span) -> Result<ExpressionType, ()>
 {
 	if lhs_type == rhs_type
 		{ Ok(lhs_type) }
 	else
-		{ Err(Message::error_span("expected arguments of the same type to binary op", span)) }
+		{ Err(report.error_span("expected arguments of the same type to binary op", span)) }
 }

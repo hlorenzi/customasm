@@ -9,7 +9,7 @@ mod asm;
 mod util;
 
 
-pub use self::diagn::Reporter;
+pub use self::diagn::Report;
 pub use self::instrset::read_instrset;
 pub use self::asm::assemble;
 pub use self::util::FileServer;

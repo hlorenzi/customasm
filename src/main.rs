@@ -27,9 +27,6 @@ fn main()
 		#addr 16 + 16 + 16
 		#write 24
 		#res 255
-		
-		#addr 0xfffffffffffffffe
-		#res 2
 	
 		halt
 		jmp 0x01
@@ -47,17 +44,17 @@ fn main()
 		load 0x05, 0x06, 0x07
 	");
 	
-	let mut reporter = customasm::Reporter::new();
+	let mut report = customasm::Report::new();
 	
-	if let Some(instrset) = customasm::read_instrset(&mut reporter, &fileserver, "instrset")
+	if let Ok(instrset) = customasm::read_instrset(&mut report, &fileserver, "instrset")
 	{
 		//println!("{:#?}", instrset);
 		
-		if let Some(assembled) = customasm::assemble(&mut reporter, &instrset, &fileserver, "code")
+		if let Ok(assembled) = customasm::assemble(&mut report, &instrset, &fileserver, "code")
 		{
 			//println!("{:#?}", assembled);
 		}
 	}
 	
-	reporter.print_all(&fileserver);
+	report.print_all(&fileserver);
 }

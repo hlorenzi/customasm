@@ -1,11 +1,19 @@
-use diagn::Message;
+use diagn::Report;
 use syntax::{Token, TokenKind};
 
 
-#[derive(Clone)]
 pub struct Parser<'t>
 {
+	pub report: &'t mut Report,
 	tokens: &'t [Token],
+	index: usize,
+	index_prev: usize,
+	read_linebreak: bool
+}
+
+
+pub struct ParserState
+{
 	index: usize,
 	index_prev: usize,
 	read_linebreak: bool
@@ -14,12 +22,13 @@ pub struct Parser<'t>
 
 impl<'t> Parser<'t>
 {
-	pub fn new(tokens: &'t [Token]) -> Parser<'t>
+	pub fn new(report: &'t mut Report, tokens: &'t [Token]) -> Parser<'t>
 	{
 		assert!(tokens[tokens.len() - 1].kind == TokenKind::End);
 	
 		let mut parser = Parser
 		{
+			report: report,
 			tokens: tokens,
 			index: 0,
 			index_prev: 0,
@@ -28,6 +37,25 @@ impl<'t> Parser<'t>
 		
 		parser.skip_ignorable();
 		parser
+	}
+	
+	
+	pub fn save(&self) -> ParserState
+	{
+		ParserState
+		{
+			index: self.index,
+			index_prev: self.index_prev,
+			read_linebreak: self.read_linebreak
+		}
+	}
+	
+	
+	pub fn restore(&mut self, state: ParserState)
+	{
+		self.index = state.index;
+		self.index_prev = state.index_prev;
+		self.read_linebreak = state.read_linebreak;
 	}
 	
 	
@@ -108,7 +136,7 @@ impl<'t> Parser<'t>
 	}
 	
 	
-	pub fn expect(&mut self, kind: TokenKind) -> Result<Token, Message>
+	pub fn expect(&mut self, kind: TokenKind) -> Result<Token, ()>
 	{
 		match self.maybe_expect(kind)
 		{
@@ -116,19 +144,21 @@ impl<'t> Parser<'t>
 			None =>
 			{
 				let descr = format!("expected {}", kind.printable());
-				Err(Message::error_span(descr, &self.tokens[self.index_prev].span.after()))
+				let span = self.tokens[self.index_prev].span.after();
+				self.report.error_span(descr, &span);
+				Err(())
 			}
 		}
 	}
 	
 	
-	pub fn expect_msg<S>(&mut self, kind: TokenKind, descr: S) -> Result<Token, Message>
+	pub fn expect_msg<S>(&mut self, kind: TokenKind, descr: S) -> Result<Token, ()>
 	where S: Into<String>
 	{
 		match self.maybe_expect(kind)
 		{
 			Some(token) => Ok(token),
-			None => Err(Message::error_span(descr, &self.tokens[self.index_prev].span.after()))
+			None => Err(self.report.error_span(descr, &self.tokens[self.index_prev].span.after()))
 		}
 	}
 	
@@ -151,11 +181,11 @@ impl<'t> Parser<'t>
 	}
 	
 	
-	pub fn expect_linebreak(&mut self) -> Result<(), Message>
+	pub fn expect_linebreak(&mut self) -> Result<(), ()>
 	{
 		if self.maybe_expect_linebreak().is_some()
 			{ Ok(()) }
 		else
-			{ Err(Message::error_span("expected line break", &self.tokens[self.index_prev].span.after())) }
+			{ Err(self.report.error_span("expected line break", &self.tokens[self.index_prev].span.after())) }
 	}
 }

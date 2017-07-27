@@ -1,4 +1,4 @@
-use diagn::Message;
+use diagn::Report;
 use super::Expression;
 use super::ExpressionValue;
 use super::UnaryOp;
@@ -11,7 +11,7 @@ use num::ToPrimitive;
 
 impl Expression
 {
-	pub fn eval<F>(&self, eval_var: &F) -> Result<ExpressionValue, Message>
+	pub fn eval<F>(&self, report: &mut Report, eval_var: &F) -> Result<ExpressionValue, ()>
 	where F: Fn(&str) -> ExpressionValue
 	{
 		match self
@@ -22,7 +22,7 @@ impl Expression
 			
 			&Expression::UnaryOp(_, _, op, ref inner_expr) =>
 			{
-				match inner_expr.eval(eval_var)?
+				match inner_expr.eval(report, eval_var)?
 				{
 					ExpressionValue::Integer(x) => match op
 					{
@@ -39,7 +39,7 @@ impl Expression
 			
 			&Expression::BinaryOp(_, ref op_span, op, ref lhs_expr, ref rhs_expr) =>
 			{
-				match (lhs_expr.eval(eval_var)?, rhs_expr.eval(eval_var)?)
+				match (lhs_expr.eval(report, eval_var)?, rhs_expr.eval(report, eval_var)?)
 				{
 					(ExpressionValue::Integer(lhs), ExpressionValue::Integer(rhs)) =>
 					{
@@ -52,31 +52,31 @@ impl Expression
 							BinaryOp::Div => match lhs.checked_div(&rhs)
 							{
 								Some(x) => Ok(ExpressionValue::Integer(x)),
-								None => Err(Message::error_span("division by 0", &op_span.join(&rhs_expr.span())))
+								None => Err(report.error_span("division by zero", &op_span.join(&rhs_expr.span())))
 							},
 							
 							BinaryOp::Mod => match bigint_checked_rem(lhs, rhs)
 							{
 								Some(x) => Ok(ExpressionValue::Integer(x)),
-								None => Err(Message::error_span("modulo by 0", &op_span.join(&rhs_expr.span())))
+								None => Err(report.error_span("modulo by zero", &op_span.join(&rhs_expr.span())))
 							},
 							
 							BinaryOp::Shl => match bigint_shl(lhs, rhs)
 							{
 								Some(x) => Ok(ExpressionValue::Integer(x)),
-								None => Err(Message::error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
+								None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
 							},
 							
 							BinaryOp::Shr => match bigint_shr(lhs, rhs)
 							{
 								Some(x) => Ok(ExpressionValue::Integer(x)),
-								None => Err(Message::error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
+								None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
 							},
 							
 							BinaryOp::UShr => match bigint_ushr(lhs, rhs)
 							{
 								Some(x) => Ok(ExpressionValue::Integer(x)),
-								None => Err(Message::error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
+								None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
 							},
 							
 							BinaryOp::And  => Ok(ExpressionValue::Integer(bigint_and(lhs, rhs))),
@@ -113,7 +113,7 @@ impl Expression
 			
 			&Expression::BitSlice(_, _, left, right, ref inner) =>
 			{
-				match inner.eval(eval_var)?
+				match inner.eval(report, eval_var)?
 				{
 					ExpressionValue::Integer(x) => Ok(ExpressionValue::Integer(bigint_slice(x, left, right))),
 					_ => unreachable!()

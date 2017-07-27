@@ -1,5 +1,5 @@
 use syntax::{TokenKind, Parser};
-use expr::{Expression, ExpressionParser};
+use expr::Expression;
 use instrset::{Rule, RulePatternPart};
 use std::collections::HashMap;
 
@@ -96,15 +96,13 @@ impl RulePatternMatcher
 	}
 	
 	
-	pub fn parse_match<'a, 'p>(&'a self, mut parser: Parser<'p>) -> Option<(Match, Parser<'p>)>
+	pub fn parse_match(&self, parser: &mut Parser) -> Option<Match>
 	{
-		parser.clear_linebreak();
-		
 		let mut exprs = Vec::new();
 		
-		match self.parse_step(parser, &self.root_step, &mut exprs)
+		match self.parse_match_step(parser, &self.root_step, &mut exprs)
 		{
-			Some((indices, parser)) =>
+			Some(indices) =>
 			{
 				let result = Match
 				{
@@ -112,7 +110,7 @@ impl RulePatternMatcher
 					exprs: exprs
 				};
 				
-				Some((result, parser))
+				Some(result)
 			}
 			
 			None => None
@@ -120,38 +118,42 @@ impl RulePatternMatcher
 	}
 	
 	
-	fn parse_step<'a, 'p>(&'a self, parser: Parser<'p>, step: &'a MatchStep, exprs: &mut Vec<Expression>) -> Option<(&'a [usize], Parser<'p>)>
+	fn parse_match_step<'s>(&'s self, parser: &mut Parser, step: &'s MatchStep, exprs: &mut Vec<Expression>) -> Option<&'s [usize]>
 	{
 		if !parser.next_is_linebreak()
 		{
 			// Try to match fixed tokens first, if some rule accepts that.
-			let mut step_exact_parser = parser.clone();
-			let tk = step_exact_parser.advance();
+			let parser_state = parser.save(); 
+			
+			let tk = parser.advance();
 			let step_exact = MatchStepExact(tk.kind, tk.excerpt);
 			
 			if let Some(next_step) = step.children_exact.get(&step_exact)
 			{
-				if let Some(result) = self.parse_step(step_exact_parser, &next_step, exprs)
+				if let Some(result) = self.parse_match_step(parser, &next_step, exprs)
 					{ return Some(result); }
 			}
+			
+			parser.restore(parser_state);
 			
 			// Then try to match argument expressions, if some rule accepts that.
 			if let Some(next_step) = step.children_param.get(&MatchStepParameter)
 			{
-				let mut step_param_parser = parser.clone();
+				let parser_state = parser.save(); 
 				
-				let expr = match ExpressionParser::new(&mut step_param_parser).parse()
+				let expr = match Expression::parse(parser)
 				{
 					Ok(expr) => expr,
-					Err(_) => return None
+					Err(()) => return None
 				};
 				
 				exprs.push(expr);
 				
-				if let Some(result) = self.parse_step(step_param_parser, &next_step, exprs)
+				if let Some(result) = self.parse_match_step(parser, &next_step, exprs)
 					{ return Some(result); }
 					
 				exprs.pop();
+				parser.restore(parser_state);
 			}
 		}
 		
@@ -161,7 +163,7 @@ impl RulePatternMatcher
 			if !parser.next_is_linebreak()
 				{ return None }
 			
-			return Some((&step.rule_indices, parser));
+			return Some(&step.rule_indices);
 		}
 		
 		// Else, return no match.

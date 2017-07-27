@@ -1,4 +1,4 @@
-use diagn::{Span, Message, Reporter};
+use diagn::{Span, Report};
 use expr::{Expression, ExpressionType, ExpressionValue};
 use instrset::{InstrSet, Rule};
 use asm::{AssemblerParser, RulePatternMatcher, LabelManager, LabelContext};
@@ -9,7 +9,6 @@ use num::bigint::ToBigInt;
 
 pub struct AssemblerState<'a>
 {
-	pub reporter: &'a mut Reporter,
 	pub fileserver: &'a FileServer,
 	pub instrset: &'a InstrSet,
 	pub pattern_matcher: RulePatternMatcher,
@@ -39,14 +38,13 @@ pub struct ExpressionContext
 }
 
 
-pub fn assemble<S>(reporter: &mut Reporter, instrset: &InstrSet, fileserver: &FileServer, filename: S) -> Option<()>
+pub fn assemble<S>(report: &mut Report, instrset: &InstrSet, fileserver: &FileServer, filename: S) -> Result<(), ()>
 where S: Into<String>
 {
 	let pattern_matcher = RulePatternMatcher::new(&instrset.rules);
 	
 	let mut state = AssemblerState
 	{
-		reporter: reporter,
 		fileserver: fileserver,
 		instrset: instrset,
 		pattern_matcher: pattern_matcher,
@@ -57,25 +55,20 @@ where S: Into<String>
 		cur_writehead: 0
 	};
 	
-	if let Err(msg) = AssemblerParser::parse_file(&mut state, filename)
+	AssemblerParser::parse_file(report, &mut state, filename)?;
+	state.resolve_instrs(report)?;
+	
+	match report.has_errors()
 	{
-		state.reporter.message(msg);
-		return None;
-	};
-	
-	if let Err(_) = state.resolve_instrs()
-		{ return None; }
-	
-	if state.reporter.has_errors()
-		{ return None; }
-	
-	Some(())
+		true => Err(()),
+		false => Ok(())
+	}
 }
 
 
 impl<'a> AssemblerState<'a>
 {
-	pub fn resolve_instrs(&mut self) -> Result<(), ()>
+	pub fn resolve_instrs(&mut self, report: &mut Report) -> Result<(), ()>
 	{
 		use std::mem;
 		
@@ -83,8 +76,8 @@ impl<'a> AssemblerState<'a>
 		
 		for mut instr in &mut instrs
 		{
-			// Errors go to the reporter.
-			let _ = self.output_instr(&mut instr);
+			// Errors go to the report.
+			let _ = self.output_instr(report, &mut instr);
 		}
 		
 		mem::replace(&mut self.parsed_instrs, instrs);
@@ -93,51 +86,37 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
-	pub fn output_advance(&mut self, bytes: usize, span: &Span) -> Result<(), Message>
+	pub fn output_advance(&mut self, report: &mut Report, bytes: usize, span: &Span) -> Result<(), ()>
 	{
 		match self.cur_address.checked_add(bytes)
 		{
 			Some(addr) => self.cur_address = addr,
-			None => return Err(Message::error_span("address overflowed valid range", span))
+			None => return Err(report.error_span("address overflowed valid range", span))
 		}
 		
 		match self.cur_writehead.checked_add(bytes)
 		{
 			Some(addr) => self.cur_writehead = addr,
-			None => return Err(Message::error_span("write pointer overflowed valid range", span))
+			None => return Err(report.error_span("write pointer overflowed valid range", span))
 		}
 		
 		Ok(())
 	}
 	
 	
-	pub fn output_instr(&mut self, instr: &mut ParsedInstruction) -> Result<(), ()>
+	pub fn output_instr(&mut self, report: &mut Report, instr: &mut ParsedInstruction) -> Result<(), ()>
 	{
-		// Resolve remaining arguments, and report errors.
+		// Resolve remaining arguments.
 		for i in 0..instr.exprs.len()
 		{
 			if instr.args[i].is_none()
-			{
-				match self.expr_eval(&instr.ctx, &instr.exprs[i])
-				{
-					Ok(arg) => instr.args[i] = Some(arg),
-					Err(msg) =>
-					{
-						self.reporter.message(msg);
-						return Err(());
-					}
-				}
-			}
+				{ instr.args[i] = Some(self.expr_eval(report, &instr.ctx, &instr.exprs[i])?); }
 		}
 		
-		// Check rule constraints, and report errors.
+		// Check rule constraints.
 		let rule = &self.instrset.rules[instr.rule_index];
 		let get_arg = |i: usize| instr.args[i].clone();
-		if let Err(msg) = self.rule_check_all_constraints_satisfied(rule, &get_arg, &instr.ctx, &instr.span)
-		{
-			self.reporter.message(msg);
-			return Err(());
-		}
+		self.rule_check_all_constraints_satisfied(report, rule, &get_arg, &instr.ctx, &instr.span)?;
 		
 		println!("");
 		println!("output rule {}", instr.rule_index);
@@ -146,28 +125,28 @@ impl<'a> AssemblerState<'a>
 		println!("args:");
 		for expr in &instr.exprs
 		{
-			println!("  {:?}", self.expr_eval(&instr.ctx, expr).ok());
+			println!("  {:?}", self.expr_eval(report, &instr.ctx, expr).ok());
 		}
 		
 		Ok(())
 	}
 	
 	
-	pub fn rule_check_all_constraints_satisfied<F>(&self, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, span: &Span) -> Result<(), Message>
+	pub fn rule_check_all_constraints_satisfied<F>(&self, report: &mut Report, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, span: &Span) -> Result<(), ()>
 	where F: Fn(usize) -> Option<ExpressionValue>
 	{
 		for constr in &rule.constraints
 		{
-			let satisfied = self.constraint_eval(rule, get_arg, ctx, &constr.expr)?;
+			let satisfied = self.constraint_eval(report, rule, get_arg, ctx, &constr.expr)?;
 			
 			if !satisfied
 			{
 				match constr.descr
 				{
 					Some(ref descr) =>
-						return Err(Message::error_span(format!("constraint not satisfied: {}", descr), &span)),
+						return Err(report.error_span(format!("constraint not satisfied: {}", descr), &span)),
 					None =>
-						return Err(Message::error_span(format!("constraint not satisfied"), &span))
+						return Err(report.error_span(format!("constraint not satisfied"), &span))
 				}
 			}
 		}
@@ -176,11 +155,11 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
-	fn constraint_eval<F>(&self, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, constr: &Expression) -> Result<bool, Message>
+	fn constraint_eval<F>(&self, report: &mut Report, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, constr: &Expression) -> Result<bool, ()>
 	where F: Fn(usize) -> Option<ExpressionValue>
 	{
-		constr.check_vars(&|name, span| self.constraint_check_var(rule, get_arg, name, span))?;
-		match constr.eval(&|name| self.constraint_get_var(rule, get_arg, ctx, name))?
+		constr.check_vars(&mut |name, span| self.constraint_check_var(report, rule, get_arg, name, span))?;
+		match constr.eval(report, &|name| self.constraint_get_var(rule, get_arg, ctx, name))?
 		{
 			ExpressionValue::Bool(b) => Ok(b),
 			_ => unreachable!()
@@ -188,7 +167,7 @@ impl<'a> AssemblerState<'a>
 	}
 
 
-	fn constraint_check_var<F>(&self, rule: &Rule, get_arg: &F, name: &str, span: &Span) -> Result<(), Message>
+	fn constraint_check_var<F>(&self, report: &mut Report, rule: &Rule, get_arg: &F, name: &str, span: &Span) -> Result<(), ()>
 	where F: Fn(usize) -> Option<ExpressionValue>
 	{
 		if name == "pc"
@@ -200,11 +179,11 @@ impl<'a> AssemblerState<'a>
 				{ Ok(()) }
 				
 			else
-				{ Err(Message::error_span("unresolved argument", span)) }
+				{ Err(report.error_span("unresolved argument", span)) }
 		}
 		
 		else
-			{ Err(Message::error_span("unknown label", span)) }
+			{ Err(report.error_span("unknown label", span)) }
 	}
 		
 		
@@ -219,18 +198,18 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
-	pub fn expr_eval(&self, ctx: &ExpressionContext, expr: &Expression) -> Result<ExpressionValue, Message>
+	pub fn expr_eval(&self, report: &mut Report, ctx: &ExpressionContext, expr: &Expression) -> Result<ExpressionValue, ()>
 	{
-		expr.check_vars(&|name, span| self.expr_check_var(ctx, name, span))?;
+		expr.check_vars(&mut |name, span| self.expr_check_var(report, ctx, name, span))?;
 		
-		if expr.eval_type(&|name| self.expr_get_var_type(name))? != ExpressionType::Integer
-			{ return Err(Message::error_span("expected integer value for instruction argument", &expr.span())); }
+		if expr.eval_type(report, &|name| self.expr_get_var_type(name))? != ExpressionType::Integer
+			{ return Err(report.error_span("expected integer value for instruction argument", &expr.span())); }
 		
-		expr.eval(&|name| self.expr_get_var(ctx, name))
+		expr.eval(report, &|name| self.expr_get_var(ctx, name))
 	}
 
 
-	fn expr_check_var(&self, ctx: &ExpressionContext, name: &str, span: &Span) -> Result<(), Message>
+	fn expr_check_var(&self, report: &mut Report, ctx: &ExpressionContext, name: &str, span: &Span) -> Result<(), ()>
 	{
 		if name == "pc"
 			{ Ok (()) }
@@ -240,14 +219,14 @@ impl<'a> AssemblerState<'a>
 			if self.labels.does_local_exist(ctx.label_ctx, name)
 				{ Ok(()) }
 			else
-				{ Err(Message::error_span("unknown local label", span)) }
+				{ Err(report.error_span("unknown local label", span)) }
 		}
 		
 		else if self.labels.does_global_exist(name)
 			{ Ok(()) }
 			
 		else
-			{ Err(Message::error_span("unknown label", span)) }
+			{ Err(report.error_span("unknown label", span)) }
 	}
 		
 		

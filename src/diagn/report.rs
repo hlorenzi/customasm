@@ -11,48 +11,31 @@ const C_LINENUM:  &'static str = "\u{1B}[0m\u{1B}[90m";
 const C_SRC:      &'static str = "\u{1B}[0m\u{1B}[97m";
 
 
-pub struct Message
+pub struct Report
+{
+	messages: Vec<Message>
+}
+
+
+struct Message
 {
 	pub descr: String,
 	pub span: Option<Span>
 }
 
 
-impl Message
+impl Report
 {
-	pub fn error<S>(descr: S) -> Message
-	where S: Into<String>
+	pub fn new() -> Report
 	{
-		Message { descr: descr.into(), span: None }
-	}
-	
-	
-	pub fn error_span<S>(descr: S, span: &Span) -> Message
-	where S: Into<String>
-	{
-		Message { descr: descr.into(), span: Some(span.clone()) }
-	}
-}
-
-
-pub struct Reporter
-{
-	messages: Vec<Message>
-}
-
-
-impl Reporter
-{
-	pub fn new() -> Reporter
-	{
-		Reporter
+		Report
 		{
 			messages: Vec::new()
 		}
 	}
 	
 	
-	pub fn message(&mut self, msg: Message)
+	fn message(&mut self, msg: Message)
 	{
 		self.messages.push(msg);
 	}
@@ -61,14 +44,16 @@ impl Reporter
 	pub fn error<S>(&mut self, descr: S)
 	where S: Into<String>
 	{
-		self.message(Message::error(descr));
+		let msg = Message { descr: descr.into(), span: None };
+		self.message(msg);
 	}
 	
 	
 	pub fn error_span<S>(&mut self, descr: S, span: &Span)
 	where S: Into<String>
 	{
-		self.message(Message::error_span(descr, span));
+		let msg = Message { descr: descr.into(), span: Some(span.clone()) };
+		self.message(msg);
 	}
 	
 	
@@ -119,7 +104,7 @@ impl Reporter
 					Some((start, end)) =>
 					{
 						// Print location information.
-						let chars = fileserver.get_chars(&*span.file).ok().unwrap();
+						let chars = fileserver.get_chars(&mut Report::new(), &*span.file).ok().unwrap();
 						let counter = CharCounter::new(&chars);
 						
 						let (line1, col1) = counter.get_line_column_at_index(start);

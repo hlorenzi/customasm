@@ -1,7 +1,6 @@
 mod span;
-mod reporter;
+mod report;
 
 
 pub use self::span::Span;
-pub use self::reporter::Message;
-pub use self::reporter::Reporter;
+pub use self::report::Report;

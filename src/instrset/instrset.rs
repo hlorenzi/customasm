@@ -1,4 +1,4 @@
-use diagn::Reporter;
+use diagn::Report;
 use syntax::tokenize;
 use util::FileServer;
 use super::InstrSetParser;
@@ -13,34 +13,17 @@ pub struct InstrSet
 }
 
 
-pub fn read_instrset<S>(reporter: &mut Reporter, fileserver: &FileServer, filename: S) -> Option<InstrSet>
+pub fn read_instrset<S>(report: &mut Report, fileserver: &FileServer, filename: S) -> Result<InstrSet, ()>
 where S: Into<String>
 {
 	let filename_owned = filename.into();
-	let chars = match fileserver.get_chars(&filename_owned)
+	let chars = fileserver.get_chars(report, &filename_owned)?;
+	let tokens = tokenize(report, filename_owned, &chars)?;
+	let instrset = InstrSetParser::new(report, &tokens).parse()?;
+	
+	match report.has_errors()
 	{
-		Ok(chars) => chars,
-		Err(msg) =>
-		{
-			reporter.message(msg);
-			return None;
-		}
-	};
-	
-	let tokens = tokenize(reporter, filename_owned, &chars);
-	
-	let instrset = match InstrSetParser::new(reporter, &tokens).parse()
-	{
-		Ok(instrset) => instrset,
-		Err(msg) => 
-		{
-			reporter.message(msg);
-			return None;
-		}
-	};
-	
-	if reporter.has_errors()
-		{ return None; }
-	
-	Some(instrset)
+		true => Err(()),
+		false => Ok(instrset)
+	}
 }
