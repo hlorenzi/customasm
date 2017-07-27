@@ -13,7 +13,7 @@ pub enum Expression
 }
 
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ExpressionValue
 {
 	Integer(BigInt),
@@ -41,7 +41,7 @@ pub enum UnaryOp
 pub enum BinaryOp
 {
 	Add, Sub, Mul, Div, Mod,
-	Shl, Shr, UShr,
+	Shl, Shr,
 	And, Or, Xor,
 	
 	Eq, Ne,
@@ -63,6 +63,22 @@ impl Expression
 			&Expression::UnaryOp (ref span, ..) => span.clone(),
 			&Expression::BinaryOp(ref span, ..) => span.clone(),
 			&Expression::BitSlice(ref span, ..) => span.clone()
+		}
+	}
+}
+
+
+impl ExpressionValue
+{
+	pub fn is_of_type(&self, typ: ExpressionType) -> bool
+	{
+		match (self, typ)
+		{
+			(&ExpressionValue::Integer(_), ExpressionType::Integer) |
+			(&ExpressionValue::Bool(_),    ExpressionType::Bool)
+				=> true,
+				
+			_ => false
 		}
 	}
 }

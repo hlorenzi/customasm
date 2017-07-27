@@ -77,8 +77,7 @@ impl Expression
 					BinaryOp::Div |
 					BinaryOp::Mod |
 					BinaryOp::Shl |
-					BinaryOp::Shr |
-					BinaryOp::UShr => ensure_binary_int_to_int(report, lhs_type, rhs_type, &op_span),
+					BinaryOp::Shr => ensure_binary_int_to_int(report, lhs_type, rhs_type, &op_span),
 					
 					BinaryOp::And |
 					BinaryOp::Or |

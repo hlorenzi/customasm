@@ -63,6 +63,41 @@ impl Report
 	}
 	
 	
+	pub fn has_error_at(&self, fileserver: &FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	{
+		for msg in &self.messages
+		{
+			if !msg.descr.contains(error_excerpt)
+				{ continue; }
+				
+			if msg.span.is_none()
+				{ continue; }
+				
+			let span = msg.span.as_ref().unwrap();
+			
+			if &*span.file != filename
+				{ continue; }
+			
+			if span.location.is_none()
+				{ continue; }
+				
+			let location = span.location.unwrap();
+			
+			let chars = fileserver.get_chars(&mut Report::new(), &*span.file).ok().unwrap();
+			let counter = CharCounter::new(&chars);
+			
+			let (span_line, _) = counter.get_line_column_at_index(location.0);
+			
+			if span_line != line
+				{ continue; }
+				
+			return true;
+		}
+		
+		false
+	}
+	
+	
 	pub fn print_all(&self, fileserver: &FileServer)
 	{
 		enable_windows_ansi_support();

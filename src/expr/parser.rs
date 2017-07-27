@@ -158,9 +158,8 @@ impl<'a, 't> ExpressionParser<'a, 't>
 	{
 		self.parse_binary_ops(
 			&[
-				(TokenKind::LessThanLessThan,                  BinaryOp::Shl),
-				(TokenKind::GreaterThanGreaterThan,            BinaryOp::Shr),
-				(TokenKind::GreaterThanGreaterThanGreaterThan, BinaryOp::UShr)
+				(TokenKind::LessThanLessThan,       BinaryOp::Shl),
+				(TokenKind::GreaterThanGreaterThan, BinaryOp::Shr)
 			],
 			|s| s.parse_addition())
 	}
