@@ -68,6 +68,16 @@ where S: Into<String>
 
 impl<'a> AssemblerState<'a>
 {
+	pub fn get_cur_context(&self) -> ExpressionContext
+	{
+		ExpressionContext
+		{
+			label_ctx: self.labels.get_cur_context(),
+			address: self.cur_address,
+			writehead: self.cur_writehead
+		}
+	}
+
 	pub fn resolve_instrs(&mut self, report: &mut Report) -> Result<(), ()>
 	{
 		use std::mem;
@@ -216,13 +226,13 @@ impl<'a> AssemblerState<'a>
 			
 		else if let Some('.') = name.chars().next()
 		{
-			if self.labels.does_local_exist(ctx.label_ctx, name)
+			if self.labels.local_exists(ctx.label_ctx, name)
 				{ Ok(()) }
 			else
 				{ Err(report.error_span("unknown local label", span)) }
 		}
 		
-		else if self.labels.does_global_exist(name)
+		else if self.labels.global_exists(name)
 			{ Ok(()) }
 			
 		else

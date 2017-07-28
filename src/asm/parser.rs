@@ -2,6 +2,7 @@ use diagn::Report;
 use syntax::{Token, TokenKind, tokenize, Parser};
 use expr::{Expression, ExpressionValue};
 use asm::{AssemblerState, ParsedInstruction, ExpressionContext};
+use num::BigInt;
 use num::ToPrimitive;
 
 
@@ -37,7 +38,6 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		while !self.parser.is_over()
 		{
 			self.parse_line()?;
-			self.parser.expect_linebreak()?;
 		}
 		
 		Ok(())
@@ -47,10 +47,28 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	fn parse_line(&mut self) -> Result<(), ()>
 	{
 		if self.parser.next_is(0, TokenKind::Hash)
-			{ self.parse_directive() }
+		{
+			self.parse_directive()?;
+			self.parser.expect_linebreak()
+		}
+			
+		else if self.parser.next_is(0, TokenKind::Identifier) && self.parser.next_is(1, TokenKind::Colon)
+			{ self.parse_label() }
+			
+		else if self.parser.next_is(0, TokenKind::Identifier) && self.parser.next_is(1, TokenKind::Equal)
+			{ self.parse_label() }
 	
+		else if self.parser.next_is(0, TokenKind::Dot) && self.parser.next_is(1, TokenKind::Identifier) && self.parser.next_is(2, TokenKind::Colon)
+			{ self.parse_label() }
+			
+		else if self.parser.next_is(0, TokenKind::Dot) && self.parser.next_is(1, TokenKind::Identifier) && self.parser.next_is(2, TokenKind::Equal)
+			{ self.parse_label() }
+		
 		else
-			{ self.parse_instruction() }
+		{
+			self.parse_instruction()?;
+			self.parser.expect_linebreak()
+		}
 	}
 	
 	
@@ -63,9 +81,9 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		
 		match name.as_ref()
 		{
-			"addr"  => self.parse_directive_addr(),
-			"write" => self.parse_directive_write(),
-			"res"   => self.parse_directive_res(&tk_name),
+			"addr" => self.parse_directive_addr(),
+			"outp" => self.parse_directive_outp(),
+			"res"  => self.parse_directive_res(&tk_name),
 			_ => Err(self.parser.report.error_span("unknown directive", &tk_name.span))
 		}
 	}
@@ -78,7 +96,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	}
 	
 	
-	fn parse_directive_write(&mut self) -> Result<(), ()>
+	fn parse_directive_outp(&mut self) -> Result<(), ()>
 	{
 		self.state.cur_writehead = self.parse_usize()?;
 		Ok(())
@@ -89,6 +107,47 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	{
 		let bytes = self.parse_usize()?;
 		self.state.output_advance(self.parser.report, bytes, &tk_name.span)
+	}
+	
+	
+	fn parse_label(&mut self) -> Result<(), ()>
+	{
+		let is_local = self.parser.maybe_expect(TokenKind::Dot).is_some();
+	
+		let tk_name = self.parser.expect(TokenKind::Identifier)?;
+		let name = tk_name.excerpt.unwrap();
+		
+		let ctx = self.state.get_cur_context();
+		
+		let value = if self.parser.maybe_expect(TokenKind::Equal).is_some()
+		{		
+			let expr = Expression::parse(&mut self.parser)?;
+			let value = self.state.expr_eval(self.parser.report, &ctx, &expr)?;
+			self.parser.expect_linebreak()?;
+			value
+		}
+		else
+		{
+			self.parser.expect(TokenKind::Colon)?;
+			ExpressionValue::Integer(BigInt::from(self.state.cur_address))
+		};
+
+		if is_local
+		{
+			if self.state.labels.local_exists(ctx.label_ctx, &name)
+				{ return Err(self.parser.report.error_span("duplicate local label", &tk_name.span)); }
+				
+			self.state.labels.add_local(ctx.label_ctx, name, value);
+		}
+		else
+		{
+			if self.state.labels.global_exists(&name)
+				{ return Err(self.parser.report.error_span("duplicate global label", &tk_name.span)); }
+				
+			self.state.labels.add_global(name, value);
+		}
+		
+		Ok(())
 	}
 	
 	
@@ -114,12 +173,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		
 		let instr_span = instr_span_start.join(&self.parser.prev().span);
 		
-		let ctx = ExpressionContext
-		{
-			label_ctx: self.state.labels.get_cur_context(),
-			address: self.state.cur_address,
-			writehead: self.state.cur_writehead
-		};
+		let ctx = self.state.get_cur_context();
 		
 		// Resolve as many arguments as possible right now.
 		let mut args: Vec<Option<ExpressionValue>> = Vec::new();

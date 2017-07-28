@@ -73,13 +73,13 @@ impl LabelManager
 	}
 	
 	
-	pub fn does_global_exist(&self, name: &str) -> bool
+	pub fn global_exists(&self, name: &str) -> bool
 	{
 		self.get_global(name).is_some()
 	}
 	
 	
-	pub fn does_local_exist(&self, ctx: LabelContext, name: &str) -> bool
+	pub fn local_exists(&self, ctx: LabelContext, name: &str) -> bool
 	{
 		self.get_local(ctx, name).is_some()
 	}

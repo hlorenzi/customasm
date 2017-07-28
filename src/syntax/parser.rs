@@ -118,12 +118,19 @@ impl<'t> Parser<'t>
 	}
 	
 	
-	pub fn next_is(&self, nth: usize, kind: TokenKind) -> bool
+	pub fn next_is(&self, mut nth: usize, kind: TokenKind) -> bool
 	{
-		if self.index + nth >= self.tokens.len()
-			{ false }
-		else
-			{ self.tokens[self.index + nth].kind == kind }
+		let mut index = self.index;
+		
+		while nth > 0 && index < self.tokens.len() - 1
+		{
+			nth -= 1;
+			index += 1;
+			while self.tokens[index].kind.ignorable() && index < self.tokens.len() - 1
+				{ index += 1; }
+		}
+		
+		self.tokens[index].kind == kind
 	}
 	
 	
@@ -165,7 +172,7 @@ impl<'t> Parser<'t>
 	
 	pub fn next_is_linebreak(&self) -> bool
 	{
-		self.read_linebreak
+		self.read_linebreak || self.is_over()
 	}
 	
 	
