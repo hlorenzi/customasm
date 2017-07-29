@@ -16,6 +16,16 @@ impl Expression
 			_ => None
 		}
 	}
+	
+	
+	pub fn slice(&self) -> Option<(usize, usize)>
+	{
+		match self
+		{
+			&Expression::BitSlice(_, _, left, right, _) => Some((left, right)),
+			_ => None
+		}
+	}
 
 
 	pub fn check_vars<F>(&self, check_var: &mut F) -> Result<(), ()>

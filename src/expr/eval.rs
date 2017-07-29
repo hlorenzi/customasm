@@ -120,6 +120,38 @@ impl Expression
 }
 
 
+impl ExpressionValue
+{
+	pub fn get_bit(&self, index: usize) -> bool
+	{
+		match self
+		{
+			&ExpressionValue::Integer(ref bigint) =>
+			{
+				let bytes = bigint.to_signed_bytes_le();
+				
+				let byte_index = index / 8;
+				if byte_index >= bytes.len()
+					{ return bigint.sign() == Sign::Minus; }
+					
+				let mut byte = bytes[byte_index];
+				
+				let mut bit_index = index % 8;
+				while bit_index > 0
+				{
+					byte >>= 1;
+					bit_index -= 1;
+				}
+				
+				(byte & 0b1) != 0
+			}
+			
+			_ => panic!("not an integer")
+		}
+	}
+}
+
+
 fn bigint_checked_rem(lhs: BigInt, rhs: BigInt) -> Option<BigInt>
 {
 	if rhs == BigInt::zero()

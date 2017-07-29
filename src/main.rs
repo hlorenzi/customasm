@@ -24,31 +24,9 @@ fn main()
 	
 	fileserver.add("code",
 	"
-		#addr 16 + 16 + 16
-		#outp 24
-		#res 255
-		
-		x = 12 + 34
-		
-		start:
 		halt
-		jmp 0x01
-		jmp 0x01
-		.mid:
-		store 0x02 + abc
-		jmp 0x01
-		jmp 0x01
-		loads: load 0x0
-		load 0x09 + 0x01 * (0x17 - 0x10)
-		load 0x03, 0x04
-		load 0x05, 0x06, 0x07
-		load 0x03, 0x04
-		load start, loads
-		
-		.y = 56 + 78
-		load x, x
-		load 0x05, 0x06, 0x07
-		.end:
+		jmp 0x1234
+		store 0x5678
 	");
 	
 	let mut report = customasm::Report::new();
@@ -57,9 +35,9 @@ fn main()
 	{
 		//println!("{:#?}", instrset);
 		
-		if let Ok(_assembled) = customasm::assemble(&mut report, &instrset, &fileserver, "code")
+		if let Ok(binary) = customasm::assemble(&mut report, &instrset, &fileserver, "code")
 		{
-			//println!("{:#?}", assembled);
+			println!("{}", binary.generate_hexstr(0, binary.len()));
 		}
 	}
 	

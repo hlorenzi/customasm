@@ -210,7 +210,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		// Also advance address and write pointer.
 		let rule = &self.state.instrset.rules[instr_match.rule_indices[best_match]];
 		
-		let instr_width = rule.production_width();
+		let instr_width = rule.production_width() / self.state.instrset.align;
 		self.state.output_advance(self.parser.report, instr_width, &instr_span)?;
 		
 		let parsed_instr = ParsedInstruction

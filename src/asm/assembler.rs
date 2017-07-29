@@ -1,7 +1,7 @@
 use diagn::{Span, Report};
 use expr::{Expression, ExpressionType, ExpressionValue};
 use instrset::{InstrSet, Rule};
-use asm::{AssemblerParser, RulePatternMatcher, LabelManager, LabelContext};
+use asm::{AssemblerParser, BinaryOutput, RulePatternMatcher, LabelManager, LabelContext};
 use util::FileServer;
 use num::bigint::ToBigInt;
 
@@ -14,6 +14,7 @@ pub struct AssemblerState<'a>
 	pub pattern_matcher: RulePatternMatcher,
 	pub labels: LabelManager,
 	pub parsed_instrs: Vec<ParsedInstruction>,
+	pub bin_output: BinaryOutput,
 	
 	pub cur_address: usize,
 	pub cur_writehead: usize
@@ -38,7 +39,7 @@ pub struct ExpressionContext
 }
 
 
-pub fn assemble<S>(report: &mut Report, instrset: &InstrSet, fileserver: &FileServer, filename: S) -> Result<(), ()>
+pub fn assemble<S>(report: &mut Report, instrset: &InstrSet, fileserver: &FileServer, filename: S) -> Result<BinaryOutput, ()>
 where S: Into<String>
 {
 	let pattern_matcher = RulePatternMatcher::new(&instrset.rules);
@@ -50,6 +51,7 @@ where S: Into<String>
 		pattern_matcher: pattern_matcher,
 		labels: LabelManager::new(),
 		parsed_instrs: Vec::new(),
+		bin_output: BinaryOutput::new(),
 		
 		cur_address: 0,
 		cur_writehead: 0
@@ -61,7 +63,7 @@ where S: Into<String>
 	match report.has_errors()
 	{
 		true => Err(()),
-		false => Ok(())
+		false => Ok(state.bin_output)
 	}
 }
 
@@ -107,7 +109,7 @@ impl<'a> AssemblerState<'a>
 		match self.cur_writehead.checked_add(bytes)
 		{
 			Some(addr) => self.cur_writehead = addr,
-			None => return Err(report.error_span("write pointer overflowed valid range", span))
+			None => return Err(report.error_span("output pointer overflowed valid range", span))
 		}
 		
 		Ok(())
@@ -126,16 +128,22 @@ impl<'a> AssemblerState<'a>
 		// Check rule constraints.
 		let rule = &self.instrset.rules[instr.rule_index];
 		let get_arg = |i: usize| instr.args[i].clone();
+		
 		self.rule_check_all_constraints_satisfied(report, rule, &get_arg, &instr.ctx, &instr.span)?;
 		
-		println!("");
-		println!("output rule {}", instr.rule_index);
-		println!("addr  0x{:x}", instr.ctx.address);
-		println!("write 0x{:x}", instr.ctx.writehead);
-		println!("args:");
-		for expr in &instr.exprs
+		// Output binary representation.
+		let mut output_bit_index = instr.ctx.writehead * self.instrset.align;
+		for part in &rule.production_parts
 		{
-			println!("  {:?}", self.expr_eval(report, &instr.ctx, expr).ok());
+			let (left, right) = part.slice().unwrap();
+			let value = self.rule_expr_eval(report, rule, &get_arg, &instr.ctx, &part)?;
+			
+			for index in 0..(left - right + 1)
+			{
+				let bit = value.get_bit(left - right - index);
+				self.bin_output.write(output_bit_index, bit);
+				output_bit_index += 1;
+			}
 		}
 		
 		Ok(())
@@ -147,7 +155,11 @@ impl<'a> AssemblerState<'a>
 	{
 		for constr in &rule.constraints
 		{
-			let satisfied = self.constraint_eval(report, rule, get_arg, ctx, &constr.expr)?;
+			let satisfied = match self.rule_expr_eval(report, rule, get_arg, ctx, &constr.expr)?
+			{
+				ExpressionValue::Bool(b) => b,
+				_ => unreachable!()
+			};
 			
 			if !satisfied
 			{
@@ -165,19 +177,15 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
-	fn constraint_eval<F>(&self, report: &mut Report, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, constr: &Expression) -> Result<bool, ()>
+	fn rule_expr_eval<F>(&self, report: &mut Report, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, expr: &Expression) -> Result<ExpressionValue, ()>
 	where F: Fn(usize) -> Option<ExpressionValue>
 	{
-		constr.check_vars(&mut |name, span| self.constraint_check_var(report, rule, get_arg, name, span))?;
-		match constr.eval(report, &|name| self.constraint_get_var(rule, get_arg, ctx, name))?
-		{
-			ExpressionValue::Bool(b) => Ok(b),
-			_ => unreachable!()
-		}
+		expr.check_vars(&mut |name, span| self.rule_expr_check_var(report, rule, get_arg, name, span))?;
+		expr.eval(report, &|name| self.rule_expr_get_var(rule, get_arg, ctx, name))
 	}
 
 
-	fn constraint_check_var<F>(&self, report: &mut Report, rule: &Rule, get_arg: &F, name: &str, span: &Span) -> Result<(), ()>
+	fn rule_expr_check_var<F>(&self, report: &mut Report, rule: &Rule, get_arg: &F, name: &str, span: &Span) -> Result<(), ()>
 	where F: Fn(usize) -> Option<ExpressionValue>
 	{
 		if name == "pc"
@@ -197,7 +205,7 @@ impl<'a> AssemblerState<'a>
 	}
 		
 		
-	fn constraint_get_var<F>(&self, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, name: &str) -> ExpressionValue
+	fn rule_expr_get_var<F>(&self, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, name: &str) -> ExpressionValue
 	where F: Fn(usize) -> Option<ExpressionValue>
 	{
 		if name == "pc"
