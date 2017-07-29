@@ -1,4 +1,5 @@
 mod expr;
+mod instrset_parsing;
 
 
 use diagn::Report;
@@ -7,7 +8,12 @@ use std::fmt::Debug;
 use std::cmp::PartialEq;
 
 
-type ExpectedResult<T> = Result<T, (&'static str, usize, &'static str)>;
+pub enum ExpectedResult<T>
+{
+	Pass(T),
+	_Warn(T, (&'static str, usize, &'static str)),
+	Fail((&'static str, usize, &'static str))
+}
 
 
 pub fn expect_result<T>(report: &Report, fileserver: &FileServer, got: Option<T>, expected: ExpectedResult<T>)
@@ -15,7 +21,7 @@ where T: Debug + PartialEq
 {
 	report.print_all(fileserver);
 	
-	if expected.as_ref().ok().is_some()
+	if let ExpectedResult::Pass(result) = expected
 	{
 		if report.has_errors()
 		{
@@ -27,13 +33,14 @@ where T: Debug + PartialEq
 			panic!("expected to pass but failed");
 		}
 		
-		if got.as_ref().unwrap() != expected.as_ref().ok().unwrap()
+		if let Some(got) = got
 		{
-			panic!("test failed\nexpected: {:?}\n     got: {:?}", expected.unwrap(), got.unwrap());
+			if got != result
+				{ panic!("test failed\nexpected: {:?}\n     got: {:?}", result, got); }
 		}
 	}
 	
-	else
+	else if let ExpectedResult::Fail(err) = expected
 	{
 		if !report.has_errors()
 		{
@@ -45,11 +52,9 @@ where T: Debug + PartialEq
 			panic!("expected to fail but passed\n     got: {:?}", got.unwrap());
 		}
 		
-		let error = expected.err().unwrap();
-		
-		if !report.has_error_at(fileserver, error.0, error.1 - 1, error.2)
+		if !report.has_error_at(fileserver, err.0, err.1 - 1, err.2)
 		{
-			panic!("expected a certain error but didn't get it\nexpected: ({:?}, {}, {:?})", error.0, error.1, error.2);
+			panic!("expected a certain error but got other errors\nexpected: ({:?}, {}, {:?})", err.0, err.1, err.2);
 		}
 	}
 }

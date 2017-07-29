@@ -66,7 +66,11 @@ impl<'t> InstrSetParser<'t>
 		if self.align_was_set
 			{ return Err(self.parser.report.error_span("duplicate align directive", &tk_name.span)); }
 			
-		self.instrset.align = excerpt_as_usize(self.parser.report, &tk_align.excerpt.unwrap(), &tk_align.span)?;
+		let align = excerpt_as_usize(self.parser.report, &tk_align.excerpt.unwrap(), &tk_align.span)?;
+		if align == 0
+			{ return Err(self.parser.report.error_span("invalid alignment", &tk_align.span)); }
+		
+		self.instrset.align = align;
 		self.align_was_set = true;
 		
 		Ok(())
@@ -90,6 +94,12 @@ impl<'t> InstrSetParser<'t>
 		let mut rule = Rule::new();
 		
 		self.parse_rule_pattern(&mut rule)?;
+		
+		if rule.pattern_parts.len() == 0
+		{
+			let span = self.parser.next().span.before();
+			return Err(self.parser.report.error_span("empty rule pattern", &span));
+		}
 		
 		while self.parser.maybe_expect(TokenKind::ColonColon).is_some()
 			{ self.parse_rule_constraint(&mut rule)?; }
@@ -142,6 +152,10 @@ impl<'t> InstrSetParser<'t>
 				rule.pattern_add_exact(&tk);
 				prev_was_parameter = false;
 			}
+			
+			// Check for end of file.
+			else if tk.kind == TokenKind::End
+				{ return Ok(()) }
 			
 			// Else, it's illegal to appear in a pattern.
 			else
