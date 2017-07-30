@@ -116,6 +116,22 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
+	pub fn output_zeroes(&mut self, report: &mut Report, bytes: usize, span: &Span) -> Result<(), ()>
+	{
+		let mut output_bit_index = self.cur_writehead * self.instrset.align;
+		for _ in 0..bytes
+		{
+			for _ in 0..self.instrset.align
+			{
+				self.bin_output.write(output_bit_index, false);
+				output_bit_index += 1;
+			}
+		}
+		
+		self.output_advance(report, bytes, span)
+	}
+	
+	
 	pub fn output_instr(&mut self, report: &mut Report, instr: &mut ParsedInstruction) -> Result<(), ()>
 	{
 		// Resolve remaining arguments.

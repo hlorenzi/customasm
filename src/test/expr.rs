@@ -17,6 +17,8 @@ where S: Into<Vec<u8>>
 		
 		let expr = Expression::parse(&mut Parser::new(report, &tokens))?;
 		
+		expr.check_vars(&mut |_, span| Err(report.error_span("unknown variable", span)))?;
+		
 		let expr_type = expr.eval_type(report, &|_| panic!("unknown variable"))?;
 		let expr_value = expr.eval(report, &|_| panic!("unknown variable"))?;
 		
@@ -57,6 +59,17 @@ fn test_literals()
 	test("8'0x0'0",  Fail(("test", 1, "invalid")));
 	test("0b8'0x00", Fail(("test", 1, "invalid")));
 	test("0x8'0x00", Fail(("test", 1, "invalid")));
+}
+
+
+#[test]
+fn test_variables()
+{
+	test(" a", Fail(("test", 1, "unknown")));
+	test(".a", Fail(("test", 1, "unknown")));
+	
+	test("1 +  a + 1", Fail(("test", 1, "unknown")));
+	test("1 + .a + 1", Fail(("test", 1, "unknown")));
 }
 
 

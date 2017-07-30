@@ -1,5 +1,6 @@
 mod expr;
-mod instrset_parsing;
+mod instrset;
+mod asm;
 
 
 use diagn::Report;

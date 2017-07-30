@@ -51,7 +51,7 @@ impl BinaryOutput
 	}
 	
 	
-	fn generate_str(&self, digit_bits: usize, start_bit: usize, end_bit: usize) -> String
+	pub fn generate_str(&self, digit_bits: usize, start_bit: usize, end_bit: usize) -> String
 	{
 		let mut result = String::new();
 		

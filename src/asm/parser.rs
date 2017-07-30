@@ -106,16 +106,17 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	fn parse_directive_res(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
 		let bytes = self.parse_usize()?;
-		self.state.output_advance(self.parser.report, bytes, &tk_name.span)
+		self.state.output_zeroes(self.parser.report, bytes, &tk_name.span)
 	}
 	
 	
 	fn parse_label(&mut self) -> Result<(), ()>
 	{
 		let is_local = self.parser.maybe_expect(TokenKind::Dot).is_some();
+		let mut name = if is_local { "." } else { "" }.to_string();
 	
 		let tk_name = self.parser.expect(TokenKind::Identifier)?;
-		let name = tk_name.excerpt.unwrap();
+		name.push_str(&tk_name.excerpt.unwrap());
 		
 		let ctx = self.state.get_cur_context();
 		

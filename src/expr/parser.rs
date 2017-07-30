@@ -235,6 +235,9 @@ impl<'a, 't> ExpressionParser<'a, 't>
 		else if self.parser.next_is(0, TokenKind::Identifier)
 			{ self.parse_variable() }
 			
+		else if self.parser.next_is(0, TokenKind::Dot)
+			{ self.parse_variable() }
+			
 		else if self.parser.next_is(0, TokenKind::Number)
 			{ self.parse_number() }
 			
@@ -257,10 +260,16 @@ impl<'a, 't> ExpressionParser<'a, 't>
 	
 	fn parse_variable(&mut self) -> Result<Expression, ()>
 	{
-		let tk_name = self.parser.expect(TokenKind::Identifier)?;
-		let name = tk_name.excerpt.clone().unwrap();
+		let tk_dot = self.parser.maybe_expect(TokenKind::Dot);
+		let mut name = if tk_dot.is_some() { "." } else { "" }.to_string();
 		
-		Ok(Expression::Variable(tk_name.span.clone(), name))
+		let tk_name = self.parser.expect(TokenKind::Identifier)?;
+		name.push_str(&tk_name.excerpt.clone().unwrap());
+		
+		if let Some(tk_dot) = tk_dot
+			{ Ok(Expression::Variable(tk_dot.span.join(&tk_name.span), name)) }
+		else
+			{ Ok(Expression::Variable(tk_name.span.clone(), name)) }
 	}
 	
 	
