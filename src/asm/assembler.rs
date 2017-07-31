@@ -57,7 +57,7 @@ where S: Into<String>
 		cur_writehead: 0
 	};
 	
-	AssemblerParser::parse_file(report, &mut state, filename)?;
+	AssemblerParser::parse_file(report, &mut state, filename, None)?;
 	state.resolve_instrs(report)?;
 	
 	match report.has_errors()

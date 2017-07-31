@@ -10,27 +10,35 @@ use ::assemble;
 fn test<S, T>(instrset: S, asm: T, expected: ExpectedResult<(usize, &'static str)>)
 where S: Into<Vec<u8>>, T: Into<Vec<u8>>
 {
-	fn compile(report: &mut Report, fileserver: &FileServer) -> Result<BinaryOutput, ()>
-	{
-		let instrset = read_instrset(report, fileserver, "instrset")?;
-		assemble(report, &instrset, fileserver, "asm")
-	}
-	
-	let mut report = Report::new();
 	let mut fileserver = FileServerMock::new();
 	fileserver.add("instrset", instrset);
 	fileserver.add("asm", asm);
+	
+	test_fileserver(&fileserver, "instrset", "asm", expected);
+}
+
+
+fn test_fileserver<S, T>(fileserver: &FileServer, instrset_filename: S, asm_filename: T, expected: ExpectedResult<(usize, &'static str)>)
+where S: Into<String>, T: Into<String>
+{
+	let compile = |report: &mut Report, fileserver: &FileServer| -> Result<BinaryOutput, ()>
+	{
+		let instrset = read_instrset(report, fileserver, instrset_filename)?;
+		assemble(report, &instrset, fileserver, asm_filename)
+	};
+	
+	let mut report = Report::new();
 	
 	let bits = if let Pass(expected) = expected
 		{ expected.0 }
 	else
 		{ 4 };
 	
-	let result = compile(&mut report, &fileserver).ok();
+	let result = compile(&mut report, fileserver).ok();
 	let result = result.map(|r| (bits, r.generate_str(bits, 0, r.len())));
 	let result = result.as_ref().map(|r| (r.0, r.1.as_ref()));
 	
-	expect_result(&report, &fileserver, result, expected);
+	expect_result(&report, fileserver, result, expected);
 }
 
 
@@ -269,4 +277,79 @@ fn test_cascading()
 	test(INSTRSET, "            b = 0x15 \n add a, b \n a = 0x25",             Pass((4, "cc2515")));
 	test(INSTRSET, "                        add a, b \n a = 0x07 \n b = 0x07", Pass((4, "dd0707")));
 	test(INSTRSET, "                        add a, b \n a = 0x25 \n b = 0x25", Pass((4, "dd2525")));
+}
+
+
+#[test]
+fn test_include_directive()
+{
+	static INSTRSET: &'static str = "
+		halt     -> 8'0x12, pc[7:0]
+		load {a} -> 8'0x34,  a[7:0]";
+		
+	static MAIN1: &'static str = "
+		start:
+			halt
+			load start
+			halt
+			
+		#include \"folder1/file1\"
+		#include \"file1\"
+		
+			halt
+			load start
+			load at_folder1_file1
+			load at_folder1_file2
+			load at_file1";
+			
+	static FOLDER1_FILE1: &'static str ="
+		at_folder1_file1:
+			halt
+			load start
+			
+		#include \"file2\"";
+	
+	static FOLDER1_FILE2: &'static str ="
+		at_folder1_file2:
+			halt
+			load start
+			load at_folder1_file1
+			load at_folder1_file2";
+			
+	static FILE1: &'static str ="
+		at_file1:
+			halt
+			load start
+			load at_folder1_file1
+			load at_folder1_file2
+			load at_file1";
+			
+	static MAIN2: &'static str ="
+		#include \"unknown\"";
+			
+	static MAIN3: &'static str ="
+		#include \"../invalid\"";
+			
+	static MAIN4: &'static str ="
+		#include \"./invalid\"";
+		
+	static MAIN5: &'static str ="
+		#include \"C:\\invalid\"";
+			
+	let mut fileserver = FileServerMock::new();
+	fileserver.add("instrset", INSTRSET);
+	fileserver.add("main1", MAIN1);
+	fileserver.add("folder1/file1", FOLDER1_FILE1);
+	fileserver.add("folder1/file2", FOLDER1_FILE2);
+	fileserver.add("file1", FILE1);
+	fileserver.add("main2", MAIN2);
+	fileserver.add("main3", MAIN3);
+	fileserver.add("main4", MAIN4);
+	fileserver.add("main5", MAIN5);
+	
+	test_fileserver(&fileserver, "instrset", "main1", Pass((4, "12003400120412063400120a34003406340a121234003406340a3412121c34003406340a3412")));
+	test_fileserver(&fileserver, "instrset", "main2", Fail(("main2", 2, "not found")));
+	test_fileserver(&fileserver, "instrset", "main3", Fail(("main3", 2, "invalid")));
+	test_fileserver(&fileserver, "instrset", "main4", Fail(("main4", 2, "invalid")));
+	test_fileserver(&fileserver, "instrset", "main5", Fail(("main5", 2, "invalid")));
 }

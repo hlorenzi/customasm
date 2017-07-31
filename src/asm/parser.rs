@@ -1,7 +1,9 @@
-use diagn::Report;
+use diagn::{Span, Report};
 use syntax::{Token, TokenKind, tokenize, Parser};
+use syntax::excerpt_as_string_contents;
 use expr::{Expression, ExpressionValue};
 use asm::{AssemblerState, ParsedInstruction, ExpressionContext};
+use util::filename_navigate;
 use num::BigInt;
 use num::ToPrimitive;
 
@@ -10,22 +12,24 @@ pub struct AssemblerParser<'a, 'b>
 where 'b: 'a
 {
 	pub state: &'a mut AssemblerState<'b>,
+	pub cur_filename: String,
 	pub parser: Parser<'a>
 }
 	
 	
 impl<'a, 'b> AssemblerParser<'a, 'b>
 {
-	pub fn parse_file<S>(report: &mut Report, state: &mut AssemblerState, filename: S) -> Result<(), ()>
+	pub fn parse_file<S>(report: &mut Report, state: &mut AssemblerState, filename: S, filename_span: Option<&Span>) -> Result<(), ()>
 	where S: Into<String>
 	{
 		let filename_owned = filename.into();
-		let chars = state.fileserver.get_chars(report, &filename_owned)?;
-		let tokens = tokenize(report, filename_owned, &chars)?;
+		let chars = state.fileserver.get_chars(report, &filename_owned, filename_span)?;
+		let tokens = tokenize(report, filename_owned.as_ref(), &chars)?;
 		
 		let mut parser = AssemblerParser
 		{
 			state: state,
+			cur_filename: filename_owned,
 			parser: Parser::new(report, &tokens)
 		};
 		
@@ -81,9 +85,10 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		
 		match name.as_ref()
 		{
-			"addr" => self.parse_directive_addr(),
-			"outp" => self.parse_directive_outp(),
-			"res"  => self.parse_directive_res(&tk_name),
+			"addr"    => self.parse_directive_addr(),
+			"outp"    => self.parse_directive_outp(),
+			"res"     => self.parse_directive_res(&tk_name),
+			"include" => self.parse_directive_include(),
 			_ => Err(self.parser.report.error_span("unknown directive", &tk_name.span))
 		}
 	}
@@ -107,6 +112,17 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	{
 		let bytes = self.parse_usize()?;
 		self.state.output_zeroes(self.parser.report, bytes, &tk_name.span)
+	}
+	
+	
+	fn parse_directive_include(&mut self) -> Result<(), ()>
+	{
+		let tk_filename = self.parser.expect(TokenKind::String)?;
+		let filename = excerpt_as_string_contents(tk_filename.excerpt.as_ref().unwrap().as_ref());
+	
+		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
+		
+		AssemblerParser::parse_file(self.parser.report, self.state, new_filename, Some(&tk_filename.span))
 	}
 	
 	

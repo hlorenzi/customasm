@@ -17,7 +17,7 @@ pub fn read_instrset<S>(report: &mut Report, fileserver: &FileServer, filename: 
 where S: Into<String>
 {
 	let filename_owned = filename.into();
-	let chars = fileserver.get_chars(report, &filename_owned)?;
+	let chars = fileserver.get_chars(report, &filename_owned, None)?;
 	let tokens = tokenize(report, filename_owned, &chars)?;
 	let instrset = InstrSetParser::new(report, &tokens).parse()?;
 	

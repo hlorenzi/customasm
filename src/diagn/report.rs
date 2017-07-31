@@ -83,7 +83,7 @@ impl Report
 				
 			let location = span.location.unwrap();
 			
-			let chars = fileserver.get_chars(&mut Report::new(), &*span.file).ok().unwrap();
+			let chars = fileserver.get_chars(&mut Report::new(), &*span.file, None).ok().unwrap();
 			let counter = CharCounter::new(&chars);
 			
 			let (span_line, _) = counter.get_line_column_at_index(location.0);
@@ -139,7 +139,7 @@ impl Report
 					Some((start, end)) =>
 					{
 						// Print location information.
-						let chars = fileserver.get_chars(&mut Report::new(), &*span.file).ok().unwrap();
+						let chars = fileserver.get_chars(&mut Report::new(), &*span.file, None).ok().unwrap();
 						let counter = CharCounter::new(&chars);
 						
 						let (line1, col1) = counter.get_line_column_at_index(start);

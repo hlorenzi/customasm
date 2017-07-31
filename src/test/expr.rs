@@ -12,7 +12,7 @@ where S: Into<Vec<u8>>
 {
 	fn compile(report: &mut Report, fileserver: &FileServer) -> Result<ExpressionValue, ()>
 	{
-		let chars = fileserver.get_chars(report, "test")?;
+		let chars = fileserver.get_chars(report, "test", None)?;
 		let tokens = tokenize(report, "test", &chars)?;
 		
 		let expr = Expression::parse(&mut Parser::new(report, &tokens))?;

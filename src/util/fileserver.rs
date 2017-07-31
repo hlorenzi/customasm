@@ -1,15 +1,15 @@
-use diagn::Report;
+use diagn::{Span, Report};
 use std::collections::HashMap;
 
 
 pub trait FileServer
 {
-	fn get_bytes(&self, report: &mut Report, filename: &str) -> Result<Vec<u8>, ()>;
+	fn get_bytes(&self, report: &mut Report, filename: &str, span: Option<&Span>) -> Result<Vec<u8>, ()>;
 	
 	
-	fn get_chars(&self, report: &mut Report, filename: &str) -> Result<Vec<char>, ()>
+	fn get_chars(&self, report: &mut Report, filename: &str, span: Option<&Span>) -> Result<Vec<char>, ()>
 	{
-		let bytes = self.get_bytes(report, filename)?;
+		let bytes = self.get_bytes(report, filename, span)?;
 		
 		Ok(String::from_utf8_lossy(&bytes).chars().collect())
 	}
@@ -43,11 +43,20 @@ impl FileServerMock
 
 impl FileServer for FileServerMock
 {
-	fn get_bytes(&self, report: &mut Report, filename: &str) -> Result<Vec<u8>, ()>
+	fn get_bytes(&self, report: &mut Report, filename: &str, span: Option<&Span>) -> Result<Vec<u8>, ()>
 	{
 		match self.files.get(filename)
 		{
-			None => Err(report.error(format!("file not found: `{}`", filename))),
+			None =>
+			{
+				let descr = format!("file not found: `{}`", filename);
+				if let Some(span) = span
+					{ report.error_span(descr, span); }
+				else
+					{ report.error(descr); }
+					
+				Err(())
+			}
 			Some(bytes) => Ok(bytes.clone())
 		}
 	}
