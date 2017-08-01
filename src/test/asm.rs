@@ -162,7 +162,6 @@ fn test_outp_directive()
 	test("halt -> 8'0x12, pc[7:0]", "#outp 0x00 \n halt \n halt \n #outp 0x10 \n halt \n halt", Pass((4, "1200120200000000000000000000000012041206")));
 	
 	test("halt -> 8'0x12", "#outp 0xffff_ffff_ffff_ffff",           Pass((4, "")));
-	test("halt -> 8'0x12", "#outp 0xffff_ffff_ffff_ffff   \n halt", Fail(("asm", 2, "overflow")));
 	test("halt -> 8'0x12", "#outp 0x1_0000_0000_0000_0000 \n halt", Fail(("asm", 1, "large")));
 }
 
@@ -179,6 +178,94 @@ fn test_res_directive()
 	test("halt -> 8'0x12, pc[7:0]", "#res 1 \n halt", Pass((4, "001201")));
 	test("halt -> 8'0x12, pc[7:0]", "#res 2 \n halt", Pass((4, "00001202")));
 	test("halt -> 8'0x12, pc[7:0]", "#res 4 \n halt", Pass((4, "000000001204")));
+}
+
+
+#[test]
+fn test_data_directive()
+{
+	test("", "#d8 0",     Pass((4, "00")));
+	test("", "#d8 0xff",  Pass((4, "ff")));
+	test("", "#d8 -1",    Pass((4, "ff")));
+	test("", "#d8 0x80",  Pass((4, "80")));
+	test("", "#d8 -0x7f", Pass((4, "81")));
+	test("", "#d8 -0x80", Pass((4, "80")));
+	test("", "#d8 1 + 1", Pass((4, "02")));
+	test("", "#d8 pc",    Pass((4, "00")));
+	
+	test("", "#d8 0x1ff[7:0]", Pass((4, "ff")));
+	test("", "#d8 -0x81[7:0]", Pass((4, "7f")));
+	
+	test("", "#d16 0",       Pass((4, "0000")));
+	test("", "#d16 0xffff",  Pass((4, "ffff")));
+	test("", "#d16 -1",      Pass((4, "ffff")));
+	test("", "#d16 0x8000",  Pass((4, "8000")));
+	test("", "#d16 -0x7fff", Pass((4, "8001")));
+	test("", "#d16 -0x8000", Pass((4, "8000")));
+	test("", "#d16 1 + 1",   Pass((4, "0002")));
+	test("", "#d16 pc",      Pass((4, "0000")));
+	
+	test("", "#d16 0x1ffff[15:0]", Pass((4, "ffff")));
+	test("", "#d16 -0x8001[15:0]", Pass((4, "7fff")));
+	
+	test("#align 3", "#d3 0",      Pass((1, "000")));
+	test("#align 3", "#d3 0b111",  Pass((1, "111")));
+	test("#align 3", "#d3 -1",     Pass((1, "111")));
+	test("#align 3", "#d3 0b100",  Pass((1, "100")));
+	test("#align 3", "#d3 -0b011", Pass((1, "101")));
+	test("#align 3", "#d3 -0b100", Pass((1, "100")));
+	test("#align 3", "#d3 1 + 1",  Pass((1, "010")));
+	test("#align 3", "#d3 pc",     Pass((1, "000")));
+	
+	test("", "#d8 1,    2,    3", Pass((4, "010203")));
+	test("", "#d8 1, \n 2, \n 3", Pass((4, "010203")));
+	
+	test("", "#d16  1,  2,  3", Pass((4, "000100020003")));
+	test("", "#d16 -1, -2, -3", Pass((4, "fffffffefffd")));
+	test("", "#d32  1,  2,  3", Pass((4, "000000010000000200000003")));
+	test("", "#d32 -1, -2, -3", Pass((4, "fffffffffffffffefffffffd")));
+	
+	test("#align 1", "#d1 1, 0, 1, -1", Pass((1, "1011")));
+	test("#align 2", "#d2 1, 2, 3, -1", Pass((1, "01101111")));
+	test("#align 3", "#d3 1, 2, 3, -1", Pass((1, "001010011111")));
+	test("#align 5", "#d5 1, 2, 3, -1", Pass((1, "00001000100001111111")));
+	test("#align 7", "#d7 1, 2, 3, -1", Pass((1, "0000001000001000000111111111")));
+	test("#align 9", "#d9 1, 2, 3, -1", Pass((1, "000000001000000010000000011111111111")));
+	
+	test("", "#d8  x \n  x =  0x12", Pass((4, "12")));
+	test("", "#d8  x \n  x = 0x100", Fail(("asm", 1, "large")));
+	test("", "#d8  x \n  x = -0x81", Fail(("asm", 1, "large")));
+	test("", "#d8  x",               Fail(("asm", 1, "unknown")));
+	test("", "#d8 .x \n .x =  0x12", Pass((4, "12")));
+	test("", "#d8 .x \n .x = 0x100", Fail(("asm", 1, "large")));
+	test("", "#d8 .x \n .x = -0x81", Fail(("asm", 1, "large")));
+	test("", "#d8 .x",               Fail(("asm", 1, "unknown")));
+	
+	test("", "              #d8 x + pc \n #addr 0x55 \n x = 0x11", Pass((4, "11")));
+	test("", "#addr 0x55 \n #d8 x + pc \n               x = 0x11", Pass((4, "66")));
+	
+	test("", "#d8 0x100", Fail(("asm", 1, "large")));
+	test("", "#d8 -0x81", Fail(("asm", 1, "large")));
+	
+	test("", "#d16 0x10000", Fail(("asm", 1, "large")));
+	test("", "#d16 -0x8001", Fail(("asm", 1, "large")));
+	
+	test("#align 1", "#d1 2",  Fail(("asm", 1, "large")));
+	test("#align 1", "#d1 -2", Fail(("asm", 1, "large")));
+	
+	test("", "#d1 0", Fail(("asm", 1, "align")));
+	test("", "#d2 0", Fail(("asm", 1, "align")));
+	test("", "#d3 0", Fail(("asm", 1, "align")));
+	test("", "#d4 0", Fail(("asm", 1, "align")));
+	test("", "#d5 0", Fail(("asm", 1, "align")));
+	test("", "#d6 0", Fail(("asm", 1, "align")));
+	test("", "#d7 0", Fail(("asm", 1, "align")));
+	test("", "#d9 0", Fail(("asm", 1, "align")));
+	
+	test("", "#d0    0",      Fail(("asm", 1, "invalid")));
+	test("", "#d16y  0xffff", Fail(("asm", 1, "unknown")));
+	test("", "#da16  0xffff", Fail(("asm", 1, "unknown")));
+	test("", "#d0x10 0xffff", Fail(("asm", 1, "unknown")));
 }
 
 
@@ -335,7 +422,7 @@ fn test_include_directive()
 		
 	static MAIN5: &'static str ="
 		#include \"C:\\invalid\"";
-			
+	
 	let mut fileserver = FileServerMock::new();
 	fileserver.add("instrset", INSTRSET);
 	fileserver.add("main1", MAIN1);

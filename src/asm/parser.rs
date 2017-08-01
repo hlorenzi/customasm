@@ -2,7 +2,7 @@ use diagn::{Span, Report};
 use syntax::{Token, TokenKind, tokenize, Parser};
 use syntax::excerpt_as_string_contents;
 use expr::{Expression, ExpressionValue};
-use asm::{AssemblerState, ParsedInstruction, ExpressionContext};
+use asm::{AssemblerState, ParsedInstruction, ParsedExpression, ExpressionContext};
 use util::filename_navigate;
 use num::BigInt;
 use num::ToPrimitive;
@@ -83,6 +83,12 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let tk_name = self.parser.expect(TokenKind::Identifier)?;
 		let name = tk_name.excerpt.clone().unwrap();
 		
+		if name.chars().next() == Some('d')
+		{
+			if let Ok(size) = usize::from_str_radix(&name[1..], 10)
+				{ return self.parse_directive_data(size, &tk_name); }
+		}
+		
 		match name.as_ref()
 		{
 			"addr"    => self.parse_directive_addr(),
@@ -123,6 +129,41 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
 		
 		AssemblerParser::parse_file(self.parser.report, self.state, new_filename, Some(&tk_filename.span))
+	}
+	
+	
+	fn parse_directive_data(&mut self, elem_size: usize, tk_name: &Token) -> Result<(), ()>
+	{
+		if elem_size == 0
+			{ return Err(self.parser.report.error_span("invalid element size", &tk_name.span)); }
+			
+		if elem_size % self.state.instrset.align != 0
+			{ return Err(self.parser.report.error_span("element size does not align with a word boundary", &tk_name.span)); }
+			
+		let elem_bytes = elem_size / self.state.instrset.align;
+		
+		loop
+		{
+			let ctx = self.state.get_cur_context();
+			let expr = Expression::parse(&mut self.parser)?;
+			let span = expr.span();
+			
+			let parsed_expr = ParsedExpression
+			{
+				ctx: ctx,
+				size_bytes: elem_bytes,
+				expr: expr
+			};
+			
+			self.state.parsed_exprs.push(parsed_expr);
+			
+			self.state.output_zeroes(self.parser.report, elem_bytes, &span)?;
+			
+			if self.parser.maybe_expect(TokenKind::Comma).is_none()
+				{ break; }
+		}
+		
+		Ok(())
 	}
 	
 	
@@ -228,7 +269,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let rule = &self.state.instrset.rules[instr_match.rule_indices[best_match]];
 		
 		let instr_width = rule.production_width() / self.state.instrset.align;
-		self.state.output_advance(self.parser.report, instr_width, &instr_span)?;
+		self.state.output_zeroes(self.parser.report, instr_width, &instr_span)?;
 		
 		let parsed_instr = ParsedInstruction
 		{

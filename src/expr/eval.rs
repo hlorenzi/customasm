@@ -122,6 +122,17 @@ impl Expression
 
 impl ExpressionValue
 {
+	pub fn bits(&self) -> usize
+	{
+		match self
+		{
+			&ExpressionValue::Integer(ref bigint) => bigint_bits(&bigint),
+			
+			_ => panic!("not an integer")
+		}
+	}
+	
+
 	pub fn get_bit(&self, index: usize) -> bool
 	{
 		match self
@@ -149,6 +160,21 @@ impl ExpressionValue
 			_ => panic!("not an integer")
 		}
 	}
+}
+
+
+fn bigint_bits(x: &BigInt) -> usize
+{
+	if x.is_zero()
+		{ return 1; }
+
+	if x < &BigInt::zero()
+	{
+		let y: BigInt = x + 1;
+		y.bits() + 1
+	}
+	else
+		{ x.bits() }
 }
 
 

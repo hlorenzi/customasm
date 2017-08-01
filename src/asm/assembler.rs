@@ -14,10 +14,19 @@ pub struct AssemblerState<'a>
 	pub pattern_matcher: RulePatternMatcher,
 	pub labels: LabelManager,
 	pub parsed_instrs: Vec<ParsedInstruction>,
+	pub parsed_exprs: Vec<ParsedExpression>,
 	pub bin_output: BinaryOutput,
 	
 	pub cur_address: usize,
 	pub cur_writehead: usize
+}
+
+
+pub struct ExpressionContext
+{
+	pub label_ctx: LabelContext,
+	pub address: usize,
+	pub writehead: usize
 }
 
 
@@ -31,11 +40,11 @@ pub struct ParsedInstruction
 }
 
 
-pub struct ExpressionContext
+pub struct ParsedExpression
 {
-	pub label_ctx: LabelContext,
-	pub address: usize,
-	pub writehead: usize
+	pub ctx: ExpressionContext,
+	pub size_bytes: usize,
+	pub expr: Expression
 }
 
 
@@ -51,6 +60,7 @@ where S: Into<String>
 		pattern_matcher: pattern_matcher,
 		labels: LabelManager::new(),
 		parsed_instrs: Vec::new(),
+		parsed_exprs: Vec::new(),
 		bin_output: BinaryOutput::new(),
 		
 		cur_address: 0,
@@ -59,6 +69,7 @@ where S: Into<String>
 	
 	AssemblerParser::parse_file(report, &mut state, filename, None)?;
 	state.resolve_instrs(report)?;
+	state.resolve_exprs(report)?;
 	
 	match report.has_errors()
 	{
@@ -80,6 +91,7 @@ impl<'a> AssemblerState<'a>
 		}
 	}
 
+	
 	pub fn resolve_instrs(&mut self, report: &mut Report) -> Result<(), ()>
 	{
 		use std::mem;
@@ -93,6 +105,24 @@ impl<'a> AssemblerState<'a>
 		}
 		
 		mem::replace(&mut self.parsed_instrs, instrs);
+		
+		Ok(())
+	}
+	
+
+	pub fn resolve_exprs(&mut self, report: &mut Report) -> Result<(), ()>
+	{
+		use std::mem;
+		
+		let exprs = mem::replace(&mut self.parsed_exprs, Vec::new());
+		
+		for expr in &exprs
+		{
+			// Errors go to the report.
+			let _ = self.output_expr(report, expr);
+		}
+		
+		mem::replace(&mut self.parsed_exprs, exprs);
 		
 		Ok(())
 	}
@@ -160,6 +190,35 @@ impl<'a> AssemblerState<'a>
 				self.bin_output.write(output_bit_index, bit);
 				output_bit_index += 1;
 			}
+		}
+		
+		Ok(())
+	}
+	
+	
+	pub fn output_expr(&mut self, report: &mut Report, expr: &ParsedExpression) -> Result<(), ()>
+	{
+		// Resolve expression.
+		let value = self.expr_eval(report, &expr.ctx, &expr.expr)?;
+		
+		// Check size constraints.
+		let size_bits = value.bits();
+		let max_bits = expr.size_bytes * self.instrset.align;
+		
+		if size_bits > max_bits
+		{
+			let descr = format!("value (width = {}) is larger than the specified size; use a bit slice", size_bits);
+			return Err(report.error_span(descr, &expr.expr.span()));
+		}
+		
+		// Output binary representation.
+		let mut output_bit_index = expr.ctx.writehead * self.instrset.align;
+		
+		for index in 0..max_bits
+		{
+			let bit = value.get_bit(max_bits - index - 1);
+			self.bin_output.write(output_bit_index, bit);
+			output_bit_index += 1;
 		}
 		
 		Ok(())
