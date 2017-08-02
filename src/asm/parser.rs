@@ -91,10 +91,13 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		
 		match name.as_ref()
 		{
-			"addr"    => self.parse_directive_addr(),
-			"outp"    => self.parse_directive_outp(),
-			"res"     => self.parse_directive_res(&tk_name),
-			"include" => self.parse_directive_include(),
+			"addr"      => self.parse_directive_addr(),
+			"outp"      => self.parse_directive_outp(),
+			"res"       => self.parse_directive_res(&tk_name),
+			"include"   => self.parse_directive_include(),
+			"incbin"    => self.parse_directive_incbin(),
+			"incbinstr" => self.parse_directive_incbinstr(),
+			"inchexstr" => self.parse_directive_inchexstr(),
 			_ => Err(self.parser.report.error_span("unknown directive", &tk_name.span))
 		}
 	}
@@ -129,6 +132,51 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
 		
 		AssemblerParser::parse_file(self.parser.report, self.state, new_filename, Some(&tk_filename.span))
+	}
+	
+	
+	fn parse_directive_incbin(&mut self) -> Result<(), ()>
+	{
+		let tk_filename = self.parser.expect(TokenKind::String)?;
+		let filename = excerpt_as_string_contents(tk_filename.excerpt.as_ref().unwrap().as_ref());
+		
+		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
+		
+		let bytes = self.state.fileserver.get_bytes(self.parser.report, &new_filename, Some(&tk_filename.span))?;
+		
+		let unaligned_bits = bytes.len() * 8 % self.state.instrset.align;
+		if unaligned_bits != 0
+			{ return Err(self.parser.report.error_span(format!("binary file length does not align with a word boundary (excess bits = {})", unaligned_bits), &tk_filename.span)); }
+		
+		let writehead = self.state.cur_writehead;
+		let size_bytes = bytes.len() / self.state.instrset.align;
+		self.state.output_advance(self.parser.report, size_bytes, &tk_filename.span)?;
+		
+		let mut output_bit_index = writehead * self.state.instrset.align;
+		for mut byte in bytes
+		{
+			for _ in 0..8
+			{
+				let bit = byte & 0x80 == 0x80;
+				self.state.bin_output.write(output_bit_index, bit);
+				output_bit_index += 1;
+				byte <<= 1;
+			}
+		}
+		
+		Ok(())
+	}
+	
+	
+	fn parse_directive_incbinstr(&mut self) -> Result<(), ()>
+	{
+		unimplemented!()
+	}
+	
+	
+	fn parse_directive_inchexstr(&mut self) -> Result<(), ()>
+	{
+		unimplemented!()
 	}
 	
 	

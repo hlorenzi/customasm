@@ -440,3 +440,58 @@ fn test_include_directive()
 	test_fileserver(&fileserver, "instrset", "main4", Fail(("main4", 2, "invalid")));
 	test_fileserver(&fileserver, "instrset", "main5", Fail(("main5", 2, "invalid")));
 }
+
+
+#[test]
+fn test_incbin_directive()
+{
+	static INSTRSET1: &'static str = "";
+
+	static INSTRSET2: &'static str = "#align 5";
+	
+	static INSTRSET3: &'static str = "#align 32";
+	
+	static MAIN1: &'static str = "#incbin \"binary1\"";
+
+	static MAIN2: &'static str = "#incbin \"binary2\"";
+
+	static MAIN3: &'static str = "#incbin \"binary3\"";
+		
+	static MAIN4: &'static str = "#incbin \"unknown\"";
+	
+	static MAIN5: &'static str = "#incbin \"../invalid\"";
+	
+	static BINARY1: &'static str = "\x12\x34\x56\x78";
+	
+	static BINARY2: &'static str = "testing!!!";
+	
+	static BINARY3: &'static str = "\u{80}\u{ff}\u{5927}";
+	
+	let mut fileserver = FileServerMock::new();
+	fileserver.add("instrset1", INSTRSET1);
+	fileserver.add("instrset2", INSTRSET2);
+	fileserver.add("instrset3", INSTRSET3);
+	fileserver.add("main1", MAIN1);
+	fileserver.add("main2", MAIN2);
+	fileserver.add("main3", MAIN3);
+	fileserver.add("main4", MAIN4);
+	fileserver.add("main5", MAIN5);
+	fileserver.add("binary1", BINARY1);
+	fileserver.add("binary2", BINARY2);
+	fileserver.add("binary3", BINARY3);
+	
+	test_fileserver(&fileserver, "instrset1", "main1", Pass((4, "12345678")));
+	test_fileserver(&fileserver, "instrset1", "main2", Pass((4, "74657374696e67212121")));
+	test_fileserver(&fileserver, "instrset1", "main3", Pass((4, "c280c3bfe5a4a7")));
+	
+	test_fileserver(&fileserver, "instrset2", "main1", Fail(("main1", 1, "align")));
+	test_fileserver(&fileserver, "instrset2", "main2", Pass((4, "74657374696e67212121")));
+	test_fileserver(&fileserver, "instrset2", "main3", Fail(("main3", 1, "align")));
+	
+	test_fileserver(&fileserver, "instrset3", "main1", Pass((4, "12345678")));
+	test_fileserver(&fileserver, "instrset3", "main2", Fail(("main2", 1, "align")));
+	test_fileserver(&fileserver, "instrset3", "main3", Fail(("main3", 1, "align")));
+	
+	test_fileserver(&fileserver, "instrset1", "main4", Fail(("main4", 1, "not found")));
+	test_fileserver(&fileserver, "instrset1", "main5", Fail(("main5", 1, "invalid")));
+}
