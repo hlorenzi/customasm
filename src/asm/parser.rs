@@ -96,8 +96,8 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			"res"       => self.parse_directive_res(&tk_name),
 			"include"   => self.parse_directive_include(),
 			"incbin"    => self.parse_directive_incbin(),
-			"incbinstr" => self.parse_directive_incbinstr(),
-			"inchexstr" => self.parse_directive_inchexstr(),
+			"incbinstr" => self.parse_directive_incstr(1),
+			"inchexstr" => self.parse_directive_incstr(4),
 			_ => Err(self.parser.report.error_span("unknown directive", &tk_name.span))
 		}
 	}
@@ -143,21 +143,22 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
 		
 		let bytes = self.state.fileserver.get_bytes(self.parser.report, &new_filename, Some(&tk_filename.span))?;
+		let size_bits = bytes.len() * 8;
 		
-		let unaligned_bits = bytes.len() * 8 % self.state.instrset.align;
+		let unaligned_bits = size_bits % self.state.instrset.align;
 		if unaligned_bits != 0
 			{ return Err(self.parser.report.error_span(format!("binary file length does not align with a word boundary (excess bits = {})", unaligned_bits), &tk_filename.span)); }
 		
 		let writehead = self.state.cur_writehead;
-		let size_bytes = bytes.len() / self.state.instrset.align;
-		self.state.output_advance(self.parser.report, size_bytes, &tk_filename.span)?;
+		let size_bytes = size_bits / self.state.instrset.align;
+		self.state.output_zeroes(self.parser.report, size_bytes, &tk_filename.span)?;
 		
 		let mut output_bit_index = writehead * self.state.instrset.align;
 		for mut byte in bytes
 		{
 			for _ in 0..8
 			{
-				let bit = byte & 0x80 == 0x80;
+				let bit = byte & 0x80 != 0;
 				self.state.bin_output.write(output_bit_index, bit);
 				output_bit_index += 1;
 				byte <<= 1;
@@ -168,15 +169,43 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	}
 	
 	
-	fn parse_directive_incbinstr(&mut self) -> Result<(), ()>
+	fn parse_directive_incstr(&mut self, bits_per_char: usize) -> Result<(), ()>
 	{
-		unimplemented!()
-	}
-	
-	
-	fn parse_directive_inchexstr(&mut self) -> Result<(), ()>
-	{
-		unimplemented!()
+		let tk_filename = self.parser.expect(TokenKind::String)?;
+		let filename = excerpt_as_string_contents(tk_filename.excerpt.as_ref().unwrap().as_ref());
+		
+		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
+		
+		let chars = self.state.fileserver.get_chars(self.parser.report, &new_filename, Some(&tk_filename.span))?;
+		let size_bits = chars.len() * bits_per_char;
+		
+		let unaligned_bits = size_bits % self.state.instrset.align;
+		if unaligned_bits != 0
+			{ return Err(self.parser.report.error_span(format!("interpreted file length does not align with a word boundary (excess bits = {})", unaligned_bits), &tk_filename.span)); }
+		
+		let writehead = self.state.cur_writehead;
+		let size_bytes = size_bits / self.state.instrset.align;
+		self.state.output_zeroes(self.parser.report, size_bytes, &tk_filename.span)?;
+		
+		let mut output_bit_index = writehead * self.state.instrset.align;
+		for c in chars
+		{
+			let mut digit = match c.to_digit(1 << bits_per_char)
+			{
+				Some(digit) => digit,
+				None => return Err(self.parser.report.error_span("invalid character in file contents", &tk_filename.span))
+			};
+			
+			for _ in 0..bits_per_char
+			{
+				let bit = digit & (1 << (bits_per_char - 1)) != 0;
+				self.state.bin_output.write(output_bit_index, bit);
+				output_bit_index += 1;
+				digit <<= 1;
+			}
+		}
+		
+		Ok(())
 	}
 	
 	
