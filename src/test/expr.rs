@@ -216,6 +216,21 @@ fn test_ops_slice()
 
 
 #[test]
+fn test_ops_concat()
+{
+	test("8'0     @ 8'0",     Pass(ExpressionValue::Integer(BigInt::from(0))));
+	test("8'0x12  @ 8'0x34",  Pass(ExpressionValue::Integer(BigInt::from(0x1234))));
+	test("16'0x12 @ 16'0x34", Pass(ExpressionValue::Integer(BigInt::from(0x120034))));
+	
+	test("(6 + 6)[3:0] @ (5 + 5)[3:0]", Pass(ExpressionValue::Integer(BigInt::from(0xca))));
+	
+	test("  0 @   0", Fail(("test", 1, "concatenation")));
+	test("8'0 @   0", Fail(("test", 1, "concatenation")));
+	test("  0 @ 8'0", Fail(("test", 1, "concatenation")));
+}
+
+
+#[test]
 fn test_ops_relational_int()
 {
 	test("0 == 0", Pass(ExpressionValue::Bool(true)));
@@ -312,6 +327,8 @@ fn test_ops_type_errors()
 	test("(1 == 1) + (1 == 1)", Fail(("test", 1, "argument")));
 	
 	test("-(1 == 1)", Fail(("test", 1, "argument")));
+	
+	test("(1 == 1) @ (1 == 1)", Fail(("test", 1, "argument")));
 }
 
 

@@ -1,5 +1,6 @@
+use diagn::Span;
 use syntax::{Token, TokenKind};
-use expr::Expression;
+use expr::{Expression, ExpressionValue};
 
 
 #[derive(Debug)]
@@ -8,7 +9,7 @@ pub struct Rule
 	pub pattern_parts: Vec<RulePatternPart>,
 	pub params: Vec<RuleParameter>,
 	pub constraints: Vec<RuleConstraint>,
-	pub production_parts: Vec<Expression>
+	pub production: Expression
 }
 
 
@@ -44,7 +45,7 @@ impl Rule
 			pattern_parts: Vec::new(),
 			params: Vec::new(),
 			constraints: Vec::new(),
-			production_parts: Vec::new()
+			production: Expression::Literal(Span::new_dummy(), ExpressionValue::Bool(false))
 		}
 	}
 	
@@ -98,16 +99,5 @@ impl Rule
 		};
 		
 		self.constraints.push(constr);
-	}
-	
-	
-	pub fn production_width(&self) -> usize
-	{
-		let mut width = 0;
-		
-		for expr in &self.production_parts
-			{ width += expr.width().unwrap(); }
-			
-		width
 	}
 }

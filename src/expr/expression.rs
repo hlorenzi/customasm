@@ -48,7 +48,9 @@ pub enum BinaryOp
 	Lt, Le,
 	Gt, Ge,
 	
-	LazyAnd, LazyOr
+	LazyAnd, LazyOr,
+	
+	Concat
 }
 
 

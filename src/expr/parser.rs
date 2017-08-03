@@ -31,7 +31,7 @@ impl<'a, 't> ExpressionParser<'a, 't>
 	
 	pub fn parse_expr(&mut self) -> Result<Expression, ()>
 	{
-		self.parse_lazy_or()
+		self.parse_concat()
 	}
 	
 	
@@ -86,6 +86,16 @@ impl<'a, 't> ExpressionParser<'a, 't>
 		}
 		
 		Ok(lhs)
+	}
+	
+	
+	fn parse_concat(&mut self) -> Result<Expression, ()>
+	{
+		self.parse_binary_ops(
+			&[
+				(TokenKind::At, BinaryOp::Concat)
+			],
+			|s| s.parse_lazy_or())
 	}
 	
 	

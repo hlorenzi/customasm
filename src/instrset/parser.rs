@@ -210,34 +210,23 @@ impl<'t> InstrSetParser<'t>
 
 	fn parse_rule_production(&mut self, rule: &mut Rule) -> Result<(), ()>
 	{
-		let mut total_span = self.parser.next().span;
-		let mut total_width = 0;
+		let expr = Expression::parse(&mut self.parser)?;
 		
-		loop
+		expr.check_vars(&mut |name, span| expr_check_var(self.parser.report, rule, name, span))?;
+		
+		if expr.eval_type(self.parser.report, &|name| expr_get_var_type(rule, name))? != ExpressionType::Integer
+			{ return Err(self.parser.report.error_span("expected integer expression for production", &expr.span())) }
+		
+		let width = match expr.width()
 		{
-			let expr = Expression::parse(&mut self.parser)?;
-			
-			expr.check_vars(&mut |name, span| expr_check_var(self.parser.report, rule, name, span))?;
-			
-			if expr.eval_type(self.parser.report, &|name| expr_get_var_type(rule, name))? != ExpressionType::Integer
-				{ return Err(self.parser.report.error_span("expected integer expression for production", &expr.span())) }
-				
-			match expr.width()
-			{
-				Some(w) => total_width += w,
-				None => return Err(self.parser.report.error_span("width of expression not known; use a bit slice", &expr.span()))
-			}
-			
-			total_span = total_span.join(&expr.span());
-			
-			rule.production_parts.push(expr);
-			
-			if self.parser.maybe_expect(TokenKind::Comma).is_none()
-				{ break; }
-		}
+			Some(w) => w,
+			None => return Err(self.parser.report.error_span("width of expression not known; use bit slices", &expr.span()))
+		};
 		
-		if total_width % self.instrset.align != 0
-			{ return Err(self.parser.report.error_span(format!("production (width = {}) does not align with a word boundary", total_width), &total_span)); }
+		if width % self.instrset.align != 0
+			{ return Err(self.parser.report.error_span(format!("production (width = {}) does not align with a word boundary", width), &expr.span())); }
+		
+		rule.production = expr;
 		
 		Ok(())
 	}

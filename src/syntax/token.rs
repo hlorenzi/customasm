@@ -45,6 +45,7 @@ pub enum TokenKind
 	VerticalBar,
 	Circumflex,
 	Tilde,
+	At,
 	AmpersandAmpersand,
 	VerticalBarVerticalBar,
 	EqualEqual,
@@ -98,6 +99,7 @@ impl TokenKind
 		self == TokenKind::VerticalBar ||
 		self == TokenKind::Circumflex ||
 		self == TokenKind::Tilde ||
+		self == TokenKind::At ||
 		self == TokenKind::LessThan ||
 		self == TokenKind::GreaterThan
 	}
@@ -146,6 +148,7 @@ impl TokenKind
 			TokenKind::VerticalBar => "`|`",
 			TokenKind::Circumflex => "`^`",
 			TokenKind::Tilde => "`~`",
+			TokenKind::At => "`@`",
 			TokenKind::AmpersandAmpersand => "`&&`",
 			TokenKind::VerticalBarVerticalBar => "`||`",
 			TokenKind::EqualEqual => "`==`",
@@ -303,7 +306,7 @@ fn check_for_string(src: &[char]) -> Option<(TokenKind, usize)>
 
 fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 {
-	static OPERATORS: [(&str, TokenKind); 35] =
+	static POSSIBLE_TOKENS: [(&str, TokenKind); 36] =
 	[
 		("\n",  TokenKind::LineBreak),
 		("(",   TokenKind::ParenOpen),
@@ -325,6 +328,7 @@ fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 		("%",   TokenKind::Percent),
 		("^",   TokenKind::Circumflex),
 		("~",   TokenKind::Tilde),
+		("@",   TokenKind::At),
 		("&&",  TokenKind::AmpersandAmpersand),
 		("&",   TokenKind::Ampersand),
 		("||",  TokenKind::VerticalBarVerticalBar),
@@ -342,7 +346,7 @@ fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 		(">",   TokenKind::GreaterThan)
 	];
 	
-	let maybe_match = OPERATORS.iter().find(|op|
+	let maybe_match = POSSIBLE_TOKENS.iter().find(|op|
 	{
 		for (i, c) in op.0.chars().enumerate()
 		{

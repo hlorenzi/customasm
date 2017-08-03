@@ -84,6 +84,17 @@ impl Expression
 							BinaryOp::Le   => Ok(ExpressionValue::Bool(lhs <= rhs)),
 							BinaryOp::Gt   => Ok(ExpressionValue::Bool(lhs >  rhs)),
 							BinaryOp::Ge   => Ok(ExpressionValue::Bool(lhs >= rhs)),
+							
+							BinaryOp::Concat =>
+							{
+								match (lhs_expr.width(), rhs_expr.width())
+								{
+									(Some(lhs_width), Some(rhs_width)) => Ok(ExpressionValue::Integer(bigint_concat(lhs, lhs_width, rhs, rhs_width))),
+									(None, _) => Err(report.error_span("argument to concatenation with no known width", &lhs_expr.span())),
+									(_, None) => Err(report.error_span("argument to concatenation with no known width", &rhs_expr.span()))
+								}							
+							}
+
 							_ => unreachable!()
 						}
 					}
@@ -206,6 +217,12 @@ fn bigint_shr(lhs: BigInt, rhs: BigInt) -> Option<BigInt>
 			else
 				{ Some(result) }
 	}
+}
+
+
+fn bigint_concat(lhs: BigInt, _lhs_width: usize, rhs: BigInt, rhs_width: usize) -> BigInt
+{
+	bigint_or(lhs << rhs_width, rhs)
 }
 
 

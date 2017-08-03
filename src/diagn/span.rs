@@ -21,6 +21,16 @@ impl Span
 	}
 	
 	
+	pub fn new_dummy() -> Span
+	{
+		Span
+		{
+			file: Rc::new("".to_string()),
+			location: None
+		}
+	}
+	
+	
 	pub fn before(&self) -> Span
 	{
 		if self.location.is_none()

@@ -178,18 +178,15 @@ impl<'a> AssemblerState<'a>
 		self.rule_check_all_constraints_satisfied(report, rule, &get_arg, &instr.ctx, &instr.span)?;
 		
 		// Output binary representation.
+		let (left, right) = rule.production.slice().unwrap();
+		let value = self.rule_expr_eval(report, rule, &get_arg, &instr.ctx, &rule.production)?;
+		
 		let mut output_bit_index = instr.ctx.writehead * self.instrset.align;
-		for part in &rule.production_parts
+		for index in 0..(left - right + 1)
 		{
-			let (left, right) = part.slice().unwrap();
-			let value = self.rule_expr_eval(report, rule, &get_arg, &instr.ctx, &part)?;
-			
-			for index in 0..(left - right + 1)
-			{
-				let bit = value.get_bit(left - right - index);
-				self.bin_output.write(output_bit_index, bit);
-				output_bit_index += 1;
-			}
+			let bit = value.get_bit(left - right - index);
+			self.bin_output.write(output_bit_index, bit);
+			output_bit_index += 1;
 		}
 		
 		Ok(())

@@ -48,10 +48,10 @@ fn test_simple()
 	test("",            "", Pass((1, "")));
 	test("halt -> 8'0", "", Pass((1, "")));
 	
-	test("halt -> 8'0",            "halt", Pass((4, "00")));
-	test("halt -> 16'0x1234",      "halt", Pass((4, "1234")));
-	test("halt -> 8'0x12, 8'0x34", "halt", Pass((4, "1234")));
-	test("halt -> 4'0xa,  4'0xb",  "halt", Pass((4, "ab")));
+	test("halt -> 8'0",             "halt", Pass((4, "00")));
+	test("halt -> 16'0x1234",       "halt", Pass((4, "1234")));
+	test("halt -> 8'0x12 @ 8'0x34", "halt", Pass((4, "1234")));
+	test("halt -> 4'0xa  @ 4'0xb",  "halt", Pass((4, "ab")));
 	
 	test("halt -> (1 + 1)[7:0]", "halt", Pass((4, "02")));
 	test("halt -> pc[7:0]",      "halt", Pass((4, "00")));
@@ -76,36 +76,36 @@ fn test_simple()
 #[test]
 fn test_parameters()
 {
-	test("load {a} -> 8'0x12, a[7:0]",         "load 0x34", Pass((4, "1234")));
-	test("load {a} -> 8'0x12, a[7:0]",         "load pc",   Pass((4, "1200")));
-	test("load {a} -> 8'0x12, a[3:0], a[7:4]", "load 0x34", Pass((4, "1243")));
-	test("load {a} -> 8'0x12, a[15:0]",        "load 0x34", Pass((4, "120034")));
+	test("load {a} -> 8'0x12 @ a[7:0]",          "load 0x34", Pass((4, "1234")));
+	test("load {a} -> 8'0x12 @ a[7:0]",          "load pc",   Pass((4, "1200")));
+	test("load {a} -> 8'0x12 @ a[3:0] @ a[7:4]", "load 0x34", Pass((4, "1243")));
+	test("load {a} -> 8'0x12 @ a[15:0]",         "load 0x34", Pass((4, "120034")));
 	
-	test("load {a}, {b} -> 8'0x12, a[7:0], b[7:0]", "load 0x34, 0x56", Pass((4, "123456")));
-	test("load {a}, {b} -> 8'0x12, b[7:0], a[7:0]", "load 0x34, 0x56", Pass((4, "125634")));
+	test("load {a}, {b} -> 8'0x12 @ a[7:0] @ b[7:0]", "load 0x34, 0x56", Pass((4, "123456")));
+	test("load {a}, {b} -> 8'0x12 @ b[7:0] @ a[7:0]", "load 0x34, 0x56", Pass((4, "125634")));
 	
-	test("load {a}      -> 8'0x12, (a +  0x22)[7:0]", "load 0x34",       Pass((4, "1256")));
-	test("load {a}      -> 8'0x12, (a + 0xf22)[7:0]", "load 0x34",       Pass((4, "1256")));
-	test("load {a}, {b} -> 8'0x12, (a + b)[7:0]",     "load 0x34, 0x56", Pass((4, "128a")));
+	test("load {a}      -> 8'0x12 @ (a +  0x22)[7:0]", "load 0x34",       Pass((4, "1256")));
+	test("load {a}      -> 8'0x12 @ (a + 0xf22)[7:0]", "load 0x34",       Pass((4, "1256")));
+	test("load {a}, {b} -> 8'0x12 @ (a + b)[7:0]",     "load 0x34, 0x56", Pass((4, "128a")));
 	
-	test("load {a} -> 8'0x12, a[7:0]", "load 1 == 1", Fail(("asm", 1, "integer")));
-	test("load {a} -> 8'0x12, a[7:0]", "load",        Fail(("asm", 1, "no match")));
-	test("load {a} -> 8'0x12, a[7:0]", "load 1, 2",   Fail(("asm", 1, "no match")));
-	test("load {a} -> 8'0x12, a[7:0]", "load a",      Fail(("asm", 1, "unknown")));
+	test("load {a} -> 8'0x12 @ a[7:0]", "load 1 == 1", Fail(("asm", 1, "integer")));
+	test("load {a} -> 8'0x12 @ a[7:0]", "load",        Fail(("asm", 1, "no match")));
+	test("load {a} -> 8'0x12 @ a[7:0]", "load 1, 2",   Fail(("asm", 1, "no match")));
+	test("load {a} -> 8'0x12 @ a[7:0]", "load a",      Fail(("asm", 1, "unknown")));
 	
-	test("load {a}, {b} -> 8'0x12, a[7:0], b[7:0]", "load 1",       Fail(("asm", 1, "no match")));
-	test("load {a}, {b} -> 8'0x12, a[7:0], b[7:0]", "load 1, 2, 3", Fail(("asm", 1, "no match")));
+	test("load {a}, {b} -> 8'0x12 @ a[7:0] @ b[7:0]", "load 1",       Fail(("asm", 1, "no match")));
+	test("load {a}, {b} -> 8'0x12 @ a[7:0] @ b[7:0]", "load 1, 2, 3", Fail(("asm", 1, "no match")));
 }
 
 
 #[test]
 fn test_constraints()
 {
-	test("load {a} :: a % 2 == 0 -> 8'0x12, a[7:0]", "load 0x34", Pass((4, "1234")));
+	test("load {a} :: a % 2 == 0 -> 8'0x12 @ a[7:0]", "load 0x34", Pass((4, "1234")));
 	
-	test("load {a} :: a % 2 == 0               -> 8'0x12, a[7:0]", "load 0x23", Fail(("asm", 1, "constraint")));
-	test("load {a} :: a % 2 == 0, \"not even\" -> 8'0x12, a[7:0]", "load 0x23", Fail(("asm", 1, "not even")));
-	test("load {a} :: pc >= 0x02, \"too low\"  -> 8'0x12, a[7:0]", "load 0x34", Fail(("asm", 1, "too low")));
+	test("load {a} :: a % 2 == 0               -> 8'0x12 @ a[7:0]", "load 0x23", Fail(("asm", 1, "constraint")));
+	test("load {a} :: a % 2 == 0, \"not even\" -> 8'0x12 @ a[7:0]", "load 0x23", Fail(("asm", 1, "not even")));
+	test("load {a} :: pc >= 0x02, \"too low\"  -> 8'0x12 @ a[7:0]", "load 0x34", Fail(("asm", 1, "too low")));
 }
 
 
@@ -117,16 +117,16 @@ fn test_addr_directive()
 	test("halt -> 8'0x12", "#addr 0x34        \n halt", Pass((4, "12")));
 	test("halt -> 8'0x12", "#addr 0xffff_ffff \n halt", Pass((4, "12")));
 	
-	test("halt -> 8'0x12, pc[7:0]", "                     halt", Pass((4, "1200")));
-	test("halt -> 8'0x12, pc[7:0]", "#addr 0x00        \n halt", Pass((4, "1200")));
-	test("halt -> 8'0x12, pc[7:0]", "#addr 0x34        \n halt", Pass((4, "1234")));
-	test("halt -> 8'0x12, pc[7:0]", "#addr 0xffff_ffff \n halt", Pass((4, "12ff")));
+	test("halt -> 8'0x12 @ pc[7:0]", "                     halt", Pass((4, "1200")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x00        \n halt", Pass((4, "1200")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x34        \n halt", Pass((4, "1234")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0xffff_ffff \n halt", Pass((4, "12ff")));
 	
-	test("halt -> 8'0x12, pc[7:0]", "halt \n halt \n halt",                       Pass((4, "120012021204")));
-	test("halt -> 8'0x12, pc[7:0]", "halt \n halt \n #addr 0x33 \n halt \n halt", Pass((4, "1200120212331235")));
+	test("halt -> 8'0x12 @ pc[7:0]", "halt \n halt \n halt",                       Pass((4, "120012021204")));
+	test("halt -> 8'0x12 @ pc[7:0]", "halt \n halt \n #addr 0x33 \n halt \n halt", Pass((4, "1200120212331235")));
 	
-	test("halt :: pc % 2 == 0 -> 8'0x12, pc[7:0]", "halt \n halt \n halt",               Pass((4, "120012021204")));
-	test("halt :: pc % 2 == 0 -> 8'0x12, pc[7:0]", "halt \n halt \n #addr 0x33 \n halt", Fail(("asm", 4, "constraint")));
+	test("halt :: pc % 2 == 0 -> 8'0x12 @ pc[7:0]", "halt \n halt \n halt",               Pass((4, "120012021204")));
+	test("halt :: pc % 2 == 0 -> 8'0x12 @ pc[7:0]", "halt \n halt \n #addr 0x33 \n halt", Fail(("asm", 4, "constraint")));
 	
 	test("halt -> 8'0x12", "#addr 0xffff_ffff_ffff_ffff",           Pass((4, "")));
 	test("halt -> 8'0x12", "#addr 0xffff_ffff_ffff_ffff   \n halt", Fail(("asm", 2, "overflow")));
@@ -143,23 +143,23 @@ fn test_outp_directive()
 	test("halt -> 8'0x12", "#outp 0x02 \n halt", Pass((4, "000012")));
 	test("halt -> 8'0x12", "#outp 0x10 \n halt", Pass((4, "0000000000000000000000000000000012")));
 	
-	test("halt -> 8'0x12, pc[7:0]", "              halt", Pass((4, "1200")));
-	test("halt -> 8'0x12, pc[7:0]", "#outp 0x00 \n halt", Pass((4, "1200")));
-	test("halt -> 8'0x12, pc[7:0]", "#outp 0x01 \n halt", Pass((4, "001200")));
-	test("halt -> 8'0x12, pc[7:0]", "#outp 0x02 \n halt", Pass((4, "00001200")));
-	test("halt -> 8'0x12, pc[7:0]", "#outp 0x10 \n halt", Pass((4, "000000000000000000000000000000001200")));
+	test("halt -> 8'0x12 @ pc[7:0]", "              halt", Pass((4, "1200")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#outp 0x00 \n halt", Pass((4, "1200")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#outp 0x01 \n halt", Pass((4, "001200")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#outp 0x02 \n halt", Pass((4, "00001200")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#outp 0x10 \n halt", Pass((4, "000000000000000000000000000000001200")));
 	
-	test("halt -> 8'0x12, pc[7:0]", "#addr 0x45 \n #outp 0x00 \n halt", Pass((4, "1245")));
-	test("halt -> 8'0x12, pc[7:0]", "#addr 0x77 \n #outp 0x01 \n halt", Pass((4, "001277")));
-	test("halt -> 8'0x12, pc[7:0]", "#addr 0x93 \n #outp 0x02 \n halt", Pass((4, "00001293")));
-	test("halt -> 8'0x12, pc[7:0]", "#addr 0xbf \n #outp 0x10 \n halt", Pass((4, "0000000000000000000000000000000012bf")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x45 \n #outp 0x00 \n halt", Pass((4, "1245")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x77 \n #outp 0x01 \n halt", Pass((4, "001277")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x93 \n #outp 0x02 \n halt", Pass((4, "00001293")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0xbf \n #outp 0x10 \n halt", Pass((4, "0000000000000000000000000000000012bf")));
 	
-	test("halt -> 8'0x12, pc[7:0]", "#addr 0x45 \n #outp 0x00 \n halt \n halt \n halt", Pass((4, "124512471249")));
-	test("halt -> 8'0x12, pc[7:0]", "#addr 0x77 \n #outp 0x01 \n halt \n halt \n halt", Pass((4, "0012771279127b")));
-	test("halt -> 8'0x12, pc[7:0]", "#addr 0x93 \n #outp 0x02 \n halt \n halt \n halt", Pass((4, "0000129312951297")));
-	test("halt -> 8'0x12, pc[7:0]", "#addr 0xbf \n #outp 0x10 \n halt \n halt \n halt", Pass((4, "0000000000000000000000000000000012bf12c112c3")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x45 \n #outp 0x00 \n halt \n halt \n halt", Pass((4, "124512471249")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x77 \n #outp 0x01 \n halt \n halt \n halt", Pass((4, "0012771279127b")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x93 \n #outp 0x02 \n halt \n halt \n halt", Pass((4, "0000129312951297")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0xbf \n #outp 0x10 \n halt \n halt \n halt", Pass((4, "0000000000000000000000000000000012bf12c112c3")));
 	
-	test("halt -> 8'0x12, pc[7:0]", "#outp 0x00 \n halt \n halt \n #outp 0x10 \n halt \n halt", Pass((4, "1200120200000000000000000000000012041206")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#outp 0x00 \n halt \n halt \n #outp 0x10 \n halt \n halt", Pass((4, "1200120200000000000000000000000012041206")));
 	
 	test("halt -> 8'0x12", "#outp 0xffff_ffff_ffff_ffff",           Pass((4, "")));
 	test("halt -> 8'0x12", "#outp 0x1_0000_0000_0000_0000 \n halt", Fail(("asm", 1, "large")));
@@ -169,15 +169,15 @@ fn test_outp_directive()
 #[test]
 fn test_res_directive()
 {
-	test("halt -> 8'0x12, pc[7:0]", "halt \n #res 0", Pass((4, "1200")));
-	test("halt -> 8'0x12, pc[7:0]", "halt \n #res 1", Pass((4, "120000")));
-	test("halt -> 8'0x12, pc[7:0]", "halt \n #res 2", Pass((4, "12000000")));
-	test("halt -> 8'0x12, pc[7:0]", "halt \n #res 4", Pass((4, "120000000000")));
+	test("halt -> 8'0x12 @ pc[7:0]", "halt \n #res 0", Pass((4, "1200")));
+	test("halt -> 8'0x12 @ pc[7:0]", "halt \n #res 1", Pass((4, "120000")));
+	test("halt -> 8'0x12 @ pc[7:0]", "halt \n #res 2", Pass((4, "12000000")));
+	test("halt -> 8'0x12 @ pc[7:0]", "halt \n #res 4", Pass((4, "120000000000")));
 	
-	test("halt -> 8'0x12, pc[7:0]", "#res 0 \n halt", Pass((4, "1200")));
-	test("halt -> 8'0x12, pc[7:0]", "#res 1 \n halt", Pass((4, "001201")));
-	test("halt -> 8'0x12, pc[7:0]", "#res 2 \n halt", Pass((4, "00001202")));
-	test("halt -> 8'0x12, pc[7:0]", "#res 4 \n halt", Pass((4, "000000001204")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#res 0 \n halt", Pass((4, "1200")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#res 1 \n halt", Pass((4, "001201")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#res 2 \n halt", Pass((4, "00001202")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#res 4 \n halt", Pass((4, "000000001204")));
 }
 
 
@@ -274,7 +274,7 @@ fn test_labels()
 {
 	static INSTRSET: &'static str = "
 		halt -> 8'0x12 \n
-		jump {a} -> 8'0x77, a[7:0]";
+		jump {a} -> 8'0x77 @ a[7:0]";
 	
 	test(INSTRSET, "label: halt \n jump label",                Pass((4, "127700")));
 	test(INSTRSET, "       halt \n jump label \n label: halt", Pass((4, "12770312")));
@@ -312,18 +312,18 @@ fn test_labels()
 fn test_cascading()
 {
 	static INSTRSET: &'static str = "
-		load {a} :: a < 0x10 -> 8'0x10, a[7:0] \n
-		load {a} :: a < 0x20 -> 8'0x20, a[7:0] \n
-		load {a}             -> 8'0xff, a[7:0] \n
+		load {a} :: a < 0x10 -> 8'0x10 @ a[7:0] \n
+		load {a} :: a < 0x20 -> 8'0x20 @ a[7:0] \n
+		load {a}             -> 8'0xff @ a[7:0] \n
 		
-		store {a} :: a < 0x10 -> 8'0x30, a[7:0] \n
-		store {a} :: a < 0x20 -> 8'0x40, a[7:0] \n
-		store {a} :: a < 0x30 -> 8'0x50, a[7:0] \n
+		store {a} :: a < 0x10 -> 8'0x30 @ a[7:0] \n
+		store {a} :: a < 0x20 -> 8'0x40 @ a[7:0] \n
+		store {a} :: a < 0x30 -> 8'0x50 @ a[7:0] \n
 		
-		add {a}, {b} :: a < 0x10 :: b < 0x10 -> 8'0xaa, a[7:0], b[7:0] \n
-		add {a}, {b} :: a < 0x20             -> 8'0xbb, a[7:0], b[7:0] \n
-		add {a}, {b}             :: b < 0x20 -> 8'0xcc, a[7:0], b[7:0] \n 
-		add {a}, {b}                         -> 8'0xdd, a[7:0], b[7:0]";
+		add {a}, {b} :: a < 0x10 :: b < 0x10 -> 8'0xaa @ a[7:0] @ b[7:0] \n
+		add {a}, {b} :: a < 0x20             -> 8'0xbb @ a[7:0] @ b[7:0] \n
+		add {a}, {b}             :: b < 0x20 -> 8'0xcc @ a[7:0] @ b[7:0] \n 
+		add {a}, {b}                         -> 8'0xdd @ a[7:0] @ b[7:0]";
 		
 	test(INSTRSET, "load 0x05", Pass((4, "1005")));
 	test(INSTRSET, "load 0x15", Pass((4, "2015")));
@@ -371,8 +371,8 @@ fn test_cascading()
 fn test_include_directive()
 {
 	static INSTRSET: &'static str = "
-		halt     -> 8'0x12, pc[7:0]
-		load {a} -> 8'0x34,  a[7:0]";
+		halt     -> 8'0x12 @ pc[7:0]
+		load {a} -> 8'0x34 @  a[7:0]";
 		
 	static MAIN1: &'static str = "
 		start:

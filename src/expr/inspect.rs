@@ -12,6 +12,17 @@ impl Expression
 	{
 		match self
 		{
+			&Expression::BinaryOp(_, _, BinaryOp::Concat, ref lhs, ref rhs) =>
+			{
+				let lhs_width = lhs.width();
+				let rhs_width = rhs.width();
+				
+				if lhs_width.is_none() || rhs_width.is_none()
+					{ return None; }
+					
+				Some(lhs_width.unwrap() + rhs_width.unwrap())
+			}
+			
 			&Expression::BitSlice(_, _, left, right, _) => Some(left + 1 - right),
 			_ => None
 		}
@@ -22,6 +33,7 @@ impl Expression
 	{
 		match self
 		{
+			&Expression::BinaryOp(_, _, BinaryOp::Concat, _, _) => self.width().map(|w| (w - 1, 0)),
 			&Expression::BitSlice(_, _, left, right, _) => Some((left, right)),
 			_ => None
 		}
@@ -87,7 +99,8 @@ impl Expression
 					BinaryOp::Div |
 					BinaryOp::Mod |
 					BinaryOp::Shl |
-					BinaryOp::Shr => ensure_binary_int_to_int(report, lhs_type, rhs_type, &op_span),
+					BinaryOp::Shr |
+					BinaryOp::Concat => ensure_binary_int_to_int(report, lhs_type, rhs_type, &op_span),
 					
 					BinaryOp::And |
 					BinaryOp::Or |

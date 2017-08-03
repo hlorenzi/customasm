@@ -54,9 +54,9 @@ fn test_rules_simple()
 	test("halt    -> 0[7:0]", Pass(()));
 	test("halt \n -> 0[7:0]", Pass(()));
 	
-	test("halt -> 8'0x12, 8'0x34", Pass(()));
-	test("halt -> 16'0x1234",      Pass(()));
-	test("halt -> 3'0x7, 5'0x1f",  Pass(()));
+	test("halt -> 8'0x12 @ 8'0x34", Pass(()));
+	test("halt -> 16'0x1234",       Pass(()));
+	test("halt -> 3'0x7 @ 5'0x1f",  Pass(()));
 	
 	test("halt + - > < * / # -> 8'0xab", Pass(()));
 	
@@ -82,26 +82,26 @@ fn test_rules_simple()
 #[test]
 fn test_rules_parameters()
 {
-	test("load {a} -> 8'0",                  Pass(()));
-	test("load {a} -> 8'0, a[15:0]",         Pass(()));
-	test("load {a} -> 8'0, a[15:0], a[7:0]", Pass(()));
+	test("load {a} -> 8'0",                    Pass(()));
+	test("load {a} -> 8'0 @ a[15:0]",          Pass(()));
+	test("load {a} -> 8'0 @ a[15:0] @ a[7:0]", Pass(()));
 	
-	test("load {a}, {b} -> 8'0",                 Pass(()));
-	test("load {a}, {b} -> 8'0, a[7:0]",         Pass(()));
-	test("load {a}, {b} -> 8'0, a[7:0], b[7:0]", Pass(()));
+	test("load {a}, {b} -> 8'0",                   Pass(()));
+	test("load {a}, {b} -> 8'0 @ a[7:0]",          Pass(()));
+	test("load {a}, {b} -> 8'0 @ a[7:0] @ b[7:0]", Pass(()));
 	
-	test("load +{a}, -{b} -> 8'0, a[7:0], b[7:0]", Pass(()));
+	test("load +{a}, -{b} -> 8'0 @ a[7:0] @ b[7:0]", Pass(()));
 	
 	test("load {pc}     -> 8'0", Fail(("test", 1, "reserved")));
 	test("load {a}, {a} -> 8'0", Fail(("test", 1, "duplicate")));
 	
-	test("load {a} -> 8'0, a", Fail(("test", 1, "width")));
+	test("load {a} -> 8'0 @ a", Fail(("test", 1, "width")));
 	
 	test("load {a}   {b} -> 8'0", Fail(("test", 1, "separating")));
 	test("load {a} + {b} -> 8'0", Fail(("test", 1, "token")));
 	
-	test("load          -> 8'0, a[7:0]", Fail(("test", 1, "unknown")));
-	test("load {a}, {b} -> 8'0, c[7:0]", Fail(("test", 1, "unknown")));
+	test("load          -> 8'0 @ a[7:0]", Fail(("test", 1, "unknown")));
+	test("load {a}, {b} -> 8'0 @ c[7:0]", Fail(("test", 1, "unknown")));
 }
 
 
