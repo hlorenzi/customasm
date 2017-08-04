@@ -1,3 +1,4 @@
+mod excerpt;
 mod expr;
 mod instrset;
 mod asm;
@@ -43,14 +44,14 @@ where T: Debug + PartialEq
 	
 	else if let ExpectedResult::Fail(err) = expected
 	{
-		if !report.has_errors()
-		{
-			panic!("expected to fail but passed");
-		}
-		
 		if got.is_some()
 		{
 			panic!("expected to fail but passed\n     got: {:?}", got.unwrap());
+		}
+		
+		if !report.has_errors()
+		{
+			panic!("expected to fail but passed");
 		}
 		
 		if !report.has_error_at(fileserver, err.0, err.1 - 1, err.2)

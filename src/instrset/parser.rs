@@ -198,7 +198,7 @@ impl<'t> InstrSetParser<'t>
 		let descr = if self.parser.maybe_expect(TokenKind::Comma).is_some()
 		{
 			let tk_descr = self.parser.expect(TokenKind::String)?;
-			Some(excerpt_as_string_contents(&tk_descr.excerpt.unwrap()))
+			Some(excerpt_as_string_contents(self.parser.report, &tk_descr.excerpt.unwrap(), &tk_descr.span)?)
 		}
 		else
 			{ None };

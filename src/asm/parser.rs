@@ -127,7 +127,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	fn parse_directive_include(&mut self) -> Result<(), ()>
 	{
 		let tk_filename = self.parser.expect(TokenKind::String)?;
-		let filename = excerpt_as_string_contents(tk_filename.excerpt.as_ref().unwrap().as_ref());
+		let filename = excerpt_as_string_contents(self.parser.report, tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
 	
 		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
 		
@@ -138,7 +138,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	fn parse_directive_incbin(&mut self) -> Result<(), ()>
 	{
 		let tk_filename = self.parser.expect(TokenKind::String)?;
-		let filename = excerpt_as_string_contents(tk_filename.excerpt.as_ref().unwrap().as_ref());
+		let filename = excerpt_as_string_contents(self.parser.report, tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
 		
 		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
 		
@@ -172,7 +172,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	fn parse_directive_incstr(&mut self, bits_per_char: usize) -> Result<(), ()>
 	{
 		let tk_filename = self.parser.expect(TokenKind::String)?;
-		let filename = excerpt_as_string_contents(tk_filename.excerpt.as_ref().unwrap().as_ref());
+		let filename = excerpt_as_string_contents(self.parser.report, tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
 		
 		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
 		

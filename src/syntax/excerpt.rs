@@ -3,12 +3,101 @@ use num::BigInt;
 use num::Zero;
 
 
-pub fn excerpt_as_string_contents(excerpt: &str) -> String
+pub fn excerpt_as_string_contents(report: &mut Report, excerpt: &str, span: &Span) -> Result<String, ()>
 {
-	let chars: Vec<char> = excerpt.chars().collect();
-	assert!(chars.len() >= 2);
+	assert!(excerpt.len() >= 2);
 	
-	chars[1..(chars.len() - 1)].iter().collect()
+	let mut chars = excerpt[1..(excerpt.len() - 1)].chars().peekable();
+	
+	let mut result = String::new();
+	
+	while let Some(c) = chars.peek().map(|c| *c)
+	{
+		chars.next();
+		
+		let unescaped = if c == '\\'
+		{
+			match chars.next()
+			{
+				Some('0')  => '\0',
+				Some('t')  => '\t',
+				Some('r')  => '\r',
+				Some('n')  => '\n',
+				Some('\'') => '\'',
+				Some('\"') => '\"', // "
+				Some('\\') => '\\',
+				
+				Some('x') =>
+				{
+					let mut byte = 0u8;
+					
+					for _ in 0..2
+					{
+						byte <<= 4;
+						
+						byte += match chars.next().map(|c| c.to_digit(16))
+						{
+							Some(Some(d)) => d as u8,
+							_ => return Err(report.error_span("invalid escape sequence", span))
+						};
+					}
+					
+					if byte > 0x7f
+						{ return Err(report.error_span("invalid escape sequence", span)); }
+					
+					byte as char
+				}
+				
+				Some('u') =>
+				{
+					let mut codepoint = 0u32;
+					
+					if chars.next() != Some('{')
+						{ return Err(report.error_span("invalid escape sequence", span)); }
+					
+					let mut i = 0;
+					loop
+					{
+						if i > 6
+							{ return Err(report.error_span("invalid escape sequence", span)); }
+							
+						i += 1;
+						
+						let digit = match chars.next()
+						{
+							Some('}') => break,
+							Some(c) => match c.to_digit(16)
+							{
+								Some(d) => d,
+								None => return Err(report.error_span("invalid escape sequence", span))
+							}
+							
+							None => return Err(report.error_span("invalid escape sequence", span))
+						};
+						
+						codepoint <<= 4;						
+						codepoint += digit;
+					}
+					
+					use std::char;
+					match char::from_u32(codepoint)
+					{
+						Some(c) => c,
+						None => return Err(report.error_span("invalid escape sequence", span))
+					}
+				}
+				
+				Some(_) |
+				None => return Err(report.error_span("invalid escape sequence", span))
+			}
+		}
+		else
+			{ c };
+			
+		result.push(unescaped);
+	}
+	
+	Ok(result)
 }
 
 
