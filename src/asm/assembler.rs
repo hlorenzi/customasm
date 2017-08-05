@@ -17,16 +17,16 @@ pub struct AssemblerState<'a>
 	pub parsed_exprs: Vec<ParsedExpression>,
 	pub bin_output: BinaryOutput,
 	
-	pub cur_address: usize,
-	pub cur_writehead: usize
+	pub cur_address_bit: usize,
+	pub cur_output_bit: usize
 }
 
 
 pub struct ExpressionContext
 {
 	pub label_ctx: LabelContext,
-	pub address: usize,
-	pub writehead: usize
+	pub address_bit: usize,
+	pub output_bit: usize
 }
 
 
@@ -43,7 +43,7 @@ pub struct ParsedInstruction
 pub struct ParsedExpression
 {
 	pub ctx: ExpressionContext,
-	pub size_bytes: usize,
+	pub width: usize,
 	pub expr: Expression
 }
 
@@ -63,8 +63,8 @@ where S: Into<String>
 		parsed_exprs: Vec::new(),
 		bin_output: BinaryOutput::new(),
 		
-		cur_address: 0,
-		cur_writehead: 0
+		cur_address_bit: 0,
+		cur_output_bit: 0
 	};
 	
 	AssemblerParser::parse_file(report, &mut state, filename, None)?;
@@ -86,9 +86,40 @@ impl<'a> AssemblerState<'a>
 		ExpressionContext
 		{
 			label_ctx: self.labels.get_cur_context(),
-			address: self.cur_address,
-			writehead: self.cur_writehead
+			address_bit: self.cur_address_bit,
+			output_bit: self.cur_output_bit
 		}
+	}
+	
+	
+	pub fn output_bit(&mut self, report: &mut Report, bit: bool, span: &Span) -> Result<(), ()>
+	{
+		let output_bit = self.cur_output_bit;
+	
+		match self.cur_address_bit.checked_add(1)
+		{
+			Some(addr) => self.cur_address_bit = addr,
+			None => return Err(report.error_span("address overflowed valid range", span))
+		}
+		
+		match self.cur_output_bit.checked_add(1)
+		{
+			Some(outp) => self.cur_output_bit = outp,
+			None => return Err(report.error_span("output pointer overflowed valid range", span))
+		}
+		
+		self.bin_output.write(output_bit, bit);
+		
+		Ok(())
+	}
+	
+	
+	pub fn output_zero_bits(&mut self, report: &mut Report, num: usize, span: &Span) -> Result<(), ()>
+	{
+		for _ in 0..num
+			{ self.output_bit(report, false, span)?; }
+			
+		Ok(())
 	}
 
 	
@@ -101,7 +132,7 @@ impl<'a> AssemblerState<'a>
 		for mut instr in &mut instrs
 		{
 			// Errors go to the report.
-			let _ = self.output_instr(report, &mut instr);
+			let _ = self.output_parsed_instr(report, &mut instr);
 		}
 		
 		mem::replace(&mut self.parsed_instrs, instrs);
@@ -119,7 +150,7 @@ impl<'a> AssemblerState<'a>
 		for expr in &exprs
 		{
 			// Errors go to the report.
-			let _ = self.output_expr(report, expr);
+			let _ = self.output_parsed_expr(report, expr);
 		}
 		
 		mem::replace(&mut self.parsed_exprs, exprs);
@@ -128,41 +159,7 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
-	pub fn output_advance(&mut self, report: &mut Report, bytes: usize, span: &Span) -> Result<(), ()>
-	{
-		match self.cur_address.checked_add(bytes)
-		{
-			Some(addr) => self.cur_address = addr,
-			None => return Err(report.error_span("address overflowed valid range", span))
-		}
-		
-		match self.cur_writehead.checked_add(bytes)
-		{
-			Some(addr) => self.cur_writehead = addr,
-			None => return Err(report.error_span("output pointer overflowed valid range", span))
-		}
-		
-		Ok(())
-	}
-	
-	
-	pub fn output_zeroes(&mut self, report: &mut Report, bytes: usize, span: &Span) -> Result<(), ()>
-	{
-		let mut output_bit_index = self.cur_writehead * self.instrset.align;
-		for _ in 0..bytes
-		{
-			for _ in 0..self.instrset.align
-			{
-				self.bin_output.write(output_bit_index, false);
-				output_bit_index += 1;
-			}
-		}
-		
-		self.output_advance(report, bytes, span)
-	}
-	
-	
-	pub fn output_instr(&mut self, report: &mut Report, instr: &mut ParsedInstruction) -> Result<(), ()>
+	pub fn output_parsed_instr(&mut self, report: &mut Report, instr: &mut ParsedInstruction) -> Result<(), ()>
 	{
 		// Resolve remaining arguments.
 		for i in 0..instr.exprs.len()
@@ -181,41 +178,35 @@ impl<'a> AssemblerState<'a>
 		let (left, right) = rule.production.slice().unwrap();
 		let value = self.rule_expr_eval(report, rule, &get_arg, &instr.ctx, &rule.production)?;
 		
-		let mut output_bit_index = instr.ctx.writehead * self.instrset.align;
-		for index in 0..(left - right + 1)
+		for i in 0..(left - right + 1)
 		{
-			let bit = value.get_bit(left - right - index);
-			self.bin_output.write(output_bit_index, bit);
-			output_bit_index += 1;
+			let bit = value.get_bit(left - right - i);
+			self.bin_output.write(instr.ctx.output_bit + i, bit);
 		}
 		
 		Ok(())
 	}
 	
 	
-	pub fn output_expr(&mut self, report: &mut Report, expr: &ParsedExpression) -> Result<(), ()>
+	pub fn output_parsed_expr(&mut self, report: &mut Report, expr: &ParsedExpression) -> Result<(), ()>
 	{
 		// Resolve expression.
 		let value = self.expr_eval(report, &expr.ctx, &expr.expr)?;
 		
 		// Check size constraints.
-		let size_bits = value.bits();
-		let max_bits = expr.size_bytes * self.instrset.align;
+		let value_width = value.bits();
 		
-		if size_bits > max_bits
+		if value_width > expr.width
 		{
-			let descr = format!("value (width = {}) is larger than the specified size; use a bit slice", size_bits);
+			let descr = format!("value (width = {}) is larger than the specified width; use a bit slice", value_width);
 			return Err(report.error_span(descr, &expr.expr.span()));
 		}
 		
 		// Output binary representation.
-		let mut output_bit_index = expr.ctx.writehead * self.instrset.align;
-		
-		for index in 0..max_bits
+		for i in 0..expr.width
 		{
-			let bit = value.get_bit(max_bits - index - 1);
-			self.bin_output.write(output_bit_index, bit);
-			output_bit_index += 1;
+			let bit = value.get_bit(expr.width - i - 1);
+			self.bin_output.write(expr.ctx.output_bit + i, bit);
 		}
 		
 		Ok(())
@@ -281,7 +272,7 @@ impl<'a> AssemblerState<'a>
 	where F: Fn(usize) -> Option<ExpressionValue>
 	{
 		if name == "pc"
-			{ ExpressionValue::Integer(ctx.address.to_bigint().unwrap()) }
+			{ ExpressionValue::Integer((ctx.address_bit / self.instrset.align).to_bigint().unwrap()) }
 		
 		else
 			{ get_arg(rule.param_index(name)).unwrap() }
@@ -330,7 +321,7 @@ impl<'a> AssemblerState<'a>
 	fn expr_get_var(&self, ctx: &ExpressionContext, name: &str) -> ExpressionValue
 	{
 		if name == "pc"
-			{ ExpressionValue::Integer(ctx.address.to_bigint().unwrap()) }
+			{ ExpressionValue::Integer((ctx.address_bit / self.instrset.align).to_bigint().unwrap()) }
 		
 		else if let Some('.') = name.chars().next()
 			{ self.labels.get_local(ctx.label_ctx, name).unwrap().clone() }

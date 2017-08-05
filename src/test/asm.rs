@@ -128,9 +128,11 @@ fn test_addr_directive()
 	test("halt :: pc % 2 == 0 -> 8'0x12 @ pc[7:0]", "halt \n halt \n halt",               Pass((4, "120012021204")));
 	test("halt :: pc % 2 == 0 -> 8'0x12 @ pc[7:0]", "halt \n halt \n #addr 0x33 \n halt", Fail(("asm", 4, "constraint")));
 	
-	test("halt -> 8'0x12", "#addr 0xffff_ffff_ffff_ffff",           Pass((4, "")));
-	test("halt -> 8'0x12", "#addr 0xffff_ffff_ffff_ffff   \n halt", Fail(("asm", 2, "overflow")));
-	test("halt -> 8'0x12", "#addr 0x1_0000_0000_0000_0000 \n halt", Fail(("asm", 1, "large")));
+	test("halt -> 8'0x12", "#addr 0xffff_ffff_ffff_ffff / 8 - 1 \n halt", Pass((4, "12")));
+	test("halt -> 8'0x12", "#addr 0xffff_ffff_ffff_ffff / 8",             Pass((4, "")));
+	test("halt -> 8'0x12", "#addr 0xffff_ffff_ffff_ffff / 8     \n halt", Fail(("asm", 2, "valid range")));
+	test("halt -> 8'0x12", "#addr 0x1_0000_0000_0000_0000 / 8   \n halt", Fail(("asm", 1, "valid range")));
+	test("halt -> 8'0x12", "#addr 0x1_0000_0000_0000_0000       \n halt", Fail(("asm", 1, "large")));
 }
 
 
@@ -161,7 +163,8 @@ fn test_outp_directive()
 	
 	test("halt -> 8'0x12 @ pc[7:0]", "#outp 0x00 \n halt \n halt \n #outp 0x10 \n halt \n halt", Pass((4, "1200120200000000000000000000000012041206")));
 	
-	test("halt -> 8'0x12", "#outp 0xffff_ffff_ffff_ffff",           Pass((4, "")));
+	test("halt -> 8'0x12", "#outp 0xffff_ffff_ffff_ffff / 8",       Pass((4, "")));
+	test("halt -> 8'0x12", "#outp 0x1_0000_0000_0000_0000 / 8",     Fail(("asm", 1, "valid range")));
 	test("halt -> 8'0x12", "#outp 0x1_0000_0000_0000_0000 \n halt", Fail(("asm", 1, "large")));
 }
 
@@ -560,17 +563,17 @@ fn test_incstr_directives()
 	
 	test_fileserver(&fileserver, "instrset2", "main1", Fail(("main1", 1, "align")));
 	test_fileserver(&fileserver, "instrset2", "main2", Fail(("main2", 1, "align")));
-	test_fileserver(&fileserver, "instrset2", "main3", Fail(("main3", 1, "align")));
+	test_fileserver(&fileserver, "instrset2", "main3", Fail(("main3", 1, "invalid character")));
 	test_fileserver(&fileserver, "instrset2", "main4", Fail(("main4", 1, "align")));
-	test_fileserver(&fileserver, "instrset2", "main5", Fail(("main5", 1, "align")));
-	test_fileserver(&fileserver, "instrset2", "main6", Fail(("main6", 1, "align")));
+	test_fileserver(&fileserver, "instrset2", "main5", Fail(("main5", 1, "invalid character")));
+	test_fileserver(&fileserver, "instrset2", "main6", Fail(("main6", 1, "invalid character")));
 	test_fileserver(&fileserver, "instrset2", "main7", Pass((1, "111010110100011")));
 	
 	test_fileserver(&fileserver, "instrset3", "main1", Fail(("main1", 1, "align")));
 	test_fileserver(&fileserver, "instrset3", "main2", Pass((4, "1110101101000111")));
-	test_fileserver(&fileserver, "instrset3", "main3", Fail(("main3", 1, "align")));
+	test_fileserver(&fileserver, "instrset3", "main3", Fail(("main3", 1, "invalid character")));
 	test_fileserver(&fileserver, "instrset3", "main4", Pass((4, "0123456789abcdef")));
-	test_fileserver(&fileserver, "instrset3", "main5", Fail(("main5", 1, "align")));
+	test_fileserver(&fileserver, "instrset3", "main5", Fail(("main5", 1, "invalid character")));
 	test_fileserver(&fileserver, "instrset3", "main6", Fail(("main6", 1, "invalid character")));
 	test_fileserver(&fileserver, "instrset3", "main7", Fail(("main7", 1, "align")));
 	

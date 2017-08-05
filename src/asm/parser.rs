@@ -2,7 +2,7 @@ use diagn::{Span, Report};
 use syntax::{Token, TokenKind, tokenize, Parser};
 use syntax::excerpt_as_string_contents;
 use expr::{Expression, ExpressionValue};
-use asm::{AssemblerState, ParsedInstruction, ParsedExpression, ExpressionContext};
+use asm::{AssemblerState, ParsedInstruction, ParsedExpression};
 use util::filename_navigate;
 use num::BigInt;
 use num::ToPrimitive;
@@ -85,42 +85,57 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		
 		if name.chars().next() == Some('d')
 		{
-			if let Ok(size) = usize::from_str_radix(&name[1..], 10)
-				{ return self.parse_directive_data(size, &tk_name); }
+			if let Ok(elem_width) = usize::from_str_radix(&name[1..], 10)
+				{ return self.parse_directive_data(elem_width, &tk_name); }
 		}
 		
 		match name.as_ref()
 		{
-			"addr"      => self.parse_directive_addr(),
-			"outp"      => self.parse_directive_outp(),
+			"addr"      => self.parse_directive_addr(&tk_name),
+			"outp"      => self.parse_directive_outp(&tk_name),
 			"res"       => self.parse_directive_res(&tk_name),
 			"include"   => self.parse_directive_include(),
-			"incbin"    => self.parse_directive_incbin(),
-			"incbinstr" => self.parse_directive_incstr(1),
-			"inchexstr" => self.parse_directive_incstr(4),
+			"incbin"    => self.parse_directive_incbin(&tk_name),
+			"incbinstr" => self.parse_directive_incstr(1, &tk_name),
+			"inchexstr" => self.parse_directive_incstr(4, &tk_name),
 			_ => Err(self.parser.report.error_span("unknown directive", &tk_name.span))
 		}
 	}
 	
 	
-	fn parse_directive_addr(&mut self) -> Result<(), ()>
+	fn parse_directive_addr(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
-		self.state.cur_address = self.parse_usize()?;
+		let address_byte = self.parse_usize()?;
+		
+		match address_byte.checked_mul(self.state.instrset.align)
+		{
+			Some(address_bit) => self.state.cur_address_bit = address_bit,
+			None => return Err(self.parser.report.error_span("address is out of valid range", &tk_name.span))
+		}
+		
 		Ok(())
 	}
 	
 	
-	fn parse_directive_outp(&mut self) -> Result<(), ()>
+	fn parse_directive_outp(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
-		self.state.cur_writehead = self.parse_usize()?;
+		let output_byte = self.parse_usize()?;
+		
+		match output_byte.checked_mul(self.state.instrset.align)
+		{
+			Some(output_bit) => self.state.cur_output_bit = output_bit,
+			None => return Err(self.parser.report.error_span("output pointer is out of valid range", &tk_name.span))
+		}
+		
 		Ok(())
 	}
 	
 	
 	fn parse_directive_res(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
-		let bytes = self.parse_usize()?;
-		self.state.output_zeroes(self.parser.report, bytes, &tk_name.span)
+		let bits = self.parse_usize()? * self.state.instrset.align;
+		
+		self.state.output_zero_bits(self.parser.report, bits, &tk_name.span)
 	}
 	
 	
@@ -135,7 +150,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	}
 	
 	
-	fn parse_directive_incbin(&mut self) -> Result<(), ()>
+	fn parse_directive_incbin(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
 		let tk_filename = self.parser.expect(TokenKind::String)?;
 		let filename = excerpt_as_string_contents(self.parser.report, tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
@@ -143,33 +158,26 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
 		
 		let bytes = self.state.fileserver.get_bytes(self.parser.report, &new_filename, Some(&tk_filename.span))?;
-		let size_bits = bytes.len() * 8;
 		
-		let unaligned_bits = size_bits % self.state.instrset.align;
-		if unaligned_bits != 0
-			{ return Err(self.parser.report.error_span(format!("binary file length does not align with a word boundary (excess bits = {})", unaligned_bits), &tk_filename.span)); }
-		
-		let writehead = self.state.cur_writehead;
-		let size_bytes = size_bits / self.state.instrset.align;
-		self.state.output_zeroes(self.parser.report, size_bytes, &tk_filename.span)?;
-		
-		let mut output_bit_index = writehead * self.state.instrset.align;
 		for mut byte in bytes
 		{
 			for _ in 0..8
 			{
 				let bit = byte & 0x80 != 0;
-				self.state.bin_output.write(output_bit_index, bit);
-				output_bit_index += 1;
+				self.state.output_bit(self.parser.report, bit, &tk_filename.span)?;
 				byte <<= 1;
 			}
 		}
+		
+		let excess_bits = self.state.cur_address_bit % self.state.instrset.align;
+		if excess_bits != 0
+			{ return Err(self.parser.report.error_span(format!("data leaves address misaligned (excess bits = {})", excess_bits), &tk_name.span)); }
 		
 		Ok(())
 	}
 	
 	
-	fn parse_directive_incstr(&mut self, bits_per_char: usize) -> Result<(), ()>
+	fn parse_directive_incstr(&mut self, bits_per_char: usize, tk_name: &Token) -> Result<(), ()>
 	{
 		let tk_filename = self.parser.expect(TokenKind::String)?;
 		let filename = excerpt_as_string_contents(self.parser.report, tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
@@ -177,17 +185,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
 		
 		let chars = self.state.fileserver.get_chars(self.parser.report, &new_filename, Some(&tk_filename.span))?;
-		let size_bits = chars.len() * bits_per_char;
 		
-		let unaligned_bits = size_bits % self.state.instrset.align;
-		if unaligned_bits != 0
-			{ return Err(self.parser.report.error_span(format!("interpreted file length does not align with a word boundary (excess bits = {})", unaligned_bits), &tk_filename.span)); }
-		
-		let writehead = self.state.cur_writehead;
-		let size_bytes = size_bits / self.state.instrset.align;
-		self.state.output_zeroes(self.parser.report, size_bytes, &tk_filename.span)?;
-		
-		let mut output_bit_index = writehead * self.state.instrset.align;
 		for c in chars
 		{
 			let mut digit = match c.to_digit(1 << bits_per_char)
@@ -199,26 +197,24 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			for _ in 0..bits_per_char
 			{
 				let bit = digit & (1 << (bits_per_char - 1)) != 0;
-				self.state.bin_output.write(output_bit_index, bit);
-				output_bit_index += 1;
+				self.state.output_bit(self.parser.report, bit, &tk_filename.span)?;
 				digit <<= 1;
 			}
 		}
+		
+		let excess_bits = self.state.cur_address_bit % self.state.instrset.align;
+		if excess_bits != 0
+			{ return Err(self.parser.report.error_span(format!("data leaves address misaligned (excess bits = {})", excess_bits), &tk_name.span)); }
 		
 		Ok(())
 	}
 	
 	
-	fn parse_directive_data(&mut self, elem_size: usize, tk_name: &Token) -> Result<(), ()>
+	fn parse_directive_data(&mut self, elem_width: usize, tk_name: &Token) -> Result<(), ()>
 	{
-		if elem_size == 0
-			{ return Err(self.parser.report.error_span("invalid element size", &tk_name.span)); }
+		if elem_width == 0
+			{ return Err(self.parser.report.error_span("invalid element width", &tk_name.span)); }
 			
-		if elem_size % self.state.instrset.align != 0
-			{ return Err(self.parser.report.error_span("element size does not align with a word boundary", &tk_name.span)); }
-			
-		let elem_bytes = elem_size / self.state.instrset.align;
-		
 		loop
 		{
 			let ctx = self.state.get_cur_context();
@@ -228,17 +224,21 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			let parsed_expr = ParsedExpression
 			{
 				ctx: ctx,
-				size_bytes: elem_bytes,
+				width: elem_width,
 				expr: expr
 			};
 			
 			self.state.parsed_exprs.push(parsed_expr);
 			
-			self.state.output_zeroes(self.parser.report, elem_bytes, &span)?;
+			self.state.output_zero_bits(self.parser.report, elem_width, &span)?;
 			
 			if self.parser.maybe_expect(TokenKind::Comma).is_none()
 				{ break; }
 		}
+		
+		let excess_bits = self.state.cur_address_bit % self.state.instrset.align;
+		if excess_bits != 0
+			{ return Err(self.parser.report.error_span(format!("data leaves address misaligned (excess bits = {})", excess_bits), &tk_name.span)); }
 		
 		Ok(())
 	}
@@ -264,7 +264,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		else
 		{
 			self.parser.expect(TokenKind::Colon)?;
-			ExpressionValue::Integer(BigInt::from(self.state.cur_address))
+			ExpressionValue::Integer(BigInt::from(self.state.cur_address_bit / self.state.instrset.align))
 		};
 
 		if is_local
@@ -342,11 +342,11 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		
 		// Having found the best matching rule, save it to be output on the second pass.
 		// Remaining argument resolution and constraint checking will be done then.
-		// Also advance address and write pointer.
+		// Also output zero bits to advance address and output pointer.
 		let rule = &self.state.instrset.rules[instr_match.rule_indices[best_match]];
 		
-		let instr_width = rule.production.width().unwrap() / self.state.instrset.align;
-		self.state.output_zeroes(self.parser.report, instr_width, &instr_span)?;
+		let instr_width = rule.production.width().unwrap();
+		self.state.output_zero_bits(self.parser.report, instr_width, &instr_span)?;
 		
 		let parsed_instr = ParsedInstruction
 		{
@@ -365,12 +365,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	
 	fn parse_usize(&mut self) -> Result<usize, ()>
 	{
-		let ctx = ExpressionContext
-		{
-			label_ctx: self.state.labels.get_cur_context(),
-			address: self.state.cur_address,
-			writehead: self.state.cur_writehead
-		};
+		let ctx = self.state.get_cur_context();
 		
 		let expr = Expression::parse(&mut self.parser)?;
 		
