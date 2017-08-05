@@ -273,6 +273,30 @@ fn test_data_directive()
 
 
 #[test]
+fn test_str_directive()
+{
+	test("", "#str \"\"",                   Pass((4, "")));
+	test("", "#str \"\\thello\\r\\n\\0\"",  Pass((4, "0968656c6c6f0d0a00")));
+	test("", "#str \"\\x00\\x01\\x02\"",    Pass((4, "000102")));
+	test("", "#str \"\\u{0}\\u{1}\\u{2}\"", Pass((4, "000102")));
+	
+	test("#align 16", "#str \"\"",                         Pass((4, "")));
+	test("#align 16", "#str \"hello\\r\\n\\0\"",           Pass((4, "68656c6c6f0d0a00")));
+	test("#align 32", "#str \"\\x00\\x01\\x02\\x03\"",     Pass((4, "00010203")));
+	test("#align 32", "#str \"\\u{0}\\u{1}\\u{2}\\u{3}\"", Pass((4, "00010203")));
+	
+	test("", "#str \"\\u{7f}\\u{80}\\u{ff}\\u{10ffff}\"", Pass((4, "7fc280c3bff48fbfbf")));
+	
+	test("", "#str \"木水火\"", Pass((4, "e69ca8e6b0b4e781ab")));
+	
+	test("", "#str \"\\z\"", Fail(("asm", 1, "invalid")));
+	
+	test("#align 5",  "#str \"abc\"", Fail(("asm", 1, "misaligned")));
+	test("#align 32", "#str \"abc\"", Fail(("asm", 1, "misaligned")));
+}
+
+
+#[test]
 fn test_labels()
 {
 	static INSTRSET: &'static str = "

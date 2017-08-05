@@ -94,6 +94,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			"addr"      => self.parse_directive_addr(&tk_name),
 			"outp"      => self.parse_directive_outp(&tk_name),
 			"res"       => self.parse_directive_res(&tk_name),
+			"str"       => self.parse_directive_str(&tk_name),
 			"include"   => self.parse_directive_include(),
 			"incbin"    => self.parse_directive_incbin(&tk_name),
 			"incbinstr" => self.parse_directive_incstr(1, &tk_name),
@@ -136,6 +137,29 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let bits = self.parse_usize()? * self.state.instrset.align;
 		
 		self.state.output_zero_bits(self.parser.report, bits, &tk_name.span)
+	}
+	
+	
+	fn parse_directive_str(&mut self, tk_name: &Token) -> Result<(), ()>
+	{
+		let tk_string = self.parser.expect(TokenKind::String)?;
+		let string = excerpt_as_string_contents(self.parser.report, tk_string.excerpt.as_ref().unwrap().as_ref(), &tk_string.span)?;
+		
+		for mut byte in string.bytes()
+		{
+			for _ in 0..8
+			{
+				let bit = byte & 0x80 != 0;
+				self.state.output_bit(self.parser.report, bit, &tk_string.span)?;
+				byte <<= 1;
+			}
+		}
+		
+		let excess_bits = self.state.cur_address_bit % self.state.instrset.align;
+		if excess_bits != 0
+			{ return Err(self.parser.report.error_span(format!("string leaves address misaligned (excess bits = {})", excess_bits), &tk_name.span)); }
+			
+		Ok(())
 	}
 	
 	
