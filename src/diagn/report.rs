@@ -57,6 +57,12 @@ impl Report
 	}
 	
 	
+	pub fn has_messages(&self) -> bool
+	{
+		self.messages.len() != 0
+	}
+	
+	
 	pub fn has_errors(&self) -> bool
 	{
 		self.messages.len() != 0

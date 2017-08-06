@@ -76,4 +76,26 @@ impl BinaryOutput
 		
 		result
 	}
+	
+	
+	pub fn generate_binary(&self, start_bit: usize, end_bit: usize) -> Vec<u8>
+	{
+		let mut result = Vec::new();
+		
+		let mut index = start_bit;
+		while index < end_bit
+		{
+			let mut byte: u8 = 0;
+			for _ in 0..8
+			{
+				byte <<= 1;
+				byte |= if self.read(index) { 1 } else { 0 };
+				index += 1;
+			}
+			
+			result.push(byte);
+		}
+		
+		result
+	}
 }

@@ -12,4 +12,5 @@ name = "customasm"
 path = "src/main.rs"
 
 [dependencies]
-num = "0.1"
+getopts = "0.2.14"
+num = "0.1.40"
