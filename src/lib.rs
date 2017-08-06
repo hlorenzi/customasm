@@ -1,13 +1,24 @@
-mod assembler;
-mod definition;
-mod rule;
-mod tests;
+extern crate num;
+extern crate getopts;
+
+
+mod diagn;
+mod syntax;
+mod expr;
+mod instrset;
+mod asm;
 mod util;
+mod driver;
 
 
-pub use assembler::Assembler;
-pub use definition::Definition;
-pub use util::error::Error;
-pub use util::filehandler::FileHandler;
-pub use util::filehandler::RealFileHandler;
-pub use util::filehandler::CustomFileHandler;
+#[cfg(test)]
+mod test;
+
+
+pub use self::diagn::Report;
+pub use self::instrset::read_instrset;
+pub use self::asm::assemble;
+pub use self::util::FileServer;
+pub use self::util::FileServerMock;
+pub use self::util::FileServerReal;
+pub use self::driver::drive;

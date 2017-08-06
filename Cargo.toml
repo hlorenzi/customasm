@@ -1,6 +1,6 @@
 [package]
 name = "customasm"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Henrique Lorenzi <hlorenzi12@gmail.com>"]
 
 [lib]
@@ -13,3 +13,4 @@ path = "src/main.rs"
 
 [dependencies]
 getopts = "0.2.14"
+num = "0.1.40"
