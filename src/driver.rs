@@ -88,11 +88,11 @@ fn drive_inner(report: &mut Report, opts: &getopts::Options, args: &Vec<String>,
 	
 	let output_data = match out_format
 	{
-		OutputFormat::BinStr  => compiled.generate_binstr(0, compiled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::BinDump => compiled.generate_binstr(0, compiled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexStr  => compiled.generate_hexstr(0, compiled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexDump => compiled.generate_hexstr(0, compiled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::Binary  => compiled.generate_binary(0, compiled.len())
+		OutputFormat::BinStr  => compiled.generate_binstr (0, compiled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::BinDump => compiled.generate_bindump(0, compiled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::HexStr  => compiled.generate_hexstr (0, compiled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::HexDump => compiled.generate_hexdump(0, compiled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::Binary  => compiled.generate_binary (0, compiled.len())
 	};
 	
 	if !quiet
