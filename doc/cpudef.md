@@ -1,12 +1,25 @@
-# Instruction Set File Format
+# cpudef Directive
 
-This file controls settings for the target machine, and
+This directive controls settings for the target machine, and
 defines mnemonics for its instruction set.
 
-## Directives
+```
+#cpudef
+{
+    #align 8
+    
+    lda {value} -> 8'0x10 @ value[7:0]
+    add {value} -> 8'0xad @ value[7:0]
+    jmp {addr}  -> 8'0x55 @ addr[15:0]
+    inc {addr}  -> 8'0xcc @ addr[15:0]
+    ret         -> 8'0xee
+}
+```
 
-The file starts with a list of configuration directives, one per line.
-The currently available directive is:
+## Configurations
+
+The syntax first expects a list of configuration directives, one per line.
+The currently available configuration is:
 
 - `#align <bit_num>`  
 Sets the number of bits in a byte for the target machine.  
@@ -137,37 +150,43 @@ Rule | Used as | Output
 ## Full Examples
 
 ```
-#align 8
-
-; we can write the entire rule in one line:
-
-ld  r1, {value} :: value <=     0xff -> 8'0x10 @ value[ 7:0]
-ld  r1, {value} :: value <=   0xffff -> 8'0x11 @ value[15:0]
-ld  r1, {value} :: value <= 0xffffff -> 8'0x12 @ value[23:0]
-
-; but we can also add in line breaks for readability:
-
-add r1, {value}
-    -> 8'0x20 @ value[7:0]
-
-add {addr}, {value}
-    -> 8'0x21 @ address[23:0] @ value[7:0]
-
-inc r1
-    -> 8'0x30
-
-jmp {addr}
-    :: addr <= 0xffffff, "address is out of bounds"
-    :: addr >= 0, "address is out of bounds"
-    -> 8'0x40 @ address[23:0]
+#cpudef
+{
+    #align 8
+    
+    ; we can write the entire rule in one line:
+    
+    ld  r1, {value} :: value <=     0xff -> 8'0x10 @ value[ 7:0]
+    ld  r1, {value} :: value <=   0xffff -> 8'0x11 @ value[15:0]
+    ld  r1, {value} :: value <= 0xffffff -> 8'0x12 @ value[23:0]
+    
+    ; but we can also add in line breaks for readability:
+    
+    add r1, {value}
+        -> 8'0x20 @ value[7:0]
+    
+    add {addr}, {value}
+        -> 8'0x21 @ address[23:0] @ value[7:0]
+    
+    inc r1
+        -> 8'0x30
+    
+    jmp {addr}
+        :: addr <= 0xffffff, "address is out of bounds"
+        :: addr >= 0, "address is out of bounds"
+        -> 8'0x40 @ address[23:0]
+}
 ```
 
 ```
-#align 3
-
-lda #{value} -> 3'0b001 @ value[2:0]
-ldx #{value} -> 3'0b010 @ value[2:0]
-sta  {addr}  -> 3'0b011 @ addr[5:0]
-nop          -> 3'0b110
-halt         -> 3'0b111
+#cpudef
+{
+    #align 3
+    
+    lda #{value} -> 3'0b001 @ value[2:0]
+    ldx #{value} -> 3'0b010 @ value[2:0]
+    sta  {addr}  -> 3'0b011 @ addr[5:0]
+    nop          -> 3'0b110
+    halt         -> 3'0b111
+}
 ```

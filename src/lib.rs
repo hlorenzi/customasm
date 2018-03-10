@@ -16,8 +16,8 @@ mod test;
 
 
 pub use self::diagn::Report;
-pub use self::instrset::read_instrset;
 pub use self::asm::assemble;
+pub use self::instrset::InstrSetParser;
 pub use self::util::FileServer;
 pub use self::util::FileServerMock;
 pub use self::util::FileServerReal;

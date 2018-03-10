@@ -1,6 +1,5 @@
 use diagn::RcReport;
 use util::FileServer;
-use instrset::read_instrset;
 use asm::BinaryOutput;
 use asm::assemble;
 use getopts;
@@ -78,13 +77,12 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 	
 	let out_data_file = matches.opt_str("o").unwrap_or("a.out".to_string());
 	
-	if matches.free.len() != 2
+	if matches.free.len() != 1
 		{ return Err(true); }
 	
-	let instrset_file = matches.free[0].clone();
-	let asm_file = matches.free[1].clone();
+	let asm_file = matches.free[0].clone();
 	
-	let compiled = compile(report.clone(), fileserver, instrset_file, asm_file, quiet).map_err(|_| false)?;
+	let compiled = compile(report.clone(), fileserver, asm_file, quiet).map_err(|_| false)?;
 	
 	let output_data = match out_format
 	{
@@ -140,7 +138,7 @@ fn parse_opts(report: RcReport, opts: &getopts::Options, args: &Vec<String>) -> 
 
 fn print_usage(opts: &getopts::Options)
 {
-	println!("{}", opts.usage(&format!("Usage: {} [options] <instrset-file> <asm-file>", env!("CARGO_PKG_NAME"))));
+	println!("{}", opts.usage(&format!("Usage: {} [options] <file>", env!("CARGO_PKG_NAME"))));
 }
 
 
@@ -156,22 +154,16 @@ fn print_header()
 }
 
 
-pub fn compile<S, T>(report: RcReport, fileserver: &FileServer, instrset_file: S, asm_file: T, quiet: bool) -> Result<BinaryOutput, ()>
-where S: Into<String>, T: Into<String>
+pub fn compile<S>(report: RcReport, fileserver: &FileServer, asm_file: S, quiet: bool) -> Result<BinaryOutput, ()>
+where S: Into<String>
 {
-	let instrset_file_owned = instrset_file.into();
 	let asm_file_owned = asm_file.into();
 	
 	if !quiet
 	{
 		print_header();
-		println!("reading `{}`...", &instrset_file_owned);
+		println!("assembling `{}`...", &asm_file_owned);
 	}
-		
-	let instrset = read_instrset(report.clone(), fileserver, instrset_file_owned)?;
 	
-	if !quiet
-		{ println!("assembling `{}`...", &asm_file_owned); }
-	
-	assemble(report.clone(), &instrset, fileserver, asm_file_owned)
+	assemble(report, fileserver, asm_file_owned)
 }

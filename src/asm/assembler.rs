@@ -1,7 +1,7 @@
 use diagn::{Span, RcReport};
 use expr::{Expression, ExpressionType, ExpressionValue};
 use instrset::{InstrSet, Rule};
-use asm::{AssemblerParser, BinaryOutput, RulePatternMatcher, LabelManager, LabelContext};
+use asm::{AssemblerParser, BinaryOutput, LabelManager, LabelContext};
 use util::FileServer;
 use num::bigint::ToBigInt;
 
@@ -10,8 +10,7 @@ use num::bigint::ToBigInt;
 pub struct AssemblerState<'a>
 {
 	pub fileserver: &'a FileServer,
-	pub instrset: &'a InstrSet,
-	pub pattern_matcher: RulePatternMatcher,
+	pub instrset: Option<InstrSet>,
 	pub labels: LabelManager,
 	pub parsed_instrs: Vec<ParsedInstruction>,
 	pub parsed_exprs: Vec<ParsedExpression>,
@@ -48,16 +47,13 @@ pub struct ParsedExpression
 }
 
 
-pub fn assemble<S>(report: RcReport, instrset: &InstrSet, fileserver: &FileServer, filename: S) -> Result<BinaryOutput, ()>
+pub fn assemble<S>(report: RcReport, fileserver: &FileServer, filename: S) -> Result<BinaryOutput, ()>
 where S: Into<String>
 {
-	let pattern_matcher = RulePatternMatcher::new(&instrset.rules);
-	
 	let mut state = AssemblerState
 	{
 		fileserver: fileserver,
-		instrset: instrset,
-		pattern_matcher: pattern_matcher,
+		instrset: None,
 		labels: LabelManager::new(),
 		parsed_instrs: Vec::new(),
 		parsed_exprs: Vec::new(),
@@ -81,6 +77,15 @@ where S: Into<String>
 
 impl<'a> AssemblerState<'a>
 {
+	pub fn check_instrset_active(&self, report: RcReport, span: &Span) -> Result<(), ()>
+	{
+		if self.instrset.is_none()
+			{ Err(report.error_span("no cpu defined", span)) }
+		else
+			{ Ok(()) }
+	}
+	
+
 	pub fn get_cur_context(&self) -> ExpressionContext
 	{
 		ExpressionContext
@@ -169,7 +174,7 @@ impl<'a> AssemblerState<'a>
 		}
 		
 		// Check rule constraints.
-		let rule = &self.instrset.rules[instr.rule_index];
+		let rule = &self.instrset.as_ref().unwrap().rules[instr.rule_index];
 		let get_arg = |i: usize| instr.args[i].clone();
 		
 		self.rule_check_all_constraints_satisfied(report.clone(), rule, &get_arg, &instr.ctx, &instr.span)?;
@@ -272,7 +277,7 @@ impl<'a> AssemblerState<'a>
 	where F: Fn(usize) -> Option<ExpressionValue>
 	{
 		if name == "pc"
-			{ ExpressionValue::Integer((ctx.address_bit / self.instrset.align).to_bigint().unwrap()) }
+			{ ExpressionValue::Integer((ctx.address_bit / self.instrset.as_ref().unwrap().align).to_bigint().unwrap()) }
 		
 		else
 			{ get_arg(rule.param_index(name)).unwrap() }
@@ -321,7 +326,7 @@ impl<'a> AssemblerState<'a>
 	fn expr_get_var(&self, ctx: &ExpressionContext, name: &str) -> ExpressionValue
 	{
 		if name == "pc"
-			{ ExpressionValue::Integer((ctx.address_bit / self.instrset.align).to_bigint().unwrap()) }
+			{ ExpressionValue::Integer((ctx.address_bit / self.instrset.as_ref().unwrap().align).to_bigint().unwrap()) }
 		
 		else if let Some('.') = name.chars().next()
 			{ self.labels.get_local(ctx.label_ctx, name).unwrap().clone() }

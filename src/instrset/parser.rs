@@ -3,40 +3,46 @@ use syntax::{Token, TokenKind, Parser};
 use syntax::{excerpt_as_string_contents, excerpt_as_usize};
 use expr::{Expression, ExpressionType};
 use instrset::{InstrSet, Rule};
+use asm::RulePatternMatcher;
 
 
-pub struct InstrSetParser
+pub struct InstrSetParser<'t>
 {
-	instrset: InstrSet,
-	parser: Parser,
-	align_was_set: bool
+	parser: &'t mut Parser,
+	
+	align: Option<usize>,
+	rules: Vec<Rule>
 }
 
 
-impl InstrSetParser
+impl<'t> InstrSetParser<'t>
 {
-	pub fn new(report: RcReport, tokens: Vec<Token>) -> InstrSetParser
+	pub fn parse(parser: &mut Parser) -> Result<InstrSet, ()>
 	{
-		let instrset = InstrSet
+		let mut instrset_parser = InstrSetParser
 		{
-			align: 8,
+			parser: parser,
+			align: None,
 			rules: Vec::new()
 		};
 		
-		InstrSetParser
+		instrset_parser.parse_directives()?;	
+		
+		if instrset_parser.align.is_none()
+			{ instrset_parser.align = Some(8); }
+		
+		instrset_parser.parse_rules()?;
+		
+		let pattern_matcher = RulePatternMatcher::new(&instrset_parser.rules);
+		
+		let instrset = InstrSet
 		{
-			instrset: instrset,
-			parser: Parser::new(report.clone(), tokens),
-			align_was_set: false
-		}
-	}
-	
-
-	pub fn parse(mut self) -> Result<InstrSet, ()>
-	{
-		self.parse_directives()?;
-		self.parse_rules()?;
-		Ok(self.instrset)
+			align: instrset_parser.align.unwrap(),
+			rules: instrset_parser.rules,
+			pattern_matcher: pattern_matcher
+		};
+		
+		Ok(instrset)
 	}
 	
 
@@ -63,15 +69,14 @@ impl InstrSetParser
 	{
 		let tk_align = self.parser.expect_msg(TokenKind::Number, "expected alignment value")?;
 		
-		if self.align_was_set
+		if self.align.is_some()
 			{ return Err(self.parser.report.error_span("duplicate align directive", &tk_name.span)); }
 			
 		let align = excerpt_as_usize(self.parser.report.clone(), &tk_align.excerpt.unwrap(), &tk_align.span)?;
 		if align == 0
 			{ return Err(self.parser.report.error_span("invalid alignment", &tk_align.span)); }
 		
-		self.instrset.align = align;
-		self.align_was_set = true;
+		self.align = Some(align);
 		
 		Ok(())
 	}
@@ -79,7 +84,7 @@ impl InstrSetParser
 
 	fn parse_rules(&mut self) -> Result<(), ()>
 	{
-		while !self.parser.is_over()
+		while !self.parser.is_over() && !self.parser.next_is(0, TokenKind::BraceClose)
 		{
 			self.parse_rule()?;
 			self.parser.expect_linebreak()?;
@@ -107,7 +112,7 @@ impl InstrSetParser
 		self.parser.expect(TokenKind::Arrow)?;
 		self.parse_rule_production(&mut rule)?;
 		
-		self.instrset.rules.push(rule);
+		self.rules.push(rule);
 		
 		Ok(())
 	}
@@ -223,7 +228,7 @@ impl InstrSetParser
 			None => return Err(self.parser.report.error_span("width of expression not known; use bit slices", &expr.span()))
 		};
 		
-		if width % self.instrset.align != 0
+		if width % self.align.unwrap() != 0
 			{ return Err(self.parser.report.error_span(format!("production (width = {}) does not align with a word boundary", width), &expr.span())); }
 		
 		rule.production = expr;

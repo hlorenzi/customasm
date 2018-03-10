@@ -1,25 +1,31 @@
 use diagn::RcReport;
+use instrset::InstrSetParser;
+use syntax::{Parser, tokenize};
 use util::{FileServer, FileServerMock};
 use super::ExpectedResult::*;
 use super::{ExpectedResult, expect_result};
-use ::read_instrset;
 
 
 fn test<S>(src: S, expected: ExpectedResult<()>)
 where S: Into<Vec<u8>>
 {
-	fn compile(report: RcReport, fileserver: &FileServer) -> Result<(), ()>
+	let compile = |report: RcReport, fileserver: &FileServer| -> Result<(), ()>
 	{
-		read_instrset(report.clone(), fileserver, "test")?;
+		let chars = fileserver.get_chars(report.clone(), "test", None)?;
+		let tokens = tokenize(report.clone(), "test", &chars)?;
+		let mut parser = Parser::new(report.clone(), tokens);
+		
+		InstrSetParser::parse(&mut parser)?;
 		Ok(())
-	}
-	
+	};
+
 	let report = RcReport::new();
-	let mut fileserver = FileServerMock::new();
-	fileserver.add("test", src);
 	
-	let result = compile(report.clone(), &fileserver);
-	expect_result(report.clone(), &fileserver, result.ok(), expected);
+	let mut fileserver = FileServerMock::new();
+	fileserver.add("test", src.into());
+	
+	let result = compile(report.clone(), &fileserver).ok();
+	expect_result(report.clone(), &fileserver, result, expected);
 }
 
 

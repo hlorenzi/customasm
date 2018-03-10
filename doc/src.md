@@ -3,33 +3,35 @@
 These files contain the source code that will be
 assembled for the target machine.
 
-## Instruction Mnemonics
+## CPU Definition
 
-The simplest source file contains a list of instructions
-for the target machine, using the mnemonics defined in the
-[Instruction Set file](/doc/instrset.md). Indentation is disregarded.
+The simplest source file contains a `#cpudef` directive and then
+a list of instructions to be assembled for the target machine.
+Indentation is always disregarded everywhere.
 
-As an example, using the following Instruction Set file:
+The syntax for the `#cpudef` directive is described at
+[cpudef Directive](/doc/cpudef.md)
 
-```
-#align 8
-
-lda {value} -> 8'0x10 @ value[7:0]
-add {value} -> 8'0xad @ value[7:0]
-jmp {addr}  -> 8'0x55 @ addr[15:0]
-inc {addr}  -> 8'0xcc @ addr[15:0]
-ret         -> 8'0xee
-```
-
-...we could write the following Source file:
+As an example, the file:
 
 ```
+#cpudef
+{
+    #align 8
+    
+    lda {value} -> 8'0x10 @ value[7:0]
+    add {value} -> 8'0xad @ value[7:0]
+    jmp {addr}  -> 8'0x55 @ addr[15:0]
+    inc {addr}  -> 8'0xcc @ addr[15:0]
+    ret         -> 8'0xee
+}
+
 lda 0x77
 add 0x01
 ret
 ```
 
-...and have it assembled into:
+...would be assembled into:
 
 ```
 0x10 0x77
@@ -38,7 +40,8 @@ ret
 ```
 
 We can also use more complex expressions as arguments,
-like so:
+like so (henceforth omitting the preceding `#cpudef` directive
+for clarity):
 
 ```
 lda 0x66 + 0x11

@@ -8,11 +8,10 @@ you just implemented in FPGA!
 Check out the Releases section for pre-built binaries.  
   
 Check out the documentation for usage instructions:
-- [Instruction Set File Format](/doc/instrset.md)
 - [Source File Format](/doc/src.md)
 
 ```
-Usage: customasm [options] <instrset-file> <asm-file>
+Usage: customasm [options] <file>
 
 Options:
     -h, --help          Display this information.
@@ -24,46 +23,45 @@ Options:
         --stdout        Write output to stdout instead of a file.
 ```
 
-The idea is that, given the following Instruction Set file:
+The idea is that, given the following file:
 
 ```
-#align 8
+#cpudef
+{
+   #align 8
+   
+   load r1, {value} -> 8'0x11 @ value[7:0]
+   load r2, {value} -> 8'0x12 @ value[7:0]
+   load r3, {value} -> 8'0x13 @ value[7:0]
+   add  r1, r2      -> 8'0x21
+   sub  r3, {value} -> 8'0x33 @ value[7:0]
+   jnz  {address}   -> 8'0x40 @ address[15:0]
+   ret              -> 8'0x50
+}
 
-load r1, {value} -> 8'0x11 @ value[7:0]
-load r2, {value} -> 8'0x12 @ value[7:0]
-load r3, {value} -> 8'0x13 @ value[7:0]
-add  r1, r2      -> 8'0x21
-sub  r3, {value} -> 8'0x33 @ value[7:0]
-jnz  {address}   -> 8'0x40 @ address[15:0]
-ret              -> 8'0x50
-```
-
-...the assembler would take the following Source file:
-
-```
 #addr 0x8000
 
 multiply3x4:
-	load r1, 0
-	load r2, 3
-	load r3, 4
-	
-	.loop:
-		add r1, r2
-		sub r3, 1
-		jnz .loop
-	
-	ret
+   load r1, 0
+   load r2, 3
+   load r3, 4
+   
+   .loop:
+      add r1, r2
+      sub r3, 1
+      jnz .loop
+   
+   ret
 ```
 
-...and convert it into a binary file with the following contents:
+...the assembler would use the `#cpudef` rules to convert the instructions into binary code:
 
 ```
-0x11 0x00
-0x12 0x03
-0x13 0x04
-0x21
-0x33 0x01
-0x40 0x80 0x06
-0x50
+8000: 11 00
+8002: 12 03
+8004: 13 04
+8006: 21
+8007: 33 01
+8009: 40 80 06
+800c: 50
 ```

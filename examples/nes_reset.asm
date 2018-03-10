@@ -1,3 +1,6 @@
+#include "6502.cpu"
+
+
 #addr 0x8000
 
 
