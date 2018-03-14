@@ -1,4 +1,4 @@
-use diagn::{Span, Report};
+use diagn::{Span, RcReport};
 use std::rc::Rc;
 
 
@@ -165,7 +165,7 @@ impl TokenKind
 }
 
 
-pub fn tokenize<S>(report: &mut Report, src_filename: S, src: &[char]) -> Result<Vec<Token>, ()>
+pub fn tokenize<S>(report: RcReport, src_filename: S, src: &[char]) -> Result<Vec<Token>, ()>
 where S: Into<String>
 {
 	let filename = Rc::new(src_filename.into());

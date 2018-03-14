@@ -1,4 +1,4 @@
-use diagn::Report;
+use diagn::RcReport;
 use util::FileServer;
 use instrset::read_instrset;
 use asm::BinaryOutput;
@@ -20,9 +20,9 @@ pub fn drive(args: &Vec<String>, fileserver: &mut FileServer) -> Result<(), ()>
 {
 	let opts = make_opts();
 	
-	let mut report = Report::new();
+	let report = RcReport::new();
 	
-	let result = drive_inner(&mut report, &opts, args, fileserver);
+	let result = drive_inner(report.clone(), &opts, args, fileserver);
 	
 	if report.has_messages()
 		{ println!(""); }
@@ -39,9 +39,9 @@ pub fn drive(args: &Vec<String>, fileserver: &mut FileServer) -> Result<(), ()>
 }
 
 
-fn drive_inner(report: &mut Report, opts: &getopts::Options, args: &Vec<String>, fileserver: &mut FileServer) -> Result<(), bool>
+fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fileserver: &mut FileServer) -> Result<(), bool>
 {
-	let matches = parse_opts(report, opts, args).map_err(|_| true)?;
+	let matches = parse_opts(report.clone(), opts, args).map_err(|_| true)?;
 	
 	if matches.opt_present("h")
 	{
@@ -84,7 +84,7 @@ fn drive_inner(report: &mut Report, opts: &getopts::Options, args: &Vec<String>,
 	let instrset_file = matches.free[0].clone();
 	let asm_file = matches.free[1].clone();
 	
-	let compiled = compile(report, fileserver, instrset_file, asm_file, quiet).map_err(|_| false)?;
+	let compiled = compile(report.clone(), fileserver, instrset_file, asm_file, quiet).map_err(|_| false)?;
 	
 	let output_data = match out_format
 	{
@@ -107,7 +107,7 @@ fn drive_inner(report: &mut Report, opts: &getopts::Options, args: &Vec<String>,
 	}
 	else
 	{
-		fileserver.write_bytes(report, &out_data_file, &output_data, None).map_err(|_| false)?;
+		fileserver.write_bytes(report.clone(), &out_data_file, &output_data, None).map_err(|_| false)?;
 	}
 	
 	Ok(())
@@ -128,7 +128,7 @@ fn make_opts() -> getopts::Options
 }
 
 
-fn parse_opts(report: &mut Report, opts: &getopts::Options, args: &Vec<String>) -> Result<getopts::Matches, ()>
+fn parse_opts(report: RcReport, opts: &getopts::Options, args: &Vec<String>) -> Result<getopts::Matches, ()>
 {
 	match opts.parse(&args[1..])
 	{
@@ -156,7 +156,7 @@ fn print_header()
 }
 
 
-pub fn compile<S, T>(report: &mut Report, fileserver: &FileServer, instrset_file: S, asm_file: T, quiet: bool) -> Result<BinaryOutput, ()>
+pub fn compile<S, T>(report: RcReport, fileserver: &FileServer, instrset_file: S, asm_file: T, quiet: bool) -> Result<BinaryOutput, ()>
 where S: Into<String>, T: Into<String>
 {
 	let instrset_file_owned = instrset_file.into();
@@ -168,10 +168,10 @@ where S: Into<String>, T: Into<String>
 		println!("reading `{}`...", &instrset_file_owned);
 	}
 		
-	let instrset = read_instrset(report, fileserver, instrset_file_owned)?;
+	let instrset = read_instrset(report.clone(), fileserver, instrset_file_owned)?;
 	
 	if !quiet
 		{ println!("assembling `{}`...", &asm_file_owned); }
 	
-	assemble(report, &instrset, fileserver, asm_file_owned)
+	assemble(report.clone(), &instrset, fileserver, asm_file_owned)
 }

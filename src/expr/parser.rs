@@ -2,10 +2,9 @@ use syntax::{TokenKind, Parser, excerpt_as_usize, excerpt_as_bigint};
 use super::{Expression, ExpressionValue, UnaryOp, BinaryOp};
 
 
-pub struct ExpressionParser<'a, 't>
-where 't: 'a
+pub struct ExpressionParser<'a>
 {
-	parser: &'a mut Parser<'t>
+	parser: &'a mut Parser
 }
 
 
@@ -18,9 +17,9 @@ impl Expression
 }
 
 
-impl<'a, 't> ExpressionParser<'a, 't>
+impl<'a> ExpressionParser<'a>
 {
-	pub fn new(parser: &'a mut Parser<'t>) -> ExpressionParser<'a, 't>
+	pub fn new(parser: &mut Parser) -> ExpressionParser
 	{
 		ExpressionParser
 		{
@@ -36,7 +35,7 @@ impl<'a, 't> ExpressionParser<'a, 't>
 	
 	
 	fn parse_unary_ops<F>(&mut self, ops: &[(TokenKind, UnaryOp)], parse_inner: F) -> Result<Expression, ()>
-	where F: Fn(&mut ExpressionParser<'a, 't>) -> Result<Expression, ()>
+	where F: Fn(&mut ExpressionParser<'a>) -> Result<Expression, ()>
 	{
 		for op in ops
 		{
@@ -57,7 +56,7 @@ impl<'a, 't> ExpressionParser<'a, 't>
 	
 
 	fn parse_binary_ops<F>(&mut self, ops: &[(TokenKind, BinaryOp)], parse_inner: F) -> Result<Expression, ()>
-	where F: Fn(&mut ExpressionParser<'a, 't>) -> Result<Expression, ()>
+	where F: Fn(&mut ExpressionParser<'a>) -> Result<Expression, ()>
 	{
 		let mut lhs = parse_inner(self)?;
 		
@@ -213,8 +212,8 @@ impl<'a, 't> ExpressionParser<'a, 't>
 		let tk_rightmost = self.parser.expect(TokenKind::Number)?;
 		let tk_close = self.parser.expect(TokenKind::BracketClose)?;
 		
-		let leftmost  = excerpt_as_usize(self.parser.report, tk_leftmost. excerpt.as_ref().unwrap(), &tk_leftmost .span)?;
-		let rightmost = excerpt_as_usize(self.parser.report, tk_rightmost.excerpt.as_ref().unwrap(), &tk_rightmost.span)?;
+		let leftmost  = excerpt_as_usize(self.parser.report.clone(), tk_leftmost. excerpt.as_ref().unwrap(), &tk_leftmost .span)?;
+		let rightmost = excerpt_as_usize(self.parser.report.clone(), tk_rightmost.excerpt.as_ref().unwrap(), &tk_rightmost.span)?;
 		
 		let slice_span = tk_open.span.join(&tk_close.span);
 		let span = inner.span().join(&tk_close.span);
@@ -288,7 +287,7 @@ impl<'a, 't> ExpressionParser<'a, 't>
 		let tk_number = self.parser.expect(TokenKind::Number)?;
 		let number = tk_number.excerpt.clone().unwrap();
 		
-		let (bigint, width) = excerpt_as_bigint(self.parser.report, &number, &tk_number.span)?;
+		let (bigint, width) = excerpt_as_bigint(self.parser.report.clone(), &number, &tk_number.span)?;
 		
 		let span = tk_number.span;
 		let expr = Expression::Literal(span.clone(), ExpressionValue::Integer(bigint));

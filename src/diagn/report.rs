@@ -2,13 +2,15 @@ use diagn::Span;
 use util::CharCounter;
 use util::FileServer;
 use util::enable_windows_ansi_support;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 
 const C_DEFAULT:  &'static str = "\u{1B}[0m";
 const C_LOCATION: &'static str = "\u{1B}[0m\u{1B}[90m";
 const C_ERROR:    &'static str = "\u{1B}[0m\u{1B}[91m";
 const C_LINENUM:  &'static str = "\u{1B}[0m\u{1B}[90m";
-const C_SRC:      &'static str = "\u{1B}[0m\u{1B}[97m";
+const C_SRC:      &'static str = "\u{1B}[0m\u{1B}[97m"; //"
 
 
 pub struct Report
@@ -21,6 +23,13 @@ struct Message
 {
 	pub descr: String,
 	pub span: Option<Span>
+}
+
+
+#[derive(Clone)]
+pub struct RcReport
+{
+	report: Rc<RefCell<Report>>
 }
 
 
@@ -89,7 +98,7 @@ impl Report
 				
 			let location = span.location.unwrap();
 			
-			let chars = fileserver.get_chars(&mut Report::new(), &*span.file, None).ok().unwrap();
+			let chars = fileserver.get_chars(RcReport::new(), &*span.file, None).ok().unwrap();
 			let counter = CharCounter::new(&chars);
 			
 			let (span_line, _) = counter.get_line_column_at_index(location.0);
@@ -145,7 +154,7 @@ impl Report
 					Some((start, end)) =>
 					{
 						// Print location information.
-						let chars = fileserver.get_chars(&mut Report::new(), &*span.file, None).ok().unwrap();
+						let chars = fileserver.get_chars(RcReport::new(), &*span.file, None).ok().unwrap();
 						let counter = CharCounter::new(&chars);
 						
 						let (line1, col1) = counter.get_line_column_at_index(start);
@@ -242,5 +251,52 @@ impl Report
 		}
 		
 		print!("{}", C_DEFAULT);
+	}
+}
+
+
+impl RcReport
+{
+	pub fn new() -> RcReport
+	{
+		RcReport { report: Rc::new(RefCell::new(Report::new())) }
+	}
+	
+	
+	pub fn error<S>(&self, descr: S)
+	where S: Into<String>
+	{
+		self.report.borrow_mut().error(descr);
+	}
+	
+	
+	pub fn error_span<S>(&self, descr: S, span: &Span)
+	where S: Into<String>
+	{
+		self.report.borrow_mut().error_span(descr, span);
+	}
+	
+	
+	pub fn has_messages(&self) -> bool
+	{
+		self.report.borrow_mut().has_messages()
+	}
+	
+	
+	pub fn has_errors(&self) -> bool
+	{
+		self.report.borrow_mut().has_errors()
+	}
+	
+	
+	pub fn has_error_at(&self, fileserver: &FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	{
+		self.report.borrow_mut().has_error_at(fileserver, filename, line, error_excerpt)
+	}
+	
+	
+	pub fn print_all(&self, fileserver: &FileServer)
+	{
+		self.report.borrow_mut().print_all(fileserver);
 	}
 }

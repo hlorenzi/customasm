@@ -1,21 +1,21 @@
-use diagn::{Span, Report};
+use diagn::{Span, RcReport};
 use syntax::{Token, TokenKind, Parser};
 use syntax::{excerpt_as_string_contents, excerpt_as_usize};
 use expr::{Expression, ExpressionType};
 use instrset::{InstrSet, Rule};
 
 
-pub struct InstrSetParser<'t>
+pub struct InstrSetParser
 {
 	instrset: InstrSet,
-	parser: Parser<'t>,
+	parser: Parser,
 	align_was_set: bool
 }
 
 
-impl<'t> InstrSetParser<'t>
+impl InstrSetParser
 {
-	pub fn new(report: &'t mut Report, tokens: &'t [Token]) -> InstrSetParser<'t>
+	pub fn new(report: RcReport, tokens: Vec<Token>) -> InstrSetParser
 	{
 		let instrset = InstrSet
 		{
@@ -26,7 +26,7 @@ impl<'t> InstrSetParser<'t>
 		InstrSetParser
 		{
 			instrset: instrset,
-			parser: Parser::new(report, tokens),
+			parser: Parser::new(report.clone(), tokens),
 			align_was_set: false
 		}
 	}
@@ -66,7 +66,7 @@ impl<'t> InstrSetParser<'t>
 		if self.align_was_set
 			{ return Err(self.parser.report.error_span("duplicate align directive", &tk_name.span)); }
 			
-		let align = excerpt_as_usize(self.parser.report, &tk_align.excerpt.unwrap(), &tk_align.span)?;
+		let align = excerpt_as_usize(self.parser.report.clone(), &tk_align.excerpt.unwrap(), &tk_align.span)?;
 		if align == 0
 			{ return Err(self.parser.report.error_span("invalid alignment", &tk_align.span)); }
 		
@@ -190,15 +190,15 @@ impl<'t> InstrSetParser<'t>
 	{
 		let expr = Expression::parse(&mut self.parser)?;
 		
-		expr.check_vars(&mut |name, span| expr_check_var(self.parser.report, rule, name, span))?;
+		expr.check_vars(&mut |name, span| expr_check_var(self.parser.report.clone(), rule, name, span))?;
 		
-		if expr.eval_type(self.parser.report, &|name| expr_get_var_type(rule, name))? != ExpressionType::Bool
+		if expr.eval_type(self.parser.report.clone(), &|name| expr_get_var_type(rule, name))? != ExpressionType::Bool
 			{ return Err(self.parser.report.error_span("expected bool expression for constraint", &expr.span())) }
 			
 		let descr = if self.parser.maybe_expect(TokenKind::Comma).is_some()
 		{
 			let tk_descr = self.parser.expect(TokenKind::String)?;
-			Some(excerpt_as_string_contents(self.parser.report, &tk_descr.excerpt.unwrap(), &tk_descr.span)?)
+			Some(excerpt_as_string_contents(self.parser.report.clone(), &tk_descr.excerpt.unwrap(), &tk_descr.span)?)
 		}
 		else
 			{ None };
@@ -212,9 +212,9 @@ impl<'t> InstrSetParser<'t>
 	{
 		let expr = Expression::parse(&mut self.parser)?;
 		
-		expr.check_vars(&mut |name, span| expr_check_var(self.parser.report, rule, name, span))?;
+		expr.check_vars(&mut |name, span| expr_check_var(self.parser.report.clone(), rule, name, span))?;
 		
-		if expr.eval_type(self.parser.report, &|name| expr_get_var_type(rule, name))? != ExpressionType::Integer
+		if expr.eval_type(self.parser.report.clone(), &|name| expr_get_var_type(rule, name))? != ExpressionType::Integer
 			{ return Err(self.parser.report.error_span("expected integer expression for production", &expr.span())) }
 		
 		let width = match expr.width()
@@ -239,7 +239,7 @@ fn is_reserved_var(name: &str) -> bool
 }
 
 	
-fn expr_check_var(report: &mut Report, rule: &Rule, name: &str, span: &Span) -> Result<(), ()>
+fn expr_check_var(report: RcReport, rule: &Rule, name: &str, span: &Span) -> Result<(), ()>
 {
 	if rule.param_exists(name) || is_reserved_var(name)
 		{ Ok(()) }

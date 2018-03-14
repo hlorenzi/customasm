@@ -1,4 +1,4 @@
-use diagn::{Span, Report};
+use diagn::{Span, RcReport};
 use syntax::{Token, TokenKind, tokenize, Parser};
 use syntax::excerpt_as_string_contents;
 use expr::{Expression, ExpressionValue};
@@ -13,24 +13,24 @@ where 'b: 'a
 {
 	pub state: &'a mut AssemblerState<'b>,
 	pub cur_filename: String,
-	pub parser: Parser<'a>
+	pub parser: Parser
 }
 	
 	
 impl<'a, 'b> AssemblerParser<'a, 'b>
 {
-	pub fn parse_file<S>(report: &mut Report, state: &mut AssemblerState, filename: S, filename_span: Option<&Span>) -> Result<(), ()>
+	pub fn parse_file<S>(report: RcReport, state: &mut AssemblerState, filename: S, filename_span: Option<&Span>) -> Result<(), ()>
 	where S: Into<String>
 	{
 		let filename_owned = filename.into();
-		let chars = state.fileserver.get_chars(report, &filename_owned, filename_span)?;
-		let tokens = tokenize(report, filename_owned.as_ref(), &chars)?;
+		let chars = state.fileserver.get_chars(report.clone(), &filename_owned, filename_span)?;
+		let tokens = tokenize(report.clone(), filename_owned.as_ref(), &chars)?;
 		
 		let mut parser = AssemblerParser
 		{
 			state: state,
 			cur_filename: filename_owned,
-			parser: Parser::new(report, &tokens)
+			parser: Parser::new(report.clone(), tokens)
 		};
 		
 		parser.parse()
@@ -136,21 +136,21 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	{
 		let bits = self.parse_usize()? * self.state.instrset.align;
 		
-		self.state.output_zero_bits(self.parser.report, bits, &tk_name.span)
+		self.state.output_zero_bits(self.parser.report.clone(), bits, &tk_name.span)
 	}
 	
 	
 	fn parse_directive_str(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
 		let tk_string = self.parser.expect(TokenKind::String)?;
-		let string = excerpt_as_string_contents(self.parser.report, tk_string.excerpt.as_ref().unwrap().as_ref(), &tk_string.span)?;
+		let string = excerpt_as_string_contents(self.parser.report.clone(), tk_string.excerpt.as_ref().unwrap().as_ref(), &tk_string.span)?;
 		
 		for mut byte in string.bytes()
 		{
 			for _ in 0..8
 			{
 				let bit = byte & 0x80 != 0;
-				self.state.output_bit(self.parser.report, bit, &tk_string.span)?;
+				self.state.output_bit(self.parser.report.clone(), bit, &tk_string.span)?;
 				byte <<= 1;
 			}
 		}
@@ -166,29 +166,29 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	fn parse_directive_include(&mut self) -> Result<(), ()>
 	{
 		let tk_filename = self.parser.expect(TokenKind::String)?;
-		let filename = excerpt_as_string_contents(self.parser.report, tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
+		let filename = excerpt_as_string_contents(self.parser.report.clone(), tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
 	
-		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
+		let new_filename = filename_navigate(self.parser.report.clone(), &self.cur_filename, &filename, &tk_filename.span)?;
 		
-		AssemblerParser::parse_file(self.parser.report, self.state, new_filename, Some(&tk_filename.span))
+		AssemblerParser::parse_file(self.parser.report.clone(), self.state, new_filename, Some(&tk_filename.span))
 	}
 	
 	
 	fn parse_directive_incbin(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
 		let tk_filename = self.parser.expect(TokenKind::String)?;
-		let filename = excerpt_as_string_contents(self.parser.report, tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
+		let filename = excerpt_as_string_contents(self.parser.report.clone(), tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
 		
-		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
+		let new_filename = filename_navigate(self.parser.report.clone(), &self.cur_filename, &filename, &tk_filename.span)?;
 		
-		let bytes = self.state.fileserver.get_bytes(self.parser.report, &new_filename, Some(&tk_filename.span))?;
+		let bytes = self.state.fileserver.get_bytes(self.parser.report.clone(), &new_filename, Some(&tk_filename.span))?;
 		
 		for mut byte in bytes
 		{
 			for _ in 0..8
 			{
 				let bit = byte & 0x80 != 0;
-				self.state.output_bit(self.parser.report, bit, &tk_filename.span)?;
+				self.state.output_bit(self.parser.report.clone(), bit, &tk_filename.span)?;
 				byte <<= 1;
 			}
 		}
@@ -204,11 +204,11 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	fn parse_directive_incstr(&mut self, bits_per_char: usize, tk_name: &Token) -> Result<(), ()>
 	{
 		let tk_filename = self.parser.expect(TokenKind::String)?;
-		let filename = excerpt_as_string_contents(self.parser.report, tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
+		let filename = excerpt_as_string_contents(self.parser.report.clone(), tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
 		
-		let new_filename = filename_navigate(self.parser.report, &self.cur_filename, &filename, &tk_filename.span)?;
+		let new_filename = filename_navigate(self.parser.report.clone(), &self.cur_filename, &filename, &tk_filename.span)?;
 		
-		let chars = self.state.fileserver.get_chars(self.parser.report, &new_filename, Some(&tk_filename.span))?;
+		let chars = self.state.fileserver.get_chars(self.parser.report.clone(), &new_filename, Some(&tk_filename.span))?;
 		
 		for c in chars
 		{
@@ -221,7 +221,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			for _ in 0..bits_per_char
 			{
 				let bit = digit & (1 << (bits_per_char - 1)) != 0;
-				self.state.output_bit(self.parser.report, bit, &tk_filename.span)?;
+				self.state.output_bit(self.parser.report.clone(), bit, &tk_filename.span)?;
 				digit <<= 1;
 			}
 		}
@@ -254,7 +254,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			
 			self.state.parsed_exprs.push(parsed_expr);
 			
-			self.state.output_zero_bits(self.parser.report, elem_width, &span)?;
+			self.state.output_zero_bits(self.parser.report.clone(), elem_width, &span)?;
 			
 			if self.parser.maybe_expect(TokenKind::Comma).is_none()
 				{ break; }
@@ -281,7 +281,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let value = if self.parser.maybe_expect(TokenKind::Equal).is_some()
 		{		
 			let expr = Expression::parse(&mut self.parser)?;
-			let value = self.state.expr_eval(self.parser.report, &ctx, &expr)?;
+			let value = self.state.expr_eval(self.parser.report.clone(), &ctx, &expr)?;
 			self.parser.expect_linebreak()?;
 			value
 		}
@@ -339,9 +339,8 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		
 		for expr in &instr_match.exprs
 		{
-			// Do not report or propagate errors now.
-			let mut dummy_report = Report::new();
-			args.push(self.state.expr_eval(&mut dummy_report, &ctx, expr).ok());
+			// Use a dummy report to not propagate errors now.
+			args.push(self.state.expr_eval(RcReport::new(), &ctx, expr).ok());
 		}
 		
 		// If there is more than one match, find best suited match.
@@ -354,8 +353,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 				// be resolved now, of if it fails, just skip this rule without an error.
 				let rule = &self.state.instrset.rules[instr_match.rule_indices[best_match]];
 				let get_arg = |i: usize| args[i].clone();
-				let mut dummy_report = Report::new();
-				if self.state.rule_check_all_constraints_satisfied(&mut dummy_report, rule, &get_arg, &ctx, &instr_span).ok().is_some()
+				if self.state.rule_check_all_constraints_satisfied(RcReport::new(), rule, &get_arg, &ctx, &instr_span).ok().is_some()
 					{ break; }
 					
 				best_match += 1;
@@ -370,7 +368,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let rule = &self.state.instrset.rules[instr_match.rule_indices[best_match]];
 		
 		let instr_width = rule.production.width().unwrap();
-		self.state.output_zero_bits(self.parser.report, instr_width, &instr_span)?;
+		self.state.output_zero_bits(self.parser.report.clone(), instr_width, &instr_span)?;
 		
 		let parsed_instr = ParsedInstruction
 		{
@@ -393,7 +391,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		
 		let expr = Expression::parse(&mut self.parser)?;
 		
-		let value = match self.state.expr_eval(self.parser.report, &ctx, &expr)
+		let value = match self.state.expr_eval(self.parser.report.clone(), &ctx, &expr)
 		{
 			Ok(ExpressionValue::Integer(value)) => value,
 			Ok(_) => return Err(self.parser.report.error_span("expected integer value", &expr.span())),

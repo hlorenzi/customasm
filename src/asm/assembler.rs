@@ -1,4 +1,4 @@
-use diagn::{Span, Report};
+use diagn::{Span, RcReport};
 use expr::{Expression, ExpressionType, ExpressionValue};
 use instrset::{InstrSet, Rule};
 use asm::{AssemblerParser, BinaryOutput, RulePatternMatcher, LabelManager, LabelContext};
@@ -48,7 +48,7 @@ pub struct ParsedExpression
 }
 
 
-pub fn assemble<S>(report: &mut Report, instrset: &InstrSet, fileserver: &FileServer, filename: S) -> Result<BinaryOutput, ()>
+pub fn assemble<S>(report: RcReport, instrset: &InstrSet, fileserver: &FileServer, filename: S) -> Result<BinaryOutput, ()>
 where S: Into<String>
 {
 	let pattern_matcher = RulePatternMatcher::new(&instrset.rules);
@@ -67,9 +67,9 @@ where S: Into<String>
 		cur_output_bit: 0
 	};
 	
-	AssemblerParser::parse_file(report, &mut state, filename, None)?;
-	state.resolve_instrs(report)?;
-	state.resolve_exprs(report)?;
+	AssemblerParser::parse_file(report.clone(), &mut state, filename, None)?;
+	state.resolve_instrs(report.clone())?;
+	state.resolve_exprs(report.clone())?;
 	
 	match report.has_errors()
 	{
@@ -92,7 +92,7 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
-	pub fn output_bit(&mut self, report: &mut Report, bit: bool, span: &Span) -> Result<(), ()>
+	pub fn output_bit(&mut self, report: RcReport, bit: bool, span: &Span) -> Result<(), ()>
 	{
 		let output_bit = self.cur_output_bit;
 	
@@ -114,16 +114,16 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
-	pub fn output_zero_bits(&mut self, report: &mut Report, num: usize, span: &Span) -> Result<(), ()>
+	pub fn output_zero_bits(&mut self, report: RcReport, num: usize, span: &Span) -> Result<(), ()>
 	{
 		for _ in 0..num
-			{ self.output_bit(report, false, span)?; }
+			{ self.output_bit(report.clone(), false, span)?; }
 			
 		Ok(())
 	}
 
 	
-	pub fn resolve_instrs(&mut self, report: &mut Report) -> Result<(), ()>
+	pub fn resolve_instrs(&mut self, report: RcReport) -> Result<(), ()>
 	{
 		use std::mem;
 		
@@ -132,7 +132,7 @@ impl<'a> AssemblerState<'a>
 		for mut instr in &mut instrs
 		{
 			// Errors go to the report.
-			let _ = self.output_parsed_instr(report, &mut instr);
+			let _ = self.output_parsed_instr(report.clone(), &mut instr);
 		}
 		
 		mem::replace(&mut self.parsed_instrs, instrs);
@@ -141,7 +141,7 @@ impl<'a> AssemblerState<'a>
 	}
 	
 
-	pub fn resolve_exprs(&mut self, report: &mut Report) -> Result<(), ()>
+	pub fn resolve_exprs(&mut self, report: RcReport) -> Result<(), ()>
 	{
 		use std::mem;
 		
@@ -150,7 +150,7 @@ impl<'a> AssemblerState<'a>
 		for expr in &exprs
 		{
 			// Errors go to the report.
-			let _ = self.output_parsed_expr(report, expr);
+			let _ = self.output_parsed_expr(report.clone(), expr);
 		}
 		
 		mem::replace(&mut self.parsed_exprs, exprs);
@@ -159,24 +159,24 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
-	pub fn output_parsed_instr(&mut self, report: &mut Report, instr: &mut ParsedInstruction) -> Result<(), ()>
+	pub fn output_parsed_instr(&mut self, report: RcReport, instr: &mut ParsedInstruction) -> Result<(), ()>
 	{
 		// Resolve remaining arguments.
 		for i in 0..instr.exprs.len()
 		{
 			if instr.args[i].is_none()
-				{ instr.args[i] = Some(self.expr_eval(report, &instr.ctx, &instr.exprs[i])?); }
+				{ instr.args[i] = Some(self.expr_eval(report.clone(), &instr.ctx, &instr.exprs[i])?); }
 		}
 		
 		// Check rule constraints.
 		let rule = &self.instrset.rules[instr.rule_index];
 		let get_arg = |i: usize| instr.args[i].clone();
 		
-		self.rule_check_all_constraints_satisfied(report, rule, &get_arg, &instr.ctx, &instr.span)?;
+		self.rule_check_all_constraints_satisfied(report.clone(), rule, &get_arg, &instr.ctx, &instr.span)?;
 		
 		// Output binary representation.
 		let (left, right) = rule.production.slice().unwrap();
-		let value = self.rule_expr_eval(report, rule, &get_arg, &instr.ctx, &rule.production)?;
+		let value = self.rule_expr_eval(report.clone(), rule, &get_arg, &instr.ctx, &rule.production)?;
 		
 		for i in 0..(left - right + 1)
 		{
@@ -188,10 +188,10 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
-	pub fn output_parsed_expr(&mut self, report: &mut Report, expr: &ParsedExpression) -> Result<(), ()>
+	pub fn output_parsed_expr(&mut self, report: RcReport, expr: &ParsedExpression) -> Result<(), ()>
 	{
 		// Resolve expression.
-		let value = self.expr_eval(report, &expr.ctx, &expr.expr)?;
+		let value = self.expr_eval(report.clone(), &expr.ctx, &expr.expr)?;
 		
 		// Check size constraints.
 		let value_width = value.bits();
@@ -213,12 +213,12 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
-	pub fn rule_check_all_constraints_satisfied<F>(&self, report: &mut Report, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, span: &Span) -> Result<(), ()>
+	pub fn rule_check_all_constraints_satisfied<F>(&self, report: RcReport, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, span: &Span) -> Result<(), ()>
 	where F: Fn(usize) -> Option<ExpressionValue>
 	{
 		for constr in &rule.constraints
 		{
-			let satisfied = match self.rule_expr_eval(report, rule, get_arg, ctx, &constr.expr)?
+			let satisfied = match self.rule_expr_eval(report.clone(), rule, get_arg, ctx, &constr.expr)?
 			{
 				ExpressionValue::Bool(b) => b,
 				_ => unreachable!()
@@ -240,15 +240,15 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
-	fn rule_expr_eval<F>(&self, report: &mut Report, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, expr: &Expression) -> Result<ExpressionValue, ()>
+	fn rule_expr_eval<F>(&self, report: RcReport, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, expr: &Expression) -> Result<ExpressionValue, ()>
 	where F: Fn(usize) -> Option<ExpressionValue>
 	{
-		expr.check_vars(&mut |name, span| self.rule_expr_check_var(report, rule, get_arg, name, span))?;
-		expr.eval(report, &|name| self.rule_expr_get_var(rule, get_arg, ctx, name))
+		expr.check_vars(&mut |name, span| self.rule_expr_check_var(report.clone(), rule, get_arg, name, span))?;
+		expr.eval(report.clone(), &|name| self.rule_expr_get_var(rule, get_arg, ctx, name))
 	}
 
 
-	fn rule_expr_check_var<F>(&self, report: &mut Report, rule: &Rule, get_arg: &F, name: &str, span: &Span) -> Result<(), ()>
+	fn rule_expr_check_var<F>(&self, report: RcReport, rule: &Rule, get_arg: &F, name: &str, span: &Span) -> Result<(), ()>
 	where F: Fn(usize) -> Option<ExpressionValue>
 	{
 		if name == "pc"
@@ -279,18 +279,18 @@ impl<'a> AssemblerState<'a>
 	}
 	
 	
-	pub fn expr_eval(&self, report: &mut Report, ctx: &ExpressionContext, expr: &Expression) -> Result<ExpressionValue, ()>
+	pub fn expr_eval(&self, report: RcReport, ctx: &ExpressionContext, expr: &Expression) -> Result<ExpressionValue, ()>
 	{
-		expr.check_vars(&mut |name, span| self.expr_check_var(report, ctx, name, span))?;
+		expr.check_vars(&mut |name, span| self.expr_check_var(report.clone(), ctx, name, span))?;
 		
-		if expr.eval_type(report, &|name| self.expr_get_var_type(name))? != ExpressionType::Integer
+		if expr.eval_type(report.clone(), &|name| self.expr_get_var_type(name))? != ExpressionType::Integer
 			{ return Err(report.error_span("expected integer value for instruction argument", &expr.span())); }
 		
-		expr.eval(report, &|name| self.expr_get_var(ctx, name))
+		expr.eval(report.clone(), &|name| self.expr_get_var(ctx, name))
 	}
 
 
-	fn expr_check_var(&self, report: &mut Report, ctx: &ExpressionContext, name: &str, span: &Span) -> Result<(), ()>
+	fn expr_check_var(&self, report: RcReport, ctx: &ExpressionContext, name: &str, span: &Span) -> Result<(), ()>
 	{
 		if name == "pc"
 			{ Ok (()) }

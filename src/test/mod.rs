@@ -4,7 +4,7 @@ mod instrset;
 mod asm;
 
 
-use diagn::Report;
+use diagn::RcReport;
 use util::FileServer;
 use std::fmt::Debug;
 use std::cmp::PartialEq;
@@ -18,7 +18,7 @@ pub enum ExpectedResult<T>
 }
 
 
-pub fn expect_result<T>(report: &Report, fileserver: &FileServer, got: Option<T>, expected: ExpectedResult<T>)
+pub fn expect_result<T>(report: RcReport, fileserver: &FileServer, got: Option<T>, expected: ExpectedResult<T>)
 where T: Debug + PartialEq
 {
 	report.print_all(fileserver);

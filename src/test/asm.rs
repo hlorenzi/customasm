@@ -1,4 +1,4 @@
-use diagn::Report;
+use diagn::RcReport;
 use util::{FileServer, FileServerMock};
 use asm::BinaryOutput;
 use super::ExpectedResult::*;
@@ -21,24 +21,24 @@ where S: Into<Vec<u8>>, T: Into<Vec<u8>>
 fn test_fileserver<S, T>(fileserver: &FileServer, instrset_filename: S, asm_filename: T, expected: ExpectedResult<(usize, &'static str)>)
 where S: Into<String>, T: Into<String>
 {
-	let compile = |report: &mut Report, fileserver: &FileServer| -> Result<BinaryOutput, ()>
+	let compile = |report: RcReport, fileserver: &FileServer| -> Result<BinaryOutput, ()>
 	{
-		let instrset = read_instrset(report, fileserver, instrset_filename)?;
-		assemble(report, &instrset, fileserver, asm_filename)
+		let instrset = read_instrset(report.clone(), fileserver, instrset_filename)?;
+		assemble(report.clone(), &instrset, fileserver, asm_filename)
 	};
 	
-	let mut report = Report::new();
+	let report = RcReport::new();
 	
 	let bits = if let Pass(expected) = expected
 		{ expected.0 }
 	else
 		{ 4 };
 	
-	let result = compile(&mut report, fileserver).ok();
+	let result = compile(report.clone(), fileserver).ok();
 	let result = result.map(|r| (bits, r.generate_str(bits, 0, r.len())));
 	let result = result.as_ref().map(|r| (r.0, r.1.as_ref()));
 	
-	expect_result(&report, fileserver, result, expected);
+	expect_result(report.clone(), fileserver, result, expected);
 }
 
 

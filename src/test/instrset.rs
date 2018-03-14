@@ -1,4 +1,4 @@
-use diagn::Report;
+use diagn::RcReport;
 use util::{FileServer, FileServerMock};
 use super::ExpectedResult::*;
 use super::{ExpectedResult, expect_result};
@@ -8,18 +8,18 @@ use ::read_instrset;
 fn test<S>(src: S, expected: ExpectedResult<()>)
 where S: Into<Vec<u8>>
 {
-	fn compile(report: &mut Report, fileserver: &FileServer) -> Result<(), ()>
+	fn compile(report: RcReport, fileserver: &FileServer) -> Result<(), ()>
 	{
-		read_instrset(report, fileserver, "test")?;
+		read_instrset(report.clone(), fileserver, "test")?;
 		Ok(())
 	}
 	
-	let mut report = Report::new();
+	let report = RcReport::new();
 	let mut fileserver = FileServerMock::new();
 	fileserver.add("test", src);
 	
-	let result = compile(&mut report, &fileserver);
-	expect_result(&report, &fileserver, result.ok(), expected);
+	let result = compile(report.clone(), &fileserver);
+	expect_result(report.clone(), &fileserver, result.ok(), expected);
 }
 
 

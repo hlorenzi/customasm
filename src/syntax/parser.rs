@@ -1,11 +1,11 @@
-use diagn::Report;
+use diagn::RcReport;
 use syntax::{Token, TokenKind};
 
 
-pub struct Parser<'t>
+pub struct Parser
 {
-	pub report: &'t mut Report,
-	tokens: &'t [Token],
+	pub report: RcReport,
+	tokens: Vec<Token>,
 	index: usize,
 	index_prev: usize,
 	read_linebreak: bool
@@ -20,9 +20,9 @@ pub struct ParserState
 }
 
 
-impl<'t> Parser<'t>
+impl Parser
 {
-	pub fn new(report: &'t mut Report, tokens: &'t [Token]) -> Parser<'t>
+	pub fn new(report: RcReport, tokens: Vec<Token>) -> Parser
 	{
 		assert!(tokens[tokens.len() - 1].kind == TokenKind::End);
 	

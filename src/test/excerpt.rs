@@ -1,4 +1,4 @@
-use diagn::{Span, Report};
+use diagn::{Span, RcReport};
 use syntax::excerpt_as_string_contents;
 use util::FileServerMock;
 use super::ExpectedResult::*;
@@ -14,15 +14,15 @@ fn test(src: &str, expected: ExpectedResult<&str>)
 	src_quoted.push_str("\"");
 	let src_quoted: &str = src_quoted.as_ref();
 
-	let mut report = Report::new();
+	let report = RcReport::new();
 	let mut fileserver = FileServerMock::new();
 	fileserver.add("test", src_quoted);
 	
 	let span = Span::new(Rc::new("test".to_string()), 0, 0);
 	
-	let result = excerpt_as_string_contents(&mut report, src_quoted, &span).ok();
+	let result = excerpt_as_string_contents(report.clone(), src_quoted, &span).ok();
 	let result = result.as_ref().map(|s| s.as_ref());
-	expect_result(&report, &fileserver, result, expected);
+	expect_result(report.clone(), &fileserver, result, expected);
 }
 
 

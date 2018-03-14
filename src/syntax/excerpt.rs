@@ -1,9 +1,9 @@
-use diagn::{Span, Report};
+use diagn::{Span, RcReport};
 use num::BigInt;
 use num::Zero;
 
 
-pub fn excerpt_as_string_contents(report: &mut Report, excerpt: &str, span: &Span) -> Result<String, ()>
+pub fn excerpt_as_string_contents(report: RcReport, excerpt: &str, span: &Span) -> Result<String, ()>
 {
 	assert!(excerpt.len() >= 2);
 	
@@ -102,7 +102,7 @@ pub fn excerpt_as_string_contents(report: &mut Report, excerpt: &str, span: &Spa
 
 
 
-pub fn excerpt_as_usize(report: &mut Report, excerpt: &str, span: &Span) -> Result<usize, ()>
+pub fn excerpt_as_usize(report: RcReport, excerpt: &str, span: &Span) -> Result<usize, ()>
 {
 	let chars: Vec<char> = excerpt.chars().collect();
 	assert!(chars.len() >= 1);
@@ -141,12 +141,12 @@ pub fn excerpt_as_usize(report: &mut Report, excerpt: &str, span: &Span) -> Resu
 }
 
 
-pub fn excerpt_as_bigint(report: &mut Report, excerpt: &str, span: &Span) -> Result<(BigInt, Option<usize>), ()>
+pub fn excerpt_as_bigint(report: RcReport, excerpt: &str, span: &Span) -> Result<(BigInt, Option<usize>), ()>
 {
 	let chars: Vec<char> = excerpt.chars().collect();
 	assert!(chars.len() >= 1);
 
-	let (width,     index) = parse_width(report, &chars, span)?;
+	let (width,     index) = parse_width(report.clone(), &chars, span)?;
 	let (radix, mut index) = parse_radix(&chars, index);
 	
 	let mut value = BigInt::zero();
@@ -178,7 +178,7 @@ pub fn excerpt_as_bigint(report: &mut Report, excerpt: &str, span: &Span) -> Res
 }
 
 
-fn parse_width(report: &mut Report, chars: &[char], span: &Span) -> Result<(Option<usize>, usize), ()>
+fn parse_width(report: RcReport, chars: &[char], span: &Span) -> Result<(Option<usize>, usize), ()>
 {
 	if !chars.iter().any(|c| *c == '\'')
 		{ return Ok((None, 0)); }

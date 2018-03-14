@@ -1,4 +1,4 @@
-use diagn::Report;
+use diagn::RcReport;
 use syntax::{tokenize, Parser};
 use expr::{Expression, ExpressionValue};
 use util::{FileServer, FileServerMock};
@@ -10,17 +10,17 @@ use num::BigInt;
 fn test<S>(src: S, expected: ExpectedResult<ExpressionValue>)
 where S: Into<Vec<u8>>
 {
-	fn compile(report: &mut Report, fileserver: &FileServer) -> Result<ExpressionValue, ()>
+	fn compile(report: RcReport, fileserver: &FileServer) -> Result<ExpressionValue, ()>
 	{
-		let chars = fileserver.get_chars(report, "test", None)?;
-		let tokens = tokenize(report, "test", &chars)?;
+		let chars = fileserver.get_chars(report.clone(), "test", None)?;
+		let tokens = tokenize(report.clone(), "test", &chars)?;
 		
-		let expr = Expression::parse(&mut Parser::new(report, &tokens))?;
+		let expr = Expression::parse(&mut Parser::new(report.clone(), tokens))?;
 		
 		expr.check_vars(&mut |_, span| Err(report.error_span("unknown variable", span)))?;
 		
-		let expr_type = expr.eval_type(report, &|_| panic!("unknown variable"))?;
-		let expr_value = expr.eval(report, &|_| panic!("unknown variable"))?;
+		let expr_type = expr.eval_type(report.clone(), &|_| panic!("unknown variable"))?;
+		let expr_value = expr.eval(report.clone(), &|_| panic!("unknown variable"))?;
 		
 		if !expr_value.is_of_type(expr_type)
 			{ panic!("mismatching eval_type and actual result type"); }
@@ -29,12 +29,12 @@ where S: Into<Vec<u8>>
 	}
 	
 	
-	let mut report = Report::new();
+	let report = RcReport::new();
 	let mut fileserver = FileServerMock::new();
 	fileserver.add("test", src);
 	
-	let result = compile(&mut report, &fileserver);
-	expect_result(&report, &fileserver, result.ok(), expected);
+	let result = compile(report.clone(), &fileserver);
+	expect_result(report.clone(), &fileserver, result.ok(), expected);
 }
 
 

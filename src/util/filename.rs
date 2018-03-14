@@ -1,8 +1,8 @@
-use diagn::{Span, Report};
+use diagn::{Span, RcReport};
 use std::path::{PathBuf, Component};
 
 
-pub fn filename_validate(report: &mut Report, f: &str, span: &Span) -> Result<(), ()>
+pub fn filename_validate(report: RcReport, f: &str, span: &Span) -> Result<(), ()>
 {
 	let pathbuf = PathBuf::from(f);
 	
@@ -23,7 +23,7 @@ pub fn filename_validate(report: &mut Report, f: &str, span: &Span) -> Result<()
 }
 
 
-pub fn filename_navigate(report: &mut Report, current: &str, nav: &str, span: &Span) -> Result<String, ()>
+pub fn filename_navigate(report: RcReport, current: &str, nav: &str, span: &Span) -> Result<String, ()>
 {
 	if let Err(()) = filename_validate(report, nav, span)
 		{ return Err(()); }

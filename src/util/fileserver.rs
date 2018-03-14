@@ -1,4 +1,4 @@
-use diagn::{Span, Report};
+use diagn::{Span, RcReport};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -7,10 +7,10 @@ use std::path::Path;
 
 pub trait FileServer
 {
-	fn get_bytes(&self, report: &mut Report, filename: &str, span: Option<&Span>) -> Result<Vec<u8>, ()>;
+	fn get_bytes(&self, report: RcReport, filename: &str, span: Option<&Span>) -> Result<Vec<u8>, ()>;
 	
 	
-	fn get_chars(&self, report: &mut Report, filename: &str, span: Option<&Span>) -> Result<Vec<char>, ()>
+	fn get_chars(&self, report: RcReport, filename: &str, span: Option<&Span>) -> Result<Vec<char>, ()>
 	{
 		let bytes = self.get_bytes(report, filename, span)?;
 		
@@ -18,7 +18,7 @@ pub trait FileServer
 	}
 	
 	
-	fn write_bytes(&mut self, report: &mut Report, filename: &str, data: &Vec<u8>, span: Option<&Span>) -> Result<(), ()>;
+	fn write_bytes(&mut self, report: RcReport, filename: &str, data: &Vec<u8>, span: Option<&Span>) -> Result<(), ()>;
 }
 
 
@@ -61,7 +61,7 @@ impl FileServerReal
 
 impl FileServer for FileServerMock
 {
-	fn get_bytes(&self, report: &mut Report, filename: &str, span: Option<&Span>) -> Result<Vec<u8>, ()>
+	fn get_bytes(&self, report: RcReport, filename: &str, span: Option<&Span>) -> Result<Vec<u8>, ()>
 	{
 		match self.files.get(filename)
 		{
@@ -71,7 +71,7 @@ impl FileServer for FileServerMock
 	}
 	
 	
-	fn write_bytes(&mut self, _report: &mut Report, filename: &str, data: &Vec<u8>, _span: Option<&Span>) -> Result<(), ()>
+	fn write_bytes(&mut self, _report: RcReport, filename: &str, data: &Vec<u8>, _span: Option<&Span>) -> Result<(), ()>
 	{
 		self.files.insert(filename.to_string(), data.clone());
 		Ok(())
@@ -81,7 +81,7 @@ impl FileServer for FileServerMock
 
 impl FileServer for FileServerReal
 {
-	fn get_bytes(&self, report: &mut Report, filename: &str, span: Option<&Span>) -> Result<Vec<u8>, ()>
+	fn get_bytes(&self, report: RcReport, filename: &str, span: Option<&Span>) -> Result<Vec<u8>, ()>
 	{
 		let filename_path = &Path::new(filename);
 		
@@ -103,7 +103,7 @@ impl FileServer for FileServerReal
 	}
 	
 	
-	fn write_bytes(&mut self, report: &mut Report, filename: &str, data: &Vec<u8>, span: Option<&Span>) -> Result<(), ()>
+	fn write_bytes(&mut self, report: RcReport, filename: &str, data: &Vec<u8>, span: Option<&Span>) -> Result<(), ()>
 	{
 		let filename_path = &Path::new(filename);
 		
@@ -122,7 +122,7 @@ impl FileServer for FileServerReal
 }
 
 
-fn error<S>(report: &mut Report, descr: S, span: Option<&Span>)
+fn error<S>(report: RcReport, descr: S, span: Option<&Span>)
 where S: Into<String>
 {
 	if let Some(span) = span

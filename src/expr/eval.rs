@@ -1,4 +1,4 @@
-use diagn::Report;
+use diagn::RcReport;
 use super::Expression;
 use super::ExpressionValue;
 use super::UnaryOp;
@@ -13,7 +13,7 @@ use std::mem::swap;
 
 impl Expression
 {
-	pub fn eval<F>(&self, report: &mut Report, eval_var: &F) -> Result<ExpressionValue, ()>
+	pub fn eval<F>(&self, report: RcReport, eval_var: &F) -> Result<ExpressionValue, ()>
 	where F: Fn(&str) -> ExpressionValue
 	{
 		match self
@@ -24,7 +24,7 @@ impl Expression
 			
 			&Expression::UnaryOp(_, _, op, ref inner_expr) =>
 			{
-				match inner_expr.eval(report, eval_var)?
+				match inner_expr.eval(report.clone(), eval_var)?
 				{
 					ExpressionValue::Integer(x) => match op
 					{
@@ -41,7 +41,7 @@ impl Expression
 			
 			&Expression::BinaryOp(_, ref op_span, op, ref lhs_expr, ref rhs_expr) =>
 			{
-				match (lhs_expr.eval(report, eval_var)?, rhs_expr.eval(report, eval_var)?)
+				match (lhs_expr.eval(report.clone(), eval_var)?, rhs_expr.eval(report.clone(), eval_var)?)
 				{
 					(ExpressionValue::Integer(lhs), ExpressionValue::Integer(rhs)) =>
 					{
@@ -120,7 +120,7 @@ impl Expression
 			
 			&Expression::BitSlice(_, _, left, right, ref inner) =>
 			{
-				match inner.eval(report, eval_var)?
+				match inner.eval(report.clone(), eval_var)?
 				{
 					ExpressionValue::Integer(x) => Ok(ExpressionValue::Integer(bigint_slice(x, left, right))),
 					_ => unreachable!()
