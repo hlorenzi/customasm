@@ -72,6 +72,7 @@ impl Expression
 
 impl ExpressionValue
 {
+	#[cfg(test)]
 	pub fn is_of_type(&self, typ: ExpressionType) -> bool
 	{
 		match (self, typ)

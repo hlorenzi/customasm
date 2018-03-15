@@ -1,6 +1,6 @@
 use diagn::{Span, RcReport};
 use syntax::{Token, TokenKind, Parser};
-use syntax::{excerpt_as_string_contents, excerpt_as_usize};
+use syntax::{excerpt_as_string_contents};
 use expr::{Expression, ExpressionType};
 use asm::cpudef::{Rule, RulePatternMatcher};
 
@@ -78,12 +78,11 @@ impl<'t> CpuDefParser<'t>
 	
 	fn parse_directive_align(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
-		let tk_align = self.parser.expect_msg(TokenKind::Number, "expected alignment value")?;
+		let (tk_align, align) = self.parser.expect_usize()?;
 		
 		if self.align.is_some()
 			{ return Err(self.parser.report.error_span("duplicate align directive", &tk_name.span)); }
 			
-		let align = excerpt_as_usize(self.parser.report.clone(), &tk_align.excerpt.unwrap(), &tk_align.span)?;
 		if align == 0
 			{ return Err(self.parser.report.error_span("invalid alignment", &tk_align.span)); }
 		

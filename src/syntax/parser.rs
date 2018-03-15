@@ -1,5 +1,5 @@
 use diagn::RcReport;
-use syntax::{Token, TokenKind};
+use syntax::{Token, TokenKind, excerpt_as_usize};
 
 
 pub struct Parser
@@ -194,5 +194,13 @@ impl Parser
 			{ Ok(()) }
 		else
 			{ Err(self.report.error_span("expected line break", &self.tokens[self.index_prev].span.after())) }
+	}
+	
+	
+	pub fn expect_usize(&mut self) -> Result<(Token, usize), ()>
+	{
+		let tk = self.expect(TokenKind::Number)?;
+		let value = excerpt_as_usize(self.report.clone(), &tk.excerpt.as_ref().unwrap(), &tk.span)?;
+		Ok((tk, value))
 	}
 }

@@ -1,6 +1,7 @@
 use diagn::{Span, RcReport};
 use expr::{Expression, ExpressionType, ExpressionValue};
 use asm::{AssemblerParser, BinaryOutput, LabelManager, LabelContext};
+use asm::BankDef;
 use asm::cpudef::{CpuDef, Rule};
 use util::FileServer;
 use num::bigint::ToBigInt;
@@ -14,6 +15,10 @@ pub struct AssemblerState<'a>
 	pub labels: LabelManager,
 	pub parsed_instrs: Vec<ParsedInstruction>,
 	pub parsed_exprs: Vec<ParsedExpression>,
+	
+	pub bankdefs: Vec<BankDef>,
+	pub cur_bank: usize,
+	
 	pub bin_output: BinaryOutput,
 	
 	pub cur_address_bit: usize,
@@ -57,11 +62,17 @@ where S: Into<String>
 		labels: LabelManager::new(),
 		parsed_instrs: Vec::new(),
 		parsed_exprs: Vec::new(),
+		
+		bankdefs: Vec::new(),
+		cur_bank: 0,
+		
 		bin_output: BinaryOutput::new(),
 		
 		cur_address_bit: 0,
 		cur_output_bit: 0
 	};
+	
+	state.bankdefs.push(BankDef::new("", 0, 0x1_0000_0000, 0));
 	
 	AssemblerParser::parse_file(report.clone(), &mut state, filename, None)?;
 	state.resolve_instrs(report.clone())?;
@@ -95,6 +106,31 @@ impl<'a> AssemblerState<'a>
 			output_bit: self.cur_output_bit
 		}
 	}
+	
+	
+	pub fn find_bankdef(&self, name: &str) -> Option<usize>
+	{
+		for i in 0..self.bankdefs.len()
+		{
+			if self.bankdefs[i].name == name
+				{ return Some(i); }
+		}
+		
+		None
+	}
+	
+	
+	/*pub fn get_cur_address(&self, report: RcReport, span: &Span) -> Result<usize, ()>
+	{
+		self.check_cpudef_active(report, span)?;
+		
+		let bank = self.banks[self.cur_bank];
+		
+		if bank.len() % self.cpudef.unwrap().align != 0
+			{ return Err(report.error_span("address is not aligned to a byte", span)); }
+			
+		Ok(bank.len() / self.cpudef.unwrap().align)
+	}*/
 	
 	
 	pub fn output_bit(&mut self, report: RcReport, bit: bool, span: &Span) -> Result<(), ()>

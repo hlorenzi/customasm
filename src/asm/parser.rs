@@ -4,6 +4,7 @@ use syntax::excerpt_as_string_contents;
 use expr::{Expression, ExpressionValue};
 use asm::{AssemblerState, ParsedInstruction, ParsedExpression};
 use asm::cpudef::CpuDef;
+use asm::BankDef;
 use util::filename_navigate;
 use num::BigInt;
 use num::ToPrimitive;
@@ -93,6 +94,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		match name.as_ref()
 		{
 			"cpudef"    => self.parse_directive_cpudef(&tk_name),
+			"bankdef"   => self.parse_directive_bankdef(&tk_name),
 			"addr"      => self.parse_directive_addr(&tk_name),
 			"outp"      => self.parse_directive_outp(&tk_name),
 			"res"       => self.parse_directive_res(&tk_name),
@@ -119,6 +121,23 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		
 		self.parser.expect(TokenKind::BraceClose)?;
 		
+		Ok(())
+	}
+	
+	
+	fn parse_directive_bankdef(&mut self, _tk_name: &Token) -> Result<(), ()>
+	{
+		let tk_bankname = self.parser.expect(TokenKind::String)?;
+		let bankname = excerpt_as_string_contents(self.parser.report.clone(), tk_bankname.excerpt.as_ref().unwrap().as_ref(), &tk_bankname.span)?;
+		
+		if self.state.find_bankdef(&bankname).is_some()
+			{ return Err(self.parser.report.error_span("duplicate bank name", &tk_bankname.span)); }
+		
+		self.parser.expect(TokenKind::BraceOpen)?;
+		let bankdef = BankDef::parse(bankname, &mut self.parser, &tk_bankname.span)?;
+		self.parser.expect(TokenKind::BraceClose)?;
+		
+		self.state.bankdefs.push(bankdef);
 		Ok(())
 	}
 	
