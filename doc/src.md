@@ -10,7 +10,7 @@ a list of instructions to be assembled for the target machine.
 Indentation is always disregarded everywhere.
 
 The syntax for the `#cpudef` directive is described at
-[cpudef Directive](/doc/cpudef.md)
+[cpudef Directive](/doc/cpudef.md).
 
 As an example, the file:
 

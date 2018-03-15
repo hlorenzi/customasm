@@ -1,6 +1,6 @@
 use syntax::{TokenKind, Parser};
 use expr::Expression;
-use instrset::{Rule, RulePatternPart};
+use asm::cpudef::{Rule, RulePatternPart};
 use std::collections::HashMap;
 
 

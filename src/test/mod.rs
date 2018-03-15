@@ -1,6 +1,6 @@
 mod excerpt;
 mod expr;
-mod instrset;
+mod cpudef;
 mod asm;
 
 

@@ -1,5 +1,5 @@
 use diagn::RcReport;
-use instrset::InstrSetParser;
+use asm::cpudef::CpuDef;
 use syntax::{Parser, tokenize};
 use util::{FileServer, FileServerMock};
 use super::ExpectedResult::*;
@@ -15,7 +15,7 @@ where S: Into<Vec<u8>>
 		let tokens = tokenize(report.clone(), "test", &chars)?;
 		let mut parser = Parser::new(report.clone(), tokens);
 		
-		InstrSetParser::parse(&mut parser)?;
+		CpuDef::parse(&mut parser)?;
 		Ok(())
 	};
 

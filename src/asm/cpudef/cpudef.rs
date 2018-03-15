@@ -2,11 +2,19 @@ use diagn::{Span, RcReport};
 use syntax::{Token, TokenKind, Parser};
 use syntax::{excerpt_as_string_contents, excerpt_as_usize};
 use expr::{Expression, ExpressionType};
-use instrset::{InstrSet, Rule};
-use asm::RulePatternMatcher;
+use asm::cpudef::{Rule, RulePatternMatcher};
 
 
-pub struct InstrSetParser<'t>
+#[derive(Debug)]
+pub struct CpuDef
+{
+	pub align: usize,
+	pub rules: Vec<Rule>,
+	pub pattern_matcher: RulePatternMatcher
+}
+
+
+struct CpuDefParser<'t>
 {
 	parser: &'t mut Parser,
 	
@@ -15,37 +23,40 @@ pub struct InstrSetParser<'t>
 }
 
 
-impl<'t> InstrSetParser<'t>
+impl CpuDef
 {
-	pub fn parse(parser: &mut Parser) -> Result<InstrSet, ()>
+	pub fn parse(parser: &mut Parser) -> Result<CpuDef, ()>
 	{
-		let mut instrset_parser = InstrSetParser
+		let mut cpudef_parser = CpuDefParser
 		{
 			parser: parser,
 			align: None,
 			rules: Vec::new()
 		};
 		
-		instrset_parser.parse_directives()?;	
+		cpudef_parser.parse_directives()?;	
 		
-		if instrset_parser.align.is_none()
-			{ instrset_parser.align = Some(8); }
+		if cpudef_parser.align.is_none()
+			{ cpudef_parser.align = Some(8); }
 		
-		instrset_parser.parse_rules()?;
+		cpudef_parser.parse_rules()?;
 		
-		let pattern_matcher = RulePatternMatcher::new(&instrset_parser.rules);
+		let pattern_matcher = RulePatternMatcher::new(&cpudef_parser.rules);
 		
-		let instrset = InstrSet
+		let cpudef = CpuDef
 		{
-			align: instrset_parser.align.unwrap(),
-			rules: instrset_parser.rules,
+			align: cpudef_parser.align.unwrap(),
+			rules: cpudef_parser.rules,
 			pattern_matcher: pattern_matcher
 		};
 		
-		Ok(instrset)
+		Ok(cpudef)
 	}
-	
+}
 
+
+impl<'t> CpuDefParser<'t>
+{
 	fn parse_directives(&mut self) -> Result<(), ()>
 	{
 		while self.parser.maybe_expect(TokenKind::Hash).is_some()

@@ -3,7 +3,7 @@ use syntax::{Token, TokenKind, tokenize, Parser};
 use syntax::excerpt_as_string_contents;
 use expr::{Expression, ExpressionValue};
 use asm::{AssemblerState, ParsedInstruction, ParsedExpression};
-use instrset::InstrSetParser;
+use asm::cpudef::CpuDef;
 use util::filename_navigate;
 use num::BigInt;
 use num::ToPrimitive;
@@ -112,10 +112,10 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		
 		self.parser.expect(TokenKind::BraceOpen)?;
 		
-		if self.state.instrset.is_some()
+		if self.state.cpudef.is_some()
 			{ return Err(self.parser.report.error_span("cpu already set", &tk_name.span)); }
 		
-		self.state.instrset = Some(InstrSetParser::parse(&mut self.parser)?);
+		self.state.cpudef = Some(CpuDef::parse(&mut self.parser)?);
 		
 		self.parser.expect(TokenKind::BraceClose)?;
 		
@@ -127,9 +127,9 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	{
 		let address_byte = self.parse_usize()?;
 		
-		self.state.check_instrset_active(self.parser.report.clone(), &tk_name.span)?;
+		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
 		
-		match address_byte.checked_mul(self.state.instrset.as_ref().unwrap().align)
+		match address_byte.checked_mul(self.state.cpudef.as_ref().unwrap().align)
 		{
 			Some(address_bit) => self.state.cur_address_bit = address_bit,
 			None => return Err(self.parser.report.error_span("address is out of valid range", &tk_name.span))
@@ -143,9 +143,9 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	{
 		let output_byte = self.parse_usize()?;
 		
-		self.state.check_instrset_active(self.parser.report.clone(), &tk_name.span)?;
+		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
 		
-		match output_byte.checked_mul(self.state.instrset.as_ref().unwrap().align)
+		match output_byte.checked_mul(self.state.cpudef.as_ref().unwrap().align)
 		{
 			Some(output_bit) => self.state.cur_output_bit = output_bit,
 			None => return Err(self.parser.report.error_span("output pointer is out of valid range", &tk_name.span))
@@ -157,9 +157,9 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	
 	fn parse_directive_res(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
-		self.state.check_instrset_active(self.parser.report.clone(), &tk_name.span)?;
+		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
 		
-		let bits = self.parse_usize()? * self.state.instrset.as_ref().unwrap().align;
+		let bits = self.parse_usize()? * self.state.cpudef.as_ref().unwrap().align;
 		
 		self.state.output_zero_bits(self.parser.report.clone(), bits, &tk_name.span)
 	}
@@ -167,7 +167,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	
 	fn parse_directive_str(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
-		self.state.check_instrset_active(self.parser.report.clone(), &tk_name.span)?;
+		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
 		
 		let tk_string = self.parser.expect(TokenKind::String)?;
 		let string = excerpt_as_string_contents(self.parser.report.clone(), tk_string.excerpt.as_ref().unwrap().as_ref(), &tk_string.span)?;
@@ -182,7 +182,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			}
 		}
 		
-		let excess_bits = self.state.cur_address_bit % self.state.instrset.as_ref().unwrap().align;
+		let excess_bits = self.state.cur_address_bit % self.state.cpudef.as_ref().unwrap().align;
 		if excess_bits != 0
 			{ return Err(self.parser.report.error_span(format!("string leaves address misaligned (excess bits = {})", excess_bits), &tk_name.span)); }
 			
@@ -203,7 +203,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	
 	fn parse_directive_incbin(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
-		self.state.check_instrset_active(self.parser.report.clone(), &tk_name.span)?;
+		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
 		
 		let tk_filename = self.parser.expect(TokenKind::String)?;
 		let filename = excerpt_as_string_contents(self.parser.report.clone(), tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
@@ -222,7 +222,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			}
 		}
 		
-		let excess_bits = self.state.cur_address_bit % self.state.instrset.as_ref().unwrap().align;
+		let excess_bits = self.state.cur_address_bit % self.state.cpudef.as_ref().unwrap().align;
 		if excess_bits != 0
 			{ return Err(self.parser.report.error_span(format!("data leaves address misaligned (excess bits = {})", excess_bits), &tk_name.span)); }
 		
@@ -232,7 +232,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	
 	fn parse_directive_incstr(&mut self, bits_per_char: usize, tk_name: &Token) -> Result<(), ()>
 	{
-		self.state.check_instrset_active(self.parser.report.clone(), &tk_name.span)?;
+		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
 		
 		let tk_filename = self.parser.expect(TokenKind::String)?;
 		let filename = excerpt_as_string_contents(self.parser.report.clone(), tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
@@ -257,7 +257,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			}
 		}
 		
-		let excess_bits = self.state.cur_address_bit % self.state.instrset.as_ref().unwrap().align;
+		let excess_bits = self.state.cur_address_bit % self.state.cpudef.as_ref().unwrap().align;
 		if excess_bits != 0
 			{ return Err(self.parser.report.error_span(format!("data leaves address misaligned (excess bits = {})", excess_bits), &tk_name.span)); }
 		
@@ -270,7 +270,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		if elem_width == 0
 			{ return Err(self.parser.report.error_span("invalid element width", &tk_name.span)); }
 		
-		self.state.check_instrset_active(self.parser.report.clone(), &tk_name.span)?;
+		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
 		
 		loop
 		{
@@ -293,7 +293,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 				{ break; }
 		}
 		
-		let excess_bits = self.state.cur_address_bit % self.state.instrset.as_ref().unwrap().align;
+		let excess_bits = self.state.cur_address_bit % self.state.cpudef.as_ref().unwrap().align;
 		if excess_bits != 0
 			{ return Err(self.parser.report.error_span(format!("data leaves address misaligned (excess bits = {})", excess_bits), &tk_name.span)); }
 		
@@ -320,10 +320,10 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		}
 		else
 		{
-			self.state.check_instrset_active(self.parser.report.clone(), &tk_name.span)?;
+			self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
 			
 			self.parser.expect(TokenKind::Colon)?;
-			ExpressionValue::Integer(BigInt::from(self.state.cur_address_bit / self.state.instrset.as_ref().unwrap().align))
+			ExpressionValue::Integer(BigInt::from(self.state.cur_address_bit / self.state.cpudef.as_ref().unwrap().align))
 		};
 
 		if is_local
@@ -347,13 +347,13 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	
 	fn parse_instruction(&mut self) -> Result<(), ()>
 	{
-		self.state.check_instrset_active(self.parser.report.clone(), &self.parser.next().span)?;
+		self.state.check_cpudef_active(self.parser.report.clone(), &self.parser.next().span)?;
 		
 		let instr_span_start = self.parser.next().span;
 		
 		// Find matching rule patterns.
 		self.parser.clear_linebreak();
-		let instr_match = match self.state.instrset.as_ref().unwrap().pattern_matcher.parse_match(&mut self.parser)
+		let instr_match = match self.state.cpudef.as_ref().unwrap().pattern_matcher.parse_match(&mut self.parser)
 		{
 			Some(m) => m,
 			None =>
@@ -388,7 +388,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			{
 				// Check rule constraints. If it relies on an argument that could not
 				// be resolved now, of if it fails, just skip this rule without an error.
-				let rule = &self.state.instrset.as_ref().unwrap().rules[instr_match.rule_indices[best_match]];
+				let rule = &self.state.cpudef.as_ref().unwrap().rules[instr_match.rule_indices[best_match]];
 				let get_arg = |i: usize| args[i].clone();
 				if self.state.rule_check_all_constraints_satisfied(RcReport::new(), rule, &get_arg, &ctx, &instr_span).ok().is_some()
 					{ break; }
@@ -404,7 +404,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		// Also output zero bits to advance address and output pointer.
 		let instr_width =
 		{
-			let rule = &self.state.instrset.as_ref().unwrap().rules[instr_match.rule_indices[best_match]];
+			let rule = &self.state.cpudef.as_ref().unwrap().rules[instr_match.rule_indices[best_match]];
 			rule.production.width().unwrap()
 		};
 		
