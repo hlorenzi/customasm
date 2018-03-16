@@ -1,7 +1,7 @@
 use diagn::RcReport;
 use util::FileServer;
 use asm::BinaryOutput;
-use asm::assemble;
+use asm::AssemblerState;
 use getopts;
 
 
@@ -165,5 +165,7 @@ where S: Into<String>
 		println!("assembling `{}`...", &asm_file_owned);
 	}
 	
-	assemble(report, fileserver, asm_file_owned)
+	let mut asm = AssemblerState::new();
+	asm.assemble(report, fileserver, asm_file_owned)?;
+	Ok(asm.get_binary_output())
 }

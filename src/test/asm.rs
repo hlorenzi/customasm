@@ -1,8 +1,8 @@
 use diagn::RcReport;
+use asm::AssemblerState;
 use util::{FileServer, FileServerMock};
 use super::ExpectedResult::*;
 use super::{ExpectedResult, expect_result};
-use ::assemble;
 
 
 fn test<S, T>(instrset: S, asm: T, expected: ExpectedResult<(usize, &'static str)>)
@@ -39,7 +39,9 @@ where S: Into<String>
 		
 	let report = RcReport::new();
 	
-	let result = assemble(report.clone(), fileserver, asm_filename).ok();
+	let mut asm = AssemblerState::new();
+	let result = asm.assemble(report.clone(), fileserver, asm_filename).ok();
+	let result = result.map(|_| asm.get_binary_output());
 	let result = result.map(|r| (bits, r.generate_str(bits, 0, r.len())));
 	let result = result.as_ref().map(|r| (r.0, r.1.as_ref()));
 	
@@ -117,31 +119,35 @@ fn test_constraints()
 #[test]
 fn test_addr_directive()
 {
-	test("halt -> 8'0x12", "                     halt", Pass((4, "12")));
-	test("halt -> 8'0x12", "#addr 0x00        \n halt", Pass((4, "12")));
-	test("halt -> 8'0x12", "#addr 0x34        \n halt", Pass((4, "12")));
-	test("halt -> 8'0x12", "#addr 0xffff_ffff \n halt", Pass((4, "12")));
+	test("halt -> 8'0x12", "              halt", Pass((4, "12")));
+	test("halt -> 8'0x12", "#addr 0x00 \n halt", Pass((4, "12")));
+	test("halt -> 8'0x12", "#addr 0x01 \n halt", Pass((4, "0012")));
+	test("halt -> 8'0x12", "#addr 0x10 \n halt", Pass((4, "0000000000000000000000000000000012")));
 	
-	test("halt -> 8'0x12 @ pc[7:0]", "                     halt", Pass((4, "1200")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x00        \n halt", Pass((4, "1200")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x34        \n halt", Pass((4, "1234")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0xffff_ffff \n halt", Pass((4, "12ff")));
+	test("halt -> 8'0x12", "#addr 0x10 \n halt \n #addr 0x00", Fail(("asm", 3, "previous")));
+	test("halt -> 8'0x12", "#addr 0x10 \n halt \n #addr 0x10", Fail(("asm", 3, "previous")));
+	test("halt -> 8'0x12", "#addr 0x10 \n halt \n #addr 0x11", Pass((4, "0000000000000000000000000000000012")));
+	test("halt -> 8'0x12", "#addr 0x10 \n halt \n #addr 0x12", Pass((4, "000000000000000000000000000000001200")));
+	
+	test("halt -> 8'0x12 @ pc[7:0]", "              halt", Pass((4, "1200")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x00 \n halt", Pass((4, "1200")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x01 \n halt", Pass((4, "001201")));
+	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x10 \n halt", Pass((4, "000000000000000000000000000000001210")));
 	
 	test("halt -> 8'0x12 @ pc[7:0]", "halt \n halt \n halt",                       Pass((4, "120012021204")));
-	test("halt -> 8'0x12 @ pc[7:0]", "halt \n halt \n #addr 0x33 \n halt \n halt", Pass((4, "1200120212331235")));
+	test("halt -> 8'0x12 @ pc[7:0]", "halt \n halt \n #addr 0x10 \n halt \n halt", Pass((4, "1200120200000000000000000000000012101212")));
 	
 	test("halt :: pc % 2 == 0 -> 8'0x12 @ pc[7:0]", "halt \n halt \n halt",               Pass((4, "120012021204")));
 	test("halt :: pc % 2 == 0 -> 8'0x12 @ pc[7:0]", "halt \n halt \n #addr 0x33 \n halt", Fail(("asm", 4, "constraint")));
 	
-	test("halt -> 8'0x12", "#addr 0xffff_ffff_ffff_ffff / 8 - 1 \n halt", Pass((4, "12")));
-	test("halt -> 8'0x12", "#addr 0xffff_ffff_ffff_ffff / 8",             Pass((4, "")));
-	test("halt -> 8'0x12", "#addr 0xffff_ffff_ffff_ffff / 8     \n halt", Fail(("asm", 2, "valid range")));
-	test("halt -> 8'0x12", "#addr 0x1_0000_0000_0000_0000 / 8   \n halt", Fail(("asm", 1, "valid range")));
-	test("halt -> 8'0x12", "#addr 0x1_0000_0000_0000_0000       \n halt", Fail(("asm", 1, "large")));
+	//test("halt -> 8'0x12", "#addr 0xffff_fffe \n halt", Pass((4, "??")));
+	//test("halt -> 8'0x12", "#addr 0xffff_ffff",         Pass((4, "")));
+	test("halt -> 8'0x12", "#addr 0x1_0000_0001",           Fail(("asm", 1, "bank range")));
+	test("halt -> 8'0x12", "#addr 0x1_0000_0000_0000_0000", Fail(("asm", 1, "large")));
 }
 
 
-#[test]
+/*#[test]
 fn test_outp_directive()
 {
 	test("halt -> 8'0x12", "              halt", Pass((4, "12")));
@@ -171,7 +177,7 @@ fn test_outp_directive()
 	test("halt -> 8'0x12", "#outp 0xffff_ffff_ffff_ffff / 8",       Pass((4, "")));
 	test("halt -> 8'0x12", "#outp 0x1_0000_0000_0000_0000 / 8",     Fail(("asm", 1, "valid range")));
 	test("halt -> 8'0x12", "#outp 0x1_0000_0000_0000_0000 \n halt", Fail(("asm", 1, "large")));
-}
+}*/
 
 
 #[test]
@@ -249,8 +255,8 @@ fn test_data_directive()
 	test("", "#d8 .x \n .x = -0x81", Fail(("asm", 1, "large")));
 	test("", "#d8 .x",               Fail(("asm", 1, "unknown")));
 	
-	test("", "              #d8 x + pc \n #addr 0x55 \n x = 0x11", Pass((4, "11")));
-	test("", "#addr 0x55 \n #d8 x + pc \n               x = 0x11", Pass((4, "66")));
+	test("", "              #d8 x + pc \n #addr 0x10 \n x = 0x11", Pass((4, "11000000000000000000000000000000")));
+	test("", "#addr 0x10 \n #d8 x + pc \n               x = 0x11", Pass((4, "0000000000000000000000000000000021")));
 	
 	test("", "#d8 0x100", Fail(("asm", 1, "large")));
 	test("", "#d8 -0x81", Fail(("asm", 1, "large")));
@@ -261,14 +267,23 @@ fn test_data_directive()
 	test("#align 1", "#d1 2",  Fail(("asm", 1, "large")));
 	test("#align 1", "#d1 -2", Fail(("asm", 1, "large")));
 	
-	test("", "#d1 0", Fail(("asm", 1, "align")));
-	test("", "#d2 0", Fail(("asm", 1, "align")));
-	test("", "#d3 0", Fail(("asm", 1, "align")));
-	test("", "#d4 0", Fail(("asm", 1, "align")));
-	test("", "#d5 0", Fail(("asm", 1, "align")));
-	test("", "#d6 0", Fail(("asm", 1, "align")));
-	test("", "#d7 0", Fail(("asm", 1, "align")));
-	test("", "#d9 0", Fail(("asm", 1, "align")));
+	test("", "#d1 0", Pass((1, "0")));
+	test("", "#d2 0", Pass((1, "00")));
+	test("", "#d3 0", Pass((1, "000")));
+	test("", "#d4 0", Pass((1, "0000")));
+	test("", "#d5 0", Pass((1, "00000")));
+	test("", "#d6 0", Pass((1, "000000")));
+	test("", "#d7 0", Pass((1, "0000000")));
+	test("", "#d9 0", Pass((1, "000000000")));
+	
+	test("", "#d1 0 \n label:", Fail(("asm", 2, "align")));
+	test("", "#d2 0 \n label:", Fail(("asm", 2, "align")));
+	test("", "#d3 0 \n label:", Fail(("asm", 2, "align")));
+	test("", "#d4 0 \n label:", Fail(("asm", 2, "align")));
+	test("", "#d5 0 \n label:", Fail(("asm", 2, "align")));
+	test("", "#d6 0 \n label:", Fail(("asm", 2, "align")));
+	test("", "#d7 0 \n label:", Fail(("asm", 2, "align")));
+	test("", "#d9 0 \n label:", Fail(("asm", 2, "align")));
 	
 	test("", "#d0    0",      Fail(("asm", 1, "invalid")));
 	test("", "#d16y  0xffff", Fail(("asm", 1, "unknown")));
@@ -296,8 +311,11 @@ fn test_str_directive()
 	
 	test("", "#str \"\\z\"", Fail(("asm", 1, "invalid")));
 	
-	test("#align 5",  "#str \"abc\"", Fail(("asm", 1, "misaligned")));
-	test("#align 32", "#str \"abc\"", Fail(("asm", 1, "misaligned")));
+	test("#align 5",  "#str \"abc\" \n #d1 0    \n #str \"defgh\" \n label:", Pass((1, "01100001011000100110001100110010001100101011001100110011101101000")));
+	test("#align 32", "#str \"ab\"  \n #d8 0xff \n #str \"d\"     \n label:", Pass((4, "6162ff64")));
+	
+	test("#align 5",  "#str \"abc\" \n label:", Fail(("asm", 2, "align")));
+	test("#align 32", "#str \"abc\" \n label:", Fail(("asm", 2, "align")));
 }
 
 
@@ -333,7 +351,7 @@ fn test_labels()
 	
 	test(INSTRSET, "jump = 0x33 \n jump jump", Pass((4, "7733")));
 	
-	test(INSTRSET, "start: halt \n .br: jump .br \n #addr 0xf0 \n mid: halt \n .br: jump .br", Pass((4, "1277011277f1")));
+	test(INSTRSET, "start: halt \n .br: jump .br \n #addr 0x08 \n mid: halt \n .br: jump .br", Pass((4, "1277010000000000127709")));
 	
 	test(INSTRSET, " label: halt \n  label: halt", Fail(("asm", 2, "duplicate")));
 	test(INSTRSET, ".label: halt \n .label: halt", Fail(("asm", 2, "duplicate")));
@@ -492,15 +510,15 @@ fn test_incbin_directive()
 	
 	static INSTRSET3: &'static str = "#cpudef { \n #align 32 \n }";
 	
-	static MAIN1_1: &'static str = "#include \"instrset1\" \n #incbin \"binary1\"";
-	static MAIN1_2: &'static str = "#include \"instrset1\" \n #incbin \"binary2\"";
-	static MAIN1_3: &'static str = "#include \"instrset1\" \n #incbin \"binary3\"";
-	static MAIN2_1: &'static str = "#include \"instrset2\" \n #incbin \"binary1\"";
-	static MAIN2_2: &'static str = "#include \"instrset2\" \n #incbin \"binary2\"";
-	static MAIN2_3: &'static str = "#include \"instrset2\" \n #incbin \"binary3\"";
-	static MAIN3_1: &'static str = "#include \"instrset3\" \n #incbin \"binary1\"";
-	static MAIN3_2: &'static str = "#include \"instrset3\" \n #incbin \"binary2\"";
-	static MAIN3_3: &'static str = "#include \"instrset3\" \n #incbin \"binary3\"";
+	static MAIN1_1: &'static str = "#include \"instrset1\" \n #incbin \"binary1\" \n label:";
+	static MAIN1_2: &'static str = "#include \"instrset1\" \n #incbin \"binary2\" \n label:";
+	static MAIN1_3: &'static str = "#include \"instrset1\" \n #incbin \"binary3\" \n label:";
+	static MAIN2_1: &'static str = "#include \"instrset2\" \n #incbin \"binary1\" \n label:";
+	static MAIN2_2: &'static str = "#include \"instrset2\" \n #incbin \"binary2\" \n label:";
+	static MAIN2_3: &'static str = "#include \"instrset2\" \n #incbin \"binary3\" \n label:";
+	static MAIN3_1: &'static str = "#include \"instrset3\" \n #incbin \"binary1\" \n label:";
+	static MAIN3_2: &'static str = "#include \"instrset3\" \n #incbin \"binary2\" \n label:";
+	static MAIN3_3: &'static str = "#include \"instrset3\" \n #incbin \"binary3\" \n label:";
 		
 	static MAIN4: &'static str = "#include \"instrset1\" \n #incbin \"unknown\"";
 	static MAIN5: &'static str = "#include \"instrset1\" \n #incbin \"../invalid\"";
@@ -534,13 +552,13 @@ fn test_incbin_directive()
 	test_fileserver(&fileserver, "main1_2", Pass((4, "74657374696e67212121")));
 	test_fileserver(&fileserver, "main1_3", Pass((4, "c280c3bfe5a4a7")));
 	
-	test_fileserver(&fileserver, "main2_1", Fail(("main2_1", 2, "align")));
+	test_fileserver(&fileserver, "main2_1", Fail(("main2_1", 3, "align")));
 	test_fileserver(&fileserver, "main2_2", Pass((4, "74657374696e67212121")));
-	test_fileserver(&fileserver, "main2_3", Fail(("main2_3", 2, "align")));
+	test_fileserver(&fileserver, "main2_3", Fail(("main2_3", 3, "align")));
 	
 	test_fileserver(&fileserver, "main3_1", Pass((4, "12345678")));
-	test_fileserver(&fileserver, "main3_2", Fail(("main3_2", 2, "align")));
-	test_fileserver(&fileserver, "main3_3", Fail(("main3_3", 2, "align")));
+	test_fileserver(&fileserver, "main3_2", Fail(("main3_2", 3, "align")));
+	test_fileserver(&fileserver, "main3_3", Fail(("main3_3", 3, "align")));
 	
 	test_fileserver(&fileserver, "main4", Fail(("main4", 2, "not found")));
 	test_fileserver(&fileserver, "main5", Fail(("main5", 2, "invalid")));
@@ -556,29 +574,29 @@ fn test_incstr_directives()
 	
 	static INSTRSET3: &'static str = "#cpudef { \n #align 32 \n }";
 	
-	static MAIN1_1: &'static str = "#include \"instrset1\" \n #incbinstr \"str1\"";
-	static MAIN1_2: &'static str = "#include \"instrset1\" \n #inchexstr \"str1\"";
-	static MAIN1_3: &'static str = "#include \"instrset1\" \n #incbinstr \"str2\"";
-	static MAIN1_4: &'static str = "#include \"instrset1\" \n #inchexstr \"str2\"";
-	static MAIN1_5: &'static str = "#include \"instrset1\" \n #incbinstr \"str3\"";
-	static MAIN1_6: &'static str = "#include \"instrset1\" \n #inchexstr \"str3\"";
-	static MAIN1_7: &'static str = "#include \"instrset1\" \n #incbinstr \"str4\"";
+	static MAIN1_1: &'static str = "#include \"instrset1\" \n #incbinstr \"str1\" \n label:";
+	static MAIN1_2: &'static str = "#include \"instrset1\" \n #inchexstr \"str1\" \n label:";
+	static MAIN1_3: &'static str = "#include \"instrset1\" \n #incbinstr \"str2\" \n label:";
+	static MAIN1_4: &'static str = "#include \"instrset1\" \n #inchexstr \"str2\" \n label:";
+	static MAIN1_5: &'static str = "#include \"instrset1\" \n #incbinstr \"str3\" \n label:";
+	static MAIN1_6: &'static str = "#include \"instrset1\" \n #inchexstr \"str3\" \n label:";
+	static MAIN1_7: &'static str = "#include \"instrset1\" \n #incbinstr \"str4\" \n label:";
 	
-	static MAIN2_1: &'static str = "#include \"instrset2\" \n #incbinstr \"str1\"";
-	static MAIN2_2: &'static str = "#include \"instrset2\" \n #inchexstr \"str1\"";
-	static MAIN2_3: &'static str = "#include \"instrset2\" \n #incbinstr \"str2\"";
-	static MAIN2_4: &'static str = "#include \"instrset2\" \n #inchexstr \"str2\"";
-	static MAIN2_5: &'static str = "#include \"instrset2\" \n #incbinstr \"str3\"";
-	static MAIN2_6: &'static str = "#include \"instrset2\" \n #inchexstr \"str3\"";
-	static MAIN2_7: &'static str = "#include \"instrset2\" \n #incbinstr \"str4\"";
+	static MAIN2_1: &'static str = "#include \"instrset2\" \n #incbinstr \"str1\" \n label:";
+	static MAIN2_2: &'static str = "#include \"instrset2\" \n #inchexstr \"str1\" \n label:";
+	static MAIN2_3: &'static str = "#include \"instrset2\" \n #incbinstr \"str2\" \n label:";
+	static MAIN2_4: &'static str = "#include \"instrset2\" \n #inchexstr \"str2\" \n label:";
+	static MAIN2_5: &'static str = "#include \"instrset2\" \n #incbinstr \"str3\" \n label:";
+	static MAIN2_6: &'static str = "#include \"instrset2\" \n #inchexstr \"str3\" \n label:";
+	static MAIN2_7: &'static str = "#include \"instrset2\" \n #incbinstr \"str4\" \n label:";
 	
-	static MAIN3_1: &'static str = "#include \"instrset3\" \n #incbinstr \"str1\"";
-	static MAIN3_2: &'static str = "#include \"instrset3\" \n #inchexstr \"str1\"";
-	static MAIN3_3: &'static str = "#include \"instrset3\" \n #incbinstr \"str2\"";
-	static MAIN3_4: &'static str = "#include \"instrset3\" \n #inchexstr \"str2\"";
-	static MAIN3_5: &'static str = "#include \"instrset3\" \n #incbinstr \"str3\"";
-	static MAIN3_6: &'static str = "#include \"instrset3\" \n #inchexstr \"str3\"";
-	static MAIN3_7: &'static str = "#include \"instrset3\" \n #incbinstr \"str4\"";
+	static MAIN3_1: &'static str = "#include \"instrset3\" \n #incbinstr \"str1\" \n label:";
+	static MAIN3_2: &'static str = "#include \"instrset3\" \n #inchexstr \"str1\" \n label:";
+	static MAIN3_3: &'static str = "#include \"instrset3\" \n #incbinstr \"str2\" \n label:";
+	static MAIN3_4: &'static str = "#include \"instrset3\" \n #inchexstr \"str2\" \n label:";
+	static MAIN3_5: &'static str = "#include \"instrset3\" \n #incbinstr \"str3\" \n label:";
+	static MAIN3_6: &'static str = "#include \"instrset3\" \n #inchexstr \"str3\" \n label:";
+	static MAIN3_7: &'static str = "#include \"instrset3\" \n #incbinstr \"str4\" \n label:";
 	
 	static MAIN4: &'static str = "#include \"instrset1\" \n #incbin \"unknown\"";
 	static MAIN5: &'static str = "#include \"instrset1\" \n #incbin \"../invalid\"";
@@ -629,24 +647,142 @@ fn test_incstr_directives()
 	test_fileserver(&fileserver, "main1_4", Pass((4, "0123456789abcdef")));
 	test_fileserver(&fileserver, "main1_5", Fail(("main1_5", 2, "invalid character")));
 	test_fileserver(&fileserver, "main1_6", Fail(("main1_6", 2, "invalid character")));
-	test_fileserver(&fileserver, "main1_7", Fail(("main1_7", 2, "align")));
+	test_fileserver(&fileserver, "main1_7", Fail(("main1_7", 3, "align")));
 	
-	test_fileserver(&fileserver, "main2_1", Fail(("main2_1", 2, "align")));
-	test_fileserver(&fileserver, "main2_2", Fail(("main2_2", 2, "align")));
+	test_fileserver(&fileserver, "main2_1", Fail(("main2_1", 3, "align")));
+	test_fileserver(&fileserver, "main2_2", Fail(("main2_2", 3, "align")));
 	test_fileserver(&fileserver, "main2_3", Fail(("main2_3", 2, "invalid character")));
-	test_fileserver(&fileserver, "main2_4", Fail(("main2_4", 2, "align")));
+	test_fileserver(&fileserver, "main2_4", Fail(("main2_4", 3, "align")));
 	test_fileserver(&fileserver, "main2_5", Fail(("main2_5", 2, "invalid character")));
 	test_fileserver(&fileserver, "main2_6", Fail(("main2_6", 2, "invalid character")));
 	test_fileserver(&fileserver, "main2_7", Pass((1, "111010110100011")));
 	
-	test_fileserver(&fileserver, "main3_1", Fail(("main3_1", 2, "align")));
+	test_fileserver(&fileserver, "main3_1", Fail(("main3_1", 3, "align")));
 	test_fileserver(&fileserver, "main3_2", Pass((4, "1110101101000111")));
 	test_fileserver(&fileserver, "main3_3", Fail(("main3_3", 2, "invalid character")));
 	test_fileserver(&fileserver, "main3_4", Pass((4, "0123456789abcdef")));
 	test_fileserver(&fileserver, "main3_5", Fail(("main3_5", 2, "invalid character")));
 	test_fileserver(&fileserver, "main3_6", Fail(("main3_6", 2, "invalid character")));
-	test_fileserver(&fileserver, "main3_7", Fail(("main3_7", 2, "align")));
+	test_fileserver(&fileserver, "main3_7", Fail(("main3_7", 3, "align")));
 	
 	test_fileserver(&fileserver, "main4", Fail(("main4", 2, "not found")));
 	test_fileserver(&fileserver, "main5", Fail(("main5", 2, "invalid")));
+}
+
+
+#[test]
+fn test_banks()
+{
+	test("", "#bankdef \"\"      { }",                           Fail(("asm", 1, "invalid")));
+	test("", "#bankdef \"hello\" { }",                           Fail(("asm", 1, "missing")));
+	test("", "#bankdef \"hello\" { #addr 0 }",                   Fail(("asm", 1, "missing")));
+	test("", "#bankdef \"hello\" { #addr 0, #size 0 }",          Fail(("asm", 1, "missing")));
+	test("", "#bankdef \"hello\" { #addr 0, #size 0, #outp 0 }", Pass((4, "")));
+	
+	test("", "#bankdef \"hello\"    {    #addr 0     #size 0     #outp 0    }", Fail(("asm", 1, ",")));
+	test("", "#bankdef \"hello\"    {    #addr 0  \n #size 0  \n #outp 0    }", Pass((4, "")));
+	test("", "#bankdef \"hello\" \n { \n #addr 0  \n #size 0  \n #outp 0 \n }", Pass((4, "")));
+	test("", "#bankdef \"hello\" \n { \n #addr 0, \n #size 0, \n #outp 0 \n }", Pass((4, "")));
+	
+	test("", "#d8 0xff \n #bankdef \"hello\" { #addr 0, #size 0, #outp 0 }", Fail(("asm", 2, "default bank")));
+	
+	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 0 }
+	          #bankdef \"world\" { #addr 0, #size 4, #outp 0 }",
+	          Fail(("asm", 1, "overlap")));
+	
+	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 0 }
+	          #bankdef \"world\" { #addr 0, #size 4, #outp 3 }",
+	          Fail(("asm", 1, "overlap")));
+			  
+	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 3 }
+	          #bankdef \"world\" { #addr 0, #size 4, #outp 0 }",
+	          Fail(("asm", 1, "overlap")));
+	
+	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 0 }
+	          #bankdef \"world\" { #addr 0, #size 4, #outp 4 }",
+	          Pass((4, "")));
+			  
+	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 4 }
+	          #bankdef \"world\" { #addr 0, #size 4, #outp 0 }",
+	          Pass((4, "")));
+			  
+	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 0 }
+	          #bank \"hello\"
+	          #d8 pc, 1, 2, 3",
+	          Pass((4, "00010203")));
+			  
+	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 0 }
+	          #d8 pc, 1, 2, 3",
+	          Pass((4, "00010203")));
+	
+	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 0 }
+	          #d8 pc, 1, 2, 3
+	          label:",
+	          Fail(("asm", 3, "bank range")));
+	
+	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 0 }
+	          #addr 0
+	          #d8 0xff
+	          #addr 2
+	          #d8 0xff
+	          #addr 4",
+	          Pass((4, "ff00ff00")));
+	
+	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 0 }
+	          #d8 pc, 1, 2, 3, 4",
+	          Fail(("asm", 2, "overflow")));
+			  
+	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 4 }
+	          #d8 pc, 1, 2, 3",
+	          Pass((4, "0000000000010203")));
+			  
+	test("", "#bankdef \"hello\" { #addr 7, #size 4, #outp 0 }
+	          #d8 pc, 1, 2, 3",
+	          Pass((4, "07010203")));
+	
+	test("", "#bankdef \"hello\" { #addr 7, #size 4, #outp 4 }
+	          #d8 pc, 1, 2, 3",
+	          Pass((4, "0000000007010203")));
+			  
+	test("", "#bankdef \"hello\" { #addr 7, #size 4, #outp 4 }
+	          #d8 pc, x
+	          x:
+	          #d8 x, pc",
+	          Pass((4, "000000000709090a")));
+			  
+	test("", "#bankdef \"hello\" { #addr 7, #size 4, #outp 4 }
+	          #d8 pc, x
+	          x = pc
+	          #d8 x, pc",
+	          Pass((4, "000000000709090a")));
+			  
+	test("", "#bank \"hello\"", Fail(("asm", 1, "unknown")));
+	
+	test("", "#bankdef \"hello\" { #addr 0x00, #size 0x08, #outp 0x00 }
+	          #bankdef \"world\" { #addr 0x10, #size 0x04, #outp 0x0a }
+	          #bank \"hello\"
+			  x = pc
+			  #d8 0xaa, 0xbb
+			  #bank \"world\"
+			  y = pc
+			  #d8 0xcc, 0xdd
+			  #bank \"hello\"
+			  z = pc
+			  #d8 0xee, 0xff
+			  #d8 x, y, z",
+	          Pass((4, "aabbeeff001002000000ccdd")));
+	
+	test("", "#bankdef \"hello\" { #addr 0x00, #size 0x08, #outp 0x00 }
+	          #bankdef \"world\" { #addr 0x10, #size 0x04, #outp 0x0a }
+	          #bank \"hello\"
+			  x:
+			  #d8 0xaa, 0xbb
+			  #bank \"world\"
+			  y:
+			  #d8 0xcc, 0xdd
+			  #bank \"hello\"
+			  z:
+			  #d8 0xee, 0xff
+			  #d8 x, y, z",
+	          Pass((4, "aabbeeff001002000000ccdd")));
 }

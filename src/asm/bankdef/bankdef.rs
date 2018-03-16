@@ -7,7 +7,8 @@ pub struct BankDef
 	pub name: String,
 	pub addr: usize,
 	pub size: usize,
-	pub outp: usize
+	pub outp: usize,
+	pub decl_span: Option<Span>
 }
 
 
@@ -24,7 +25,7 @@ struct BankDefParser<'p>
 
 impl BankDef
 {
-	pub fn new<S>(name: S, addr: usize, size: usize, outp: usize) -> BankDef
+	pub fn new<S>(name: S, addr: usize, size: usize, outp: usize, decl_span: Option<Span>) -> BankDef
 	where S: Into<String>
 	{
 		BankDef
@@ -32,7 +33,8 @@ impl BankDef
 			name: name.into(),
 			addr: addr,
 			size: size,
-			outp: outp
+			outp: outp,
+			decl_span: decl_span
 		}
 	}
 	
@@ -57,7 +59,8 @@ impl BankDef
 			name: name.into(),
 			addr: bankdef_parser.addr.unwrap(),
 			size: bankdef_parser.size.unwrap(),
-			outp: bankdef_parser.outp.unwrap()
+			outp: bankdef_parser.outp.unwrap(),
+			decl_span: Some(span.clone())
 		};
 		
 		Ok(bankdef)
@@ -72,6 +75,14 @@ impl<'p> BankDefParser<'p>
 		while !self.parser.is_over() && !self.parser.next_is(0, TokenKind::BraceClose)
 		{
 			self.parse_attribute()?;
+			
+			if self.parser.maybe_expect_linebreak().is_some()
+				{ continue; }
+				
+			if self.parser.next_is(0, TokenKind::BraceClose)
+				{ continue; }
+				
+			self.parser.expect(TokenKind::Comma)?;
 		}
 		
 		if self.addr.is_none()

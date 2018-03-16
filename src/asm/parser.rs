@@ -5,31 +5,34 @@ use expr::{Expression, ExpressionValue};
 use asm::{AssemblerState, ParsedInstruction, ParsedExpression};
 use asm::cpudef::CpuDef;
 use asm::BankDef;
+use asm::BinaryBlock;
 use util::filename_navigate;
+use util::FileServer;
 use num::BigInt;
 use num::ToPrimitive;
 
 
-pub struct AssemblerParser<'a, 'b>
-where 'b: 'a
+pub struct AssemblerParser<'a>
 {
-	pub state: &'a mut AssemblerState<'b>,
+	pub fileserver: &'a FileServer,
+	pub state: &'a mut AssemblerState,
 	pub cur_filename: String,
 	pub parser: Parser
 }
 	
 	
-impl<'a, 'b> AssemblerParser<'a, 'b>
+impl<'a> AssemblerParser<'a>
 {
-	pub fn parse_file<S>(report: RcReport, state: &mut AssemblerState, filename: S, filename_span: Option<&Span>) -> Result<(), ()>
+	pub fn parse_file<S>(report: RcReport, state: &mut AssemblerState, fileserver: &FileServer, filename: S, filename_span: Option<&Span>) -> Result<(), ()>
 	where S: Into<String>
 	{
 		let filename_owned = filename.into();
-		let chars = state.fileserver.get_chars(report.clone(), &filename_owned, filename_span)?;
+		let chars = fileserver.get_chars(report.clone(), &filename_owned, filename_span)?;
 		let tokens = tokenize(report.clone(), filename_owned.as_ref(), &chars)?;
 		
 		let mut parser = AssemblerParser
 		{
+			fileserver: fileserver,
 			state: state,
 			cur_filename: filename_owned,
 			parser: Parser::new(report.clone(), tokens)
@@ -95,8 +98,8 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		{
 			"cpudef"    => self.parse_directive_cpudef(&tk_name),
 			"bankdef"   => self.parse_directive_bankdef(&tk_name),
+			"bank"      => self.parse_directive_bank(&tk_name),
 			"addr"      => self.parse_directive_addr(&tk_name),
-			"outp"      => self.parse_directive_outp(&tk_name),
 			"res"       => self.parse_directive_res(&tk_name),
 			"str"       => self.parse_directive_str(&tk_name),
 			"include"   => self.parse_directive_include(),
@@ -130,47 +133,59 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		let tk_bankname = self.parser.expect(TokenKind::String)?;
 		let bankname = excerpt_as_string_contents(self.parser.report.clone(), tk_bankname.excerpt.as_ref().unwrap().as_ref(), &tk_bankname.span)?;
 		
+		if bankname == ""
+			{ return Err(self.parser.report.error_span("invalid bank name", &tk_bankname.span)); }
+		
 		if self.state.find_bankdef(&bankname).is_some()
 			{ return Err(self.parser.report.error_span("duplicate bank name", &tk_bankname.span)); }
+			
+		if self.state.blocks[0].len() > 0
+			{ return Err(self.parser.report.error_span("cannot define bank after using the default bank", &tk_bankname.span)); }
 		
 		self.parser.expect(TokenKind::BraceOpen)?;
-		let bankdef = BankDef::parse(bankname, &mut self.parser, &tk_bankname.span)?;
+		let bankdef = BankDef::parse(bankname.clone(), &mut self.parser, &tk_bankname.span)?;
 		self.parser.expect(TokenKind::BraceClose)?;
 		
 		self.state.bankdefs.push(bankdef);
+		self.state.blocks.push(BinaryBlock::new(bankname));
+		self.state.cur_bank = self.state.bankdefs.len() - 1;
+		self.state.cur_block = self.state.bankdefs.len() - 1;
+		Ok(())
+	}
+	
+	
+	fn parse_directive_bank(&mut self, _tk_name: &Token) -> Result<(), ()>
+	{
+		let tk_bankname = self.parser.expect(TokenKind::String)?;
+		let bankname = excerpt_as_string_contents(self.parser.report.clone(), tk_bankname.excerpt.as_ref().unwrap().as_ref(), &tk_bankname.span)?;
+		
+		let bank_index = match self.state.find_bankdef(&bankname)
+		{
+			Some(i) => i,
+			None => return Err(self.parser.report.error_span("unknown bank", &tk_bankname.span))
+		};
+		
+		self.state.cur_bank = bank_index;
+		self.state.cur_block = bank_index;
 		Ok(())
 	}
 	
 	
 	fn parse_directive_addr(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
-		let address_byte = self.parse_usize()?;
+		let new_addr = self.parse_usize()?;
 		
 		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
 		
-		match address_byte.checked_mul(self.state.cpudef.as_ref().unwrap().align)
-		{
-			Some(address_bit) => self.state.cur_address_bit = address_bit,
-			None => return Err(self.parser.report.error_span("address is out of valid range", &tk_name.span))
-		}
+		let cur_addr = self.state.get_cur_address(self.parser.report.clone(), &tk_name.span)?;
+			
+		self.state.check_valid_address(self.parser.report.clone(), self.state.cur_block, new_addr, &tk_name.span)?;
 		
-		Ok(())
-	}
-	
-	
-	fn parse_directive_outp(&mut self, tk_name: &Token) -> Result<(), ()>
-	{
-		let output_byte = self.parse_usize()?;
-		
-		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
-		
-		match output_byte.checked_mul(self.state.cpudef.as_ref().unwrap().align)
-		{
-			Some(output_bit) => self.state.cur_output_bit = output_bit,
-			None => return Err(self.parser.report.error_span("output pointer is out of valid range", &tk_name.span))
-		}
-		
-		Ok(())
+		if new_addr < cur_addr
+			{ return Err(self.parser.report.error_span("cannot seek to previous address", &tk_name.span)); }
+			
+		let bits_to_skip = (new_addr - cur_addr) * self.state.cpudef.as_ref().unwrap().align;
+		self.state.output_zero_bits(self.parser.report.clone(), bits_to_skip, &tk_name.span)
 	}
 	
 	
@@ -201,10 +216,6 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 			}
 		}
 		
-		let excess_bits = self.state.cur_address_bit % self.state.cpudef.as_ref().unwrap().align;
-		if excess_bits != 0
-			{ return Err(self.parser.report.error_span(format!("string leaves address misaligned (excess bits = {})", excess_bits), &tk_name.span)); }
-			
 		Ok(())
 	}
 	
@@ -216,7 +227,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 	
 		let new_filename = filename_navigate(self.parser.report.clone(), &self.cur_filename, &filename, &tk_filename.span)?;
 		
-		AssemblerParser::parse_file(self.parser.report.clone(), self.state, new_filename, Some(&tk_filename.span))
+		AssemblerParser::parse_file(self.parser.report.clone(), self.state, self.fileserver, new_filename, Some(&tk_filename.span))
 	}
 	
 	
@@ -229,7 +240,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		
 		let new_filename = filename_navigate(self.parser.report.clone(), &self.cur_filename, &filename, &tk_filename.span)?;
 		
-		let bytes = self.state.fileserver.get_bytes(self.parser.report.clone(), &new_filename, Some(&tk_filename.span))?;
+		let bytes = self.fileserver.get_bytes(self.parser.report.clone(), &new_filename, Some(&tk_filename.span))?;
 		
 		for mut byte in bytes
 		{
@@ -240,10 +251,6 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 				byte <<= 1;
 			}
 		}
-		
-		let excess_bits = self.state.cur_address_bit % self.state.cpudef.as_ref().unwrap().align;
-		if excess_bits != 0
-			{ return Err(self.parser.report.error_span(format!("data leaves address misaligned (excess bits = {})", excess_bits), &tk_name.span)); }
 		
 		Ok(())
 	}
@@ -258,7 +265,7 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		
 		let new_filename = filename_navigate(self.parser.report.clone(), &self.cur_filename, &filename, &tk_filename.span)?;
 		
-		let chars = self.state.fileserver.get_chars(self.parser.report.clone(), &new_filename, Some(&tk_filename.span))?;
+		let chars = self.fileserver.get_chars(self.parser.report.clone(), &new_filename, Some(&tk_filename.span))?;
 		
 		for c in chars
 		{
@@ -275,10 +282,6 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 				digit <<= 1;
 			}
 		}
-		
-		let excess_bits = self.state.cur_address_bit % self.state.cpudef.as_ref().unwrap().align;
-		if excess_bits != 0
-			{ return Err(self.parser.report.error_span(format!("data leaves address misaligned (excess bits = {})", excess_bits), &tk_name.span)); }
 		
 		Ok(())
 	}
@@ -312,10 +315,6 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 				{ break; }
 		}
 		
-		let excess_bits = self.state.cur_address_bit % self.state.cpudef.as_ref().unwrap().align;
-		if excess_bits != 0
-			{ return Err(self.parser.report.error_span(format!("data leaves address misaligned (excess bits = {})", excess_bits), &tk_name.span)); }
-		
 		Ok(())
 	}
 	
@@ -339,10 +338,10 @@ impl<'a, 'b> AssemblerParser<'a, 'b>
 		}
 		else
 		{
-			self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
-			
 			self.parser.expect(TokenKind::Colon)?;
-			ExpressionValue::Integer(BigInt::from(self.state.cur_address_bit / self.state.cpudef.as_ref().unwrap().align))
+			
+			let addr = self.state.get_cur_address(self.parser.report.clone(), &tk_name.span)?;
+			ExpressionValue::Integer(BigInt::from(addr))
 		};
 
 		if is_local
