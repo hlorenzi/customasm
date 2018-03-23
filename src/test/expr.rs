@@ -108,11 +108,23 @@ fn test_ops_arithmetic()
 	test("1 << 1", Pass(ExpressionValue::Integer(BigInt::from(2))));
 	test("1 << 2", Pass(ExpressionValue::Integer(BigInt::from(4))));
 	test("1 << 3", Pass(ExpressionValue::Integer(BigInt::from(8))));
+	test("1 << 4", Pass(ExpressionValue::Integer(BigInt::from(16))));
+	test("1 << 5", Pass(ExpressionValue::Integer(BigInt::from(32))));
+	test("1 << 6", Pass(ExpressionValue::Integer(BigInt::from(64))));
+	test("1 << 7", Pass(ExpressionValue::Integer(BigInt::from(128))));
+	test("1 << 8", Pass(ExpressionValue::Integer(BigInt::from(256))));
+	test("1 << 9", Pass(ExpressionValue::Integer(BigInt::from(512))));
 	
 	test("-1 << 0", Pass(ExpressionValue::Integer(BigInt::from(-1))));
 	test("-1 << 1", Pass(ExpressionValue::Integer(BigInt::from(-2))));
 	test("-1 << 2", Pass(ExpressionValue::Integer(BigInt::from(-4))));
 	test("-1 << 3", Pass(ExpressionValue::Integer(BigInt::from(-8))));
+	test("-1 << 4", Pass(ExpressionValue::Integer(BigInt::from(-16))));
+	test("-1 << 5", Pass(ExpressionValue::Integer(BigInt::from(-32))));
+	test("-1 << 6", Pass(ExpressionValue::Integer(BigInt::from(-64))));
+	test("-1 << 7", Pass(ExpressionValue::Integer(BigInt::from(-128))));
+	test("-1 << 8", Pass(ExpressionValue::Integer(BigInt::from(-256))));
+	test("-1 << 9", Pass(ExpressionValue::Integer(BigInt::from(-512))));
 	
 	test("4 >> 0", Pass(ExpressionValue::Integer(BigInt::from(4))));
 	test("4 >> 1", Pass(ExpressionValue::Integer(BigInt::from(2))));
@@ -223,6 +235,8 @@ fn test_ops_concat()
 	test("16'0x12 @ 16'0x34", Pass(ExpressionValue::Integer(BigInt::from(0x120034))));
 	
 	test("(6 + 6)[3:0] @ (5 + 5)[3:0]", Pass(ExpressionValue::Integer(BigInt::from(0xca))));
+	
+	test("6'4 @ 5'0", Pass(ExpressionValue::Integer(BigInt::from(0b10000000))));
 	
 	test("  0 @   0", Fail(("test", 1, "concatenation")));
 	test("8'0 @   0", Fail(("test", 1, "concatenation")));

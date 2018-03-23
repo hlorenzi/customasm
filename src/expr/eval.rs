@@ -222,7 +222,8 @@ fn bigint_shr(lhs: BigInt, rhs: BigInt) -> Option<BigInt>
 
 fn bigint_concat(lhs: BigInt, _lhs_width: usize, rhs: BigInt, rhs_width: usize) -> BigInt
 {
-	bigint_or(lhs << rhs_width, rhs)
+	use num::Signed;
+	bigint_or(lhs << rhs_width, rhs).abs()
 }
 
 
