@@ -97,6 +97,8 @@ impl BinaryOutput
 		let line_start = start_bit / (byte_bits * bytes_per_line);
 		let line_end = (end_bit + (bytes_per_line - 1) * byte_bits) / (byte_bits * bytes_per_line);
 		
+		let line_end = if end_bit - start_bit < byte_bits { line_start + 1 } else { line_end };
+		
 		let addr_max_width = format!("{:x}", (line_end - 1) * bytes_per_line).len();
 		
 		for line_index in line_start..line_end
@@ -158,7 +160,7 @@ impl BinaryOutput
 					
 					if c == ' ' || c == '\t' || c == '\r' || c == '\n'
 						{ result.push(' '); }
-					else if c as u8 >= 0x80 || c < ' '
+					else if c as u8 >= 0x80 || c < ' ' || c == '|'
 						{ result.push('.'); }
 					else
 						{ result.push(c); }
