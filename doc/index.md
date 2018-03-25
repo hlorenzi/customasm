@@ -1,13 +1,12 @@
-# Source File Format
+# Usage & Syntax
 
-These files contain the source code that will be
-assembled for the target machine.
+Keep in mind that indentation is always disregarded, and
+is used only for clarity.
 
 ## CPU Definition
 
 The simplest source file contains a `#cpudef` directive and then
 a list of instructions to be assembled for the target machine.
-Indentation is always disregarded everywhere.
 
 The syntax for the `#cpudef` directive is described at
 [cpudef Directive](/doc/cpudef.md).
@@ -34,9 +33,9 @@ ret
 ...would be assembled into:
 
 ```
-0x10 0x77
-0xad 0x01
-0xee
+0x0000: 10 77
+0x0002: ad 01
+0x0004: ee
 ```
 
 We can also use more complex expressions as arguments,
@@ -62,9 +61,9 @@ inc pc + 1
 ...and it would be assembled into:
 
 ```
-0xcc 0x00 0x00
-0xcc 0x00 0x02
-0xcc 0x00 0x05
+0x0000: cc 00 00
+0x0002: cc 00 02
+0x0004: cc 00 05
 ```
 
 ## Comments
@@ -77,9 +76,9 @@ by the assembler. For example:
 ; load two values
 lda 0x77
 lda 0x88
-lda 0x99 ; I'm not sure about this one
+lda 0x99 ; Load A with 0x99, obviously
 
-; ignore the next instruction for now
+; I don't know if the next instruction is really needed
 ; lda 0xaa
 ```
 
@@ -106,9 +105,9 @@ loop:
 ...and have it assembled into:
 
 ```
-0x10 0x77
-0xad 0x01
-0x55 0x00 0x02
+0x0000: 10 77
+0x0002: ad 01
+0x0004: 55 00 02
 ```
 
 We can see that the `jmp` instruction used the `loop`
@@ -146,10 +145,10 @@ loop:
 ...and have it assembled into:
 
 ```
-0x10 0x77
-0x55 0x00 0x02
-0x10 0x88
-0x55 0x00 0x07
+0x0000: 10 77
+0x0002: 55 00 02
+0x0005: 10 88
+0x0007: 55 00 07
 ```
 
 The first `jmp .do_it` instruction used the first `.do_it` label as its target.
@@ -183,82 +182,58 @@ loop:
     lda .value
 ```
 
-## Directives
+## Banks
 
-Directives invoke special behaviors in the assembler.
+Up until now, every source file was processed by the assembler as instructions
+residing at addresses beginning at `0x0000`. With banks, we can set the
+starting program counter value and also configure how the resulting bits
+are placed into the output file.
+
+First, define one or more banks as follows:
+
+```
+#bankdef "mybank"
+{
+	#addr 0x8000
+	#size 0x4000
+	#outp 0x10
+}
+```
+
+This specifies that the bank named `mybank` starts at program counter `0x8000` and
+can hold up to `0x4000` bytes. Also, it specifies that these bytes should be
+placed starting at position `0x10` in the output file (as in, `0x10` bytes from the
+beginning of the file). This directive automatically switches to assembling at
+the newly defined bank, but if you define more banks, you can switch between them
+with the following:
+
+```
+#bank "mybank"
+```
+
+When you switch banks, the assembler resumes from where it left off the program
+counter. You can interleave bank assembling in this way.
 
 ### Address Directive
 
-Up until now, every source file was seen by the assembler as instructions
-residing at addresses beginning at `0x0000`. With the Address directive, we can
-change what address the assembler should count from. For example:
+You can skip ahead to a certain address within the current bank by using
+this directive. Skipped bits will be filled with zeroes. For example:
 
 ```
-#addr 0x8000
-start:
-    lda 0x77
-    jmp start
-
-#addr 0xf000
-loop:
-    add 0x01
-.do_it:
-    jmp .do_it
+#d8 0xab, 0xcd, 0xef
+#addr 0x8
+#d8 0xab, 0xcd, 0xef
 ```
 
 ...would be assembled into:
 
 ```
-0x10 0x77
-0x55 0x80 0x00
-0xad 0x01
-0x55 0xf0 0x02
+0x0000: ab cd ef
+0x0003: 00 00 00 00 00
+0x0008: ab cd ef
 ```
 
-The address of the instructions has been altered by the directives, but
-note that their binary representations are still located at the beginning
-of the Output file (and not at `0x8000` bytes into it). Also, the groups
-starting at `0x8000` and `0xf000` are still right next to each other,
-without any gaps. We can alter this behavior using the following directive.
-
-### Output Directive
-
-This directive alters where in the Output file the next instructions'
-binary representations will be placed. For example:
-
-```
-#outp 0x4
-start:
-    lda 0x77
-    jmp start
-```
-
-...would be assembled into:
-
-```
-0x00 0x00 0x00 0x00
-0x10 0x77
-0x55 0x00 0x00
-```
-
-The first instruction has been placed at address `0x4` in the Output
-file. But note that this doesn't change the address of the instructions
-themselves; the `start` label still points to the address `0x0000`. We
-can use both directives to align instruction addresses and output
-locations, like so:
-
-```
-#addr 0x4
-#outp 0x4
-start:
-    lda 0x77
-    jmp start
-```
-
-The `start` label would now point to the address `0x0004`, with the
-binary representation still being offset by 4 bytes at the beginning.
-
-### Data Directive
+## Data Directive
 
 This directive copies a sequence of values verbatim to the output. Its
 name contains the bit-size of each component in the sequence. This
@@ -276,17 +251,17 @@ lda 0x77
 ...would be assembled into:
 
 ```
-0x10 0x77
-0x12 0x34
-0x12 0x34 0x56 0x78
-0x12 0x34 0x56 0x78
-0x00 0x00 0x12 0x34 0x00 0x00 0x56 0x78
+0x0000: 10 77
+0x0002: 12 34
+0x0004: 12 34 56 78
+0x0008: 12 34 56 78
+0x000c: 00 00 12 34 00 00 56 78
 ```
 
 Note that the `#d32` directive's arguments, `0x1234, 0x5678`, were
 sign-extended to match the directive's bit-size.
 
-### String Directive
+## String Directive
 
 This directive copies the UTF-8 representation of a string to
 the output. Escape sequences and Unicode characters are available.
@@ -302,10 +277,10 @@ For example:
 ...would be assembled into:
 
 ```
-0x61 0x62 0x63 0x64
-0x0a 0x0d 0x00
-0x12 0x34
-0xe6 0x9c 0xa8
+0x0000: 61 62 63 64
+0x0004: 0a 0d 00
+0x0007: 12 34
+0x0009: e6 9c a8
 ```
 
 If the string's length is needed, we can use a bit of arithmetic
@@ -318,7 +293,7 @@ helloworld:
 helloworld_len = pc - helloworld
 ```
 
-### Reserve Directive
+## Reserve Directive
 
 This directive advances the instruction *and* output addresses by
 the given number of bytes, effectively reserving a location for any
@@ -339,20 +314,20 @@ start:
 ...and it would be assembled into:
 
 ```
-0x55 0x00 0x04
-0x00
-0x10 0x77
-0xcc 0x00 0x03
+0x0000: 55 00 04
+0x0003: 00
+0x0004: 10 77
+0x0006: cc 00 03
 ```
 
-### Include Directives
+## Include Directives
 
 These directives include external data from other files into
 the output. All filenames are relative to the current Source
 file being assembled. The files can also be located inside
 subfolders.
 
-#### Include Source Directive
+### Include Source Directive
 
 This directive effectively copies the given file's content as
 source code, merging it into the current file being assembled.
@@ -377,8 +352,8 @@ the `extra.asm` file can naturally see the label defined on the
 main file. This would be the output:
 
 ```
-0x10 0x77
-0x55 0x00 0x00
+0x0000: 10 77
+0x0002: 55 00 00
 ```
 
 Note that, even though the files are logically merged together, the
@@ -408,11 +383,11 @@ hello
 ...everything would be assembled into:
 
 ```
-0x10 0x77
-0x68 0x65 0x6c 0x6c 0x6f
+0x0000: 10 77
+0x0002: 68 65 6c 6c 6f
 ```
 
-#### Include Binary String Directive
+### Include Binary String Directive
 
 This directive interprets the contents of the given file as
 a string of binary digits, and copies that to the output, verbatim.
@@ -432,14 +407,14 @@ lda 0x77
 ...everything would be assembled into:
 
 ```
-0x10 0x77
-0x5a
+0x0000: 10 77
+0x0002: 5a
 ```
 
 This is specially useful when used in conjunction with
 customasm's `binstr` output format.
 
-#### Include Hexadecimal String Directive
+### Include Hexadecimal String Directive
 
 This directive interprets the contents of the given file as
 a string of hexadecimal digits, and copies that to the output,
@@ -459,8 +434,8 @@ lda 0x77
 ...everything would be assembled into:
 
 ```
-0x10 0x77
-0x5a 0xff 0xc0 0x68
+0x0000: 10 77
+0x0002: 5a ff c0 68
 ```
 
 This is specially useful when used in conjunction with

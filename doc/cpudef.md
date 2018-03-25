@@ -181,6 +181,7 @@ Rule | Used as | Output
 ```
 #cpudef
 {
+	; you can have unusual counts of bits-per-byte too!
     #align 3
     
     lda #{value} -> 3'0b001 @ value[2:0]
