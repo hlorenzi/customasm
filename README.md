@@ -10,6 +10,8 @@ for pre-built binaries.
 
 [Check out the documentation](/doc/index.md) for user instructions.
 
+Also, [check out an example project](/examples/nes/) which targets the NES!
+
 You can compile from source by simply doing `cargo build`. There's also a
 battery of tests available at `cargo test`.
 
