@@ -13,7 +13,7 @@ The syntax for the `#cpudef` directive is described at
 
 As an example, the file:
 
-```
+```asm
 #cpudef
 {
     #align 8
@@ -42,7 +42,7 @@ We can also use more complex expressions as arguments,
 like so (henceforth omitting the preceding `#cpudef` directive
 for clarity):
 
-```
+```asm
 lda 0x66 + 0x11
 add 0x10 - (2 * 4 + 0x07)
 ret
@@ -52,7 +52,7 @@ Even still, we can use predefined variables in argument
 expressions. `pc` is the current instruction's address, so
 it can be used as:
 
-```
+```asm
 inc pc
 inc pc
 inc pc + 1
@@ -72,7 +72,7 @@ There are currently only single-line comments. Everything
 after a semicolon is treated as a comment and is ignored
 by the assembler. For example:
 
-```
+```asm
 ; load two values
 lda 0x77
 lda 0x88
@@ -96,7 +96,7 @@ to indent instructions more than labels.
 
 Using the previous Instruction Set file, we could write:
 
-```
+```asm
 loop:
     add 0x01
     jmp loop
@@ -130,7 +130,7 @@ Multiple Local Labels can
 have the same name if they are defined inside different
 bodies of Global Labels. For example:
 
-```
+```asm
 start:
     lda 0x77
 .do_it:
@@ -162,17 +162,17 @@ Numerical constants can also be given a name. The syntax is
 The value can use complex expressions and
 even reference constants that were defined before. For example:
 
-```
-sevenseven = 0x77
-eighteight = sevenseven + 0x11
+```asm
+myvar1 = 0x77
+myvar2 = myvar1 + 0x11
 
-lda sevenseven
+lda myvar1
 ```
 
 There are also local constants, that are defined using a dot before their
 names, and can be used just like Local Labels:
 
-```
+```asm
 start:
 .value = 0xab
     lda .value
@@ -191,7 +191,7 @@ are placed into the output file.
 
 First, define one or more banks as follows:
 
-```
+```asm
 #bankdef "mybank"
 {
 	#addr 0x8000
@@ -207,19 +207,44 @@ beginning of the file). This directive automatically switches to assembling at
 the newly defined bank, but if you define more banks, you can switch between them
 with the following:
 
-```
+```asm
 #bank "mybank"
 ```
 
 When you switch banks, the assembler resumes from where it left off the program
 counter. You can interleave bank assembling in this way.
 
+### Non-Writable Banks
+
+If you define a bank without an `#outp` attribute, it will be treated as non-writable:
+you won't be able to write data to it, only allocate space (e.g. through the `#res`
+directive). It also won't take up space in the output file.
+
+### Fill Attribute
+
+If you define a bank with a `#fill` attribute such as the following:
+
+```asm
+#bankdef "mybank"
+{
+	#addr 0x8000
+	#size 0x4000
+	#outp 0x10
+	#fill
+}
+```
+
+...then it will occupy the entire size indicated in the output file. Usually, without
+this attribute, the assembler will truncate the output file if no more data lies
+beyond a certain point (and if the bank is the last bank in the output file).
+
+
 ### Address Directive
 
 You can skip ahead to a certain address within the current bank by using
 this directive. Skipped bits will be filled with zeroes. For example:
 
-```
+```asm
 #d8 0xab, 0xcd, 0xef
 #addr 0x8
 #d8 0xab, 0xcd, 0xef
@@ -240,7 +265,7 @@ name contains the bit-size of each component in the sequence. This
 bit-size can be any value, as long as the final address is left aligned
 to the machine's byte boundaries. For example:
 
-```
+```asm
 lda 0x77
 #d4 0x1, 0x2, 0x3, 0x4
 #d8 0x12, 0x34, 0x56, 0x78
@@ -267,7 +292,7 @@ This directive copies the UTF-8 representation of a string to
 the output. Escape sequences and Unicode characters are available.
 For example:
 
-```
+```asm
 #str "abcd"
 #str "\n\r\0"
 #str "\x12\x34"
@@ -286,11 +311,11 @@ For example:
 If the string's length is needed, we can use a bit of arithmetic
 to derive it:
 
-```
+```asm
 helloworld:
 	#str "Hello, world!\0"
 	
-helloworld_len = pc - helloworld
+helloworldLen = pc - helloworld
 ```
 
 ## Reserve Directive
@@ -300,7 +325,7 @@ the given number of bytes, effectively reserving a location for any
 other desired purpose. For example, in a machine where data and
 instructions reside on the same memory space, we could do:
 
-```
+```asm
     jmp start
   
 variable:
@@ -333,7 +358,7 @@ This directive effectively copies the given file's content as
 source code, merging it into the current file being assembled.
 For example, suppose this was the main Source file:
 
-```
+```asm
 start:
     lda 0x77
   
@@ -343,7 +368,7 @@ start:
 ...and that there were another file named `extra.asm` in the
 same directory, with the following contents:
 
-```
+```asm
 jmp start
 ```
 
@@ -369,7 +394,7 @@ to the output. Since supported filesystems are 8-bit based, this
 directive can only be used on machines with alignments that are
 multiples of 8. For example, given the following Source file:
 
-```
+```asm
 lda 0x77
 #incbin "text.bin"
 ```
@@ -393,7 +418,7 @@ This directive interprets the contents of the given file as
 a string of binary digits, and copies that to the output, verbatim.
 For example, given the following Source file:
 
-```
+```asm
 lda 0x77
 #incbinstr "data.txt"
 ```
@@ -420,7 +445,7 @@ This directive interprets the contents of the given file as
 a string of hexadecimal digits, and copies that to the output,
 verbatim. For example, given the following Source file:
 
-```
+```asm
 lda 0x77
 #inchexstr "data.txt"
 ```

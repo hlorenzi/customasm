@@ -181,11 +181,23 @@ impl<'a> AssemblerParser<'a>
 			
 		self.state.check_valid_address(self.parser.report.clone(), self.state.cur_block, new_addr, &tk_name.span)?;
 		
+		let align = self.state.cpudef.as_ref().unwrap().align;
+		
 		if new_addr < cur_addr
-			{ return Err(self.parser.report.error_span("cannot seek to previous address", &tk_name.span)); }
+		{
+			let bankdef = &self.state.bankdefs[self.state.cur_bank];
 			
-		let bits_to_skip = (new_addr - cur_addr) * self.state.cpudef.as_ref().unwrap().align;
-		self.state.output_zero_bits(self.parser.report.clone(), bits_to_skip, &tk_name.span)
+			if bankdef.outp.is_some()
+				{ return Err(self.parser.report.error_span("cannot seek to previous address", &tk_name.span)); }
+			
+			self.state.blocks[self.state.cur_block].truncate(new_addr * align);
+			Ok(())
+		}
+		else
+		{
+			let bits_to_skip = (new_addr - cur_addr) * align;
+			self.state.output_zero_bits(self.parser.report.clone(), bits_to_skip, true, &tk_name.span)
+		}
 	}
 	
 	
@@ -195,7 +207,7 @@ impl<'a> AssemblerParser<'a>
 		
 		let bits = self.parse_usize()? * self.state.cpudef.as_ref().unwrap().align;
 		
-		self.state.output_zero_bits(self.parser.report.clone(), bits, &tk_name.span)
+		self.state.output_zero_bits(self.parser.report.clone(), bits, true, &tk_name.span)
 	}
 	
 	
@@ -211,7 +223,7 @@ impl<'a> AssemblerParser<'a>
 			for _ in 0..8
 			{
 				let bit = byte & 0x80 != 0;
-				self.state.output_bit(self.parser.report.clone(), bit, &tk_string.span)?;
+				self.state.output_bit(self.parser.report.clone(), bit, false, &tk_string.span)?;
 				byte <<= 1;
 			}
 		}
@@ -247,7 +259,7 @@ impl<'a> AssemblerParser<'a>
 			for _ in 0..8
 			{
 				let bit = byte & 0x80 != 0;
-				self.state.output_bit(self.parser.report.clone(), bit, &tk_filename.span)?;
+				self.state.output_bit(self.parser.report.clone(), bit, false, &tk_filename.span)?;
 				byte <<= 1;
 			}
 		}
@@ -278,7 +290,7 @@ impl<'a> AssemblerParser<'a>
 			for _ in 0..bits_per_char
 			{
 				let bit = digit & (1 << (bits_per_char - 1)) != 0;
-				self.state.output_bit(self.parser.report.clone(), bit, &tk_filename.span)?;
+				self.state.output_bit(self.parser.report.clone(), bit, false, &tk_filename.span)?;
 				digit <<= 1;
 			}
 		}
@@ -309,7 +321,7 @@ impl<'a> AssemblerParser<'a>
 			
 			self.state.parsed_exprs.push(parsed_expr);
 			
-			self.state.output_zero_bits(self.parser.report.clone(), elem_width, &span)?;
+			self.state.output_zero_bits(self.parser.report.clone(), elem_width, false, &span)?;
 			
 			if self.parser.maybe_expect(TokenKind::Comma).is_none()
 				{ break; }
@@ -426,7 +438,7 @@ impl<'a> AssemblerParser<'a>
 			rule.production.width().unwrap()
 		};
 		
-		self.state.output_zero_bits(self.parser.report.clone(), instr_width, &instr_span)?;
+		self.state.output_zero_bits(self.parser.report.clone(), instr_width, false, &instr_span)?;
 		
 		let parsed_instr = ParsedInstruction
 		{

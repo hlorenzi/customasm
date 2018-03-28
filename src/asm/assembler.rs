@@ -65,7 +65,7 @@ impl AssemblerState
 			cur_block: 0
 		};
 		
-		state.bankdefs.push(BankDef::new("", 0, 0x1_0000_0000, 0, None));
+		state.bankdefs.push(BankDef::new("", 0, 0x1_0000_0000, Some(0), false, None));
 		state.blocks.push(BinaryBlock::new(""));
 		state
 	}
@@ -96,15 +96,18 @@ impl AssemblerState
 			let bankdef_index = self.find_bankdef(&block.bank_name).unwrap();
 			let bankdef = &self.bankdefs[bankdef_index];
 			
-			if block.len() == 0
-				{ continue; }
-				
 			let align = self.cpudef.as_ref().unwrap().align;
 			
-			let output_index = bankdef.outp;
-			for i in 0..block.len()
+			if let Some(output_index) = bankdef.outp
 			{
-				output.write(output_index * align + i, block.read(i));
+				for i in 0..block.len()
+					{ output.write(output_index * align + i, block.read(i)); }
+				
+				if bankdef.fill
+				{
+					for i in block.len()..(bankdef.size * align)
+						{ output.write(output_index * align + i, false); }
+				}
 			}
 		}
 		
@@ -153,12 +156,18 @@ impl AssemblerState
 	{
 		for j in 1..self.bankdefs.len()
 		{
+			if self.bankdefs[j].outp.is_none()
+				{ continue; }
+		
 			for i in 1..j
 			{
 				let bank1 = &self.bankdefs[i];
 				let bank2 = &self.bankdefs[j];
 				
-				if bank1.outp + bank1.size > bank2.outp && bank1.outp < bank2.outp + bank2.size
+				let outp1 = bank1.outp.unwrap();
+				let outp2 = bank2.outp.unwrap();
+				
+				if outp1 + bank1.size > outp2 && outp1 < outp2 + bank2.size
 					{ report.error_span(format!("banks `{}` and `{}` overlap in output location", bank1.name, bank2.name), &bank1.decl_span.as_ref().unwrap()); }
 			}
 		}
@@ -212,15 +221,18 @@ impl AssemblerState
 	}
 	
 	
-	pub fn output_bit(&mut self, report: RcReport, bit: bool, span: &Span) -> Result<(), ()>
+	pub fn output_bit(&mut self, report: RcReport, bit: bool, skipping: bool, span: &Span) -> Result<(), ()>
 	{
 		self.check_cpudef_active(report.clone(), span)?;
 		
 		{
 			let block = &self.blocks[self.cur_block];
-			let bankdef = self.find_bankdef(&block.bank_name).unwrap();
+			let bankdef = &self.bankdefs[self.cur_bank];
 			
-			if block.len() / self.cpudef.as_ref().unwrap().align >= self.bankdefs[bankdef].size
+			if bankdef.outp.is_none() && !skipping
+				{ return Err(report.error_span("attempt to place data in non-writable bank", span)); }
+			
+			if block.len() / self.cpudef.as_ref().unwrap().align >= bankdef.size
 				{ return Err(report.error_span("data overflowed bank size", span)); }
 		}
 		
@@ -229,10 +241,10 @@ impl AssemblerState
 	}
 	
 	
-	pub fn output_zero_bits(&mut self, report: RcReport, num: usize, span: &Span) -> Result<(), ()>
+	pub fn output_zero_bits(&mut self, report: RcReport, num: usize, skipping: bool, span: &Span) -> Result<(), ()>
 	{
 		for _ in 0..num
-			{ self.output_bit(report.clone(), false, span)?; }
+			{ self.output_bit(report.clone(), false, skipping, span)?; }
 			
 		Ok(())
 	}

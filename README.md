@@ -25,7 +25,7 @@ Options:
 
 The idea is that, given the following file:
 
-```
+```asm
 #cpudef
 {
     #align 8

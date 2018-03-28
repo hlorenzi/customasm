@@ -25,6 +25,13 @@ impl BinaryBlock
 	}
 	
 	
+	pub fn truncate(&mut self, new_len: usize)
+	{
+		while self.bits.len() > new_len
+			{ self.bits.pop(); }
+	}
+	
+	
 	pub fn write(&mut self, index: usize, bit: bool)
 	{
 		while self.bits.len() <= index

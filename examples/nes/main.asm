@@ -3,8 +3,10 @@
 #include "nes.asm"
 
 
-varTimer = 0x00
-varPaletteIndex = 0x01
+#bank "zeropage"
+
+varTimer: #res 1
+varPaletteIndex: #res 1
 
 
 #bank "prg"

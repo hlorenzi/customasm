@@ -3,7 +3,7 @@
 This directive controls settings for the target machine, and
 defines mnemonics for its instruction set.
 
-```
+```asm
 #cpudef
 {
     #align 8
@@ -22,7 +22,7 @@ The syntax first expects a list of configuration directives, one per line.
 The currently available configuration is:
 
 - `#align <bit_num>`  
-Sets the number of bits in a byte for the target machine.  
+Sets the number of bits per byte for the target machine.  
 For example, `#align 8` is the usual configuration for
 most modern CPUs.  
 Memory addresses are counted in bytes, so, with 8-bit bytes,
@@ -93,7 +93,7 @@ rule (in order of definition) that can have its constraints satisfied.
 
 For example, we can write:
 
-```
+```asm
 #align 8
 
 mov {value} :: value <=     0xff -> 8'0x10 @ value[ 7:0]
@@ -110,7 +110,7 @@ Since it is impossible to force the use of a certain cascading
 rule, it is recommended to specify unambiguous rules for all
 forms, like:
 
-```
+```asm
 #align 8
 
 mov.b {value} :: value <=     0xff -> 8'0x10 @ value[ 7:0]
@@ -149,7 +149,7 @@ Rule | Used as | Output
 
 ## Full Examples
 
-```
+```asm
 #cpudef
 {
     #align 8
@@ -178,10 +178,10 @@ Rule | Used as | Output
 }
 ```
 
-```
+```asm
 #cpudef
 {
-	; you can have unusual counts of bits-per-byte too!
+    ; you can have unusual counts of bits-per-byte too!
     #align 3
     
     lda #{value} -> 3'0b001 @ value[2:0]

@@ -7,7 +7,8 @@ pub struct BankDef
 	pub name: String,
 	pub addr: usize,
 	pub size: usize,
-	pub outp: usize,
+	pub outp: Option<usize>,
+	pub fill: bool,
 	pub decl_span: Option<Span>
 }
 
@@ -19,13 +20,14 @@ struct BankDefParser<'p>
 	
 	addr: Option<usize>,
 	size: Option<usize>,
-	outp: Option<usize>
+	outp: Option<usize>,
+	fill: Option<bool>
 }
 
 
 impl BankDef
 {
-	pub fn new<S>(name: S, addr: usize, size: usize, outp: usize, decl_span: Option<Span>) -> BankDef
+	pub fn new<S>(name: S, addr: usize, size: usize, outp: Option<usize>, fill: bool, decl_span: Option<Span>) -> BankDef
 	where S: Into<String>
 	{
 		BankDef
@@ -34,6 +36,7 @@ impl BankDef
 			addr: addr,
 			size: size,
 			outp: outp,
+			fill: fill,
 			decl_span: decl_span
 		}
 	}
@@ -49,7 +52,8 @@ impl BankDef
 			
 			addr: None,
 			size: None,
-			outp: None
+			outp: None,
+			fill: None
 		};
 		
 		bankdef_parser.parse()?;
@@ -59,7 +63,8 @@ impl BankDef
 			name: name.into(),
 			addr: bankdef_parser.addr.unwrap(),
 			size: bankdef_parser.size.unwrap(),
-			outp: bankdef_parser.outp.unwrap(),
+			outp: bankdef_parser.outp,
+			fill: bankdef_parser.fill.unwrap_or(false),
 			decl_span: Some(span.clone())
 		};
 		
@@ -91,9 +96,6 @@ impl<'p> BankDefParser<'p>
 		if self.size.is_none()
 			{ return Err(self.parser.report.error_span("missing #size attribute", &self.span)); }
 		
-		if self.outp.is_none()
-			{ return Err(self.parser.report.error_span("missing #outp attribute", &self.span)); }
-		
 		Ok(())
 	}
 	
@@ -110,6 +112,7 @@ impl<'p> BankDefParser<'p>
 			"addr" => self.parse_attribute_addr(&tk_attrb_name),
 			"size" => self.parse_attribute_size(&tk_attrb_name),
 			"outp" => self.parse_attribute_outp(&tk_attrb_name),
+			"fill" => self.parse_attribute_fill(&tk_attrb_name),
 			_ => Err(self.parser.report.error_span("unknown attribute", &tk_attrb_name.span))
 		}
 	}
@@ -147,6 +150,16 @@ impl<'p> BankDefParser<'p>
 		let (_, outp) = self.parser.expect_usize()?;
 		
 		self.outp = Some(outp);
+		Ok(())
+	}
+	
+	
+	pub fn parse_attribute_fill(&mut self, tk_attrb_name: &Token) -> Result<(), ()>
+	{
+		if self.fill.is_some()
+			{ return Err(self.parser.report.error_span("duplicate #fill attribute", &tk_attrb_name.span)); }
+			
+		self.fill = Some(true);
 		Ok(())
 	}
 }

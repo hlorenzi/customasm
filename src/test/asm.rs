@@ -673,11 +673,13 @@ fn test_incstr_directives()
 #[test]
 fn test_banks()
 {
-	test("", "#bankdef \"\"      { }",                           Fail(("asm", 1, "invalid")));
-	test("", "#bankdef \"hello\" { }",                           Fail(("asm", 1, "missing")));
-	test("", "#bankdef \"hello\" { #addr 0 }",                   Fail(("asm", 1, "missing")));
-	test("", "#bankdef \"hello\" { #addr 0, #size 0 }",          Fail(("asm", 1, "missing")));
-	test("", "#bankdef \"hello\" { #addr 0, #size 0, #outp 0 }", Pass((4, "")));
+	test("", "#bankdef \"\"      { }",                                  Fail(("asm", 1, "invalid")));
+	test("", "#bankdef \"hello\" { }",                                  Fail(("asm", 1, "missing")));
+	test("", "#bankdef \"hello\" { #addr 0 }",                          Fail(("asm", 1, "missing")));
+	test("", "#bankdef \"hello\" { #addr 0, #size 0 }",                 Pass((4, "")));
+	test("", "#bankdef \"hello\" { #addr 0, #size 0, #outp 0 }",        Pass((4, "")));
+	test("", "#bankdef \"hello\" { #addr 0, #size 0,          #fill }", Pass((4, "")));
+	test("", "#bankdef \"hello\" { #addr 0, #size 0, #outp 0, #fill }", Pass((4, "")));
 	
 	test("", "#bankdef \"hello\"    {    #addr 0     #size 0     #outp 0    }", Fail(("asm", 1, ",")));
 	test("", "#bankdef \"hello\"    {    #addr 0  \n #size 0  \n #outp 0    }", Pass((4, "")));
@@ -685,6 +687,15 @@ fn test_banks()
 	test("", "#bankdef \"hello\" \n { \n #addr 0, \n #size 0, \n #outp 0 \n }", Pass((4, "")));
 	
 	test("", "#d8 0xff \n #bankdef \"hello\" { #addr 0, #size 0, #outp 0 }", Fail(("asm", 2, "default bank")));
+	
+	test("", "#bankdef \"hello\" { #addr 0, #size 10, #outp 0        }", Pass((4, "")));
+	test("", "#bankdef \"hello\" { #addr 0, #size 10, #outp 0, #fill }", Pass((4, "00000000000000000000")));
+	
+	test("", "#bankdef \"hello\" { #addr 0, #size 10 } \n #res 1", Pass((4, "")));
+	test("", "#bankdef \"hello\" { #addr 0, #size 10 } \n #d8 0",  Fail(("asm", 2, "non-writable")));
+	
+	test("", "#bankdef \"hello\" { #addr  0, #size 10 } \n #res 1 \n #addr 0 \n #res 1", Pass((4, "")));
+	test("", "#bankdef \"hello\" { #addr 10, #size 10 } \n #res 1 \n #addr 0 \n #res 1", Fail(("asm", 3, "out of bank range")));
 	
 	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 0 }
 	          #bankdef \"world\" { #addr 0, #size 4, #outp 0 }",
@@ -785,4 +796,5 @@ fn test_banks()
 			  #d8 0xee, 0xff
 			  #d8 x, y, z",
 	          Pass((4, "aabbeeff001002000000ccdd")));
+	
 }
