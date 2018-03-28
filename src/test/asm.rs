@@ -77,6 +77,11 @@ fn test_simple()
 	test("halt -> 8'0", "halt \n unknown", Fail(("asm", 2, "no match")));
 	
 	test("halt -> 8'0", "#unknown \n halt", Fail(("asm", 1, "unknown")));
+	
+	test("halt -> 8'0", "HALT", Pass((4, "00")));
+	test("HALT -> 8'0", "halt", Pass((4, "00")));
+	test("Halt -> 8'0", "hALT", Pass((4, "00")));
+	test("hALT -> 8'0", "Halt", Pass((4, "00")));
 }
 
 
@@ -145,39 +150,6 @@ fn test_addr_directive()
 	test("halt -> 8'0x12", "#addr 0x1_0000_0001",           Fail(("asm", 1, "bank range")));
 	test("halt -> 8'0x12", "#addr 0x1_0000_0000_0000_0000", Fail(("asm", 1, "large")));
 }
-
-
-/*#[test]
-fn test_outp_directive()
-{
-	test("halt -> 8'0x12", "              halt", Pass((4, "12")));
-	test("halt -> 8'0x12", "#outp 0x00 \n halt", Pass((4, "12")));
-	test("halt -> 8'0x12", "#outp 0x01 \n halt", Pass((4, "0012")));
-	test("halt -> 8'0x12", "#outp 0x02 \n halt", Pass((4, "000012")));
-	test("halt -> 8'0x12", "#outp 0x10 \n halt", Pass((4, "0000000000000000000000000000000012")));
-	
-	test("halt -> 8'0x12 @ pc[7:0]", "              halt", Pass((4, "1200")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#outp 0x00 \n halt", Pass((4, "1200")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#outp 0x01 \n halt", Pass((4, "001200")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#outp 0x02 \n halt", Pass((4, "00001200")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#outp 0x10 \n halt", Pass((4, "000000000000000000000000000000001200")));
-	
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x45 \n #outp 0x00 \n halt", Pass((4, "1245")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x77 \n #outp 0x01 \n halt", Pass((4, "001277")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x93 \n #outp 0x02 \n halt", Pass((4, "00001293")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0xbf \n #outp 0x10 \n halt", Pass((4, "0000000000000000000000000000000012bf")));
-	
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x45 \n #outp 0x00 \n halt \n halt \n halt", Pass((4, "124512471249")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x77 \n #outp 0x01 \n halt \n halt \n halt", Pass((4, "0012771279127b")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x93 \n #outp 0x02 \n halt \n halt \n halt", Pass((4, "0000129312951297")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0xbf \n #outp 0x10 \n halt \n halt \n halt", Pass((4, "0000000000000000000000000000000012bf12c112c3")));
-	
-	test("halt -> 8'0x12 @ pc[7:0]", "#outp 0x00 \n halt \n halt \n #outp 0x10 \n halt \n halt", Pass((4, "1200120200000000000000000000000012041206")));
-	
-	test("halt -> 8'0x12", "#outp 0xffff_ffff_ffff_ffff / 8",       Pass((4, "")));
-	test("halt -> 8'0x12", "#outp 0x1_0000_0000_0000_0000 / 8",     Fail(("asm", 1, "valid range")));
-	test("halt -> 8'0x12", "#outp 0x1_0000_0000_0000_0000 \n halt", Fail(("asm", 1, "large")));
-}*/
 
 
 #[test]
@@ -355,6 +327,11 @@ fn test_labels()
 	
 	test(INSTRSET, " label: halt \n  label: halt", Fail(("asm", 2, "duplicate")));
 	test(INSTRSET, ".label: halt \n .label: halt", Fail(("asm", 2, "duplicate")));
+	
+	test(INSTRSET, "label: halt \n jump LABEL", Fail(("asm", 2, "unknown")));
+	test(INSTRSET, "LABEL: halt \n jump label", Fail(("asm", 2, "unknown")));
+	test(INSTRSET, "myVar: halt \n jump myvar", Fail(("asm", 2, "unknown")));
+	test(INSTRSET, "myvar: halt \n jump myVar", Fail(("asm", 2, "unknown")));
 }
 
 

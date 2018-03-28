@@ -65,7 +65,7 @@ impl RulePatternMatcher
 		{
 			RulePatternPart::Exact(kind, ref excerpt) =>
 			{
-				let step_kind = MatchStepExact(kind, excerpt.clone());
+				let step_kind = MatchStepExact(kind, excerpt.as_ref().map(|s| s.to_ascii_lowercase()));
 				
 				if let Some(next_step) = step.children_exact.get_mut(&step_kind)
 				{
@@ -126,7 +126,8 @@ impl RulePatternMatcher
 			let parser_state = parser.save(); 
 			
 			let tk = parser.advance();
-			let step_exact = MatchStepExact(tk.kind, tk.excerpt);
+			
+			let step_exact = MatchStepExact(tk.kind, tk.excerpt.map(|s| s.to_ascii_lowercase()));
 			
 			if let Some(next_step) = step.children_exact.get(&step_exact)
 			{
