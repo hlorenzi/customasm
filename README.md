@@ -8,10 +8,15 @@ you just implemented in FPGA!
 [Check out the Releases section](https://github.com/hlorenzi/customasm/releases) 
 for pre-built binaries.  
 
-[Check out the documentation](/doc/index.md) for usage instructions.
+[Check out the documentation](/doc/index.md) for user instructions.
+
+You can compile from source by simply doing `cargo build`. There's also a
+battery of tests available at `cargo test`.
+
+Usage of the command line interface is as follows:
 
 ```
-Usage: customasm [options] <file>
+Usage: customasm [options] <asm-file>
 
 Options:
     -h, --help          Display this information.
@@ -19,11 +24,11 @@ Options:
     -q, --quiet         Suppress progress reports.
     -f, --format FORMAT The format of the output file. Possible formats:
                         binary, binstr, hexstr, bindump, hexdump
-    -o, --out-data FILE The name of the output file. (Default: a.out)
-        --stdout        Write output to stdout instead of a file.
+    -o, --output FILE   The name of the output file.
+    -p, --print         Print output to stdout instead of writing to a file.
 ```
 
-The idea is that, given the following file:
+As an example, given the following file:
 
 ```asm
 #cpudef

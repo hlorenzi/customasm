@@ -55,6 +55,7 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 	}
 	
 	let quiet = matches.opt_present("q");
+	let out_stdout = matches.opt_present("p");
 	
 	let out_format = match matches.opt_str("f").as_ref().map(|s| s.as_ref())
 	{
@@ -62,9 +63,12 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 		Some("bindump") => OutputFormat::BinDump,
 		Some("hexstr")  => OutputFormat::HexStr,
 		Some("hexdump") => OutputFormat::HexDump,
+		Some("binary")  => OutputFormat::Binary,
 		
-		Some("binary") |
-		None => OutputFormat::Binary,
+		None => if out_stdout
+			{ OutputFormat::HexDump }
+		else
+			{ OutputFormat::Binary },
 		
 		Some(_) =>
 		{
@@ -73,14 +77,23 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 		}
 	};
 	
-	let out_stdout = matches.opt_present("stdout");
-	
-	let out_data_file = matches.opt_str("o").unwrap_or("a.out".to_string());
-	
 	if matches.free.len() != 1
 		{ return Err(true); }
 	
 	let asm_file = matches.free[0].clone();
+	
+	let output_file = match matches.opt_str("o")
+	{
+		Some(f) => f,
+		None =>
+		{
+			match get_default_output_filename(report.clone(), &asm_file)
+			{
+				Ok(f) => f,
+				Err(_) => return Err(true)
+			}
+		}
+	};
 	
 	let compiled = compile(report.clone(), fileserver, asm_file, quiet).map_err(|_| false)?;
 	
@@ -93,19 +106,23 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 		OutputFormat::Binary  => compiled.generate_binary (0, compiled.len())
 	};
 	
-	if !quiet
-		{ println!("success"); }
-	
 	if out_stdout
 	{
 		if !quiet
-			{ println!(""); }
+		{
+			println!("success");
+			println!("");
+		}
 			
 		println!("{}", String::from_utf8_lossy(&output_data));
 	}
 	else
 	{
-		fileserver.write_bytes(report.clone(), &out_data_file, &output_data, None).map_err(|_| false)?;
+		println!("writing `{}`...", &output_file);
+		fileserver.write_bytes(report.clone(), &output_file, &output_data, None).map_err(|_| false)?;
+		
+		if !quiet
+			{ println!("success"); }
 	}
 	
 	Ok(())
@@ -119,8 +136,8 @@ fn make_opts() -> getopts::Options
     opts.optflag("v", "version", "Display version information.");
     opts.optflag("q", "quiet", "Suppress progress reports.");
     opts.optopt("f", "format", "The format of the output file. Possible formats: binary, binstr, hexstr, bindump, hexdump", "FORMAT");
-    opts.optopt("o", "out-data", "The name of the output file. (Default: a.out)", "FILE");
-    opts.optflag("", "stdout", "Write output to stdout instead of a file.");
+    opts.optopt("o", "output", "The name of the output file.", "FILE");
+    opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
 	
 	opts
 }
@@ -138,7 +155,7 @@ fn parse_opts(report: RcReport, opts: &getopts::Options, args: &Vec<String>) -> 
 
 fn print_usage(opts: &getopts::Options)
 {
-	println!("{}", opts.usage(&format!("Usage: {} [options] <file>", env!("CARGO_PKG_NAME"))));
+	println!("{}", opts.usage(&format!("Usage: {} [options] <asm-file>", env!("CARGO_PKG_NAME"))));
 }
 
 
@@ -151,6 +168,22 @@ fn print_version()
 fn print_header()
 {
 	print_version();
+}
+
+
+fn get_default_output_filename(report: RcReport, input_filename: &str) -> Result<String, ()>
+{
+	use std::path::PathBuf;
+	
+	let mut output_filename = PathBuf::from(input_filename);
+	output_filename.set_extension("bin");
+	
+	let output_filename = output_filename.to_string_lossy().into_owned().replace("\\", "/");
+	
+	if output_filename == input_filename
+		{ return Err(report.error("cannot derive safe output filename")); }
+	
+	Ok(output_filename)
 }
 
 
