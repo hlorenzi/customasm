@@ -56,9 +56,34 @@ fn test_directives()
 #[test]
 fn test_rules_simple()
 {
-	test("halt    -> 8'0",    Pass(()));
-	test("halt    -> 0[7:0]", Pass(()));
-	test("halt \n -> 0[7:0]", Pass(()));
+	test("halt    -> 8'0",        Pass(()));
+	test("halt    -> 0[7:0]",     Pass(()));
+	test("halt \n -> 0[7:0]",     Pass(()));
+	test("halt    -> 0x00",       Pass(()));
+	test("halt    -> 0b00000000", Pass(()));
+	test("halt    -> 0o00000000", Pass(()));
+	
+	test("#align 1 \n halt -> 1'0",     Pass(()));
+	test("#align 1 \n halt -> 0b0",     Pass(()));
+	test("#align 1 \n halt -> 0o0",     Pass(()));
+	test("#align 1 \n halt -> 0x0",     Pass(()));
+	test("#align 1 \n halt -> 2'0b10",  Pass(()));
+	test("#align 1 \n halt -> 0b10",    Pass(()));
+	test("#align 1 \n halt -> 0o10",    Pass(()));
+	test("#align 1 \n halt -> 0x10",    Pass(()));
+	test("#align 3 \n halt -> 3'0b101", Pass(()));
+	test("#align 3 \n halt -> 0b101",   Pass(()));
+	test("#align 3 \n halt -> 0o101",   Pass(()));
+	test("#align 3 \n halt -> 0x101",   Pass(()));
+	test("#align 5 \n halt -> 5'0x13",  Pass(()));
+	test("#align 5 \n halt -> 0b10011", Pass(()));
+	test("#align 5 \n halt -> 0o13",    Fail(("test", 2, "width")));
+	test("#align 5 \n halt -> 0x13",    Fail(("test", 2, "width")));
+	
+	
+	test("halt    -> 0x_0_0",        Pass(()));
+	test("halt    -> 0b_0000_0000",  Pass(()));
+	test("halt    -> 0o_000_00_000", Pass(()));
 	
 	test("halt -> 8'0x12 @ 8'0x34", Pass(()));
 	test("halt -> 16'0x1234",       Pass(()));
@@ -73,6 +98,7 @@ fn test_rules_simple()
 	test("halt",               Fail(("test", 1, "->")));
 	test("-> 8'0",             Fail(("test", 1, "empty")));
 	test("halt -> 0",          Fail(("test", 1, "width")));
+	test("halt -> 0x0",        Fail(("test", 1, "width")));
 	test("halt -> 1 + 1",      Fail(("test", 1, "width")));
 	test("halt -> 1 + 1[7:0]", Fail(("test", 1, "width")));
 	test("halt -> 7'0",        Fail(("test", 1, "align")));

@@ -141,13 +141,15 @@ pub fn excerpt_as_usize(report: RcReport, excerpt: &str, span: &Span) -> Result<
 }
 
 
-pub fn excerpt_as_bigint(report: RcReport, excerpt: &str, span: &Span) -> Result<(BigInt, Option<usize>), ()>
+pub fn excerpt_as_bigint(report: RcReport, excerpt: &str, span: &Span) -> Result<(BigInt, Option<usize>, usize, usize), ()>
 {
 	let chars: Vec<char> = excerpt.chars().collect();
 	assert!(chars.len() >= 1);
 
 	let (width,     index) = parse_width(report.clone(), &chars, span)?;
 	let (radix, mut index) = parse_radix(&chars, index);
+	
+	let mut digit_num = 0;
 	
 	let mut value = BigInt::zero();
 	while index < chars.len()
@@ -164,6 +166,8 @@ pub fn excerpt_as_bigint(report: RcReport, excerpt: &str, span: &Span) -> Result
 			None => return Err(report.error_span("invalid digits", span))
 		};
 		
+		digit_num += 1;
+		
 		value = value * radix;
 		value = value + digit;
 	}
@@ -174,7 +178,7 @@ pub fn excerpt_as_bigint(report: RcReport, excerpt: &str, span: &Span) -> Result
 			{ return Err(report.error_span(format!("value (width = {}) is larger than specified", value.bits()), span)); }
 	}
 	
-	Ok((value, width))
+	Ok((value, width, radix, digit_num))
 }
 
 
@@ -229,6 +233,7 @@ fn parse_radix(chars: &[char], index: usize) -> (usize, usize)
 		match chars[index + 1]
 		{
 			'b' => ( 2, index + 2),
+			'o' => ( 8, index + 2),
 			'x' => (16, index + 2),
 			_ =>   (10, index)
 		}

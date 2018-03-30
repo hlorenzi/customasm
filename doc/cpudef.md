@@ -8,11 +8,11 @@ defines mnemonics for its instruction set.
 {
     #align 8
     
-    lda {value} -> 8'0x10 @ value[7:0]
-    add {value} -> 8'0xad @ value[7:0]
-    jmp {addr}  -> 8'0x55 @ addr[15:0]
-    inc {addr}  -> 8'0xcc @ addr[15:0]
-    ret         -> 8'0xee
+    lda {value} -> 0x10 @ value[7:0]
+    add {value} -> 0xad @ value[7:0]
+    jmp {addr}  -> 0x55 @ addr[15:0]
+    inc {addr}  -> 0xcc @ addr[15:0]
+    ret         -> 0xee
 }
 ```
 
@@ -55,7 +55,9 @@ The production part of a rule defines its binary representation.
 It consists of a single expression.  
 The binary representation must have a well-known number of bits,
 so that byte alignment can be verified.  
-- For literals (like fixed opcodes), use explicitly-sized literals:
+- For literals (like fixed opcodes), like `0x7f`, the number of used bits is derived automatically
+from the radix and number of digits used. If it's necessary to explicitly state the
+number of used bits, use explicitly-sized literals:
 the number of bits, followed by a single quote, followed by the value, like `8'0x05`.
 - For parameter values, use a bit slice:
 the parameter name followed by two numbers inside brackets, like `abc[y:x]`.
@@ -63,7 +65,7 @@ the parameter name followed by two numbers inside brackets, like `abc[y:x]`.
 of the value that will be selected, counting from the least significant bit.
 For example, if `abc = 0xbbaa`, then `abc[7:0] = 0xaa` and `abc[15:8] = 0xbb`.
 - Use the concatenation operator `@` to string sub-expressions together, like
-`8'0x1a @ addr[15:0]`. All arguments to the concatenation operator must have a
+`0x1a @ addr[15:0]`. All arguments to the concatenation operator must have a
 well-known number of bits.
 - More complex expressions can also be evaluated; just end them off with a
 bit slice if well-known sizes are needed, like `(abc + 0xff)[7:0] @ (pc >> 2)[15:0]`.
@@ -79,8 +81,8 @@ at assembly time.
 
 For example, we can check whether an argument fits the instruction's
 binary representation:
-- `jmp {addr} :: addr <= 0xffff -> 8'0x10 @ addr[15:0]`, or
-- `jmp {addr} :: addr <= 0xffff, "address out of bounds" -> 8'0x10 @ addr[15:0]`
+- `jmp {addr} :: addr <= 0xffff -> 0x10 @ addr[15:0]`, or
+- `jmp {addr} :: addr <= 0xffff, "address out of bounds" -> 0x10 @ addr[15:0]`
 
 ### Rule Cascading
 
@@ -96,9 +98,9 @@ For example, we can write:
 ```asm
 #align 8
 
-mov {value} :: value <=     0xff -> 8'0x10 @ value[ 7:0]
-mov {value} :: value <=   0xffff -> 8'0x11 @ value[15:0]
-mov {value} :: value <= 0xffffff -> 8'0x12 @ value[23:0]
+mov {value} :: value <=     0xff -> 0x10 @ value[ 7:0]
+mov {value} :: value <=   0xffff -> 0x11 @ value[15:0]
+mov {value} :: value <= 0xffffff -> 0x12 @ value[23:0]
 ```
 
 This will select the best fitting representation according to
@@ -113,13 +115,13 @@ forms, like:
 ```asm
 #align 8
 
-mov.b {value} :: value <=     0xff -> 8'0x10 @ value[ 7:0]
-mov.w {value} :: value <=   0xffff -> 8'0x11 @ value[15:0]
-mov.t {value} :: value <= 0xffffff -> 8'0x12 @ value[23:0]
+mov.b {value} :: value <=     0xff -> 0x10 @ value[ 7:0]
+mov.w {value} :: value <=   0xffff -> 0x11 @ value[15:0]
+mov.t {value} :: value <= 0xffffff -> 0x12 @ value[23:0]
 
-mov {value} :: value <=     0xff -> 8'0x10 @ value[ 7:0]
-mov {value} :: value <=   0xffff -> 8'0x11 @ value[15:0]
-mov {value} :: value <= 0xffffff -> 8'0x12 @ value[23:0]
+mov {value} :: value <=     0xff -> 0x10 @ value[ 7:0]
+mov {value} :: value <=   0xffff -> 0x11 @ value[15:0]
+mov {value} :: value <= 0xffffff -> 0x12 @ value[23:0]
 ```
 
 ### Predefined Variables
@@ -136,16 +138,16 @@ With `#align 8`:
 
 Rule | Used as | Output
 -----|---------|--------
-```load {x} -> 8'0x55 @ x[7:0]``` | ```load 0xff``` | ```0x55 0xff```
-```load #{x} -> 8'0x55 @ x[7:0]``` | ```load #0xff``` | ```0x55 0xff```
-```load.b {x} -> 8'0x55 @ x[7:0]``` | ```load.b 0xff``` | ```0x55 0xff```
-```mov {a} -> 8'0x77 @ a[7:0]``` | ```mov 0xff``` | ```0x77 0xff```
-```mov {a} -> 8'0x77 @ a[15:0]``` | ```mov 0xff``` | ```0x77 0x00 0xff```
-```mov {a} -> 8'0x77 @ a[15:0]``` | ```mov 0x1234``` | ```0x77 0x12 0x34```
-```mov {a} -> 8'0x77 @ a[15:8]``` | ```mov 0x1234``` | ```0x77 0x12```
-```mov {a} -> 8'0x77 @ a[15:8] @ a[7:0]``` | ```mov 0x1234``` | ```0x77 0x12 0x34```
-```mov {a} -> 8'0x77 @ a[7:0] @ a[15:8]``` | ```mov 0x1234``` | ```0x77 0x34 0x12```
-```jmp {a} -> 8'0x99 @ (a + 2)[7:0]``` | ```jmp 0x12``` | ```0x99 0x14```
+```load {x} -> 0x55 @ x[7:0]``` | ```load 0xff``` | ```0x55 0xff```
+```load #{x} -> 0x55 @ x[7:0]``` | ```load #0xff``` | ```0x55 0xff```
+```load.b {x} -> 0x55 @ x[7:0]``` | ```load.b 0xff``` | ```0x55 0xff```
+```mov {a} -> 0x77 @ a[7:0]``` | ```mov 0xff``` | ```0x77 0xff```
+```mov {a} -> 0x77 @ a[15:0]``` | ```mov 0xff``` | ```0x77 0x00 0xff```
+```mov {a} -> 0x77 @ a[15:0]``` | ```mov 0x1234``` | ```0x77 0x12 0x34```
+```mov {a} -> 0x77 @ a[15:8]``` | ```mov 0x1234``` | ```0x77 0x12```
+```mov {a} -> 0x77 @ a[15:8] @ a[7:0]``` | ```mov 0x1234``` | ```0x77 0x12 0x34```
+```mov {a} -> 0x77 @ a[7:0] @ a[15:8]``` | ```mov 0x1234``` | ```0x77 0x34 0x12```
+```jmp {a} -> 0x99 @ (a + 2)[7:0]``` | ```jmp 0x12``` | ```0x99 0x14```
 
 ## Full Examples
 
@@ -156,25 +158,25 @@ Rule | Used as | Output
     
     ; we can write the entire rule in one line:
     
-    ld  r1, {value} :: value <=     0xff -> 8'0x10 @ value[ 7:0]
-    ld  r1, {value} :: value <=   0xffff -> 8'0x11 @ value[15:0]
-    ld  r1, {value} :: value <= 0xffffff -> 8'0x12 @ value[23:0]
+    ld  r1, {value} :: value <=     0xff -> 0x10 @ value[ 7:0]
+    ld  r1, {value} :: value <=   0xffff -> 0x11 @ value[15:0]
+    ld  r1, {value} :: value <= 0xffffff -> 0x12 @ value[23:0]
     
     ; but we can also add in line breaks for readability:
     
     add r1, {value}
-        -> 8'0x20 @ value[7:0]
+        -> 0x20 @ value[7:0]
     
     add {addr}, {value}
-        -> 8'0x21 @ address[23:0] @ value[7:0]
+        -> 0x21 @ address[23:0] @ value[7:0]
     
     inc r1
-        -> 8'0x30
+        -> 0x30
     
     jmp {addr}
         :: addr <= 0xffffff, "address is out of bounds"
         :: addr >= 0, "address is out of bounds"
-        -> 8'0x40 @ address[23:0]
+        -> 0x40 @ address[23:0]
 }
 ```
 
@@ -184,10 +186,10 @@ Rule | Used as | Output
     ; you can have unusual counts of bits-per-byte too!
     #align 3
     
-    lda #{value} -> 3'0b001 @ value[2:0]
-    ldx #{value} -> 3'0b010 @ value[2:0]
-    sta  {addr}  -> 3'0b011 @ addr[5:0]
-    nop          -> 3'0b110
-    halt         -> 3'0b111
+    lda #{value} -> 0b001 @ value[2:0]
+    ldx #{value} -> 0b010 @ value[2:0]
+    sta  {addr}  -> 0b011 @ addr[5:0]
+    nop          -> 0b110
+    halt         -> 0b111
 }
 ```

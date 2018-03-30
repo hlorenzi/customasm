@@ -287,15 +287,29 @@ impl<'a> ExpressionParser<'a>
 		let tk_number = self.parser.expect(TokenKind::Number)?;
 		let number = tk_number.excerpt.clone().unwrap();
 		
-		let (bigint, width) = excerpt_as_bigint(self.parser.report.clone(), &number, &tk_number.span)?;
+		let (bigint, width, radix, digit_num) = excerpt_as_bigint(self.parser.report.clone(), &number, &tk_number.span)?;
+		
+		let radix_bits = match radix
+		{
+			2 => Some(1),
+			8 => Some(3),
+			16 => Some(4),
+			_ => None
+		};
 		
 		let span = tk_number.span;
 		let expr = Expression::Literal(span.clone(), ExpressionValue::Integer(bigint));
 		
 		match width
 		{
-			None => Ok(expr),
-			Some(width) => Ok(Expression::BitSlice(span.clone(), span, width - 1, 0, Box::new(expr)))
+			Some(width) => Ok(Expression::BitSlice(span.clone(), span, width - 1, 0, Box::new(expr))),
+			
+			None => match radix_bits
+			{
+				None => Ok(expr),
+				
+				Some(radix_bits) => Ok(Expression::BitSlice(span.clone(), span, radix_bits * digit_num - 1, 0, Box::new(expr)))
+			}
 		}
 	}
 }

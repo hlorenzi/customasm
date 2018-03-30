@@ -18,11 +18,11 @@ As an example, the file:
 {
     #align 8
     
-    lda {value} -> 8'0x10 @ value[7:0]
-    add {value} -> 8'0xad @ value[7:0]
-    jmp {addr}  -> 8'0x55 @ addr[15:0]
-    inc {addr}  -> 8'0xcc @ addr[15:0]
-    ret         -> 8'0xee
+    lda {value} -> 0x10 @ value[7:0]
+    add {value} -> 0xad @ value[7:0]
+    jmp {addr}  -> 0x55 @ addr[15:0]
+    inc {addr}  -> 0xcc @ addr[15:0]
+    ret         -> 0xee
 }
 
 lda 0x77

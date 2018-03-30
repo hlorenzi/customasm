@@ -46,6 +46,7 @@ fn test_literals()
 	test("10", Pass(ExpressionValue::Integer(BigInt::from(10))));
 	
 	test("0b10", Pass(ExpressionValue::Integer(BigInt::from(2))));
+	test("0o10", Pass(ExpressionValue::Integer(BigInt::from(8))));
 	test("0x10", Pass(ExpressionValue::Integer(BigInt::from(16))));
 	
 	test("0b1_0", Pass(ExpressionValue::Integer(BigInt::from(2))));
@@ -54,6 +55,8 @@ fn test_literals()
 	test("10a",   Fail(("test", 1, "invalid")));
 	test("0b102", Fail(("test", 1, "invalid")));
 	test("0b10a", Fail(("test", 1, "invalid")));
+	test("0o80",  Fail(("test", 1, "invalid")));
+	test("0o10a", Fail(("test", 1, "invalid")));
 	test("0x10g", Fail(("test", 1, "invalid")));
 	
 	test("8'0x0'0",  Fail(("test", 1, "invalid")));

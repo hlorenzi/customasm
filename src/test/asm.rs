@@ -12,11 +12,11 @@ where S: Into<String>, T: Into<String>
 	cpudef.push_str(&instrset.into());
 	cpudef.push_str("\n }");
 
-	let mut asm_with_cpudef = "#include \"instrset\" \n".to_string();
+	let mut asm_with_cpudef = "#include \"cpu\" \n".to_string();
 	asm_with_cpudef.push_str(&asm.into());
 	
 	let mut fileserver = FileServerMock::new();
-	fileserver.add("instrset", cpudef.bytes().collect::<Vec<u8>>());
+	fileserver.add("cpu", cpudef.bytes().collect::<Vec<u8>>());
 	fileserver.add("asm", asm_with_cpudef);
 	
 	let adjusted_result =
@@ -55,18 +55,35 @@ fn test_simple()
 	test("",            "", Pass((1, "")));
 	test("halt -> 8'0", "", Pass((1, "")));
 	
-	test("halt -> 8'0",             "halt", Pass((4, "00")));
-	test("halt -> 16'0x1234",       "halt", Pass((4, "1234")));
-	test("halt -> 8'0x12 @ 8'0x34", "halt", Pass((4, "1234")));
-	test("halt -> 4'0xa  @ 4'0xb",  "halt", Pass((4, "ab")));
+	test("halt -> 8'0",                "halt", Pass((4, "00")));
+	test("halt -> 0b00000000",         "halt", Pass((4, "00")));
+	test("halt -> 0o00000000",         "halt", Pass((4, "000000")));
+	test("halt -> 0x00",               "halt", Pass((4, "00")));
+	test("halt -> 16'0x1234",          "halt", Pass((4, "1234")));
+	test("halt -> 0b0001001000110100", "halt", Pass((4, "1234")));
+	test("halt -> 0x1234",             "halt", Pass((4, "1234")));
+	test("halt -> 8'0x12 @ 8'0x34",    "halt", Pass((4, "1234")));
+	test("halt -> 4'0xa  @ 4'0xb",     "halt", Pass((4, "ab")));
+	test("halt ->   0x12 @   0x34",    "halt", Pass((4, "1234")));
+	test("halt ->   0xa  @   0xb",     "halt", Pass((4, "ab")));
 	
 	test("halt -> (1 + 1)[7:0]", "halt", Pass((4, "02")));
 	test("halt -> pc[7:0]",      "halt", Pass((4, "00")));
 	
 	test("#align 1 \n halt -> 1'0",     "halt", Pass((1, "0")));
+	test("#align 1 \n halt -> 0b0",     "halt", Pass((1, "0")));
+	test("#align 1 \n halt -> 0o0",     "halt", Pass((1, "000")));
+	test("#align 1 \n halt -> 0x0",     "halt", Pass((1, "0000")));
 	test("#align 1 \n halt -> 2'0b10",  "halt", Pass((1, "10")));
+	test("#align 1 \n halt -> 0b10",    "halt", Pass((1, "10")));
+	test("#align 1 \n halt -> 0o10",    "halt", Pass((1, "001000")));
+	test("#align 1 \n halt -> 0x10",    "halt", Pass((1, "00010000")));
 	test("#align 3 \n halt -> 3'0b101", "halt", Pass((1, "101")));
+	test("#align 3 \n halt -> 0b101",   "halt", Pass((1, "101")));
+	test("#align 3 \n halt -> 0o101",   "halt", Pass((1, "001000001")));
+	test("#align 3 \n halt -> 0x101",   "halt", Pass((1, "000100000001")));
 	test("#align 5 \n halt -> 5'0x13",  "halt", Pass((1, "10011")));
+	test("#align 5 \n halt -> 0b10011", "halt", Pass((1, "10011")));
 	
 	test("#align 128 \n halt -> ((1 << 256) / 0xfedc)[255:0]", "halt", Pass((4, "000101254e8d998319892068f7ba90cd2a03ec79bad91fa81bbfa69a07b0c5a1")));
 	
