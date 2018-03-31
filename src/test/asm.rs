@@ -37,15 +37,21 @@ where S: Into<String>
 	else
 		{ 4 };
 		
+	let assemble = |report: RcReport, fileserver: &FileServer, filename: S| -> Result<(usize, String), ()>
+	{
+		let mut asm = AssemblerState::new();
+		asm.process_file(report.clone(), fileserver, filename)?;
+		asm.wrapup(report.clone())?;
+		
+		let output = asm.get_binary_output();
+		Ok((bits, output.generate_str(bits, 0, output.len())))
+	};
+		
 	let report = RcReport::new();
 	
-	let mut asm = AssemblerState::new();
-	let result = asm.assemble(report.clone(), fileserver, asm_filename).ok();
-	let result = result.map(|_| asm.get_binary_output());
-	let result = result.map(|r| (bits, r.generate_str(bits, 0, r.len())));
-	let result = result.as_ref().map(|r| (r.0, r.1.as_ref()));
+	let result = assemble(report.clone(), fileserver, asm_filename);
 	
-	expect_result(report.clone(), fileserver, result, expected);
+	expect_result(report.clone(), fileserver, result.as_ref().map(|r| (r.0, r.1.as_ref())).ok(), expected);
 }
 
 

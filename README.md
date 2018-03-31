@@ -15,22 +15,33 @@ Also, [check out an example project](/examples/nes/) which targets the NES!
 You can compile from source by simply doing `cargo build`. There's also a
 battery of tests available at `cargo test`.
 
-Usage of the command line interface is as follows:
+## Upgrading from `v0.4`
+
+Starting from `v0.6`, if you don't want to `#include` a CPU file in the main assembly file,
+you can specify separate files to process in the same assembly session
+with the `-i` command line option. Just remember to enclose the old CPU definition in a
+`#cpudef` directive.
+
+## Command Line Usage
 
 ```
 Usage: customasm [options] <asm-file>
 
 Options:
-    -h, --help          Display this information.
-    -v, --version       Display version information.
-    -q, --quiet         Suppress progress reports.
     -f, --format FORMAT The format of the output file. Possible formats:
                         binary, binstr, hexstr, bindump, hexdump
+    -i, --include FILE  Specifies an additional file for processing before the
+                        main assembly.
     -o, --output FILE   The name of the output file.
     -p, --print         Print output to stdout instead of writing to a file.
+    -q, --quiet         Suppress progress reports.
+    -v, --version       Display version information.
+    -h, --help          Display this information.
 ```
 
-As an example, given the following file:
+## Example
+
+Given the following file:
 
 ```asm
 #cpudef

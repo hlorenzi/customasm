@@ -95,15 +95,18 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 		}
 	};
 	
-	let compiled = compile(report.clone(), fileserver, asm_file, quiet).map_err(|_| false)?;
+	let mut filenames = matches.opt_strs("i");
+	filenames.push(asm_file);
+	
+	let assembled = assemble(report.clone(), fileserver, &filenames, quiet).map_err(|_| false)?;
 	
 	let output_data = match out_format
 	{
-		OutputFormat::BinStr  => compiled.generate_binstr (0, compiled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::BinDump => compiled.generate_bindump(0, compiled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexStr  => compiled.generate_hexstr (0, compiled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexDump => compiled.generate_hexdump(0, compiled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::Binary  => compiled.generate_binary (0, compiled.len())
+		OutputFormat::BinStr  => assembled.generate_binstr (0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::BinDump => assembled.generate_bindump(0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::HexStr  => assembled.generate_hexstr (0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::HexDump => assembled.generate_hexdump(0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::Binary  => assembled.generate_binary (0, assembled.len())
 	};
 	
 	if out_stdout
@@ -132,12 +135,13 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 fn make_opts() -> getopts::Options
 {
     let mut opts = getopts::Options::new();
-    opts.optflag("h", "help", "Display this information.");
-    opts.optflag("v", "version", "Display version information.");
-    opts.optflag("q", "quiet", "Suppress progress reports.");
     opts.optopt("f", "format", "The format of the output file. Possible formats: binary, binstr, hexstr, bindump, hexdump", "FORMAT");
+    opts.optmulti("i", "include", "Specifies an additional file for processing before the main assembly.", "FILE");
     opts.optopt("o", "output", "The name of the output file.", "FILE");
     opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
+    opts.optflag("q", "quiet", "Suppress progress reports.");
+    opts.optflag("v", "version", "Display version information.");
+    opts.optflag("h", "help", "Display this information.");
 	
 	opts
 }
@@ -187,18 +191,23 @@ fn get_default_output_filename(report: RcReport, input_filename: &str) -> Result
 }
 
 
-pub fn compile<S>(report: RcReport, fileserver: &FileServer, asm_file: S, quiet: bool) -> Result<BinaryOutput, ()>
-where S: Into<String>
+pub fn assemble(report: RcReport, fileserver: &FileServer, filenames: &[String], quiet: bool) -> Result<BinaryOutput, ()>
 {
-	let asm_file_owned = asm_file.into();
-	
 	if !quiet
-	{
-		print_header();
-		println!("assembling `{}`...", &asm_file_owned);
-	}
+		{ print_header(); }
 	
 	let mut asm = AssemblerState::new();
-	asm.assemble(report, fileserver, asm_file_owned)?;
+	
+	for filename in filenames
+	{
+		let filename_owned = filename.clone();
+		
+		if !quiet
+			{ println!("assembling `{}`...", &filename_owned); }
+	
+		asm.process_file(report.clone(), fileserver, filename_owned)?;
+	}
+	
+	asm.wrapup(report)?;
 	Ok(asm.get_binary_output())
 }

@@ -71,10 +71,21 @@ impl AssemblerState
 	}
 	
 	
-	pub fn assemble<S>(&mut self, report: RcReport, fileserver: &FileServer, filename: S) -> Result<(), ()>
+	pub fn process_file<S>(&mut self, report: RcReport, fileserver: &FileServer, filename: S) -> Result<(), ()>
 	where S: Into<String>
 	{
 		AssemblerParser::parse_file(report.clone(), self, fileserver, filename, None)?;
+		
+		match report.has_errors()
+		{
+			true => Err(()),
+			false => Ok(())
+		}
+	}
+	
+	
+	pub fn wrapup(&mut self, report: RcReport) -> Result<(), ()>
+	{
 		self.resolve_instrs(report.clone())?;
 		self.resolve_exprs(report.clone())?;
 		self.check_bank_overlap(report.clone());
