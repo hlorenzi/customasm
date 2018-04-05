@@ -123,7 +123,7 @@ fn test_parameters()
 	test("load {a}      -> 8'0x12 @ (a + 0xf22)[7:0]", "load 0x34",       Pass((4, "1256")));
 	test("load {a}, {b} -> 8'0x12 @ (a + b)[7:0]",     "load 0x34, 0x56", Pass((4, "128a")));
 	
-	test("load {a} -> 8'0x12 @ a[7:0]", "load 1 == 1", Fail(("asm", 1, "integer")));
+	test("load {a} -> 8'0x12 @ a[7:0]", "load 1 == 1", Fail(("cpu", 1, "type")));
 	test("load {a} -> 8'0x12 @ a[7:0]", "load",        Fail(("asm", 1, "no match")));
 	test("load {a} -> 8'0x12 @ a[7:0]", "load 1, 2",   Fail(("asm", 1, "no match")));
 	test("load {a} -> 8'0x12 @ a[7:0]", "load a",      Fail(("asm", 1, "unknown")));
@@ -134,13 +134,15 @@ fn test_parameters()
 
 
 #[test]
-fn test_constraints()
+fn test_assertions()
 {
-	test("load {a} :: a % 2 == 0 -> 8'0x12 @ a[7:0]", "load 0x34", Pass((4, "1234")));
+	test("load {a} -> { assert(a % 2 == 0), 0x12 @ a[7:0] }", "load 0x34",               Pass((4, "1234")));
+	test("load {a} -> { assert(a % 2 == 0), 0x12 @ a[7:0] }", "load 0x23",               Fail(("cpu", 1, "assertion")));
+	test("load {a} -> { assert(pc >= 0x02), 0x12 @ a[7:0] }", "load 0x34",               Fail(("cpu", 1, "assertion")));
+	test("load {a} -> { assert(pc >= 0x02), 0x12 @ a[7:0] }", "#addr 0x02 \n load 0x34", Pass((4, "00001234")));
 	
-	test("load {a} :: a % 2 == 0               -> 8'0x12 @ a[7:0]", "load 0x23", Fail(("asm", 1, "constraint")));
-	test("load {a} :: a % 2 == 0, \"not even\" -> 8'0x12 @ a[7:0]", "load 0x23", Fail(("asm", 1, "not even")));
-	test("load {a} :: pc >= 0x02, \"too low\"  -> 8'0x12 @ a[7:0]", "load 0x34", Fail(("asm", 1, "too low")));
+	test("halt -> { assert(pc % 2 == 0), 0x12 @ pc[7:0] }", "halt \n halt \n halt",               Pass((4, "120012021204")));
+	test("halt -> { assert(pc % 2 == 0), 0x12 @ pc[7:0] }", "halt \n halt \n #addr 0x33 \n halt", Fail(("cpu", 1, "assertion")));
 }
 
 
@@ -164,9 +166,6 @@ fn test_addr_directive()
 	
 	test("halt -> 8'0x12 @ pc[7:0]", "halt \n halt \n halt",                       Pass((4, "120012021204")));
 	test("halt -> 8'0x12 @ pc[7:0]", "halt \n halt \n #addr 0x10 \n halt \n halt", Pass((4, "1200120200000000000000000000000012101212")));
-	
-	test("halt :: pc % 2 == 0 -> 8'0x12 @ pc[7:0]", "halt \n halt \n halt",               Pass((4, "120012021204")));
-	test("halt :: pc % 2 == 0 -> 8'0x12 @ pc[7:0]", "halt \n halt \n #addr 0x33 \n halt", Fail(("asm", 4, "constraint")));
 	
 	//test("halt -> 8'0x12", "#addr 0xffff_fffe \n halt", Pass((4, "??")));
 	//test("halt -> 8'0x12", "#addr 0xffff_ffff",         Pass((4, "")));
@@ -362,18 +361,18 @@ fn test_labels()
 fn test_cascading()
 {
 	static INSTRSET: &'static str = "
-		load {a} :: a < 0x10 -> 8'0x10 @ a[7:0] \n
-		load {a} :: a < 0x20 -> 8'0x20 @ a[7:0] \n
-		load {a}             -> 8'0xff @ a[7:0] \n
+		load {a} -> { assert(a < 0x10), 0x10 @ a[7:0] } \n
+		load {a} -> { assert(a < 0x20), 0x20 @ a[7:0] } \n
+		load {a} -> {                   0xff @ a[7:0] } \n
 		
-		store {a} :: a < 0x10 -> 8'0x30 @ a[7:0] \n
-		store {a} :: a < 0x20 -> 8'0x40 @ a[7:0] \n
-		store {a} :: a < 0x30 -> 8'0x50 @ a[7:0] \n
+		store {a} -> { assert(a < 0x10), 0x30 @ a[7:0] } \n
+		store {a} -> { assert(a < 0x20), 0x40 @ a[7:0] } \n
+		store {a} -> { assert(a < 0x30), 0x50 @ a[7:0] } \n
 		
-		add {a}, {b} :: a < 0x10 :: b < 0x10 -> 8'0xaa @ a[7:0] @ b[7:0] \n
-		add {a}, {b} :: a < 0x20             -> 8'0xbb @ a[7:0] @ b[7:0] \n
-		add {a}, {b}             :: b < 0x20 -> 8'0xcc @ a[7:0] @ b[7:0] \n 
-		add {a}, {b}                         -> 8'0xdd @ a[7:0] @ b[7:0]";
+		add {a}, {b} -> { assert(a < 0x10), assert(b < 0x10), 0xaa @ a[7:0] @ b[7:0] } \n
+		add {a}, {b} -> { assert(a < 0x20),                   0xbb @ a[7:0] @ b[7:0] } \n
+		add {a}, {b} -> {                   assert(b < 0x20), 0xcc @ a[7:0] @ b[7:0] } \n 
+		add {a}, {b} -> {                                     0xdd @ a[7:0] @ b[7:0] }";
 		
 	test(INSTRSET, "load 0x05", Pass((4, "1005")));
 	test(INSTRSET, "load 0x15", Pass((4, "2015")));
@@ -390,17 +389,17 @@ fn test_cascading()
 	test(INSTRSET, "store 0x05", Pass((4, "3005")));
 	test(INSTRSET, "store 0x15", Pass((4, "4015")));
 	test(INSTRSET, "store 0x25", Pass((4, "5025")));
-	test(INSTRSET, "store 0x35", Fail(("asm", 1, "constraint")));
+	test(INSTRSET, "store 0x35", Fail(("cpu", 13, "assertion")));
 	
 	test(INSTRSET, "value = 0x05 \n store value", Pass((4, "3005")));
 	test(INSTRSET, "value = 0x15 \n store value", Pass((4, "4015")));
 	test(INSTRSET, "value = 0x25 \n store value", Pass((4, "5025")));
-	test(INSTRSET, "value = 0x35 \n store value", Fail(("asm", 2, "constraint")));
+	test(INSTRSET, "value = 0x35 \n store value", Fail(("cpu", 13, "assertion")));
 	
 	test(INSTRSET, "store value \n value = 0x05", Pass((4, "5005")));
 	test(INSTRSET, "store value \n value = 0x15", Pass((4, "5015")));
 	test(INSTRSET, "store value \n value = 0x25", Pass((4, "5025")));
-	test(INSTRSET, "store value \n value = 0x35", Fail(("asm", 1, "constraint")));
+	test(INSTRSET, "store value \n value = 0x35", Fail(("cpu", 13, "assertion")));
 	
 	test(INSTRSET, "add 0x05, 0x07", Pass((4, "aa0507")));
 	test(INSTRSET, "add 0x15, 0x25", Pass((4, "bb1525")));
@@ -408,10 +407,16 @@ fn test_cascading()
 	test(INSTRSET, "add 0x25, 0x25", Pass((4, "dd2525")));
 	
 	test(INSTRSET, "a = 0x05 \n b = 0x07 \n add a, b",                         Pass((4, "aa0507")));
-	test(INSTRSET, "a = 0x05 \n             add a, b \n b = 0x07",             Pass((4, "bb0507")));
-	test(INSTRSET, "a = 0x15 \n             add a, b \n b = 0x25",             Pass((4, "bb1525")));
-	test(INSTRSET, "            b = 0x07 \n add a, b \n a = 0x05",             Pass((4, "cc0507")));
-	test(INSTRSET, "            b = 0x15 \n add a, b \n a = 0x25",             Pass((4, "cc2515")));
+	test(INSTRSET, "a = 0x05 \n b = 0x25 \n add a, b",                         Pass((4, "bb0525")));
+	test(INSTRSET, "a = 0x15 \n b = 0x07 \n add a, b",                         Pass((4, "bb1507")));
+	test(INSTRSET, "a = 0x15 \n b = 0x25 \n add a, b",                         Pass((4, "bb1525")));
+	test(INSTRSET, "a = 0x25 \n b = 0x15 \n add a, b",                         Pass((4, "cc2515")));
+	test(INSTRSET, "a = 0x25 \n b = 0x25 \n add a, b",                         Pass((4, "dd2525")));
+	
+	test(INSTRSET, "a = 0x05 \n             add a, b \n b = 0x07",             Pass((4, "dd0507")));
+	test(INSTRSET, "a = 0x15 \n             add a, b \n b = 0x25",             Pass((4, "dd1525")));
+	test(INSTRSET, "            b = 0x07 \n add a, b \n a = 0x05",             Pass((4, "dd0507")));
+	test(INSTRSET, "            b = 0x15 \n add a, b \n a = 0x25",             Pass((4, "dd2515")));
 	test(INSTRSET, "                        add a, b \n a = 0x07 \n b = 0x07", Pass((4, "dd0707")));
 	test(INSTRSET, "                        add a, b \n a = 0x25 \n b = 0x25", Pass((4, "dd2525")));
 }

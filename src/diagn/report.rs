@@ -15,14 +15,16 @@ const C_SRC:      &'static str = "\u{1B}[0m\u{1B}[97m"; //"
 
 pub struct Report
 {
-	messages: Vec<Message>
+	messages: Vec<Message>,
+	parents: Vec<Message>
 }
 
 
 struct Message
 {
 	pub descr: String,
-	pub span: Option<Span>
+	pub span: Option<Span>,
+	pub inner: Option<Box<Message>>
 }
 
 
@@ -33,19 +35,29 @@ pub struct RcReport
 }
 
 
+pub struct ReportParentGuard
+{
+	report: RcReport
+}
+
+
 impl Report
 {
 	pub fn new() -> Report
 	{
 		Report
 		{
-			messages: Vec::new()
+			messages: Vec::new(),
+			parents: Vec::new()
 		}
 	}
 	
 	
-	fn message(&mut self, msg: Message)
+	fn message(&mut self, mut msg: Message)
 	{
+		for parent in self.parents.iter().rev()
+			{ msg = Message{ descr: parent.descr.clone(), span: parent.span.clone(), inner: Some(Box::new(msg)) }; }
+		
 		self.messages.push(msg);
 	}
 	
@@ -53,7 +65,7 @@ impl Report
 	pub fn error<S>(&mut self, descr: S)
 	where S: Into<String>
 	{
-		let msg = Message { descr: descr.into(), span: None };
+		let msg = Message{ descr: descr.into(), span: None, inner: None };
 		self.message(msg);
 	}
 	
@@ -61,8 +73,22 @@ impl Report
 	pub fn error_span<S>(&mut self, descr: S, span: &Span)
 	where S: Into<String>
 	{
-		let msg = Message { descr: descr.into(), span: Some(span.clone()) };
+		let msg = Message{ descr: descr.into(), span: Some(span.clone()), inner: None };
 		self.message(msg);
+	}
+	
+	
+	pub fn push_parent<S>(&mut self, descr: S, span: &Span)
+	where S: Into<String>
+	{
+		let msg = Message{ descr: descr.into(), span: Some(span.clone()), inner: None };
+		self.parents.push(msg);
+	}
+	
+	
+	pub fn pop_parent(&mut self)
+	{
+		self.parents.pop();
 	}
 	
 	
@@ -82,34 +108,52 @@ impl Report
 	{
 		for msg in &self.messages
 		{
-			if !msg.descr.contains(error_excerpt)
-				{ continue; }
-				
-			if msg.span.is_none()
-				{ continue; }
-				
-			let span = msg.span.as_ref().unwrap();
-			
-			if &*span.file != filename
-				{ continue; }
-			
-			if span.location.is_none()
-				{ continue; }
-				
-			let location = span.location.unwrap();
-			
-			let chars = fileserver.get_chars(RcReport::new(), &*span.file, None).ok().unwrap();
-			let counter = CharCounter::new(&chars);
-			
-			let (span_line, _) = counter.get_line_column_at_index(location.0);
-			
-			if span_line != line
-				{ continue; }
-				
-			return true;
+			if self.msg_has_error_at(msg, fileserver, filename, line, error_excerpt)
+				{ return true; }
 		}
 		
 		false
+	}
+	
+	
+	fn msg_has_error_at(&self, msg: &Message, fileserver: &FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	{
+		match msg.inner
+		{
+			Some(ref inner) => match self.msg_has_error_at(&inner, fileserver, filename, line, error_excerpt)
+			{
+				true => return true,
+				false => { }
+			}
+			
+			None => { }
+		}
+	
+		if !msg.descr.contains(error_excerpt)
+			{ return false; }
+			
+		if msg.span.is_none()
+			{ return false; }
+			
+		let span = msg.span.as_ref().unwrap();
+		
+		if &*span.file != filename
+			{ return false; }
+		
+		if span.location.is_none()
+			{ return false; }
+			
+		let location = span.location.unwrap();
+		
+		let chars = fileserver.get_chars(RcReport::new(), &*span.file, None).ok().unwrap();
+		let counter = CharCounter::new(&chars);
+		
+		let (span_line, _) = counter.get_line_column_at_index(location.0);
+		
+		if span_line != line
+			{ return false; }
+			
+		true
 	}
 	
 	
@@ -119,13 +163,13 @@ impl Report
 		
 		for msg in &self.messages
 		{
-			self.print_msg(fileserver, msg);
+			self.print_msg(fileserver, msg, 0);
 			println!();
 		}
 	}
 	
 	
-	fn print_msg(&self, fileserver: &FileServer, msg: &Message)
+	fn print_msg(&self, fileserver: &FileServer, msg: &Message, indent: usize)
 	{
 		match msg.span
 		{
@@ -144,6 +188,7 @@ impl Report
 					None =>
 					{
 						// Print description with filename but without position information.
+						self.print_indent(indent);
 						print!("{}", C_LOCATION);
 						println!("{}:", *span.file);
 						print!("{}", C_ERROR);
@@ -160,26 +205,41 @@ impl Report
 						let (line1, col1) = counter.get_line_column_at_index(start);
 						let (line2, col2) = counter.get_line_column_at_index(end);
 						
+						self.print_indent(indent);
 						print!("{}", C_LOCATION);
 						println!("{}:{}:{} {}:{}:",
 							*span.file,
 							line1 + 1, col1 + 1,
 							line2 + 1, col2 + 1);
 							
+						self.print_indent(indent);
 						print!("{}", C_ERROR);
 						println!("error: {}", msg.descr);
 						print!("{}", C_DEFAULT);
 						
 						// Print annotated source code.
-						self.print_msg_src(&counter, line1, col1, line2, col2);
+						self.print_msg_src(&counter, line1, col1, line2, col2, indent);
 					}
 				}
 			}
 		}
+		
+		match msg.inner
+		{
+			Some(ref inner) => self.print_msg(fileserver, &inner, indent + 1),
+			None => { }
+		}
 	}
 	
 	
-	fn print_msg_src(&self, counter: &CharCounter, line1: usize, col1: usize, line2: usize, col2: usize)
+	fn print_indent(&self, indent: usize)
+	{
+		for _ in 0..indent
+			{ print!("     "); }
+	}
+	
+	
+	fn print_msg_src(&self, counter: &CharCounter, line1: usize, col1: usize, line2: usize, col2: usize, indent: usize)
 	{
 		let first_line = if (line1 as isize - 2) < 0
 			{ 0 }
@@ -196,6 +256,7 @@ impl Report
 		// Print annotated source lines.
 		for line in first_line..last_line
 		{
+			self.print_indent(indent);
 			print!("{}", C_LINENUM);
 			print!("{:4} | ", line + 1);
 			print!("{}", C_SRC);
@@ -225,6 +286,7 @@ impl Report
 			// Print markings on line below, if contained in span.
 			if line >= line1 && line <= line2
 			{
+				self.print_indent(indent);
 				print!("{}", C_LINENUM);
 				print!("     | ");
 				print!("{}", C_ERROR);
@@ -277,6 +339,23 @@ impl RcReport
 	}
 	
 	
+	pub fn push_parent<S>(&self, descr: S, span: &Span) -> ReportParentGuard
+	where S: Into<String>
+	{
+		let guard = ReportParentGuard{ report: self.clone() };
+		
+		self.report.borrow_mut().push_parent(descr, span);
+		
+		guard
+	}
+	
+	
+	fn pop_parent(&self)
+	{
+		self.report.borrow_mut().pop_parent();
+	}
+	
+	
 	pub fn has_messages(&self) -> bool
 	{
 		self.report.borrow_mut().has_messages()
@@ -298,5 +377,14 @@ impl RcReport
 	pub fn print_all(&self, fileserver: &FileServer)
 	{
 		self.report.borrow_mut().print_all(fileserver);
+	}
+}
+
+
+impl Drop for ReportParentGuard
+{
+	fn drop(&mut self)
+	{
+		self.report.pop_parent();
 	}
 }

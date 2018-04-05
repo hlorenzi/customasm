@@ -1,5 +1,5 @@
 use diagn::{Span, RcReport};
-use expr::{Expression, ExpressionType, ExpressionValue};
+use expr::{Expression, ExpressionValue};
 use asm::{AssemblerParser, BinaryOutput, LabelManager, LabelContext};
 use asm::BankDef;
 use asm::BinaryBlock;
@@ -310,10 +310,11 @@ impl AssemblerState
 		let rule = &self.cpudef.as_ref().unwrap().rules[instr.rule_index];
 		let get_arg = |i: usize| instr.args[i].clone();
 		
-		self.rule_check_all_constraints_satisfied(report.clone(), rule, &get_arg, &instr.ctx, &instr.span)?;
-		
 		// Output binary representation.
 		let (left, right) = rule.production.slice().unwrap();
+		
+		let _guard = report.push_parent("failed to resolve instruction", &instr.span);
+		
 		let value = self.rule_expr_eval(report.clone(), rule, &get_arg, &instr.ctx, &rule.production)?;
 		
 		let block = &mut self.blocks[instr.ctx.block];
@@ -330,6 +331,8 @@ impl AssemblerState
 	
 	pub fn output_parsed_expr(&mut self, report: RcReport, expr: &ParsedExpression) -> Result<(), ()>
 	{
+		let _guard = report.push_parent("failed to resolve expression", &expr.expr.span());
+		
 		// Resolve expression.
 		let value = self.expr_eval(report.clone(), &expr.ctx, &expr.expr)?;
 		
@@ -355,121 +358,102 @@ impl AssemblerState
 	}
 	
 	
-	pub fn rule_check_all_constraints_satisfied<F>(&self, report: RcReport, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, span: &Span) -> Result<(), ()>
+	pub fn rule_expr_eval<F>(&self, report: RcReport, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, expr: &Expression) -> Result<ExpressionValue, ()>
 	where F: Fn(usize) -> Option<ExpressionValue>
 	{
-		for constr in &rule.constraints
-		{
-			let satisfied = match self.rule_expr_eval(report.clone(), rule, get_arg, ctx, &constr.expr)?
-			{
-				ExpressionValue::Bool(b) => b,
-				_ => unreachable!()
-			};
+		expr.eval(
+			report.clone(),
+			&|report, name| self.rule_expr_get_var(report, rule, get_arg, ctx, name),
+			&|report, fn_id, args, span| self.expr_eval_fn(report, fn_id, args, span))
+	}
+		
+		
+	pub fn rule_expr_get_var<F>(&self, _report: RcReport, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, name: &str) -> Result<ExpressionValue, ()>
+	where F: Fn(usize) -> Option<ExpressionValue>
+	{
+		if name == "pc"
+			{ Ok(ExpressionValue::Integer(ctx.get_address_at(self).to_bigint().unwrap())) }
 			
-			if !satisfied
+		else if name == "assert"
+			{ Ok(ExpressionValue::Function(0)) }
+		
+		else
+		{
+			if rule.param_exists(name)
 			{
-				match constr.descr
+				match get_arg(rule.param_index(name))
 				{
-					Some(ref descr) =>
-						return Err(report.error_span(format!("constraint not satisfied: {}", descr), &span)),
-					None =>
-						return Err(report.error_span(format!("constraint not satisfied"), &span))
+					Some(arg) => Ok(arg),
+					None => Err(())
 				}
 			}
-		}
-		
-		Ok(())
-	}
-	
-	
-	fn rule_expr_eval<F>(&self, report: RcReport, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, expr: &Expression) -> Result<ExpressionValue, ()>
-	where F: Fn(usize) -> Option<ExpressionValue>
-	{
-		expr.check_vars(&mut |name, span| self.rule_expr_check_var(report.clone(), rule, get_arg, name, span))?;
-		expr.eval(report.clone(), &|name| self.rule_expr_get_var(rule, get_arg, ctx, name))
-	}
-
-
-	fn rule_expr_check_var<F>(&self, report: RcReport, rule: &Rule, get_arg: &F, name: &str, span: &Span) -> Result<(), ()>
-	where F: Fn(usize) -> Option<ExpressionValue>
-	{
-		if name == "pc"
-			{ Ok (()) }
-			
-		else if rule.param_exists(name)
-		{
-			if get_arg(rule.param_index(name)).is_some()
-				{ Ok(()) }
-				
 			else
-				{ Err(report.error_span("unresolved argument", span)) }
+				{ Err(()) }
 		}
-		
-		else
-			{ Err(report.error_span("unknown label", span)) }
-	}
-		
-		
-	fn rule_expr_get_var<F>(&self, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, name: &str) -> ExpressionValue
-	where F: Fn(usize) -> Option<ExpressionValue>
-	{
-		if name == "pc"
-			{ ExpressionValue::Integer(ctx.get_address_at(self).to_bigint().unwrap()) }
-		
-		else
-			{ get_arg(rule.param_index(name)).unwrap() }
 	}
 	
 	
 	pub fn expr_eval(&self, report: RcReport, ctx: &ExpressionContext, expr: &Expression) -> Result<ExpressionValue, ()>
 	{
-		expr.check_vars(&mut |name, span| self.expr_check_var(report.clone(), ctx, name, span))?;
-		
-		if expr.eval_type(report.clone(), &|name| self.expr_get_var_type(name))? != ExpressionType::Integer
-			{ return Err(report.error_span("expected integer value for instruction argument", &expr.span())); }
-		
-		expr.eval(report.clone(), &|name| self.expr_get_var(ctx, name))
+		expr.eval(
+			report.clone(),
+			&|report, name| self.expr_get_var(report, ctx, name),
+			&|report, fn_id, args, span| self.expr_eval_fn(report, fn_id, args, span))
 	}
-
-
-	fn expr_check_var(&self, report: RcReport, ctx: &ExpressionContext, name: &str, span: &Span) -> Result<(), ()>
+		
+		
+	fn expr_get_var(&self, _report: RcReport, ctx: &ExpressionContext, name: &str) -> Result<ExpressionValue, ()>
 	{
 		if name == "pc"
-			{ Ok (()) }
+			{ Ok(ExpressionValue::Integer(ctx.get_address_at(self).to_bigint().unwrap())) }
 			
+		else if name == "assert"
+			{ Ok(ExpressionValue::Function(0)) }
+		
 		else if let Some('.') = name.chars().next()
 		{
 			if self.labels.local_exists(ctx.label_ctx, name)
-				{ Ok(()) }
+				{ Ok(self.labels.get_local(ctx.label_ctx, name).unwrap().clone()) }
 			else
-				{ Err(report.error_span("unknown local label", span)) }
+				{ Err(()) }
 		}
 		
-		else if self.labels.global_exists(name)
-			{ Ok(()) }
+		else
+		{
+			if self.labels.global_exists(name)
+				{ Ok(self.labels.get_global(name).unwrap().clone()) }
+			else
+				{ Err(()) }
+		}
+	}
+	
+	
+	fn expr_eval_fn(&self, report: RcReport, fn_id: usize, args: Vec<ExpressionValue>, span: &Span) -> Result<ExpressionValue, ()>
+	{
+		match fn_id
+		{
+			0 =>
+			{
+				if args.len() != 1
+					{ return Err(report.error_span("wrong number of arguments", span)); }
+					
+				match args[0]
+				{
+					ExpressionValue::Bool(value) =>
+					{
+						match value
+						{
+							true => Ok(ExpressionValue::Void),
+							false => Err(report.error_span("assertion failed", span))
+						}
+					}
+					
+					_ => Err(report.error_span("wrong argument type", span))
+				}
+			}
 			
-		else
-			{ Err(report.error_span("unknown label", span)) }
-	}
-		
-		
-	fn expr_get_var_type(&self, _name: &str) -> ExpressionType
-	{
-		// All variables are integer type for now.
-		ExpressionType::Integer
-	}
-		
-		
-	fn expr_get_var(&self, ctx: &ExpressionContext, name: &str) -> ExpressionValue
-	{
-		if name == "pc"
-			{ ExpressionValue::Integer(ctx.get_address_at(self).to_bigint().unwrap()) }
-		
-		else if let Some('.') = name.chars().next()
-			{ self.labels.get_local(ctx.label_ctx, name).unwrap().clone() }
-		
-		else
-			{ self.labels.get_global(name).unwrap().clone() }
+			_ => unreachable!()
+		}
 	}
 }
 

@@ -232,13 +232,43 @@ impl<'a> ExpressionParser<'a>
 				(TokenKind::Exclamation, UnaryOp::Not),
 				(TokenKind::Minus,       UnaryOp::Neg)
 			],
-			|s| s.parse_leaf())
+			|s| s.parse_call())
+	}
+	
+	
+	fn parse_call(&mut self) -> Result<Expression, ()>
+	{
+		let leaf = self.parse_leaf()?;
+		
+		if self.parser.next_is_linebreak()
+			{ return Ok(leaf); }
+			
+		if self.parser.maybe_expect(TokenKind::ParenOpen).is_none()
+			{ return Ok(leaf); }
+			
+		let mut args = Vec::new();
+		while !self.parser.next_is(0, TokenKind::ParenClose)
+		{
+			args.push(self.parse_expr()?);
+			
+			if self.parser.next_is(0, TokenKind::ParenClose)
+				{ break; }
+				
+			self.parser.expect(TokenKind::Comma)?;
+		}
+		
+		let tk_close = self.parser.expect(TokenKind::ParenClose)?;
+		
+		Ok(Expression::Call(leaf.span().join(&tk_close.span), Box::new(leaf), args))
 	}
 	
 	
 	fn parse_leaf(&mut self) -> Result<Expression, ()>
 	{
-		if self.parser.next_is(0, TokenKind::ParenOpen)
+		if self.parser.next_is(0, TokenKind::BraceOpen)
+			{ self.parse_block() }
+	
+		else if self.parser.next_is(0, TokenKind::ParenOpen)
 			{ self.parse_parenthesized() }
 	
 		else if self.parser.next_is(0, TokenKind::Identifier)
@@ -255,6 +285,30 @@ impl<'a> ExpressionParser<'a>
 			let span = self.parser.prev().span.after();
 			Err(self.parser.report.error_span("expected expression", &span))
 		}
+	}
+	
+	
+	fn parse_block(&mut self) -> Result<Expression, ()>
+	{
+		let tk_open = self.parser.expect(TokenKind::BraceOpen)?;
+		
+		let mut exprs = Vec::new();
+		while !self.parser.next_is(0, TokenKind::BraceClose)
+		{
+			exprs.push(self.parse_expr()?);
+			
+			if self.parser.maybe_expect_linebreak().is_some()
+				{ continue; }
+				
+			if self.parser.next_is(0, TokenKind::BraceClose)
+				{ break; }
+				
+			self.parser.expect(TokenKind::Comma)?;
+		}
+		
+		let tk_close = self.parser.expect(TokenKind::BraceClose)?;
+		
+		Ok(Expression::Block(tk_open.span.join(&tk_close.span), exprs))
 	}
 	
 	

@@ -1,4 +1,4 @@
-use diagn::RcReport;
+use diagn::{RcReport, Span};
 use super::Expression;
 use super::ExpressionValue;
 use super::UnaryOp;
@@ -13,35 +13,44 @@ use std::mem::swap;
 
 impl Expression
 {
-	pub fn eval<F>(&self, report: RcReport, eval_var: &F) -> Result<ExpressionValue, ()>
-	where F: Fn(&str) -> ExpressionValue
+	pub fn eval<FVar, FFn>(&self, report: RcReport, eval_var: &FVar, eval_fn: &FFn) -> Result<ExpressionValue, ()>
+	where
+	FVar: Fn(RcReport, &str) -> Result<ExpressionValue, ()>,
+	FFn: Fn(RcReport, usize, Vec<ExpressionValue>, &Span) -> Result<ExpressionValue, ()>
 	{
 		match self
 		{
 			&Expression::Literal(_, ref value) => Ok(value.clone()),
 			
-			&Expression::Variable(_, ref name) => Ok(eval_var(&name)),
-			
-			&Expression::UnaryOp(_, _, op, ref inner_expr) =>
+			&Expression::Variable(ref span, ref name) => match eval_var(report.clone(), &name)
 			{
-				match inner_expr.eval(report.clone(), eval_var)?
+				Ok(value) => Ok(value),
+				Err(_) => Err(report.error_span("unknown variable", &span))
+			}
+			
+			&Expression::UnaryOp(ref span, _, op, ref inner_expr) =>
+			{
+				match inner_expr.eval(report.clone(), eval_var, eval_fn)?
 				{
 					ExpressionValue::Integer(x) => match op
 					{
 						UnaryOp::Neg => Ok(ExpressionValue::Integer(-x)),
 						UnaryOp::Not => Ok(ExpressionValue::Integer(bigint_not(x)))
 					},
+					
 					ExpressionValue::Bool(b) => match op
 					{
 						UnaryOp::Not => Ok(ExpressionValue::Bool(!b)),
-						_ => unreachable!()
-					}
+						_ => Err(report.error_span("invalid argument type to operator", &span))
+					},
+					
+					_ => Err(report.error_span("invalid argument type to operator", &span))
 				}
 			}
 			
-			&Expression::BinaryOp(_, ref op_span, op, ref lhs_expr, ref rhs_expr) =>
+			&Expression::BinaryOp(ref span, ref op_span, op, ref lhs_expr, ref rhs_expr) =>
 			{
-				match (lhs_expr.eval(report.clone(), eval_var)?, rhs_expr.eval(report.clone(), eval_var)?)
+				match (lhs_expr.eval(report.clone(), eval_var, eval_fn)?, rhs_expr.eval(report.clone(), eval_var, eval_fn)?)
 				{
 					(ExpressionValue::Integer(lhs), ExpressionValue::Integer(rhs)) =>
 					{
@@ -95,7 +104,7 @@ impl Expression
 								}							
 							}
 
-							_ => unreachable!()
+							_ => Err(report.error_span("invalid argument types to operator", &span))
 						}
 					}
 					
@@ -110,20 +119,47 @@ impl Expression
 							BinaryOp::Xor     => Ok(ExpressionValue::Bool(lhs ^ rhs)),
 							BinaryOp::Eq      => Ok(ExpressionValue::Bool(lhs == rhs)),
 							BinaryOp::Ne      => Ok(ExpressionValue::Bool(lhs != rhs)),
-							_ => unreachable!()
+							_ => Err(report.error_span("invalid argument types to operator", &span))
 						}
 					}
 					
-					_ => unreachable!()
+					_ => Err(report.error_span("invalid argument types to operator", &span))
 				}
 			}
 			
-			&Expression::BitSlice(_, _, left, right, ref inner) =>
+			&Expression::BitSlice(ref span, _, left, right, ref inner) =>
 			{
-				match inner.eval(report.clone(), eval_var)?
+				match inner.eval(report.clone(), eval_var, eval_fn)?
 				{
 					ExpressionValue::Integer(x) => Ok(ExpressionValue::Integer(bigint_slice(x, left, right))),
-					_ => unreachable!()
+					_ => Err(report.error_span("invalid argument type to slice", &span))
+				}
+			}
+			
+			&Expression::Block(_, ref exprs) =>
+			{
+				let mut result = ExpressionValue::Void;
+				
+				for expr in exprs
+					{ result = expr.eval(report.clone(), eval_var, eval_fn)?; }
+					
+				Ok(result)
+			}
+			
+			&Expression::Call(ref span, ref target, ref arg_exprs) =>
+			{
+				match target.eval(report.clone(), eval_var, eval_fn)?
+				{
+					ExpressionValue::Function(id) =>
+					{
+						let mut args = Vec::new();
+						for expr in arg_exprs
+							{ args.push(expr.eval(report.clone(), eval_var, eval_fn)?); }
+							
+						eval_fn(report, id, args, &span)
+					}
+					
+					_ => Err(report.error_span("uncallable type", &target.span()))
 				}
 			}
 		}

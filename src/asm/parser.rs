@@ -420,7 +420,7 @@ impl<'a> AssemblerParser<'a>
 				// be resolved now, of if it fails, just skip this rule without an error.
 				let rule = &self.state.cpudef.as_ref().unwrap().rules[instr_match.rule_indices[best_match]];
 				let get_arg = |i: usize| args[i].clone();
-				if self.state.rule_check_all_constraints_satisfied(RcReport::new(), rule, &get_arg, &ctx, &instr_span).ok().is_some()
+				if self.state.rule_expr_eval(RcReport::new(), rule, &get_arg, &ctx, &rule.production).is_ok()
 					{ break; }
 					
 				best_match += 1;

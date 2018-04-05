@@ -9,23 +9,20 @@ pub enum Expression
 	Variable(Span, String),
 	UnaryOp(Span, Span, UnaryOp, Box<Expression>),
 	BinaryOp(Span, Span, BinaryOp, Box<Expression>, Box<Expression>),
-	BitSlice(Span, Span, usize, usize, Box<Expression>)
+	BitSlice(Span, Span, usize, usize, Box<Expression>),
+	Block(Span, Vec<Expression>),
+	Call(Span, Box<Expression>, Vec<Expression>)
 }
 
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ExpressionValue
 {
+	Void,
 	Integer(BigInt),
-	Bool(bool)
-}
-
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum ExpressionType
-{
-	Integer,
-	Bool
+	Bool(bool),
+	String(String),
+	Function(usize)
 }
 
 
@@ -64,24 +61,9 @@ impl Expression
 			&Expression::Variable(ref span, ..) => span.clone(),
 			&Expression::UnaryOp (ref span, ..) => span.clone(),
 			&Expression::BinaryOp(ref span, ..) => span.clone(),
-			&Expression::BitSlice(ref span, ..) => span.clone()
-		}
-	}
-}
-
-
-impl ExpressionValue
-{
-	#[cfg(test)]
-	pub fn is_of_type(&self, typ: ExpressionType) -> bool
-	{
-		match (self, typ)
-		{
-			(&ExpressionValue::Integer(_), ExpressionType::Integer) |
-			(&ExpressionValue::Bool(_),    ExpressionType::Bool)
-				=> true,
-				
-			_ => false
+			&Expression::BitSlice(ref span, ..) => span.clone(),
+			&Expression::Block   (ref span, ..) => span.clone(),
+			&Expression::Call    (ref span, ..) => span.clone()
 		}
 	}
 }

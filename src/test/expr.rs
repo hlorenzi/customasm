@@ -17,14 +17,8 @@ where S: Into<Vec<u8>>
 		
 		let expr = Expression::parse(&mut Parser::new(report.clone(), tokens))?;
 		
-		expr.check_vars(&mut |_, span| Err(report.error_span("unknown variable", span)))?;
+		let expr_value = expr.eval(report.clone(), &|_, _| Err(()), &|_, _, _, _| Err(()))?;
 		
-		let expr_type = expr.eval_type(report.clone(), &|_| panic!("unknown variable"))?;
-		let expr_value = expr.eval(report.clone(), &|_| panic!("unknown variable"))?;
-		
-		if !expr_value.is_of_type(expr_type)
-			{ panic!("mismatching eval_type and actual result type"); }
-			
 		Ok(expr_value)
 	}
 	

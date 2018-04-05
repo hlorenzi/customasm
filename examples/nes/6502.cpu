@@ -28,7 +28,19 @@
 
 	cmp #{imm} -> 0xc9 @ imm[7:0]
 	
-	bne {addr} -> 0xd0 @ (addr - pc - 2)[7:0]
-	bpl {addr} -> 0x10 @ (addr - pc - 2)[7:0]
 	jmp {addr} -> 0x4c @ addr[7:0] @ addr[15:8]
+	
+	bne {addr} ->
+	{
+		assert((addr - pc - 2) <=  0x7f)
+		assert((addr - pc - 2) >= !0x7f)
+		0xd0 @ (addr - pc - 2)[7:0]
+	}
+	
+	bpl {addr} ->
+	{
+		assert((addr - pc - 2) <=  0x7f)
+		assert((addr - pc - 2) >= !0x7f)
+		0x10 @ (addr - pc - 2)[7:0]
+	}
 }

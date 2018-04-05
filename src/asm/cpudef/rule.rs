@@ -8,7 +8,6 @@ pub struct Rule
 {
 	pub pattern_parts: Vec<RulePatternPart>,
 	pub params: Vec<RuleParameter>,
-	pub constraints: Vec<RuleConstraint>,
 	pub production: Expression
 }
 
@@ -28,14 +27,6 @@ pub struct RuleParameter
 }
 
 
-#[derive(Debug)]
-pub struct RuleConstraint
-{
-	pub expr: Expression,
-	pub descr: Option<String>
-}
-
-
 impl Rule
 {
 	pub fn new() -> Rule
@@ -44,7 +35,6 @@ impl Rule
 		{
 			pattern_parts: Vec::new(),
 			params: Vec::new(),
-			constraints: Vec::new(),
 			production: Expression::Literal(Span::new_dummy(), ExpressionValue::Bool(false))
 		}
 	}
@@ -87,17 +77,5 @@ impl Rule
 	pub fn param_index(&self, name: &str) -> usize
 	{
 		self.params.iter().enumerate().find(|p| p.1.name == name).unwrap().0
-	}
-	
-	
-	pub fn constraint_add(&mut self, expr: Expression, descr: Option<String>)
-	{
-		let constr = RuleConstraint
-		{
-			expr: expr,
-			descr: descr
-		};
-		
-		self.constraints.push(constr);
 	}
 }

@@ -107,7 +107,7 @@ fn test_rules_simple()
 	test("halt = 0 -> 8'0x12", Fail(("test", 1, "token")));
 	test("halt : 0 -> 8'0x12", Fail(("test", 1, "token")));
 	
-	test("halt -> (1 == 1)", Fail(("test", 1, "integer")));
+	//test("halt -> (1 == 1)", Fail(("test", 1, "integer")));
 }
 
 
@@ -132,15 +132,15 @@ fn test_rules_parameters()
 	test("load {a}   {b} -> 8'0", Fail(("test", 1, "separating")));
 	test("load {a} + {b} -> 8'0", Fail(("test", 1, "token")));
 	
-	test("load          -> 8'0 @ a[7:0]", Fail(("test", 1, "unknown")));
-	test("load {a}, {b} -> 8'0 @ c[7:0]", Fail(("test", 1, "unknown")));
+	test("load          -> 8'0 @ a[7:0]", Pass(()));
+	test("load {a}, {b} -> 8'0 @ c[7:0]", Pass(()));
 }
 
 
 #[test]
 fn test_rules_constraints()
 {
-	test("halt :: 1 == 1            -> 8'0", Pass(()));
+	/*test("halt :: 1 == 1            -> 8'0", Pass(()));
 	test("halt :: 1 == 1, \"descr\" -> 8'0", Pass(()));
 	test("halt :: 1 != 1, \"descr\" -> 8'0", Pass(()));
 	
@@ -153,5 +153,5 @@ fn test_rules_constraints()
 	test("load {a}, {b} :: b  == a :: a == b -> 8'0", Pass(()));
 	
 	test("halt :: 123          -> 8'0", Fail(("test", 1, "bool")));
-	test("halt :: unknown == 0 -> 8'0", Fail(("test", 1, "unknown")));
+	test("halt :: unknown == 0 -> 8'0", Fail(("test", 1, "unknown")));*/
 }

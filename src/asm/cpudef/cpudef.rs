@@ -1,7 +1,5 @@
-use diagn::{Span, RcReport};
 use syntax::{Token, TokenKind, Parser};
-use syntax::{excerpt_as_string_contents};
-use expr::{Expression, ExpressionType};
+use expr::Expression;
 use asm::cpudef::{Rule, RulePatternMatcher};
 
 
@@ -116,9 +114,6 @@ impl<'t> CpuDefParser<'t>
 			return Err(self.parser.report.error_span("empty rule pattern", &span));
 		}
 		
-		while self.parser.maybe_expect(TokenKind::ColonColon).is_some()
-			{ self.parse_rule_constraint(&mut rule)?; }
-		
 		self.parser.expect(TokenKind::Arrow)?;
 		self.parse_rule_production(&mut rule)?;
 		
@@ -162,7 +157,7 @@ impl<'t> CpuDefParser<'t>
 			{
 				// Check for a stricter set of tokens if a parameter came just before.
 				if prev_was_parameter && !tk.kind.is_allowed_after_pattern_parameter()
-					{ return Err(self.parser.report.error_span("invalid pattern token after parameter", &tk.span)); }
+					{ return Err(self.parser.report.error_span("ambiguous pattern token after parameter", &tk.span)); }
 				
 				rule.pattern_add_exact(&tk);
 				prev_was_parameter = false;
@@ -201,36 +196,9 @@ impl<'t> CpuDefParser<'t>
 	}
 	
 
-	fn parse_rule_constraint(&mut self, rule: &mut Rule) -> Result<(), ()>
-	{
-		let expr = Expression::parse(&mut self.parser)?;
-		
-		expr.check_vars(&mut |name, span| expr_check_var(self.parser.report.clone(), rule, name, span))?;
-		
-		if expr.eval_type(self.parser.report.clone(), &|name| expr_get_var_type(rule, name))? != ExpressionType::Bool
-			{ return Err(self.parser.report.error_span("expected bool expression for constraint", &expr.span())) }
-			
-		let descr = if self.parser.maybe_expect(TokenKind::Comma).is_some()
-		{
-			let tk_descr = self.parser.expect(TokenKind::String)?;
-			Some(excerpt_as_string_contents(self.parser.report.clone(), &tk_descr.excerpt.unwrap(), &tk_descr.span)?)
-		}
-		else
-			{ None };
-		
-		rule.constraint_add(expr, descr);
-		Ok(())
-	}
-	
-
 	fn parse_rule_production(&mut self, rule: &mut Rule) -> Result<(), ()>
 	{
 		let expr = Expression::parse(&mut self.parser)?;
-		
-		expr.check_vars(&mut |name, span| expr_check_var(self.parser.report.clone(), rule, name, span))?;
-		
-		if expr.eval_type(self.parser.report.clone(), &|name| expr_get_var_type(rule, name))? != ExpressionType::Integer
-			{ return Err(self.parser.report.error_span("expected integer expression for production", &expr.span())) }
 		
 		let width = match expr.width()
 		{
@@ -251,20 +219,4 @@ impl<'t> CpuDefParser<'t>
 fn is_reserved_var(name: &str) -> bool
 {
 	name == "pc"
-}
-
-	
-fn expr_check_var(report: RcReport, rule: &Rule, name: &str, span: &Span) -> Result<(), ()>
-{
-	if rule.param_exists(name) || is_reserved_var(name)
-		{ Ok(()) }
-	else
-		{ Err(report.error_span("unknown variable", span)) }
-}
-	
-	
-fn expr_get_var_type(_rule: &Rule, _name: &str) -> ExpressionType
-{
-	// All variables are integer type for now.
-	ExpressionType::Integer
 }
