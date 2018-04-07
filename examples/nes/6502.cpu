@@ -32,15 +32,17 @@
 	
 	bne {addr} ->
 	{
-		assert((addr - pc - 2) <=  0x7f)
-		assert((addr - pc - 2) >= !0x7f)
-		0xd0 @ (addr - pc - 2)[7:0]
+		reladdr = addr - pc - 2
+		assert(reladdr <=  0x7f)
+		assert(reladdr >= !0x7f)
+		0xd0 @ reladdr[7:0]
 	}
 	
 	bpl {addr} ->
 	{
-		assert((addr - pc - 2) <=  0x7f)
-		assert((addr - pc - 2) >= !0x7f)
-		0x10 @ (addr - pc - 2)[7:0]
+		reladdr = addr - pc - 2
+		assert(reladdr <=  0x7f)
+		assert(reladdr >= !0x7f)
+		0x10 @ reladdr[7:0]
 	}
 }

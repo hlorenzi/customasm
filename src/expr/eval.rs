@@ -96,80 +96,100 @@ impl Expression
 			
 			&Expression::BinaryOp(ref span, ref op_span, op, ref lhs_expr, ref rhs_expr) =>
 			{
-				match (lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?, rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?)
+				if op == BinaryOp::Assign
 				{
-					(ExpressionValue::Integer(lhs), ExpressionValue::Integer(rhs)) =>
+					use std::ops::Deref;
+					
+					match lhs_expr.deref()
 					{
-						match op
+						&Expression::Variable(_, ref name) =>
 						{
-							BinaryOp::Add => Ok(ExpressionValue::Integer(lhs + rhs)),
-							BinaryOp::Sub => Ok(ExpressionValue::Integer(lhs - rhs)),
-							BinaryOp::Mul => Ok(ExpressionValue::Integer(lhs * rhs)),
-							
-							BinaryOp::Div => match lhs.checked_div(&rhs)
+							let value = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?;
+							ctx.set_local(name.clone(), value);
+							Ok(ExpressionValue::Void)
+						}
+						
+						_ => Err(report.error_span("invalid assignment destination", &lhs_expr.span()))
+					}
+				}
+				
+				else
+				{
+					match (lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?, rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?)
+					{
+						(ExpressionValue::Integer(lhs), ExpressionValue::Integer(rhs)) =>
+						{
+							match op
 							{
-								Some(x) => Ok(ExpressionValue::Integer(x)),
-								None => Err(report.error_span("division by zero", &op_span.join(&rhs_expr.span())))
-							},
-							
-							BinaryOp::Mod => match bigint_checked_rem(lhs, rhs)
-							{
-								Some(x) => Ok(ExpressionValue::Integer(x)),
-								None => Err(report.error_span("modulo by zero", &op_span.join(&rhs_expr.span())))
-							},
-							
-							BinaryOp::Shl => match bigint_shl(lhs, rhs)
-							{
-								Some(x) => Ok(ExpressionValue::Integer(x)),
-								None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
-							},
-							
-							BinaryOp::Shr => match bigint_shr(lhs, rhs)
-							{
-								Some(x) => Ok(ExpressionValue::Integer(x)),
-								None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
-							},
-							
-							BinaryOp::And  => Ok(ExpressionValue::Integer(bigint_and(lhs, rhs))),
-							BinaryOp::Or   => Ok(ExpressionValue::Integer(bigint_or (lhs, rhs))),
-							BinaryOp::Xor  => Ok(ExpressionValue::Integer(bigint_xor(lhs, rhs))),
-							BinaryOp::Eq   => Ok(ExpressionValue::Bool(lhs == rhs)),
-							BinaryOp::Ne   => Ok(ExpressionValue::Bool(lhs != rhs)),
-							BinaryOp::Lt   => Ok(ExpressionValue::Bool(lhs <  rhs)),
-							BinaryOp::Le   => Ok(ExpressionValue::Bool(lhs <= rhs)),
-							BinaryOp::Gt   => Ok(ExpressionValue::Bool(lhs >  rhs)),
-							BinaryOp::Ge   => Ok(ExpressionValue::Bool(lhs >= rhs)),
-							
-							BinaryOp::Concat =>
-							{
-								match (lhs_expr.width(), rhs_expr.width())
+								BinaryOp::Add => Ok(ExpressionValue::Integer(lhs + rhs)),
+								BinaryOp::Sub => Ok(ExpressionValue::Integer(lhs - rhs)),
+								BinaryOp::Mul => Ok(ExpressionValue::Integer(lhs * rhs)),
+								
+								BinaryOp::Div => match lhs.checked_div(&rhs)
 								{
-									(Some(lhs_width), Some(rhs_width)) => Ok(ExpressionValue::Integer(bigint_concat(lhs, lhs_width, rhs, rhs_width))),
-									(None, _) => Err(report.error_span("argument to concatenation with no known width", &lhs_expr.span())),
-									(_, None) => Err(report.error_span("argument to concatenation with no known width", &rhs_expr.span()))
-								}							
-							}
+									Some(x) => Ok(ExpressionValue::Integer(x)),
+									None => Err(report.error_span("division by zero", &op_span.join(&rhs_expr.span())))
+								},
+								
+								BinaryOp::Mod => match bigint_checked_rem(lhs, rhs)
+								{
+									Some(x) => Ok(ExpressionValue::Integer(x)),
+									None => Err(report.error_span("modulo by zero", &op_span.join(&rhs_expr.span())))
+								},
+								
+								BinaryOp::Shl => match bigint_shl(lhs, rhs)
+								{
+									Some(x) => Ok(ExpressionValue::Integer(x)),
+									None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
+								},
+								
+								BinaryOp::Shr => match bigint_shr(lhs, rhs)
+								{
+									Some(x) => Ok(ExpressionValue::Integer(x)),
+									None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
+								},
+								
+								BinaryOp::And  => Ok(ExpressionValue::Integer(bigint_and(lhs, rhs))),
+								BinaryOp::Or   => Ok(ExpressionValue::Integer(bigint_or (lhs, rhs))),
+								BinaryOp::Xor  => Ok(ExpressionValue::Integer(bigint_xor(lhs, rhs))),
+								BinaryOp::Eq   => Ok(ExpressionValue::Bool(lhs == rhs)),
+								BinaryOp::Ne   => Ok(ExpressionValue::Bool(lhs != rhs)),
+								BinaryOp::Lt   => Ok(ExpressionValue::Bool(lhs <  rhs)),
+								BinaryOp::Le   => Ok(ExpressionValue::Bool(lhs <= rhs)),
+								BinaryOp::Gt   => Ok(ExpressionValue::Bool(lhs >  rhs)),
+								BinaryOp::Ge   => Ok(ExpressionValue::Bool(lhs >= rhs)),
+								
+								BinaryOp::Concat =>
+								{
+									match (lhs_expr.width(), rhs_expr.width())
+									{
+										(Some(lhs_width), Some(rhs_width)) => Ok(ExpressionValue::Integer(bigint_concat(lhs, lhs_width, rhs, rhs_width))),
+										(None, _) => Err(report.error_span("argument to concatenation with no known width", &lhs_expr.span())),
+										(_, None) => Err(report.error_span("argument to concatenation with no known width", &rhs_expr.span()))
+									}							
+								}
 
-							_ => Err(report.error_span("invalid argument types to operator", &span))
+								_ => Err(report.error_span("invalid argument types to operator", &span))
+							}
 						}
-					}
-					
-					(ExpressionValue::Bool(lhs), ExpressionValue::Bool(rhs)) =>
-					{
-						match op
+						
+						(ExpressionValue::Bool(lhs), ExpressionValue::Bool(rhs)) =>
 						{
-							BinaryOp::And |
-							BinaryOp::LazyAnd => Ok(ExpressionValue::Bool(lhs & rhs)),
-							BinaryOp::Or |
-							BinaryOp::LazyOr  => Ok(ExpressionValue::Bool(lhs | rhs)),
-							BinaryOp::Xor     => Ok(ExpressionValue::Bool(lhs ^ rhs)),
-							BinaryOp::Eq      => Ok(ExpressionValue::Bool(lhs == rhs)),
-							BinaryOp::Ne      => Ok(ExpressionValue::Bool(lhs != rhs)),
-							_ => Err(report.error_span("invalid argument types to operator", &span))
+							match op
+							{
+								BinaryOp::And |
+								BinaryOp::LazyAnd => Ok(ExpressionValue::Bool(lhs & rhs)),
+								BinaryOp::Or |
+								BinaryOp::LazyOr  => Ok(ExpressionValue::Bool(lhs | rhs)),
+								BinaryOp::Xor     => Ok(ExpressionValue::Bool(lhs ^ rhs)),
+								BinaryOp::Eq      => Ok(ExpressionValue::Bool(lhs == rhs)),
+								BinaryOp::Ne      => Ok(ExpressionValue::Bool(lhs != rhs)),
+								_ => Err(report.error_span("invalid argument types to operator", &span))
+							}
 						}
+						
+						_ => Err(report.error_span("invalid argument types to operator", &span))
 					}
-					
-					_ => Err(report.error_span("invalid argument types to operator", &span))
 				}
 			}
 			

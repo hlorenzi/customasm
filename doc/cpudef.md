@@ -80,16 +80,31 @@ expressions in separate steps (by using local variables), or to create
 assertions (e.g. that verify the validity of passed arguments). For example,
 the following rule would only allow arguments between `0x00` and `0x10`:
 
-```
+```asm
 load {value} ->
 {
 	assert(value >= 0x00)
 	assert(value <  0x10)
+	
 	0x1 @ value[7:0]
 }
 ```
 
 Sub-expressions in a block can be separated by linebreaks or commas.
+
+Local variables can also be used by assigning a value to any name:
+
+```asm
+load {value} ->
+{
+	finalValue = value * 2
+	
+	assert(finalValue >= 0x00)
+	assert(finalValue <  0x10)
+	
+	0x1 @ finalValue[7:0]
+}
+```
 
 ### Rule Cascading
 
@@ -165,9 +180,11 @@ Rule | Used as | Output
     
     ; we can write the entire rule in one line:
     
-    ld  r1, {value} -> { assert(value <=     0xff), 0x10 @ value[ 7:0] }
-    ld  r1, {value} -> { assert(value <=   0xffff), 0x11 @ value[15:0] }
-    ld  r1, {value} -> { assert(value <= 0xffffff), 0x12 @ value[23:0] }
+    inc r1 -> 0x30
+	
+    ld r1, {value} -> { assert(value <=     0xff), 0x10 @ value[ 7:0] }
+    ld r1, {value} -> { assert(value <=   0xffff), 0x11 @ value[15:0] }
+    ld r1, {value} -> { assert(value <= 0xffffff), 0x12 @ value[23:0] }
     
     ; but we can also add in line breaks for readability:
     
@@ -177,15 +194,13 @@ Rule | Used as | Output
     add {addr}, {value} ->
         0x21 @ address[23:0] @ value[7:0]
     
-    inc r1 ->
-		0x30
-    
     jmp {addr} ->
-	{
+    {
         assert(addr <= 0xffffff)
         assert(addr >= 0)
+
         0x40 @ address[23:0]
-	}
+    }
 }
 ```
 

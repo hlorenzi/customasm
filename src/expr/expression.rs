@@ -26,7 +26,7 @@ pub enum ExpressionValue
 }
 
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum UnaryOp
 {
 	Neg,
@@ -34,9 +34,11 @@ pub enum UnaryOp
 }
 
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum BinaryOp
 {
+	Assign,
+	
 	Add, Sub, Mul, Div, Mod,
 	Shl, Shr,
 	And, Or, Xor,

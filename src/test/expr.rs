@@ -377,6 +377,8 @@ fn test_blocks()
 	test("{0,   1}", Pass(ExpressionValue::Integer(BigInt::from(1))));
 	test("{0 \n 1}", Pass(ExpressionValue::Integer(BigInt::from(1))));
 	
+	test("{0 1}", Fail(("test", 1, "`,`")));
+	
 	test("{1 + 2, 3} + {4, 5 + 6}", Pass(ExpressionValue::Integer(BigInt::from(14))));
 }
 
@@ -386,4 +388,21 @@ fn test_calls()
 {
 	test("0()",        Fail(("test", 1, "callable")));
 	test("0(1, 2, 3)", Fail(("test", 1, "callable")));
+}
+
+
+#[test]
+fn test_assignment()
+{
+	test("   x  = 123",      Pass(ExpressionValue::Void));
+	test("{  x  = 123, x }", Pass(ExpressionValue::Integer(BigInt::from(123))));
+	test("{ (x) = 123, x }", Pass(ExpressionValue::Integer(BigInt::from(123))));
+	
+	test("{ x = 123, y = 321,            x + y }",       Pass(ExpressionValue::Integer(BigInt::from(444))));
+	test("{ x = 123, y = x * 2,          x + y }",       Pass(ExpressionValue::Integer(BigInt::from(369))));
+	test("{ x = 123, y = x * 2, x = 753, x + y }",       Pass(ExpressionValue::Integer(BigInt::from(999))));
+	
+	test("0 = 1",     Fail(("test", 1, "invalid")));
+	test("x + 1 = 2", Fail(("test", 1, "invalid")));
+	test("{x} = 1",   Fail(("test", 1, "invalid")));
 }

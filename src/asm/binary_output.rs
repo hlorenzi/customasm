@@ -133,6 +133,9 @@ impl BinaryOutput
 				}
 				
 				result.push(' ');
+				
+				if byte_index % 4 == 3 && byte_index < bytes_per_line - 1
+					{ result.push(' '); }
 			}
 			
 			result.push_str("| ");

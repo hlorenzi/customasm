@@ -30,7 +30,7 @@ impl<'a> ExpressionParser<'a>
 	
 	pub fn parse_expr(&mut self) -> Result<Expression, ()>
 	{
-		self.parse_concat()
+		self.parse_assignment()
 	}
 	
 	
@@ -85,6 +85,44 @@ impl<'a> ExpressionParser<'a>
 		}
 		
 		Ok(lhs)
+	}
+	
+
+	fn parse_right_associative_binary_ops<F>(&mut self, ops: &[(TokenKind, BinaryOp)], parse_inner: F) -> Result<Expression, ()>
+	where F: Fn(&mut ExpressionParser<'a>) -> Result<Expression, ()>
+	{
+		let mut lhs = parse_inner(self)?;
+		
+		let mut op_match = None;
+		
+		for op in ops
+		{
+			if let Some(tk) = self.parser.maybe_expect(op.0)
+			{
+				op_match = Some((tk, op.1));
+				break;
+			}
+		}
+		
+		if let Some(op_match) = op_match
+		{				
+			let rhs = self.parse_expr()?;
+			let span = lhs.span().join(&rhs.span());
+			
+			lhs = Expression::BinaryOp(span, op_match.0.span.clone(), op_match.1, Box::new(lhs), Box::new(rhs));
+		}
+		
+		Ok(lhs)
+	}
+	
+	
+	fn parse_assignment(&mut self) -> Result<Expression, ()>
+	{
+		self.parse_right_associative_binary_ops(
+			&[
+				(TokenKind::Equal, BinaryOp::Assign)
+			],
+			|s| s.parse_concat())
 	}
 	
 	
