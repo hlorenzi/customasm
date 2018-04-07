@@ -1,7 +1,7 @@
 use diagn::{Span, RcReport};
 use syntax::{Token, TokenKind, tokenize, Parser};
 use syntax::excerpt_as_string_contents;
-use expr::{Expression, ExpressionValue};
+use expr::{Expression, ExpressionValue, ExpressionEvalContext};
 use asm::{AssemblerState, ParsedInstruction, ParsedExpression};
 use asm::cpudef::CpuDef;
 use asm::BankDef;
@@ -101,11 +101,11 @@ impl<'a> AssemblerParser<'a>
 			"bank"      => self.parse_directive_bank(&tk_name),
 			"addr"      => self.parse_directive_addr(&tk_name),
 			"res"       => self.parse_directive_res(&tk_name),
-			"str"       => self.parse_directive_str(&tk_name),
+			"str"       => self.parse_directive_str(),
 			"include"   => self.parse_directive_include(),
-			"incbin"    => self.parse_directive_incbin(&tk_name),
-			"incbinstr" => self.parse_directive_incstr(1, &tk_name),
-			"inchexstr" => self.parse_directive_incstr(4, &tk_name),
+			"incbin"    => self.parse_directive_incbin(),
+			"incbinstr" => self.parse_directive_incstr(1),
+			"inchexstr" => self.parse_directive_incstr(4),
 			_ => Err(self.parser.report.error_span("unknown directive", &tk_name.span))
 		}
 	}
@@ -211,10 +211,8 @@ impl<'a> AssemblerParser<'a>
 	}
 	
 	
-	fn parse_directive_str(&mut self, tk_name: &Token) -> Result<(), ()>
+	fn parse_directive_str(&mut self) -> Result<(), ()>
 	{
-		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
-		
 		let tk_string = self.parser.expect(TokenKind::String)?;
 		let string = excerpt_as_string_contents(self.parser.report.clone(), tk_string.excerpt.as_ref().unwrap().as_ref(), &tk_string.span)?;
 		
@@ -243,10 +241,8 @@ impl<'a> AssemblerParser<'a>
 	}
 	
 	
-	fn parse_directive_incbin(&mut self, tk_name: &Token) -> Result<(), ()>
+	fn parse_directive_incbin(&mut self) -> Result<(), ()>
 	{
-		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
-		
 		let tk_filename = self.parser.expect(TokenKind::String)?;
 		let filename = excerpt_as_string_contents(self.parser.report.clone(), tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
 		
@@ -268,10 +264,8 @@ impl<'a> AssemblerParser<'a>
 	}
 	
 	
-	fn parse_directive_incstr(&mut self, bits_per_char: usize, tk_name: &Token) -> Result<(), ()>
+	fn parse_directive_incstr(&mut self, bits_per_char: usize) -> Result<(), ()>
 	{
-		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
-		
 		let tk_filename = self.parser.expect(TokenKind::String)?;
 		let filename = excerpt_as_string_contents(self.parser.report.clone(), tk_filename.excerpt.as_ref().unwrap().as_ref(), &tk_filename.span)?;
 		
@@ -303,8 +297,6 @@ impl<'a> AssemblerParser<'a>
 	{
 		if elem_width == 0
 			{ return Err(self.parser.report.error_span("invalid element width", &tk_name.span)); }
-		
-		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
 		
 		loop
 		{
@@ -344,7 +336,7 @@ impl<'a> AssemblerParser<'a>
 		let value = if self.parser.maybe_expect(TokenKind::Equal).is_some()
 		{		
 			let expr = Expression::parse(&mut self.parser)?;
-			let value = self.state.expr_eval(self.parser.report.clone(), &ctx, &expr)?;
+			let value = self.state.expr_eval(self.parser.report.clone(), &ctx, &expr, &mut ExpressionEvalContext::new())?;
 			self.parser.expect_linebreak()?;
 			value
 		}
@@ -407,51 +399,67 @@ impl<'a> AssemblerParser<'a>
 		for expr in &instr_match.exprs
 		{
 			// Use a dummy report to not propagate errors now.
-			args.push(self.state.expr_eval(RcReport::new(), &ctx, expr).ok());
+			args.push(self.state.expr_eval(RcReport::new(), &ctx, expr, &mut ExpressionEvalContext::new()).ok());
 		}
 		
-		// If there is more than one match, find best suited match.
-		let best_match =
+		// If some argument could not be resolved, save instruction for resolving on the second pass.
+		if args.iter().any(|a| a.is_none())
 		{
+			let rule_index = *instr_match.rule_indices.last().unwrap();
+			
+			let parsed_instr = ParsedInstruction
+			{
+				rule_index: rule_index,
+				span: instr_span.clone(),
+				ctx: ctx,
+				exprs: instr_match.exprs,
+				args: args
+			};
+			
+			self.state.parsed_instrs.push(parsed_instr);
+			
+			// Also output zero bits to advance the current address.
+			let instr_width =
+			{
+				let rule = &self.state.cpudef.as_ref().unwrap().rules[rule_index];
+				rule.production.width().unwrap()
+			};
+			
+			self.state.output_zero_bits(self.parser.report.clone(), instr_width, false, &instr_span)
+		}
+		
+		// ...or if all arguments could be resolved, output instruction now.
+		else
+		{
+			// Apply cascading to find best suited match.
 			let mut best_match = 0;
 			while best_match < instr_match.rule_indices.len() - 1
 			{
-				// Check rule constraints. If it relies on an argument that could not
-				// be resolved now, of if it fails, just skip this rule without an error.
+				// Evaluate the instruction's production and check whether it
+				// generates an error, in which case, just try the next instruction in the series.
 				let rule = &self.state.cpudef.as_ref().unwrap().rules[instr_match.rule_indices[best_match]];
-				let get_arg = |i: usize| args[i].clone();
-				if self.state.rule_expr_eval(RcReport::new(), rule, &get_arg, &ctx, &rule.production).is_ok()
+				
+				let mut args_eval_ctx = ExpressionEvalContext::new();
+				for i in 0..args.len()
+					{ args_eval_ctx.set_local(rule.params[i].name.clone(), args[i].clone().unwrap()); }
+				
+				if self.state.expr_eval(RcReport::new(), &ctx, &rule.production, &mut args_eval_ctx).is_ok()
 					{ break; }
-					
+				
 				best_match += 1;
 			}
 			
-			best_match
-		};
-		
-		// Having found the best matching rule, save it to be output on the second pass.
-		// Remaining argument resolution and constraint checking will be done then.
-		// Also output zero bits to advance address and output pointer.
-		let instr_width =
-		{
-			let rule = &self.state.cpudef.as_ref().unwrap().rules[instr_match.rule_indices[best_match]];
-			rule.production.width().unwrap()
-		};
-		
-		self.state.output_zero_bits(self.parser.report.clone(), instr_width, false, &instr_span)?;
-		
-		let parsed_instr = ParsedInstruction
-		{
-			rule_index: instr_match.rule_indices[best_match],
-			span: instr_span,
-			ctx: ctx,
-			exprs: instr_match.exprs,
-			args: args
-		};
-		
-		self.state.parsed_instrs.push(parsed_instr);
-		
-		Ok(())
+			let mut parsed_instr = ParsedInstruction
+			{
+				rule_index: instr_match.rule_indices[best_match],
+				span: instr_span,
+				ctx: ctx,
+				exprs: instr_match.exprs,
+				args: args
+			};
+			
+			self.state.output_parsed_instr(self.parser.report.clone(), &mut parsed_instr)
+		}
 	}
 	
 	
@@ -461,7 +469,7 @@ impl<'a> AssemblerParser<'a>
 		
 		let expr = Expression::parse(&mut self.parser)?;
 		
-		let value = match self.state.expr_eval(self.parser.report.clone(), &ctx, &expr)
+		let value = match self.state.expr_eval(self.parser.report.clone(), &ctx, &expr, &mut ExpressionEvalContext::new())
 		{
 			Ok(ExpressionValue::Integer(value)) => value,
 			Ok(_) => return Err(self.parser.report.error_span("expected integer value", &expr.span())),

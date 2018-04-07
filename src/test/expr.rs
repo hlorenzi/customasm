@@ -1,6 +1,6 @@
 use diagn::RcReport;
 use syntax::{tokenize, Parser};
-use expr::{Expression, ExpressionValue};
+use expr::{Expression, ExpressionValue, ExpressionEvalContext};
 use util::{FileServer, FileServerMock};
 use super::ExpectedResult::*;
 use super::{ExpectedResult, expect_result};
@@ -17,7 +17,9 @@ where S: Into<Vec<u8>>
 		
 		let expr = Expression::parse(&mut Parser::new(report.clone(), tokens))?;
 		
-		let expr_value = expr.eval(report.clone(), &|_, _| Err(()), &|_, _, _, _| Err(()))?;
+		let expr_value = expr.eval(report.clone(), &mut ExpressionEvalContext::new(),
+			&|_, _, _| Err(false),
+			&|_, _, _, _| Err(false))?;
 		
 		Ok(expr_value)
 	}
@@ -361,4 +363,27 @@ fn test_precedence()
 	test("0b110 == 0b110 &  0b11 == 0b11", Fail(("test", 1, "argument")));
 	test("0b110 == 0b110 || 0b11 == 0b11", Pass(ExpressionValue::Bool(true)));
 	test("0b110 == 0b110 |  0b11 == 0b11", Fail(("test", 1, "argument")));
+}
+
+
+#[test]
+fn test_blocks()
+{
+	test("{}",       Pass(ExpressionValue::Void));
+	test("{0}",      Pass(ExpressionValue::Integer(BigInt::from(0))));
+	test("{0,}",     Pass(ExpressionValue::Integer(BigInt::from(0))));
+	test("{0 \n }",  Pass(ExpressionValue::Integer(BigInt::from(0))));
+	test("{0,\n }",  Pass(ExpressionValue::Integer(BigInt::from(0))));
+	test("{0,   1}", Pass(ExpressionValue::Integer(BigInt::from(1))));
+	test("{0 \n 1}", Pass(ExpressionValue::Integer(BigInt::from(1))));
+	
+	test("{1 + 2, 3} + {4, 5 + 6}", Pass(ExpressionValue::Integer(BigInt::from(14))));
+}
+
+
+#[test]
+fn test_calls()
+{
+	test("0()",        Fail(("test", 1, "callable")));
+	test("0(1, 2, 3)", Fail(("test", 1, "callable")));
 }

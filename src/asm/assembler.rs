@@ -1,9 +1,9 @@
 use diagn::{Span, RcReport};
-use expr::{Expression, ExpressionValue};
+use expr::{Expression, ExpressionValue, ExpressionEvalContext};
 use asm::{AssemblerParser, BinaryOutput, LabelManager, LabelContext};
 use asm::BankDef;
 use asm::BinaryBlock;
-use asm::cpudef::{CpuDef, Rule};
+use asm::cpudef::CpuDef;
 use util::FileServer;
 use num::bigint::ToBigInt;
 
@@ -65,7 +65,7 @@ impl AssemblerState
 			cur_block: 0
 		};
 		
-		state.bankdefs.push(BankDef::new("", 0, 0x1_0000_0000, Some(0), false, None));
+		state.bankdefs.push(BankDef::new("", 0, 0, Some(0), false, None));
 		state.blocks.push(BinaryBlock::new(""));
 		state
 	}
@@ -107,7 +107,10 @@ impl AssemblerState
 			let bankdef_index = self.find_bankdef(&block.bank_name).unwrap();
 			let bankdef = &self.bankdefs[bankdef_index];
 			
-			let align = self.cpudef.as_ref().unwrap().align;
+			let align = if bankdef_index == 0
+				{ 1 }
+			else
+				{ self.cpudef.as_ref().unwrap().align };
 			
 			if let Some(output_index) = bankdef.outp
 			{
@@ -197,7 +200,7 @@ impl AssemblerState
 		{
 			let bits_short = align - excess_bits;
 			let plural = if bits_short > 1 { "bits" } else { "bit" };
-			return Err(report.error_span(format!("address is not aligned to a byte ({} {} short)", bits_short, plural), span));
+			return Err(report.error_span(format!("address is not aligned to a word boundary ({} {} short)", bits_short, plural), span));
 		}
 			
 		let bankdef_index = self.find_bankdef(&block.bank_name).unwrap();
@@ -210,7 +213,7 @@ impl AssemblerState
 			None => return Err(report.error_span("address overflowed valid range", span))
 		};
 		
-		if addr >= bankdef.addr + bankdef.size
+		if bankdef_index != 0 && addr >= bankdef.addr + bankdef.size
 			{ return Err(report.error_span("address is out of bank range", span)); }
 			
 		Ok(addr)
@@ -219,11 +222,12 @@ impl AssemblerState
 	
 	pub fn check_valid_address(&self, report: RcReport, block_index: usize, addr: usize, span: &Span) -> Result<(), ()>
 	{
-		self.check_cpudef_active(report.clone(), span)?;
-		
 		let block = &self.blocks[block_index];
 		let bankdef_index = self.find_bankdef(&block.bank_name).unwrap();
 		let bankdef = &self.bankdefs[bankdef_index];
+		
+		if bankdef_index == 0
+			{ return Ok(()); }
 		
 		if addr < bankdef.addr || addr > bankdef.addr + bankdef.size
 			{ return Err(report.error_span("address is out of bank range", span)); }
@@ -234,8 +238,6 @@ impl AssemblerState
 	
 	pub fn output_bit(&mut self, report: RcReport, bit: bool, skipping: bool, span: &Span) -> Result<(), ()>
 	{
-		self.check_cpudef_active(report.clone(), span)?;
-		
 		{
 			let block = &self.blocks[self.cur_block];
 			let bankdef = &self.bankdefs[self.cur_bank];
@@ -243,8 +245,13 @@ impl AssemblerState
 			if bankdef.outp.is_none() && !skipping
 				{ return Err(report.error_span("attempt to place data in non-writable bank", span)); }
 			
-			if block.len() / self.cpudef.as_ref().unwrap().align >= bankdef.size
-				{ return Err(report.error_span("data overflowed bank size", span)); }
+			if self.cur_bank != 0
+			{
+				self.check_cpudef_active(report.clone(), span)?;
+				
+				if block.len() / self.cpudef.as_ref().unwrap().align >= bankdef.size
+					{ return Err(report.error_span("data overflowed bank size", span)); }
+			}
 		}
 		
 		self.blocks[self.cur_block].append(bit);
@@ -303,19 +310,21 @@ impl AssemblerState
 		for i in 0..instr.exprs.len()
 		{
 			if instr.args[i].is_none()
-				{ instr.args[i] = Some(self.expr_eval(report.clone(), &instr.ctx, &instr.exprs[i])?); }
+				{ instr.args[i] = Some(self.expr_eval(report.clone(), &instr.ctx, &instr.exprs[i], &mut ExpressionEvalContext::new())?); }
 		}
 		
 		// Check rule constraints.
 		let rule = &self.cpudef.as_ref().unwrap().rules[instr.rule_index];
-		let get_arg = |i: usize| instr.args[i].clone();
+		let mut args_eval_ctx = ExpressionEvalContext::new();
+		for i in 0..instr.args.len()
+			{ args_eval_ctx.set_local(rule.params[i].name.clone(), instr.args[i].clone().unwrap()); }
 		
 		// Output binary representation.
 		let (left, right) = rule.production.slice().unwrap();
 		
 		let _guard = report.push_parent("failed to resolve instruction", &instr.span);
 		
-		let value = self.rule_expr_eval(report.clone(), rule, &get_arg, &instr.ctx, &rule.production)?;
+		let value = self.expr_eval(report.clone(), &instr.ctx, &rule.production, &mut args_eval_ctx)?;
 		
 		let block = &mut self.blocks[instr.ctx.block];
 		
@@ -331,10 +340,8 @@ impl AssemblerState
 	
 	pub fn output_parsed_expr(&mut self, report: RcReport, expr: &ParsedExpression) -> Result<(), ()>
 	{
-		let _guard = report.push_parent("failed to resolve expression", &expr.expr.span());
-		
 		// Resolve expression.
-		let value = self.expr_eval(report.clone(), &expr.ctx, &expr.expr)?;
+		let value = self.expr_eval(report.clone(), &expr.ctx, &expr.expr, &mut ExpressionEvalContext::new())?;
 		
 		// Check size constraints.
 		let value_width = value.bits();
@@ -358,54 +365,18 @@ impl AssemblerState
 	}
 	
 	
-	pub fn rule_expr_eval<F>(&self, report: RcReport, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, expr: &Expression) -> Result<ExpressionValue, ()>
-	where F: Fn(usize) -> Option<ExpressionValue>
+	pub fn expr_eval(&self, report: RcReport, ctx: &ExpressionContext, expr: &Expression, eval_ctx: &mut ExpressionEvalContext) -> Result<ExpressionValue, ()>
 	{
-		expr.eval(
-			report.clone(),
-			&|report, name| self.rule_expr_get_var(report, rule, get_arg, ctx, name),
+		expr.eval(report.clone(), eval_ctx,
+			&|report, name, span| self.expr_eval_var(report, ctx, name, span),
 			&|report, fn_id, args, span| self.expr_eval_fn(report, fn_id, args, span))
 	}
 		
 		
-	pub fn rule_expr_get_var<F>(&self, _report: RcReport, rule: &Rule, get_arg: &F, ctx: &ExpressionContext, name: &str) -> Result<ExpressionValue, ()>
-	where F: Fn(usize) -> Option<ExpressionValue>
+	fn expr_eval_var(&self, report: RcReport, ctx: &ExpressionContext, name: &str, span: &Span) -> Result<ExpressionValue, bool>
 	{
 		if name == "pc"
-			{ Ok(ExpressionValue::Integer(ctx.get_address_at(self).to_bigint().unwrap())) }
-			
-		else if name == "assert"
-			{ Ok(ExpressionValue::Function(0)) }
-		
-		else
-		{
-			if rule.param_exists(name)
-			{
-				match get_arg(rule.param_index(name))
-				{
-					Some(arg) => Ok(arg),
-					None => Err(())
-				}
-			}
-			else
-				{ Err(()) }
-		}
-	}
-	
-	
-	pub fn expr_eval(&self, report: RcReport, ctx: &ExpressionContext, expr: &Expression) -> Result<ExpressionValue, ()>
-	{
-		expr.eval(
-			report.clone(),
-			&|report, name| self.expr_get_var(report, ctx, name),
-			&|report, fn_id, args, span| self.expr_eval_fn(report, fn_id, args, span))
-	}
-		
-		
-	fn expr_get_var(&self, _report: RcReport, ctx: &ExpressionContext, name: &str) -> Result<ExpressionValue, ()>
-	{
-		if name == "pc"
-			{ Ok(ExpressionValue::Integer(ctx.get_address_at(self).to_bigint().unwrap())) }
+			{ Ok(ExpressionValue::Integer(ctx.get_address_at(report, self, span)?.to_bigint().unwrap())) }
 			
 		else if name == "assert"
 			{ Ok(ExpressionValue::Function(0)) }
@@ -415,7 +386,7 @@ impl AssemblerState
 			if self.labels.local_exists(ctx.label_ctx, name)
 				{ Ok(self.labels.get_local(ctx.label_ctx, name).unwrap().clone()) }
 			else
-				{ Err(()) }
+				{ Err(false) }
 		}
 		
 		else
@@ -423,19 +394,19 @@ impl AssemblerState
 			if self.labels.global_exists(name)
 				{ Ok(self.labels.get_global(name).unwrap().clone()) }
 			else
-				{ Err(()) }
+				{ Err(false) }
 		}
 	}
 	
 	
-	fn expr_eval_fn(&self, report: RcReport, fn_id: usize, args: Vec<ExpressionValue>, span: &Span) -> Result<ExpressionValue, ()>
+	fn expr_eval_fn(&self, report: RcReport, fn_id: usize, args: Vec<ExpressionValue>, span: &Span) -> Result<ExpressionValue, bool>
 	{
 		match fn_id
 		{
 			0 =>
 			{
 				if args.len() != 1
-					{ return Err(report.error_span("wrong number of arguments", span)); }
+					{ return Err({ report.error_span("wrong number of arguments", span); true }); }
 					
 				match args[0]
 				{
@@ -444,11 +415,11 @@ impl AssemblerState
 						match value
 						{
 							true => Ok(ExpressionValue::Void),
-							false => Err(report.error_span("assertion failed", span))
+							false => Err({ report.error_span("assertion failed", span); true })
 						}
 					}
 					
-					_ => Err(report.error_span("wrong argument type", span))
+					_ => Err({ report.error_span("wrong argument type", span); true })
 				}
 			}
 			
@@ -460,21 +431,24 @@ impl AssemblerState
 
 impl ExpressionContext
 {
-	pub fn get_address_at(&self, state: &AssemblerState) -> usize
+	pub fn get_address_at(&self, report: RcReport, state: &AssemblerState, span: &Span) -> Result<usize, bool>
 	{
+		if let Err(_) = state.check_cpudef_active(report.clone(), span)
+			{ return Err(true); }
+	
 		let align = state.cpudef.as_ref().unwrap().align;
 		let block = &state.blocks[self.block];
 		
 		if block.len() % align != 0
-			{ panic!("address is not aligned to a byte"); }
+			{ return Err({ report.error_span("address is not aligned to a byte", span); true }); }
 			
 		let bankdef = state.find_bankdef(&block.bank_name).unwrap();
 		
 		let block_offset = self.offset / align;
 		match block_offset.checked_add(state.bankdefs[bankdef].addr)
 		{
-			Some(addr) => addr,
-			None => panic!("address overflowed valid range")
+			Some(addr) => Ok(addr),
+			None => Err({ report.error_span("address overflowed valid range", span); true })
 		}
 	}
 }

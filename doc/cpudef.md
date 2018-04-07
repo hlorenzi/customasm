@@ -38,7 +38,7 @@ The first line not starting with a `#` begins the list of rules.
 A rule defines a valid mnemonic for the target machine, and its
 respective binary representation.
 
-Rules are written as `pattern -> production` and must be separated
+Rules are written as `pattern -> output` and must be separated
 by line breaks.
 
 ### Pattern
@@ -49,40 +49,47 @@ The pattern is a sequence of tokens:
 - For mnemonics, text, or punctuation: just write them out verbatim.
 - For parameter slots: write them as `{x}`, with `x` being any valid name.
 
-### Production
+### Output
 
-The production part of a rule defines its binary representation.
-It consists of a single expression.  
-The binary representation must have a well-known number of bits,
-so that byte alignment can be verified.  
-- For literals (like fixed opcodes), like `0x7f`, the number of used bits is derived automatically
+The output part of a rule defines its binary representation.
+It consists of a single expression, the integer result of which is
+sent to the output. Note is that this integer result
+must have a known width (number of bits) to allow for advancing
+the current address while assembling, and to allow for verification
+of word alignment.
+
+- For literals (like fixed opcodes), like `0x7f`, the width is derived automatically
 from the radix and number of digits used. If it's necessary to explicitly state the
-number of used bits, use explicitly-sized literals:
+width, use explicitly-sized literals:
 the number of bits, followed by a single quote, followed by the value, like `8'0x05`.
-- For parameter values, use a bit slice:
-the parameter name followed by two numbers inside brackets, like `abc[y:x]`.
-`x` and `y` define the rightmost and the leftmost 0-based bit index
+- For any other value, including arguments to the instruction, use a bit slice:
+the expression followed by two numbers inside brackets, like `abc[hi:lo]`.
+`hi` and `lo` define the rightmost and the leftmost 0-based bit index
 of the value that will be selected, counting from the least significant bit.
 For example, if `abc = 0xbbaa`, then `abc[7:0] = 0xaa` and `abc[15:8] = 0xbb`.
+- More complex expressions can also be evaluated; just end them off with a
+bit slice if known widths are required, like `(abc + 0xff)[7:0] @ (pc >> 2)[15:0]`.
 - Use the concatenation operator `@` to string sub-expressions together, like
 `0x1a @ addr[15:0]`. All arguments to the concatenation operator must have a
-well-known number of bits.
-- More complex expressions can also be evaluated; just end them off with a
-bit slice if well-known sizes are needed, like `(abc + 0xff)[7:0] @ (pc >> 2)[15:0]`.
+known width.
 - [Predefined variables](#predefined-variables) are also available.
 
-### Constraints
+An expression can also be a block, the result of which is defined to be its
+last sub-expression. Blocks are especially useful to evaluate more complex
+expressions in separate steps (by using local variables), or to create
+assertions (e.g. that verify the validity of passed arguments). For example,
+the following rule would only allow arguments between `0x00` and `0x10`:
 
-Rules can be given constraints that are used to validate arguments to an
-instruction. They come before the `->` token, and each one is marked
-with a `::` token. They consist of a condition expression and an
-optional description. When the condition is violated, an error is produced
-at assembly time.  
+```
+load {value} ->
+{
+	assert(value >= 0x00)
+	assert(value <  0x10)
+	0x1 @ value[7:0]
+}
+```
 
-For example, we can check whether an argument fits the instruction's
-binary representation:
-- `jmp {addr} :: addr <= 0xffff -> 0x10 @ addr[15:0]`, or
-- `jmp {addr} :: addr <= 0xffff, "address out of bounds" -> 0x10 @ addr[15:0]`
+Sub-expressions in a block can be separated by linebreaks or commas.
 
 ### Rule Cascading
 
@@ -91,37 +98,37 @@ representation for a given instruction (e.g. when there are short
 forms for commonly-used arguments), we can use rule cascading.
 When we define multiple rules with the same pattern, they are
 eligible for cascading. The assembler will select the first
-rule (in order of definition) that can have its constraints satisfied.
+rule (in order of definition) that can have its expression evaluated
+without error (and without any assertion failures).
 
 For example, we can write:
 
 ```asm
 #align 8
 
-mov {value} :: value <=     0xff -> 0x10 @ value[ 7:0]
-mov {value} :: value <=   0xffff -> 0x11 @ value[15:0]
-mov {value} :: value <= 0xffffff -> 0x12 @ value[23:0]
+mov {value} -> { assert(value <=     0xff), 0x10 @ value[ 7:0] }
+mov {value} -> { assert(value <=   0xffff), 0x11 @ value[15:0] }
+mov {value} -> { assert(value <= 0xffffff), 0x12 @ value[23:0] }
 ```
 
-This will select the best fitting representation according to
-the given argument. If a rule constraint cannot be resolved
-due to a label that is not yet defined, the rule is skipped as
-if its constraint was violated.
+If the arguments to the instruction cannot be resolved in the first
+pass (e.g. when using a label that will only be defined later), the
+last rule in the cascading series is always the one selected.
 
-Since it is impossible to force the use of a certain cascading
-rule, it is recommended to specify unambiguous rules for all
+Since it is impossible to force the use of a certain rule under
+cascading, it may be convenient to specify unambiguous rules for all
 forms, like:
 
 ```asm
 #align 8
 
-mov.b {value} :: value <=     0xff -> 0x10 @ value[ 7:0]
-mov.w {value} :: value <=   0xffff -> 0x11 @ value[15:0]
-mov.t {value} :: value <= 0xffffff -> 0x12 @ value[23:0]
+mov.b {value} -> { assert(value <=     0xff), 0x10 @ value[ 7:0] }
+mov.w {value} -> { assert(value <=   0xffff), 0x11 @ value[15:0] }
+mov.t {value} -> { assert(value <= 0xffffff), 0x12 @ value[23:0] }
 
-mov {value} :: value <=     0xff -> 0x10 @ value[ 7:0]
-mov {value} :: value <=   0xffff -> 0x11 @ value[15:0]
-mov {value} :: value <= 0xffffff -> 0x12 @ value[23:0]
+mov {value} -> { assert(value <=     0xff), 0x10 @ value[ 7:0] }
+mov {value} -> { assert(value <=   0xffff), 0x11 @ value[15:0] }
+mov {value} -> { assert(value <= 0xffffff), 0x12 @ value[23:0] }
 ```
 
 ### Predefined Variables
@@ -158,25 +165,27 @@ Rule | Used as | Output
     
     ; we can write the entire rule in one line:
     
-    ld  r1, {value} :: value <=     0xff -> 0x10 @ value[ 7:0]
-    ld  r1, {value} :: value <=   0xffff -> 0x11 @ value[15:0]
-    ld  r1, {value} :: value <= 0xffffff -> 0x12 @ value[23:0]
+    ld  r1, {value} -> { assert(value <=     0xff), 0x10 @ value[ 7:0] }
+    ld  r1, {value} -> { assert(value <=   0xffff), 0x11 @ value[15:0] }
+    ld  r1, {value} -> { assert(value <= 0xffffff), 0x12 @ value[23:0] }
     
     ; but we can also add in line breaks for readability:
     
-    add r1, {value}
-        -> 0x20 @ value[7:0]
+    add r1, {value} ->
+        0x20 @ value[7:0]
     
-    add {addr}, {value}
-        -> 0x21 @ address[23:0] @ value[7:0]
+    add {addr}, {value} ->
+        0x21 @ address[23:0] @ value[7:0]
     
-    inc r1
-        -> 0x30
+    inc r1 ->
+		0x30
     
-    jmp {addr}
-        :: addr <= 0xffffff, "address is out of bounds"
-        :: addr >= 0, "address is out of bounds"
-        -> 0x40 @ address[23:0]
+    jmp {addr} ->
+	{
+        assert(addr <= 0xffffff)
+        assert(addr >= 0)
+        0x40 @ address[23:0]
+	}
 }
 ```
 

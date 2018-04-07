@@ -9,28 +9,74 @@ use num::Zero;
 use num::One;
 use num::ToPrimitive;
 use std::mem::swap;
+use std::collections::HashMap;
+
+
+pub struct ExpressionEvalContext
+{
+	locals: HashMap<String, ExpressionValue>
+}
+
+
+impl ExpressionEvalContext
+{
+	pub fn new() -> ExpressionEvalContext
+	{
+		ExpressionEvalContext
+		{
+			locals: HashMap::new()
+		}
+	}
+	
+	
+	pub fn set_local<S>(&mut self, name: S, value: ExpressionValue)
+	where S: Into<String>
+	{
+		self.locals.insert(name.into(), value);
+	}
+	
+	
+	pub fn get_local(&self, name: &str) -> Result<ExpressionValue, ()>
+	{
+		match self.locals.get(name)
+		{
+			Some(value) => Ok(value.clone()),
+			None => Err(())
+		}
+	}
+}
 
 
 impl Expression
 {
-	pub fn eval<FVar, FFn>(&self, report: RcReport, eval_var: &FVar, eval_fn: &FFn) -> Result<ExpressionValue, ()>
-	where
-	FVar: Fn(RcReport, &str) -> Result<ExpressionValue, ()>,
-	FFn: Fn(RcReport, usize, Vec<ExpressionValue>, &Span) -> Result<ExpressionValue, ()>
+	pub fn eval<FVar, FFn>(&self, report: RcReport, ctx: &mut ExpressionEvalContext, eval_var: &FVar, eval_fn: &FFn) -> Result<ExpressionValue, ()>
+		where
+		FVar: Fn(RcReport, &str, &Span) -> Result<ExpressionValue, bool>,
+		FFn: Fn(RcReport, usize, Vec<ExpressionValue>, &Span) -> Result<ExpressionValue, bool>
 	{
 		match self
 		{
 			&Expression::Literal(_, ref value) => Ok(value.clone()),
 			
-			&Expression::Variable(ref span, ref name) => match eval_var(report.clone(), &name)
+			&Expression::Variable(ref span, ref name) => match ctx.get_local(&name)
 			{
 				Ok(value) => Ok(value),
-				Err(_) => Err(report.error_span("unknown variable", &span))
+				Err(_) => match eval_var(report.clone(), &name, &span)
+				{
+					Ok(value) => Ok(value),
+					Err(handled) =>
+					{
+						if !handled
+							{ report.error_span("unknown variable", &span); }
+							
+						Err(())
+					}
+				}
 			}
 			
 			&Expression::UnaryOp(ref span, _, op, ref inner_expr) =>
 			{
-				match inner_expr.eval(report.clone(), eval_var, eval_fn)?
+				match inner_expr.eval(report.clone(), ctx, eval_var, eval_fn)?
 				{
 					ExpressionValue::Integer(x) => match op
 					{
@@ -50,7 +96,7 @@ impl Expression
 			
 			&Expression::BinaryOp(ref span, ref op_span, op, ref lhs_expr, ref rhs_expr) =>
 			{
-				match (lhs_expr.eval(report.clone(), eval_var, eval_fn)?, rhs_expr.eval(report.clone(), eval_var, eval_fn)?)
+				match (lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?, rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?)
 				{
 					(ExpressionValue::Integer(lhs), ExpressionValue::Integer(rhs)) =>
 					{
@@ -129,7 +175,7 @@ impl Expression
 			
 			&Expression::BitSlice(ref span, _, left, right, ref inner) =>
 			{
-				match inner.eval(report.clone(), eval_var, eval_fn)?
+				match inner.eval(report.clone(), ctx, eval_var, eval_fn)?
 				{
 					ExpressionValue::Integer(x) => Ok(ExpressionValue::Integer(bigint_slice(x, left, right))),
 					_ => Err(report.error_span("invalid argument type to slice", &span))
@@ -141,25 +187,29 @@ impl Expression
 				let mut result = ExpressionValue::Void;
 				
 				for expr in exprs
-					{ result = expr.eval(report.clone(), eval_var, eval_fn)?; }
+					{ result = expr.eval(report.clone(), ctx, eval_var, eval_fn)?; }
 					
 				Ok(result)
 			}
 			
 			&Expression::Call(ref span, ref target, ref arg_exprs) =>
 			{
-				match target.eval(report.clone(), eval_var, eval_fn)?
+				match target.eval(report.clone(), ctx, eval_var, eval_fn)?
 				{
 					ExpressionValue::Function(id) =>
 					{
 						let mut args = Vec::new();
 						for expr in arg_exprs
-							{ args.push(expr.eval(report.clone(), eval_var, eval_fn)?); }
+							{ args.push(expr.eval(report.clone(), ctx, eval_var, eval_fn)?); }
 							
-						eval_fn(report, id, args, &span)
+						match eval_fn(report, id, args, &span)
+						{
+							Ok(value) => Ok(value),
+							Err(_handled) => Err(())
+						}
 					}
 					
-					_ => Err(report.error_span("uncallable type", &target.span()))
+					_ => Err(report.error_span("expression is not callable", &target.span()))
 				}
 			}
 		}

@@ -29,6 +29,16 @@ where S: Into<String>, T: Into<String>
 }
 
 
+fn test_no_cpu<S>(asm: S, expected: ExpectedResult<(usize, &'static str)>)
+where S: Into<Vec<u8>>
+{
+	let mut fileserver = FileServerMock::new();
+	fileserver.add("asm", asm.into());
+	
+	test_fileserver(&fileserver, "asm", expected);
+}
+
+
 fn test_fileserver<S>(fileserver: &FileServer, asm_filename: S, expected: ExpectedResult<(usize, &'static str)>)
 where S: Into<String>
 {
@@ -96,40 +106,40 @@ fn test_simple()
 	test("#align 3 \n halt -> 3'0b101 \n cli -> 3'0b110", "halt \n cli \n halt \n cli", Pass((1, "101110101110")));
 	test("#align 8 \n halt -> 8'0x12  \n cli -> 8'0x34",  "halt \n cli \n halt \n cli", Pass((4, "12341234")));
 	
-	test("halt -> 8'0", "unknown",         Fail(("asm", 1, "no match")));
-	test("halt -> 8'0", "halt \n unknown", Fail(("asm", 2, "no match")));
+	test("halt -> 0x00", "unknown",         Fail(("asm", 1, "no match")));
+	test("halt -> 0x00", "halt \n unknown", Fail(("asm", 2, "no match")));
 	
-	test("halt -> 8'0", "#unknown \n halt", Fail(("asm", 1, "unknown")));
+	test("halt -> 0x00", "#unknown \n halt", Fail(("asm", 1, "unknown")));
 	
-	test("halt -> 8'0", "HALT", Pass((4, "00")));
-	test("HALT -> 8'0", "halt", Pass((4, "00")));
-	test("Halt -> 8'0", "hALT", Pass((4, "00")));
-	test("hALT -> 8'0", "Halt", Pass((4, "00")));
+	test("halt -> 0x00", "HALT", Pass((4, "00")));
+	test("HALT -> 0x00", "halt", Pass((4, "00")));
+	test("Halt -> 0x00", "hALT", Pass((4, "00")));
+	test("hALT -> 0x00", "Halt", Pass((4, "00")));
 }
 
 
 #[test]
 fn test_parameters()
 {
-	test("load {a} -> 8'0x12 @ a[7:0]",          "load 0x34", Pass((4, "1234")));
-	test("load {a} -> 8'0x12 @ a[7:0]",          "load pc",   Pass((4, "1200")));
-	test("load {a} -> 8'0x12 @ a[3:0] @ a[7:4]", "load 0x34", Pass((4, "1243")));
-	test("load {a} -> 8'0x12 @ a[15:0]",         "load 0x34", Pass((4, "120034")));
+	test("load {a} -> 0x12 @ a[7:0]",          "load 0x34", Pass((4, "1234")));
+	test("load {a} -> 0x12 @ a[7:0]",          "load pc",   Pass((4, "1200")));
+	test("load {a} -> 0x12 @ a[3:0] @ a[7:4]", "load 0x34", Pass((4, "1243")));
+	test("load {a} -> 0x12 @ a[15:0]",         "load 0x34", Pass((4, "120034")));
 	
-	test("load {a}, {b} -> 8'0x12 @ a[7:0] @ b[7:0]", "load 0x34, 0x56", Pass((4, "123456")));
-	test("load {a}, {b} -> 8'0x12 @ b[7:0] @ a[7:0]", "load 0x34, 0x56", Pass((4, "125634")));
+	test("load {a}, {b} -> 0x12 @ a[7:0] @ b[7:0]", "load 0x34, 0x56", Pass((4, "123456")));
+	test("load {a}, {b} -> 0x12 @ b[7:0] @ a[7:0]", "load 0x34, 0x56", Pass((4, "125634")));
 	
-	test("load {a}      -> 8'0x12 @ (a +  0x22)[7:0]", "load 0x34",       Pass((4, "1256")));
-	test("load {a}      -> 8'0x12 @ (a + 0xf22)[7:0]", "load 0x34",       Pass((4, "1256")));
-	test("load {a}, {b} -> 8'0x12 @ (a + b)[7:0]",     "load 0x34, 0x56", Pass((4, "128a")));
+	test("load {a}      -> 0x12 @ (a +  0x22)[7:0]", "load 0x34",       Pass((4, "1256")));
+	test("load {a}      -> 0x12 @ (a + 0xf22)[7:0]", "load 0x34",       Pass((4, "1256")));
+	test("load {a}, {b} -> 0x12 @ (a + b)[7:0]",     "load 0x34, 0x56", Pass((4, "128a")));
 	
-	test("load {a} -> 8'0x12 @ a[7:0]", "load 1 == 1", Fail(("cpu", 1, "type")));
-	test("load {a} -> 8'0x12 @ a[7:0]", "load",        Fail(("asm", 1, "no match")));
-	test("load {a} -> 8'0x12 @ a[7:0]", "load 1, 2",   Fail(("asm", 1, "no match")));
-	test("load {a} -> 8'0x12 @ a[7:0]", "load a",      Fail(("asm", 1, "unknown")));
+	test("load {a} -> 0x12 @ a[7:0]", "load 1 == 1", Fail(("cpu", 1, "type")));
+	test("load {a} -> 0x12 @ a[7:0]", "load",        Fail(("asm", 1, "no match")));
+	test("load {a} -> 0x12 @ a[7:0]", "load 1, 2",   Fail(("asm", 1, "no match")));
+	test("load {a} -> 0x12 @ a[7:0]", "load a",      Fail(("asm", 1, "unknown")));
 	
-	test("load {a}, {b} -> 8'0x12 @ a[7:0] @ b[7:0]", "load 1",       Fail(("asm", 1, "no match")));
-	test("load {a}, {b} -> 8'0x12 @ a[7:0] @ b[7:0]", "load 1, 2, 3", Fail(("asm", 1, "no match")));
+	test("load {a}, {b} -> 0x12 @ a[7:0] @ b[7:0]", "load 1",       Fail(("asm", 1, "no match")));
+	test("load {a}, {b} -> 0x12 @ a[7:0] @ b[7:0]", "load 1, 2, 3", Fail(("asm", 1, "no match")));
 }
 
 
@@ -149,43 +159,43 @@ fn test_assertions()
 #[test]
 fn test_addr_directive()
 {
-	test("halt -> 8'0x12", "              halt", Pass((4, "12")));
-	test("halt -> 8'0x12", "#addr 0x00 \n halt", Pass((4, "12")));
-	test("halt -> 8'0x12", "#addr 0x01 \n halt", Pass((4, "0012")));
-	test("halt -> 8'0x12", "#addr 0x10 \n halt", Pass((4, "0000000000000000000000000000000012")));
+	test("halt -> 0x12", "              halt", Pass((4, "12")));
+	test("halt -> 0x12", "#addr 0x00 \n halt", Pass((4, "12")));
+	test("halt -> 0x12", "#addr 0x01 \n halt", Pass((4, "0012")));
+	test("halt -> 0x12", "#addr 0x10 \n halt", Pass((4, "0000000000000000000000000000000012")));
 	
-	test("halt -> 8'0x12", "#addr 0x10 \n halt \n #addr 0x00", Fail(("asm", 3, "previous")));
-	test("halt -> 8'0x12", "#addr 0x10 \n halt \n #addr 0x10", Fail(("asm", 3, "previous")));
-	test("halt -> 8'0x12", "#addr 0x10 \n halt \n #addr 0x11", Pass((4, "0000000000000000000000000000000012")));
-	test("halt -> 8'0x12", "#addr 0x10 \n halt \n #addr 0x12", Pass((4, "000000000000000000000000000000001200")));
+	test("halt -> 0x12", "#addr 0x10 \n halt \n #addr 0x00", Fail(("asm", 3, "previous")));
+	test("halt -> 0x12", "#addr 0x10 \n halt \n #addr 0x10", Fail(("asm", 3, "previous")));
+	test("halt -> 0x12", "#addr 0x10 \n halt \n #addr 0x11", Pass((4, "0000000000000000000000000000000012")));
+	test("halt -> 0x12", "#addr 0x10 \n halt \n #addr 0x12", Pass((4, "000000000000000000000000000000001200")));
 	
-	test("halt -> 8'0x12 @ pc[7:0]", "              halt", Pass((4, "1200")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x00 \n halt", Pass((4, "1200")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x01 \n halt", Pass((4, "001201")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#addr 0x10 \n halt", Pass((4, "000000000000000000000000000000001210")));
+	test("halt -> 0x12 @ pc[7:0]", "              halt", Pass((4, "1200")));
+	test("halt -> 0x12 @ pc[7:0]", "#addr 0x00 \n halt", Pass((4, "1200")));
+	test("halt -> 0x12 @ pc[7:0]", "#addr 0x01 \n halt", Pass((4, "001201")));
+	test("halt -> 0x12 @ pc[7:0]", "#addr 0x10 \n halt", Pass((4, "000000000000000000000000000000001210")));
 	
-	test("halt -> 8'0x12 @ pc[7:0]", "halt \n halt \n halt",                       Pass((4, "120012021204")));
-	test("halt -> 8'0x12 @ pc[7:0]", "halt \n halt \n #addr 0x10 \n halt \n halt", Pass((4, "1200120200000000000000000000000012101212")));
+	test("halt -> 0x12 @ pc[7:0]", "halt \n halt \n halt",                       Pass((4, "120012021204")));
+	test("halt -> 0x12 @ pc[7:0]", "halt \n halt \n #addr 0x10 \n halt \n halt", Pass((4, "1200120200000000000000000000000012101212")));
 	
-	//test("halt -> 8'0x12", "#addr 0xffff_fffe \n halt", Pass((4, "??")));
-	//test("halt -> 8'0x12", "#addr 0xffff_ffff",         Pass((4, "")));
-	test("halt -> 8'0x12", "#addr 0x1_0000_0001",           Fail(("asm", 1, "bank range")));
-	test("halt -> 8'0x12", "#addr 0x1_0000_0000_0000_0000", Fail(("asm", 1, "large")));
+	//test("halt -> 0x12", "#addr 0xffff_fffe \n halt", Pass((4, "??")));
+	//test("halt -> 0x12", "#addr 0xffff_ffff",         Pass((4, "")));
+	//test("halt -> 0x12", "#addr 0x1_0000_0001",           Fail(("asm", 1, "bank range")));
+	test("halt -> 0x12", "#addr 0x1_0000_0000_0000_0000", Fail(("asm", 1, "large")));
 }
 
 
 #[test]
 fn test_res_directive()
 {
-	test("halt -> 8'0x12 @ pc[7:0]", "halt \n #res 0", Pass((4, "1200")));
-	test("halt -> 8'0x12 @ pc[7:0]", "halt \n #res 1", Pass((4, "120000")));
-	test("halt -> 8'0x12 @ pc[7:0]", "halt \n #res 2", Pass((4, "12000000")));
-	test("halt -> 8'0x12 @ pc[7:0]", "halt \n #res 4", Pass((4, "120000000000")));
+	test("halt -> 0x12 @ pc[7:0]", "halt \n #res 0", Pass((4, "1200")));
+	test("halt -> 0x12 @ pc[7:0]", "halt \n #res 1", Pass((4, "120000")));
+	test("halt -> 0x12 @ pc[7:0]", "halt \n #res 2", Pass((4, "12000000")));
+	test("halt -> 0x12 @ pc[7:0]", "halt \n #res 4", Pass((4, "120000000000")));
 	
-	test("halt -> 8'0x12 @ pc[7:0]", "#res 0 \n halt", Pass((4, "1200")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#res 1 \n halt", Pass((4, "001201")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#res 2 \n halt", Pass((4, "00001202")));
-	test("halt -> 8'0x12 @ pc[7:0]", "#res 4 \n halt", Pass((4, "000000001204")));
+	test("halt -> 0x12 @ pc[7:0]", "#res 0 \n halt", Pass((4, "1200")));
+	test("halt -> 0x12 @ pc[7:0]", "#res 1 \n halt", Pass((4, "001201")));
+	test("halt -> 0x12 @ pc[7:0]", "#res 2 \n halt", Pass((4, "00001202")));
+	test("halt -> 0x12 @ pc[7:0]", "#res 4 \n halt", Pass((4, "000000001204")));
 }
 
 
@@ -283,6 +293,10 @@ fn test_data_directive()
 	test("", "#d16y  0xffff", Fail(("asm", 1, "unknown")));
 	test("", "#da16  0xffff", Fail(("asm", 1, "unknown")));
 	test("", "#d0x10 0xffff", Fail(("asm", 1, "unknown")));
+	
+	test_no_cpu("#d8 0",           Pass((4, "00")));
+	test_no_cpu("#d8 0, 1, 2, 3",  Pass((4, "00010203")));
+	test_no_cpu("#d8 pc",          Fail(("asm", 1, "cpu")));
 }
 
 
@@ -485,7 +499,7 @@ fn test_include_directive()
 		
 	static MAIN5: &'static str ="
 		#include \"instrset\"
-		#include \"C:\\invalid\"";
+		#include \"C:\\\\invalid\"";
 	
 	let mut fileserver = FileServerMock::new();
 	fileserver.add("instrset", INSTRSET);

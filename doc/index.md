@@ -5,7 +5,7 @@ is used only for clarity.
 
 ## CPU Definition
 
-The simplest source file contains a `#cpudef` directive and then
+The typical source file contains a `#cpudef` directive and then
 a list of instructions to be assembled for the target machine.
 
 The syntax for the `#cpudef` directive is described at
