@@ -113,6 +113,31 @@ impl Expression
 					}
 				}
 				
+				else if op == BinaryOp::LazyOr || op == BinaryOp::LazyAnd
+				{
+					let lhs = lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?;
+					
+					match (op, &lhs)
+					{
+						(BinaryOp::LazyOr,  &ExpressionValue::Bool(true))  => return Ok(lhs),
+						(BinaryOp::LazyAnd, &ExpressionValue::Bool(false)) => return Ok(lhs),
+						(BinaryOp::LazyOr,  &ExpressionValue::Bool(false)) => { }
+						(BinaryOp::LazyAnd, &ExpressionValue::Bool(true))  => { }
+						_ => return Err(report.error_span("invalid argument type to operator", &lhs_expr.span()))
+					}
+					
+					let rhs = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?;
+					
+					match (op, &rhs)
+					{
+						(BinaryOp::LazyOr,  &ExpressionValue::Bool(true))  => Ok(rhs),
+						(BinaryOp::LazyAnd, &ExpressionValue::Bool(false)) => Ok(rhs),
+						(BinaryOp::LazyOr,  &ExpressionValue::Bool(false)) => Ok(rhs),
+						(BinaryOp::LazyAnd, &ExpressionValue::Bool(true))  => Ok(rhs),
+						_ => Err(report.error_span("invalid argument type to operator", &rhs_expr.span()))
+					}
+				}
+				
 				else
 				{
 					match (lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?, rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?)
@@ -177,13 +202,11 @@ impl Expression
 						{
 							match op
 							{
-								BinaryOp::And |
-								BinaryOp::LazyAnd => Ok(ExpressionValue::Bool(lhs & rhs)),
-								BinaryOp::Or |
-								BinaryOp::LazyOr  => Ok(ExpressionValue::Bool(lhs | rhs)),
-								BinaryOp::Xor     => Ok(ExpressionValue::Bool(lhs ^ rhs)),
-								BinaryOp::Eq      => Ok(ExpressionValue::Bool(lhs == rhs)),
-								BinaryOp::Ne      => Ok(ExpressionValue::Bool(lhs != rhs)),
+								BinaryOp::And => Ok(ExpressionValue::Bool(lhs & rhs)),
+								BinaryOp::Or  => Ok(ExpressionValue::Bool(lhs | rhs)),
+								BinaryOp::Xor => Ok(ExpressionValue::Bool(lhs ^ rhs)),
+								BinaryOp::Eq  => Ok(ExpressionValue::Bool(lhs == rhs)),
+								BinaryOp::Ne  => Ok(ExpressionValue::Bool(lhs != rhs)),
 								_ => Err(report.error_span("invalid argument types to operator", &span))
 							}
 						}

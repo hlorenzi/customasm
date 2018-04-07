@@ -285,23 +285,15 @@ fn test_ops_relational_int()
 #[test]
 fn test_ops_relational_bool()
 {
-	test("(1 == 1) &  (1 == 1)", Pass(ExpressionValue::Bool(true)));
-	test("(1 == 1) &  (1 == 0)", Pass(ExpressionValue::Bool(false)));
-	test("(1 == 0) &  (1 == 1)", Pass(ExpressionValue::Bool(false)));
-	test("(1 == 0) &  (1 == 0)", Pass(ExpressionValue::Bool(false)));
-	test("(1 == 1) && (1 == 1)", Pass(ExpressionValue::Bool(true)));
-	test("(1 == 1) && (1 == 0)", Pass(ExpressionValue::Bool(false)));
-	test("(1 == 0) && (1 == 1)", Pass(ExpressionValue::Bool(false)));
-	test("(1 == 0) && (1 == 0)", Pass(ExpressionValue::Bool(false)));
+	test("(1 == 1) & (1 == 1)", Pass(ExpressionValue::Bool(true)));
+	test("(1 == 1) & (1 == 0)", Pass(ExpressionValue::Bool(false)));
+	test("(1 == 0) & (1 == 1)", Pass(ExpressionValue::Bool(false)));
+	test("(1 == 0) & (1 == 0)", Pass(ExpressionValue::Bool(false)));
 	
-	test("(1 == 1) |  (1 == 1)", Pass(ExpressionValue::Bool(true)));
-	test("(1 == 1) |  (1 == 0)", Pass(ExpressionValue::Bool(true)));
-	test("(1 == 0) |  (1 == 1)", Pass(ExpressionValue::Bool(true)));
-	test("(1 == 0) |  (1 == 0)", Pass(ExpressionValue::Bool(false)));
-	test("(1 == 1) || (1 == 1)", Pass(ExpressionValue::Bool(true)));
-	test("(1 == 1) || (1 == 0)", Pass(ExpressionValue::Bool(true)));
-	test("(1 == 0) || (1 == 1)", Pass(ExpressionValue::Bool(true)));
-	test("(1 == 0) || (1 == 0)", Pass(ExpressionValue::Bool(false)));
+	test("(1 == 1) | (1 == 1)", Pass(ExpressionValue::Bool(true)));
+	test("(1 == 1) | (1 == 0)", Pass(ExpressionValue::Bool(true)));
+	test("(1 == 0) | (1 == 1)", Pass(ExpressionValue::Bool(true)));
+	test("(1 == 0) | (1 == 0)", Pass(ExpressionValue::Bool(false)));
 	
 	test("(1 == 1) ^ (1 == 1)", Pass(ExpressionValue::Bool(false)));
 	test("(1 == 1) ^ (1 == 0)", Pass(ExpressionValue::Bool(true)));
@@ -317,6 +309,31 @@ fn test_ops_relational_bool()
 	test("(1 == 1) != (1 == 0)", Pass(ExpressionValue::Bool(true)));
 	test("(1 == 0) != (1 == 1)", Pass(ExpressionValue::Bool(true)));
 	test("(1 == 0) != (1 == 0)", Pass(ExpressionValue::Bool(false)));
+}
+
+
+#[test]
+fn test_ops_lazy()
+{
+	test("(1 == 1) && (1 == 1)", Pass(ExpressionValue::Bool(true)));
+	test("(1 == 1) && (1 == 0)", Pass(ExpressionValue::Bool(false)));
+	test("(1 == 0) && (1 == 1)", Pass(ExpressionValue::Bool(false)));
+	test("(1 == 0) && (1 == 0)", Pass(ExpressionValue::Bool(false)));
+	
+	test("(1 == 1) || (1 == 1)", Pass(ExpressionValue::Bool(true)));
+	test("(1 == 1) || (1 == 0)", Pass(ExpressionValue::Bool(true)));
+	test("(1 == 0) || (1 == 1)", Pass(ExpressionValue::Bool(true)));
+	test("(1 == 0) || (1 == 0)", Pass(ExpressionValue::Bool(false)));
+	
+	test("(1 == 1) && 123",     Fail(("test", 1, "type")));
+	test("(1 == 1) && (1 / 0)", Fail(("test", 1, "zero")));
+	test("(1 == 0) && 123",     Pass(ExpressionValue::Bool(false)));
+	test("(1 == 0) && (1 / 0)", Pass(ExpressionValue::Bool(false)));
+	
+	test("(1 == 1) || 123",     Pass(ExpressionValue::Bool(true)));
+	test("(1 == 1) || (1 / 0)", Pass(ExpressionValue::Bool(true)));
+	test("(1 == 0) || 123",     Fail(("test", 1, "type")));
+	test("(1 == 0) || (1 / 0)", Fail(("test", 1, "zero")));
 }
 
 

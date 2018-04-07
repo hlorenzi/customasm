@@ -66,6 +66,9 @@ inc pc + 1
 0x0004: cc 00 05
 ```
 
+[Check out the expression documentation](/doc/expr.md) for a full list
+of what is available.
+
 ## Comments
 
 There are currently only single-line comments. Everything

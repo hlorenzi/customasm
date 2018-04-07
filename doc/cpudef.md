@@ -72,7 +72,8 @@ bit slice if known widths are required, like `(abc + 0xff)[7:0] @ (pc >> 2)[15:0
 - Use the concatenation operator `@` to string sub-expressions together, like
 `0x1a @ addr[15:0]`. All arguments to the concatenation operator must have a
 known width.
-- [Predefined variables](#predefined-variables) are also available.
+- [Check out the expression documentation](/doc/expr.md) for a full list of
+what is available.
 
 An expression can also be a block, the result of which is defined to be its
 last sub-expression. Blocks are especially useful to evaluate more complex
@@ -145,14 +146,6 @@ mov {value} -> { assert(value <=     0xff), 0x10 @ value[ 7:0] }
 mov {value} -> { assert(value <=   0xffff), 0x11 @ value[15:0] }
 mov {value} -> { assert(value <= 0xffffff), 0x12 @ value[23:0] }
 ```
-
-### Predefined Variables
-
-The following predefined variables can be used as either arguments to
-instructions, or in rule production expressions:
-- `pc`  
-The address of the current instruction, or, in other words, the
-value of the program counter when it reaches the current instruction.
 
 ### Rule Examples
 
