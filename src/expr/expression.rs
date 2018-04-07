@@ -9,6 +9,7 @@ pub enum Expression
 	Variable(Span, String),
 	UnaryOp(Span, Span, UnaryOp, Box<Expression>),
 	BinaryOp(Span, Span, BinaryOp, Box<Expression>, Box<Expression>),
+	TernaryOp(Span, Box<Expression>, Box<Expression>, Box<Expression>),
 	BitSlice(Span, Span, usize, usize, Box<Expression>),
 	Block(Span, Vec<Expression>),
 	Call(Span, Box<Expression>, Vec<Expression>)
@@ -59,13 +60,14 @@ impl Expression
 	{
 		match self
 		{
-			&Expression::Literal (ref span, ..) => span.clone(),
-			&Expression::Variable(ref span, ..) => span.clone(),
-			&Expression::UnaryOp (ref span, ..) => span.clone(),
-			&Expression::BinaryOp(ref span, ..) => span.clone(),
-			&Expression::BitSlice(ref span, ..) => span.clone(),
-			&Expression::Block   (ref span, ..) => span.clone(),
-			&Expression::Call    (ref span, ..) => span.clone()
+			&Expression::Literal  (ref span, ..) => span.clone(),
+			&Expression::Variable (ref span, ..) => span.clone(),
+			&Expression::UnaryOp  (ref span, ..) => span.clone(),
+			&Expression::BinaryOp (ref span, ..) => span.clone(),
+			&Expression::TernaryOp(ref span, ..) => span.clone(),
+			&Expression::BitSlice (ref span, ..) => span.clone(),
+			&Expression::Block    (ref span, ..) => span.clone(),
+			&Expression::Call     (ref span, ..) => span.clone()
 		}
 	}
 }

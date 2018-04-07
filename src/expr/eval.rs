@@ -216,6 +216,16 @@ impl Expression
 				}
 			}
 			
+			&Expression::TernaryOp(_, ref cond, ref true_branch, ref false_branch) =>
+			{
+				match cond.eval(report.clone(), ctx, eval_var, eval_fn)?
+				{
+					ExpressionValue::Bool(true)  => true_branch.eval(report.clone(), ctx, eval_var, eval_fn),
+					ExpressionValue::Bool(false) => false_branch.eval(report.clone(), ctx, eval_var, eval_fn),
+					_ => Err(report.error_span("invalid condition type", &cond.span()))
+				}
+			}
+			
 			&Expression::BitSlice(ref span, _, left, right, ref inner) =>
 			{
 				match inner.eval(report.clone(), ctx, eval_var, eval_fn)?

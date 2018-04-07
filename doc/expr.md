@@ -11,6 +11,7 @@ radix and digits (except decimal literals).
 The following operators are listed in the order of the lowest precedence
 to the highest.
 
+- `?`, `? :` Binary and Ternary Conditional
 - `=` Assignment
 - `@` Concatenation
 - `||` Lazy Or
@@ -21,9 +22,27 @@ to the highest.
 - `&` Binary And
 - `<<`, `>>` Binary Shifts
 - `+`, `-` Addition and Subtraction
-- `*`, `/` Multiplication and Division
+- `*`, `/`, `%` Multiplication, Division, and Modulo
 - `[hi:lo]` Bit-slice
 - `!`, `-` Unary Not and Unary Negation
+
+## Blocks
+
+You can evaluate multiple sub-expressions by using blocks. The last
+sub-expression is returned. You can separate sub-expressions with
+commas or linebreaks:
+
+```c
+{ x = 123, y = 456, x + y }
+```
+
+```c
+{
+    x = 123
+    y = 456
+    x + y
+}
+```
 
 ## Predefined Variables
 

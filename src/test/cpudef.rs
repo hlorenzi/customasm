@@ -94,6 +94,9 @@ fn test_rules_simple()
 	test("halt -> pc[23:0]",      Pass(()));
 	test("halt -> (1 + 1)[23:0]", Pass(()));
 	
+	test("halt -> { x = 0x1234, x       }", Fail(("test", 1, "width")));
+	test("halt -> { x = 0x1234, x[15:0] }", Pass(()));
+	
 	test("+halt",              Fail(("test", 1, "identifier")));
 	test("halt",               Fail(("test", 1, "->")));
 	test("-> 8'0",             Fail(("test", 1, "empty")));
@@ -103,6 +106,9 @@ fn test_rules_simple()
 	test("halt -> 1 + 1[7:0]", Fail(("test", 1, "width")));
 	test("halt -> 7'0",        Fail(("test", 1, "align")));
 	test("halt -> 8'0 8'0",    Fail(("test", 1, "line break")));
+	
+	test("halt -> 1 == 1 ? 0x12",        Fail(("test", 1, "width")));
+	test("halt -> 1 == 1 ? 0x12 : 0x34", Fail(("test", 1, "width")));
 	
 	test("halt = 0 -> 8'0x12", Fail(("test", 1, "token")));
 	test("halt : 0 -> 8'0x12", Fail(("test", 1, "token")));

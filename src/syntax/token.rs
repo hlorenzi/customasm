@@ -40,6 +40,7 @@ pub enum TokenKind
 	Asterisk,
 	Slash,
 	Percent,
+	Question,
 	Exclamation,
 	Ampersand,
 	VerticalBar,
@@ -143,6 +144,7 @@ impl TokenKind
 			TokenKind::Asterisk => "`*`",
 			TokenKind::Slash => "`/`",
 			TokenKind::Percent => "`%`",
+			TokenKind::Question => "`?`",
 			TokenKind::Exclamation => "`!`",
 			TokenKind::Ampersand => "`&`",
 			TokenKind::VerticalBar => "`|`",
@@ -306,7 +308,7 @@ fn check_for_string(src: &[char]) -> Option<(TokenKind, usize)>
 
 fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 {
-	static POSSIBLE_TOKENS: [(&str, TokenKind); 36] =
+	static POSSIBLE_TOKENS: [(&str, TokenKind); 37] =
 	[
 		("\n",  TokenKind::LineBreak),
 		("(",   TokenKind::ParenOpen),
@@ -335,6 +337,7 @@ fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 		("|",   TokenKind::VerticalBar),
 		("==",  TokenKind::EqualEqual),
 		("=",   TokenKind::Equal),
+		("?",   TokenKind::Question),
 		("!=",  TokenKind::ExclamationEqual),
 		("!",   TokenKind::Exclamation),
 		("<=",  TokenKind::LessThanEqual),

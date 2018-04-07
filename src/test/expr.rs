@@ -338,6 +338,29 @@ fn test_ops_lazy()
 
 
 #[test]
+fn test_ops_ternary()
+{
+	test("(1 == 1) ? 123", Pass(ExpressionValue::Integer(BigInt::from(123))));
+	test("(1 == 0) ? 123", Pass(ExpressionValue::Void));
+	
+	test("(1 == 1) ? 123 : 456", Pass(ExpressionValue::Integer(BigInt::from(123))));
+	test("(1 == 0) ? 123 : 456", Pass(ExpressionValue::Integer(BigInt::from(456))));
+	
+	test("(1 == 1) ? 123 : (1 == 1)", Pass(ExpressionValue::Integer(BigInt::from(123))));
+	test("(1 == 0) ? 123 : (1 == 1)", Pass(ExpressionValue::Bool(true)));
+	test("(1 == 1) ? (1 == 1) : 123", Pass(ExpressionValue::Bool(true)));
+	test("(1 == 0) ? (1 == 1) : 123", Pass(ExpressionValue::Integer(BigInt::from(123))));
+	
+	test("(1 == 1) ? 123 : (1 / 0)", Pass(ExpressionValue::Integer(BigInt::from(123))));
+	test("(1 == 0) ? 123 : (1 / 0)", Fail(("test", 1, "zero")));
+	test("(1 == 1) ? (1 / 0) : 123", Fail(("test", 1, "zero")));
+	test("(1 == 0) ? (1 / 0) : 123", Pass(ExpressionValue::Integer(BigInt::from(123))));
+	
+	test("123 ? 456 : 789", Fail(("test", 1, "type")));
+}
+
+
+#[test]
 fn test_ops_arith_errors()
 {
 	test("2 / 0",       Fail(("test", 1, "division by zero")));
@@ -418,6 +441,12 @@ fn test_assignment()
 	test("{ x = 123, y = 321,            x + y }",       Pass(ExpressionValue::Integer(BigInt::from(444))));
 	test("{ x = 123, y = x * 2,          x + y }",       Pass(ExpressionValue::Integer(BigInt::from(369))));
 	test("{ x = 123, y = x * 2, x = 753, x + y }",       Pass(ExpressionValue::Integer(BigInt::from(999))));
+	
+	test("{ x = 123, y = 456, x < y ? min = x : min = y, min }", Pass(ExpressionValue::Integer(BigInt::from(123))));
+	test("{ x = 456, y = 123, x < y ? min = x : min = y, min }", Pass(ExpressionValue::Integer(BigInt::from(123))));
+	
+	test("{ x = 123, y = 456, x < y ? min = x,           min }", Pass(ExpressionValue::Integer(BigInt::from(123))));
+	test("{ x = 456, y = 123, x < y ? min = x,           min }", Fail(("test", 1, "unknown")));
 	
 	test("0 = 1",     Fail(("test", 1, "invalid")));
 	test("x + 1 = 2", Fail(("test", 1, "invalid")));

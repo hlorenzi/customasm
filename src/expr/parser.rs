@@ -30,7 +30,7 @@ impl<'a> ExpressionParser<'a>
 	
 	pub fn parse_expr(&mut self) -> Result<Expression, ()>
 	{
-		self.parse_assignment()
+		self.parse_ternary_conditional()
 	}
 	
 	
@@ -113,6 +113,29 @@ impl<'a> ExpressionParser<'a>
 		}
 		
 		Ok(lhs)
+	}
+	
+	
+	fn parse_ternary_conditional(&mut self) -> Result<Expression, ()>
+	{
+		let cond = self.parse_assignment()?;
+		
+		if self.parser.maybe_expect(TokenKind::Question).is_some()
+		{
+			let true_branch = self.parse_expr()?;
+			
+			let false_branch =
+			{
+				if self.parser.maybe_expect(TokenKind::Colon).is_some()
+					{ self.parse_assignment()? }
+				else
+					{ Expression::Block(true_branch.span(), Vec::new()) }
+			};
+			
+			Ok(Expression::TernaryOp(cond.span().join(&false_branch.span()), Box::new(cond), Box::new(true_branch), Box::new(false_branch)))
+		}
+		else
+			{ Ok(cond) }
 	}
 	
 	
