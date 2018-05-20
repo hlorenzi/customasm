@@ -77,17 +77,17 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 		}
 	};
 	
-	if matches.free.len() != 1
+	if matches.free.len() < 1
 		{ return Err(true); }
 	
-	let asm_file = matches.free[0].clone();
+	let main_asm_file = matches.free[0].clone();
 	
 	let output_file = match matches.opt_str("o")
 	{
 		Some(f) => f,
 		None =>
 		{
-			match get_default_output_filename(report.clone(), &asm_file)
+			match get_default_output_filename(report.clone(), &main_asm_file)
 			{
 				Ok(f) => f,
 				Err(_) => return Err(true)
@@ -96,7 +96,8 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 	};
 	
 	let mut filenames = matches.opt_strs("i");
-	filenames.push(asm_file);
+	for filename in matches.free
+		{ filenames.push(filename); }
 	
 	let assembled = assemble(report.clone(), fileserver, &filenames, quiet).map_err(|_| false)?;
 	
@@ -136,7 +137,7 @@ fn make_opts() -> getopts::Options
 {
     let mut opts = getopts::Options::new();
     opts.optopt("f", "format", "The format of the output file. Possible formats: binary, binstr, hexstr, bindump, hexdump", "FORMAT");
-    opts.optmulti("i", "include", "Specifies an additional file for processing before the main assembly.", "FILE");
+    opts.optmulti("i", "include", "Specifies an additional file for processing before the given <asm-files>.", "FILE");
     opts.optopt("o", "output", "The name of the output file.", "FILE");
     opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
     opts.optflag("q", "quiet", "Suppress progress reports.");
@@ -159,7 +160,7 @@ fn parse_opts(report: RcReport, opts: &getopts::Options, args: &Vec<String>) -> 
 
 fn print_usage(opts: &getopts::Options)
 {
-	println!("{}", opts.usage(&format!("Usage: {} [options] <asm-file>", env!("CARGO_PKG_NAME"))));
+	println!("{}", opts.usage(&format!("Usage: {} [options] <asm-file-1> ... <asm-file-N>", env!("CARGO_PKG_NAME"))));
 }
 
 

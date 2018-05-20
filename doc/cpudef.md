@@ -19,7 +19,7 @@ defines mnemonics for its instruction set.
 ## Configurations
 
 The syntax first expects a list of configuration directives, one per line.
-The currently available configuration is:
+The currently available configurations are:
 
 - `#align <bit_num>`  
 Sets the number of bits per byte for the target machine.  
@@ -31,6 +31,19 @@ memory, inclusive.
 Machine instructions must be aligned to a byte boundary,
 hence the directive's name. So, with 8-bit bytes, valid
 instruction sizes are 8 bits, 16 bits, 24 bits, and so on.
+
+- `#tokendef <name>`
+Creates a group of tokens with associated values, which can
+be used in place of arguments (e.g. for named registers).
+See below for usage in parameters. Syntax is as follows:
+```asm
+#tokendef reg
+{
+	a = 1
+	b = 2
+	c = 3
+}
+```
 
 ## Rules
 
@@ -48,6 +61,9 @@ The pattern part of a rule defines its mnemonic and/or parameter slots.
 The pattern is a sequence of tokens:  
 - For mnemonics, text, or punctuation: just write them out verbatim.
 - For parameter slots: write them as `{x}`, with `x` being any valid name.
+- For custom token groups declared with `#tokendef`, write them as `{x: name}`,
+with `name` being the name given at the `#tokendef` declaration (`reg` in the
+example above).
 
 ### Output
 
@@ -208,5 +224,24 @@ Rule | Used as | Output
     sta  {addr}  -> 0b011 @ addr[5:0]
     nop          -> 0b110
     halt         -> 0b111
+}
+```
+
+```asm
+#cpudef
+{
+    ; example with named registers
+	
+    #align 8
+	
+	#tokendef reg
+	{
+		r0 = 0
+		r1 = 1
+		r2 = 2
+		r3 = 3
+	}
+    
+	mov {dest: reg}, {value} -> 0b111100 @ dest[1:0] @ value[7:0]
 }
 ```

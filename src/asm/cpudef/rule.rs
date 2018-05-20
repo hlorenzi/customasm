@@ -20,10 +20,19 @@ pub enum RulePatternPart
 }
 
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub enum RuleParameterType
+{
+	Expression,
+	CustomTokenDef(usize)
+}
+
+
 #[derive(Debug)]
 pub struct RuleParameter
 {
-	pub name: String
+	pub name: String,
+	pub typ: RuleParameterType
 }
 
 
@@ -47,7 +56,7 @@ impl Rule
 	}
 	
 	
-	pub fn pattern_add_param<S>(&mut self, name: S)
+	pub fn pattern_add_param<S>(&mut self, name: S, typ: RuleParameterType)
 	where S: Into<String>
 	{
 		let name_owned = name.into();
@@ -58,7 +67,8 @@ impl Rule
 		
 		let param = RuleParameter
 		{
-			name: name_owned
+			name: name_owned,
+			typ: typ
 		};
 		
 		self.params.push(param);

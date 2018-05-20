@@ -144,6 +144,27 @@ fn test_parameters()
 
 
 #[test]
+fn test_tokendef()
+{
+	test("#tokendef reg { r1 = 1    } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Pass((4, "ff01")));
+	test("#tokendef reg { r1 = 0xbc } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Pass((4, "ffbc")));
+	
+	test("#tokendef reg { r1 = 1, r2 = 2 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1 \n mov r2", Pass((4, "ff01ff02")));
+	
+	test("#tokendef reg1 { r1 = 1 } \n #tokendef reg2 { r1 = 2 } \n mov1 {a: reg1} -> 0xff @ a[7:0] \n mov2 {a: reg2} -> 0xee @ a[7:0]", "mov1 r1 \n mov2 r1", Pass((4, "ff01ee02")));
+	
+	test("#tokendef reg1 { r1 = 1 } \n #tokendef reg2 { r1 = 2 } \n mov {a: reg1} -> 0xff @ a[7:0] \n mov {a: reg2} -> 0xee @ a[7:0]", "mov r1 \n mov r1", Pass((4, "ff01ff01")));
+	test("#tokendef reg1 { r1 = 1 } \n #tokendef reg2 { r2 = 2 } \n mov {a: reg1} -> 0xff @ a[7:0] \n mov {a: reg2} -> 0xee @ a[7:0]", "mov r1 \n mov r2", Pass((4, "ff01ee02")));
+	
+	test("#tokendef reg { r1 = 0xbc } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r2", Fail(("asm", 1, "no match")));
+	
+	test("#tokendef reg { r1 = 1, r1 = 2 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Fail(("cpu", 1, "duplicate token")));
+	test("#tokendef 123 { r1 = 1, r2 = 2 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Fail(("cpu", 1, "identifier")));
+	test("#tokendef reg { r1 = 1 } \n #tokendef reg { r2 = 1 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Fail(("cpu", 2, "duplicate custom token")));
+}
+
+
+#[test]
 fn test_assertions()
 {
 	test("load {a} -> { assert(a % 2 == 0), 0x12 @ a[7:0] }", "load 0x34",               Pass((4, "1234")));

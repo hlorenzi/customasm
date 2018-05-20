@@ -1,6 +1,6 @@
 use syntax::{TokenKind, Parser};
-use expr::Expression;
-use asm::cpudef::{Rule, RulePatternPart};
+use expr::{Expression, ExpressionValue};
+use asm::cpudef::{Rule, RuleParameterType, RulePatternPart, CustomTokenDef};
 use std::collections::HashMap;
 
 
@@ -15,9 +15,10 @@ pub struct RulePatternMatcher
 struct MatchStep
 {
 	rule_indices: Vec<usize>,
-	children_exact: HashMap<MatchStepExact, MatchStep>,
+	children_exact: HashMap<MatchStepExact, (Option<ExpressionValue>, MatchStep)>,
 	children_param: HashMap<MatchStepParameter, MatchStep>
 }
+
 
 #[derive(Debug, Eq, PartialEq, Hash)]
 struct MatchStepExact(TokenKind, Option<String>);
@@ -37,12 +38,12 @@ pub struct Match
 
 impl RulePatternMatcher
 {
-	pub fn new(rules: &[Rule]) -> RulePatternMatcher
+	pub fn new(rules: &[Rule], custom_token_defs: &Vec<CustomTokenDef>) -> RulePatternMatcher
 	{
 		let mut root_step = MatchStep::new();
 		
 		for i in 0..rules.len()
-			{ RulePatternMatcher::build_step(&mut root_step, &rules[i].pattern_parts, i); }
+			{ RulePatternMatcher::build_step(&mut root_step, &rules[i], &rules[i].pattern_parts, i, custom_token_defs); }
 		
 		
 		RulePatternMatcher
@@ -52,7 +53,7 @@ impl RulePatternMatcher
 	}
 	
 
-	fn build_step(step: &mut MatchStep, next_parts: &[RulePatternPart], rule_index: usize)
+	fn build_step(step: &mut MatchStep, rule: &Rule, next_parts: &[RulePatternPart], rule_index: usize, custom_token_defs: &Vec<CustomTokenDef>)
 	{
 		if next_parts.len() == 0
 		{
@@ -67,30 +68,52 @@ impl RulePatternMatcher
 			{
 				let step_kind = MatchStepExact(kind, excerpt.as_ref().map(|s| s.to_ascii_lowercase()));
 				
-				if let Some(next_step) = step.children_exact.get_mut(&step_kind)
+				if let Some(&mut (_, ref mut next_step)) = step.children_exact.get_mut(&step_kind)
 				{
-					RulePatternMatcher::build_step(next_step, &next_parts[1..], rule_index);
+					RulePatternMatcher::build_step(next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
 					return;
 				}
 				
 				let mut next_step = MatchStep::new();
-				RulePatternMatcher::build_step(&mut next_step, &next_parts[1..], rule_index);
-				step.children_exact.insert(step_kind, next_step);
+				RulePatternMatcher::build_step(&mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
+				step.children_exact.insert(step_kind, (None, next_step));
 			}
 			
-			RulePatternPart::Parameter(_) =>
+			RulePatternPart::Parameter(param_index) =>
 			{
-				let step_kind = MatchStepParameter;
-				
-				if let Some(next_step) = step.children_param.get_mut(&step_kind)
+				if let RuleParameterType::CustomTokenDef(tokendef_index) = rule.params[param_index].typ
 				{
-					RulePatternMatcher::build_step(next_step, &next_parts[1..], rule_index);
-					return;
+					let custom_token_def = &custom_token_defs[tokendef_index];
+					
+					for (excerpt, value) in &custom_token_def.excerpt_to_value_map
+					{
+						let step_kind = MatchStepExact(TokenKind::Identifier, Some(excerpt.to_ascii_lowercase()));
+						
+						if let Some(&mut (_, ref mut next_step)) = step.children_exact.get_mut(&step_kind)
+						{
+							RulePatternMatcher::build_step(next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
+							return;
+						}
+						
+						let mut next_step = MatchStep::new();
+						RulePatternMatcher::build_step(&mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
+						step.children_exact.insert(step_kind, (Some(value.clone()), next_step));
+					}
 				}
-				
-				let mut next_step = MatchStep::new();
-				RulePatternMatcher::build_step(&mut next_step, &next_parts[1..], rule_index);
-				step.children_param.insert(step_kind, next_step);
+				else
+				{			
+					let step_kind = MatchStepParameter;
+					
+					if let Some(next_step) = step.children_param.get_mut(&step_kind)
+					{
+						RulePatternMatcher::build_step(next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
+						return;
+					}
+					
+					let mut next_step = MatchStep::new();
+					RulePatternMatcher::build_step(&mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
+					step.children_param.insert(step_kind, next_step);
+				}
 			}
 		}
 	}
@@ -129,10 +152,18 @@ impl RulePatternMatcher
 			
 			let step_exact = MatchStepExact(tk.kind, tk.excerpt.map(|s| s.to_ascii_lowercase()));
 			
-			if let Some(next_step) = step.children_exact.get(&step_exact)
+			if let Some(&(ref value, ref next_step)) = step.children_exact.get(&step_exact)
 			{
-				if let Some(result) = self.parse_match_step(parser, &next_step, exprs)
-					{ return Some(result); }
+				if value.is_some()
+					{ exprs.push(value.as_ref().unwrap().make_literal()); }
+				
+				if let Some(result) = self.parse_match_step(parser, next_step, exprs)
+				{
+					return Some(result);
+				}
+				
+				if value.is_some()
+					{ exprs.pop(); }
 			}
 			
 			parser.restore(parser_state);

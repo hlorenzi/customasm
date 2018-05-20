@@ -71,3 +71,12 @@ impl Expression
 		}
 	}
 }
+
+
+impl ExpressionValue
+{
+	pub fn make_literal(&self) -> Expression
+	{
+		Expression::Literal(Span::new_dummy(), self.clone())
+	}
+}
