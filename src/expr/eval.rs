@@ -361,8 +361,7 @@ fn bigint_shr(lhs: BigInt, rhs: BigInt) -> Option<BigInt>
 
 fn bigint_concat(lhs: BigInt, _lhs_width: usize, rhs: BigInt, rhs_width: usize) -> BigInt
 {
-	use num::Signed;
-	bigint_or(lhs << rhs_width, rhs).abs()
+	bigint_or(lhs << rhs_width, rhs)
 }
 
 
@@ -385,6 +384,12 @@ where F: Fn(u8, u8) -> u8
 	let mut rhs_bytes = rhs.to_signed_bytes_le();
 	let mut rhs_sign = rhs.sign();
 	
+	if lhs_sign != Sign::Minus && (lhs_bytes[0] & 0x80) != 0
+		{ lhs_bytes.push(0); }
+	
+	if rhs_sign != Sign::Minus && (rhs_bytes[0] & 0x80) != 0
+		{ rhs_bytes.push(0); }
+		
 	if rhs_bytes.len() > lhs_bytes.len()
 	{
 		swap(&mut lhs_bytes, &mut rhs_bytes);
