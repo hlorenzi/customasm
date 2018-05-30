@@ -1,5 +1,5 @@
 use diagn::Span;
-use num::BigInt;
+use num_bigint::BigInt;
 
 
 #[derive(Debug)]

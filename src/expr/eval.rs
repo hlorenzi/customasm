@@ -3,11 +3,11 @@ use super::Expression;
 use super::ExpressionValue;
 use super::UnaryOp;
 use super::BinaryOp;
-use num::BigInt;
-use num::bigint::Sign;
-use num::Zero;
-use num::One;
-use num::ToPrimitive;
+use num_bigint::BigInt;
+use num_bigint::Sign;
+use num_traits::Zero;
+use num_traits::One;
+use num_traits::ToPrimitive;
 use std::mem::swap;
 use std::collections::HashMap;
 

@@ -1,7 +1,7 @@
 use syntax::{Token, TokenKind, Parser};
 use expr::{Expression, ExpressionValue};
 use asm::cpudef::{Rule, RuleParameterType, RulePatternMatcher};
-use num::BigInt;
+use num_bigint::BigInt;
 use std::collections::HashMap;
 
 

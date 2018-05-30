@@ -1,6 +1,6 @@
 use diagn::{Span, RcReport};
-use num::BigInt;
-use num::Zero;
+use num_bigint::BigInt;
+use num_traits::Zero;
 
 
 pub fn excerpt_as_string_contents(report: RcReport, excerpt: &str, span: &Span) -> Result<String, ()>

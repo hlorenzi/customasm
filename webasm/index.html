@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script>
+		console.log("fetching...");
+      fetch("customasm.gc.wasm")
+        .then(r => { console.log(r); return r.arrayBuffer() })
+        .then(r => { console.log(r); return WebAssembly.instantiate(r) })
+        .then(wasm_module => {
+			console.log(wasm_module);
+            alert("This is still a work-in-progress! For now, here's a simple FFI function call:\n2 + 3 = " + wasm_module.instance.exports.add(2, 3));
+        });
+    </script>
+  </head>
+  <body></body>
+</html>

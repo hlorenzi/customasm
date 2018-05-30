@@ -8,8 +8,8 @@ use asm::BankDef;
 use asm::BinaryBlock;
 use util::filename_navigate;
 use util::FileServer;
-use num::BigInt;
-use num::ToPrimitive;
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 
 
 pub struct AssemblerParser<'a>

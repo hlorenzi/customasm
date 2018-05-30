@@ -1,5 +1,6 @@
 use expr::ExpressionValue;
-use num::{BigInt, Zero};
+use num_bigint::BigInt;
+use num_traits::Zero;
 use std::collections::HashMap;
 
 

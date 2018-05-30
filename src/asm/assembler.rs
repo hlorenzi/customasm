@@ -5,7 +5,7 @@ use asm::BankDef;
 use asm::BinaryBlock;
 use asm::cpudef::CpuDef;
 use util::FileServer;
-use num::bigint::ToBigInt;
+use num_bigint::ToBigInt;
 
 
 pub struct AssemblerState
