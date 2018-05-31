@@ -6,9 +6,9 @@ mod asm;
 
 use diagn::RcReport;
 use util::FileServer;
+use util::enable_windows_ansi_support;
 use std::fmt::Debug;
 use std::cmp::PartialEq;
-use std::io::stdout;
 
 
 pub enum ExpectedResult<T>
@@ -22,7 +22,11 @@ pub enum ExpectedResult<T>
 pub fn expect_result<T>(report: RcReport, fileserver: &FileServer, got: Option<T>, expected: ExpectedResult<T>)
 where T: Debug + PartialEq
 {
-	report.print_all(&mut stdout(), fileserver);
+	enable_windows_ansi_support();
+	
+	let mut msgs = Vec::<u8>::new();
+	report.print_all(&mut msgs, fileserver);
+	print!("{}", String::from_utf8(msgs).unwrap());
 	
 	if let ExpectedResult::Pass(result) = expected
 	{

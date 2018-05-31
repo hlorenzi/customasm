@@ -4,7 +4,7 @@ use expr::{Expression, ExpressionValue, ExpressionEvalContext};
 use util::{FileServer, FileServerMock};
 use super::ExpectedResult::*;
 use super::{ExpectedResult, expect_result};
-use num::BigInt;
+use num_bigint::BigInt;
 
 
 fn test<S>(src: S, expected: ExpectedResult<ExpressionValue>)
