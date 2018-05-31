@@ -6,7 +6,6 @@ or even if you're eager to write programs for that new processor architecture
 you just implemented in FPGA!
 
 [Try it right now on your browser!](https://hlorenzi.github.io/customasm/webasm/)
-(work-in-progress)
 
 [Check out the Releases section](https://github.com/hlorenzi/customasm/releases) 
 for pre-built binaries.  

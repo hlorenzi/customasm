@@ -8,6 +8,7 @@ use diagn::RcReport;
 use util::FileServer;
 use std::fmt::Debug;
 use std::cmp::PartialEq;
+use std::io::stdout;
 
 
 pub enum ExpectedResult<T>
@@ -21,7 +22,7 @@ pub enum ExpectedResult<T>
 pub fn expect_result<T>(report: RcReport, fileserver: &FileServer, got: Option<T>, expected: ExpectedResult<T>)
 where T: Debug + PartialEq
 {
-	report.print_all(fileserver);
+	report.print_all(&mut stdout(), fileserver);
 	
 	if let ExpectedResult::Pass(result) = expected
 	{

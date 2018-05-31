@@ -1,7 +1,9 @@
 use diagn::RcReport;
 use util::FileServer;
+use util::enable_windows_ansi_support;
 use asm::BinaryOutput;
 use asm::AssemblerState;
+use std::io::stdout;
 use getopts;
 
 
@@ -26,7 +28,8 @@ pub fn drive(args: &Vec<String>, fileserver: &mut FileServer) -> Result<(), ()>
 	if report.has_messages()
 		{ println!(""); }
 	
-	report.print_all(fileserver);
+	enable_windows_ansi_support();
+	report.print_all(&mut stdout(), fileserver);
 	
 	if let Err(show_usage) = result
 	{

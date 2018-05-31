@@ -1,9 +1,9 @@
 use diagn::Span;
 use util::CharCounter;
 use util::FileServer;
-use util::enable_windows_ansi_support;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::io::Write;
 
 
 const C_DEFAULT:  &'static str = "\u{1B}[0m";
@@ -157,28 +157,26 @@ impl Report
 	}
 	
 	
-	pub fn print_all(&self, fileserver: &FileServer)
+	pub fn print_all(&self, writer: &mut Write, fileserver: &FileServer)
 	{
-		enable_windows_ansi_support();
-		
 		for msg in &self.messages
 		{
-			self.print_msg(fileserver, msg, 0);
-			println!();
+			self.print_msg(writer, fileserver, msg, 0);
+			writeln!(writer).unwrap();
 		}
 	}
 	
 	
-	fn print_msg(&self, fileserver: &FileServer, msg: &Message, indent: usize)
+	fn print_msg(&self, writer: &mut Write, fileserver: &FileServer, msg: &Message, indent: usize)
 	{
 		match msg.span
 		{
 			None =>
 			{
 				// Print description without location information.
-				print!("{}", C_ERROR);
-				println!("error: {}", msg.descr);
-				print!("{}", C_DEFAULT);
+				write!(writer, "{}", C_ERROR).unwrap();
+				writeln!(writer, "error: {}", msg.descr).unwrap();
+				write!(writer, "{}", C_DEFAULT).unwrap();
 			}
 			
 			Some(ref span) =>
@@ -188,12 +186,12 @@ impl Report
 					None =>
 					{
 						// Print description with filename but without position information.
-						self.print_indent(indent);
-						print!("{}", C_LOCATION);
-						println!("{}:", *span.file);
-						print!("{}", C_ERROR);
-						println!("error: {}", msg.descr);
-						print!("{}", C_DEFAULT);
+						self.print_indent(writer, indent);
+						write!(writer, "{}", C_LOCATION).unwrap();
+						writeln!(writer, "{}:", *span.file).unwrap();
+						write!(writer, "{}", C_ERROR).unwrap();
+						writeln!(writer, "error: {}", msg.descr).unwrap();
+						write!(writer, "{}", C_DEFAULT).unwrap();
 					}
 					
 					Some((start, end)) =>
@@ -205,20 +203,20 @@ impl Report
 						let (line1, col1) = counter.get_line_column_at_index(start);
 						let (line2, col2) = counter.get_line_column_at_index(end);
 						
-						self.print_indent(indent);
-						print!("{}", C_LOCATION);
-						println!("{}:{}:{} {}:{}:",
+						self.print_indent(writer, indent);
+						write!(writer, "{}", C_LOCATION).unwrap();
+						writeln!(writer, "{}:{}:{} {}:{}:",
 							*span.file,
 							line1 + 1, col1 + 1,
-							line2 + 1, col2 + 1);
+							line2 + 1, col2 + 1).unwrap();
 							
-						self.print_indent(indent);
-						print!("{}", C_ERROR);
-						println!("error: {}", msg.descr);
-						print!("{}", C_DEFAULT);
+						self.print_indent(writer, indent);
+						write!(writer, "{}", C_ERROR).unwrap();
+						writeln!(writer, "error: {}", msg.descr).unwrap();
+						write!(writer, "{}", C_DEFAULT).unwrap();
 						
 						// Print annotated source code.
-						self.print_msg_src(&counter, line1, col1, line2, col2, indent);
+						self.print_msg_src(writer, &counter, line1, col1, line2, col2, indent);
 					}
 				}
 			}
@@ -226,20 +224,20 @@ impl Report
 		
 		match msg.inner
 		{
-			Some(ref inner) => self.print_msg(fileserver, &inner, indent + 1),
+			Some(ref inner) => self.print_msg(writer, fileserver, &inner, indent + 1),
 			None => { }
 		}
 	}
 	
 	
-	fn print_indent(&self, indent: usize)
+	fn print_indent(&self, writer: &mut Write, indent: usize)
 	{
 		for _ in 0..indent
-			{ print!("     "); }
+			{ write!(writer, "     ").unwrap(); }
 	}
 	
 	
-	fn print_msg_src(&self, counter: &CharCounter, line1: usize, col1: usize, line2: usize, col2: usize, indent: usize)
+	fn print_msg_src(&self, writer: &mut Write, counter: &CharCounter, line1: usize, col1: usize, line2: usize, col2: usize, indent: usize)
 	{
 		let first_line = if (line1 as isize - 2) < 0
 			{ 0 }
@@ -256,10 +254,10 @@ impl Report
 		// Print annotated source lines.
 		for line in first_line..last_line
 		{
-			self.print_indent(indent);
-			print!("{}", C_LINENUM);
-			print!("{:4} | ", line + 1);
-			print!("{}", C_SRC);
+			self.print_indent(writer, indent);
+			write!(writer, "{}", C_LINENUM).unwrap();
+			write!(writer, "{:4} | ", line + 1).unwrap();
+			write!(writer, "{}", C_SRC).unwrap();
 			
 			let line_pos = counter.get_index_range_of_line(line);
 			let excerpt = counter.get_excerpt(line_pos.0, line_pos.1);
@@ -269,33 +267,33 @@ impl Report
 			{
 				// Add a space for spans of zero characters.
 				if line == line1 && line == line2 && p == col1 && p == col2
-					{ print!(" "); }
+					{ write!(writer, " ").unwrap(); }
 				
 				let c = excerpt[p];
 				
 				if c == '\t'
-					{ print!("  "); }
+					{ write!(writer, "  ").unwrap(); }
 				else if c <= ' '
-					{ print!(" "); }
+					{ write!(writer, " ").unwrap(); }
 				else
-					{ print!("{}", c); }
+					{ write!(writer, "{}", c).unwrap(); }
 			}
 			
-			println!("");
+			writeln!(writer, "").unwrap();
 			
 			// Print markings on line below, if contained in span.
 			if line >= line1 && line <= line2
 			{
-				self.print_indent(indent);
-				print!("{}", C_LINENUM);
-				print!("     | ");
-				print!("{}", C_ERROR);
+				self.print_indent(writer, indent);
+				write!(writer, "{}", C_LINENUM).unwrap();
+				write!(writer, "     | ").unwrap();
+				write!(writer, "{}", C_ERROR).unwrap();
 				
 				for p in 0..excerpt.len()
 				{
 					// Print markings for spans of zero characters.
 					if p == col1 && p == col2
-						{ print!("^"); }
+						{ write!(writer, "^").unwrap(); }
 						
 					let marking = if p >= col1 && p < col2
 						{ "^" }
@@ -303,16 +301,16 @@ impl Report
 						{ " " };
 				
 					if excerpt[p] == '\t'
-						{ print!("{0}{0}", marking); }
+						{ write!(writer, "{0}{0}", marking).unwrap(); }
 					else
-						{ print!("{}", marking); }
+						{ write!(writer, "{}", marking).unwrap(); }
 				}
 				
-				println!("");
+				writeln!(writer, "").unwrap();
 			}
 		}
 		
-		print!("{}", C_DEFAULT);
+		write!(writer, "{}", C_DEFAULT).unwrap();
 	}
 }
 
@@ -374,9 +372,9 @@ impl RcReport
 	}
 	
 	
-	pub fn print_all(&self, fileserver: &FileServer)
+	pub fn print_all(&self, writer: &mut Write, fileserver: &FileServer)
 	{
-		self.report.borrow_mut().print_all(fileserver);
+		self.report.borrow_mut().print_all(writer, fileserver);
 	}
 }
 
