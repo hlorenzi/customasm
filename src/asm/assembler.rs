@@ -236,6 +236,22 @@ impl AssemblerState
 	}
 	
 	
+	pub fn output_bits_until_aligned(&mut self, report: RcReport, multiple_of: usize, span: &Span) -> Result<(), ()>
+	{
+		if multiple_of == 0
+			{ return Err(report.error_span("invalid alignment", span)); }
+		
+		self.check_cpudef_active(report.clone(), span)?;
+		
+		let align = self.cpudef.as_ref().unwrap().align;
+		
+		while self.blocks[self.cur_block].len() % (align * multiple_of) != 0
+			{ self.output_bit(report.clone(), false, true, span)?; }
+			
+		Ok(())
+	}
+	
+	
 	pub fn output_bit(&mut self, report: RcReport, bit: bool, skipping: bool, span: &Span) -> Result<(), ()>
 	{
 		{

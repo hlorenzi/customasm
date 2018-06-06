@@ -100,6 +100,7 @@ impl<'a> AssemblerParser<'a>
 			"bankdef"   => self.parse_directive_bankdef(&tk_name),
 			"bank"      => self.parse_directive_bank(&tk_name),
 			"addr"      => self.parse_directive_addr(&tk_name),
+			"align"     => self.parse_directive_align(&tk_name),
 			"res"       => self.parse_directive_res(&tk_name),
 			"str"       => self.parse_directive_str(),
 			"include"   => self.parse_directive_include(),
@@ -198,6 +199,16 @@ impl<'a> AssemblerParser<'a>
 			let bits_to_skip = (new_addr - cur_addr) * align;
 			self.state.output_zero_bits(self.parser.report.clone(), bits_to_skip, true, &tk_name.span)
 		}
+	}
+	
+	
+	fn parse_directive_align(&mut self, tk_name: &Token) -> Result<(), ()>
+	{
+		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
+		
+		let addr_multiple_of = self.parse_usize()?;
+		
+		self.state.output_bits_until_aligned(self.parser.report.clone(), addr_multiple_of, &tk_name.span)
 	}
 	
 	

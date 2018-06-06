@@ -73,16 +73,18 @@ of what is available.
 
 There are currently only single-line comments. Everything
 after a semicolon is treated as a comment and is ignored
-by the assembler. For example:
+by the assembler, until the next line break. For example:
 
 ```asm
-; load two values
+; load some values
 lda 0x77
 lda 0x88
-lda 0x99 ; Load A with 0x99, obviously
+lda 0x99 ; load A with 0x99
 
-; I don't know if the next instruction is really needed
+; disable the next instructions for now:
 ; lda 0xaa
+; lda 0xbb
+; lda 0xcc
 ```
 
 ## Labels
@@ -292,7 +294,7 @@ sign-extended to match the directive's bit-size.
 ## String Directive
 
 This directive copies the UTF-8 representation of a string to
-the output. Escape sequences and Unicode characters are available.
+the output. Rust-like escape sequences and Unicode characters are available.
 For example:
 
 ```asm
@@ -321,9 +323,29 @@ helloworld:
 helloworldLen = pc - helloworld
 ```
 
+## Align Directive
+
+This directive advances the current address until its value is a multiple
+of the given value, but does nothing if it already is.
+
+```asm
+#d8 0xff
+	
+#align 4
+loop:
+	jmp loop
+```
+
+...would be assembled to:
+
+```
+0x0000: ff 00 00 00
+0x0004: 55 00 04
+```
+
 ## Reserve Directive
 
-This directive advances the instruction *and* output addresses by
+This directive advances the current address by
 the given number of bytes, effectively reserving a location for any
 other desired purpose. For example, in a machine where data and
 instructions reside on the same memory space, we could do:

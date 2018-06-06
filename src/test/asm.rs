@@ -206,6 +206,29 @@ fn test_addr_directive()
 
 
 #[test]
+fn test_align_directive()
+{
+	test("halt -> 0x12", "#align 1 \n halt", Pass((4, "12")));
+	test("halt -> 0x12", "#align 2 \n halt", Pass((4, "12")));
+	test("halt -> 0x12", "#align 3 \n halt", Pass((4, "12")));
+	test("halt -> 0x12", "#align 4 \n halt", Pass((4, "12")));
+	
+	test("halt -> 0x12", "halt \n #align 1 \n halt", Pass((4, "1212")));
+	test("halt -> 0x12", "halt \n #align 2 \n halt", Pass((4, "120012")));
+	test("halt -> 0x12", "halt \n #align 3 \n halt", Pass((4, "12000012")));
+	test("halt -> 0x12", "halt \n #align 4 \n halt", Pass((4, "1200000012")));
+	
+	test("halt -> 0x12", "#d8 0, 0, 0 \n halt \n #align 1 \n halt", Pass((4, "0000001212")));
+	test("halt -> 0x12", "#d8 0, 0, 0 \n halt \n #align 2 \n halt", Pass((4, "0000001212")));
+	test("halt -> 0x12", "#d8 0, 0, 0 \n halt \n #align 3 \n halt", Pass((4, "00000012000012")));
+	test("halt -> 0x12", "#d8 0, 0, 0 \n halt \n #align 4 \n halt", Pass((4, "0000001212")));
+	
+	test("halt -> 0x12", "halt \n #align 0                       \n halt", Fail(("asm", 2, "invalid")));
+	test("halt -> 0x12", "halt \n #align 0x1_0000_0000_0000_0000 \n halt", Fail(("asm", 2, "large")));
+}
+
+
+#[test]
 fn test_res_directive()
 {
 	test("halt -> 0x12 @ pc[7:0]", "halt \n #res 0", Pass((4, "1200")));

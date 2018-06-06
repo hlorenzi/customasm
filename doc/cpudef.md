@@ -35,13 +35,14 @@ instruction sizes are 8 bits, 16 bits, 24 bits, and so on.
 - `#tokendef <name>`
 Creates a group of tokens with associated values, which can
 be used in place of arguments (e.g. for named registers).
-See below for usage in parameters. Syntax is as follows:
+See below for usage in parameters, and check the example at
+the bottom of the page. Syntax is as follows:
 ```asm
 #tokendef reg
 {
-	a = 1
-	b = 2
-	c = 3
+    a = 1
+    b = 2
+    c = 3
 }
 ```
 
@@ -100,10 +101,10 @@ the following rule would only allow arguments between `0x00` and `0x10`:
 ```asm
 load {value} ->
 {
-	assert(value >= 0x00)
-	assert(value <  0x10)
-	
-	0x1 @ value[7:0]
+    assert(value >= 0x00)
+    assert(value <  0x10)
+    
+    0x1 @ value[7:0]
 }
 ```
 
@@ -114,12 +115,12 @@ Local variables can also be used by assigning a value to any name:
 ```asm
 load {value} ->
 {
-	finalValue = value * 2
-	
-	assert(finalValue >= 0x00)
-	assert(finalValue <  0x10)
-	
-	0x1 @ finalValue[7:0]
+    finalValue = value * 2
+    
+    assert(finalValue >= 0x00)
+    assert(finalValue <  0x10)
+    
+    0x1 @ finalValue[7:0]
 }
 ```
 
@@ -190,7 +191,7 @@ Rule | Used as | Output
     ; we can write the entire rule in one line:
     
     inc r1 -> 0x30
-	
+    
     ld r1, {value} -> { assert(value <=     0xff), 0x10 @ value[ 7:0] }
     ld r1, {value} -> { assert(value <=   0xffff), 0x11 @ value[15:0] }
     ld r1, {value} -> { assert(value <= 0xffffff), 0x12 @ value[23:0] }
@@ -217,6 +218,7 @@ Rule | Used as | Output
 #cpudef
 {
     ; you can have unusual counts of bits-per-byte too!
+	
     #align 3
     
     lda #{value} -> 0b001 @ value[2:0]
@@ -231,17 +233,17 @@ Rule | Used as | Output
 #cpudef
 {
     ; example with named registers
-	
-    #align 8
-	
-	#tokendef reg
-	{
-		r0 = 0
-		r1 = 1
-		r2 = 2
-		r3 = 3
-	}
     
-	mov {dest: reg}, {value} -> 0b111100 @ dest[1:0] @ value[7:0]
+    #align 8
+    
+    #tokendef reg
+    {
+        r0 = 0
+        r1 = 1
+        r2 = 2
+        r3 = 3
+    }
+    
+    mov {dest: reg}, {value} -> 0b111100 @ dest[1:0] @ value[7:0]
 }
 ```
