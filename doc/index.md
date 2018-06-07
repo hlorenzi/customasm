@@ -199,9 +199,9 @@ First, define one or more banks as follows:
 ```asm
 #bankdef "mybank"
 {
-	#addr 0x8000
-	#size 0x4000
-	#outp 0x10
+    #addr 0x8000
+    #size 0x4000
+    #outp 0x10
 }
 ```
 
@@ -232,10 +232,10 @@ If you define a bank with a `#fill` attribute such as the following:
 ```asm
 #bankdef "mybank"
 {
-	#addr 0x8000
-	#size 0x4000
-	#outp 0x10
-	#fill
+    #addr 0x8000
+    #size 0x4000
+    #outp 0x10
+    #fill
 }
 ```
 
@@ -318,8 +318,8 @@ to derive it:
 
 ```asm
 helloworld:
-	#str "Hello, world!\0"
-	
+    #str "Hello, world!\0"
+    
 helloworldLen = pc - helloworld
 ```
 
@@ -330,10 +330,10 @@ of the given value, but does nothing if it already is.
 
 ```asm
 #d8 0xff
-	
+    
 #align 4
 loop:
-	jmp loop
+    jmp loop
 ```
 
 ...would be assembled to:
