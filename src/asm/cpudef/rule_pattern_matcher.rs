@@ -1,3 +1,4 @@
+use diagn::RcReport;
 use syntax::{TokenKind, Parser};
 use expr::{Expression, ExpressionValue};
 use asm::cpudef::{Rule, RuleParameterType, RulePatternPart, CustomTokenDef};
@@ -38,28 +39,28 @@ pub struct Match
 
 impl RulePatternMatcher
 {
-	pub fn new(rules: &[Rule], custom_token_defs: &Vec<CustomTokenDef>) -> RulePatternMatcher
+	pub fn new(report: RcReport, rules: &[Rule], custom_token_defs: &Vec<CustomTokenDef>) -> Result<RulePatternMatcher, ()>
 	{
 		let mut root_step = MatchStep::new();
 		
 		for i in 0..rules.len()
-			{ RulePatternMatcher::build_step(&mut root_step, &rules[i], &rules[i].pattern_parts, i, custom_token_defs); }
+			{ RulePatternMatcher::build_step(report.clone(), &mut root_step, &rules[i], &rules[i].pattern_parts, i, custom_token_defs)?; }
 		
 		
-		RulePatternMatcher
+		Ok(RulePatternMatcher
 		{
 			root_step: root_step
-		}
+		})
 	}
 	
 
-	fn build_step(step: &mut MatchStep, rule: &Rule, next_parts: &[RulePatternPart], rule_index: usize, custom_token_defs: &Vec<CustomTokenDef>)
+	fn build_step(report: RcReport, step: &mut MatchStep, rule: &Rule, next_parts: &[RulePatternPart], rule_index: usize, custom_token_defs: &Vec<CustomTokenDef>) -> Result<(), ()>
 	{
 		if next_parts.len() == 0
 		{
 			step.rule_indices.push(rule_index);
 			step.rule_indices.sort();
-			return;
+			return Ok(());
 		}
 		
 		match next_parts[0]
@@ -68,14 +69,16 @@ impl RulePatternMatcher
 			{
 				let step_kind = MatchStepExact(kind, excerpt.as_ref().map(|s| s.to_ascii_lowercase()));
 				
-				if let Some(&mut (_, ref mut next_step)) = step.children_exact.get_mut(&step_kind)
+				if let Some(&mut (ref current_value, ref mut next_step)) = step.children_exact.get_mut(&step_kind)
 				{
-					RulePatternMatcher::build_step(next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
-					return;
+					if current_value.is_some()
+						{ return Err(report.error_span("pattern clashes with a previous instruction pattern", &rule.pattern_span)); }
+				
+					return RulePatternMatcher::build_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
 				}
 				
 				let mut next_step = MatchStep::new();
-				RulePatternMatcher::build_step(&mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
+				RulePatternMatcher::build_step(report.clone(), &mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
 				step.children_exact.insert(step_kind, (None, next_step));
 			}
 			
@@ -89,14 +92,16 @@ impl RulePatternMatcher
 					{
 						let step_kind = MatchStepExact(TokenKind::Identifier, Some(excerpt.to_ascii_lowercase()));
 						
-						if let Some(&mut (_, ref mut next_step)) = step.children_exact.get_mut(&step_kind)
+						if let Some(&mut (ref current_value, ref mut next_step)) = step.children_exact.get_mut(&step_kind)
 						{
-							RulePatternMatcher::build_step(next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
-							return;
+							if current_value.is_none() || (current_value.is_some() && current_value.as_ref().unwrap() != value)
+								{ return Err(report.error_span("pattern clashes with a previous instruction pattern", &rule.pattern_span)); }
+							
+							return RulePatternMatcher::build_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
 						}
 						
 						let mut next_step = MatchStep::new();
-						RulePatternMatcher::build_step(&mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
+						RulePatternMatcher::build_step(report.clone(), &mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
 						step.children_exact.insert(step_kind, (Some(value.clone()), next_step));
 					}
 				}
@@ -105,17 +110,16 @@ impl RulePatternMatcher
 					let step_kind = MatchStepParameter;
 					
 					if let Some(next_step) = step.children_param.get_mut(&step_kind)
-					{
-						RulePatternMatcher::build_step(next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
-						return;
-					}
+						{ return RulePatternMatcher::build_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs); }
 					
 					let mut next_step = MatchStep::new();
-					RulePatternMatcher::build_step(&mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
+					RulePatternMatcher::build_step(report.clone(), &mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
 					step.children_param.insert(step_kind, next_step);
 				}
 			}
 		}
+		
+		return Ok(());
 	}
 	
 	

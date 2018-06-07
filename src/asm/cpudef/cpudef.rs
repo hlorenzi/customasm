@@ -39,6 +39,8 @@ impl CpuDef
 {
 	pub fn parse(parser: &mut Parser) -> Result<CpuDef, ()>
 	{
+		let report = parser.report.clone();
+		
 		let mut cpudef_parser = CpuDefParser
 		{
 			parser: parser,
@@ -55,7 +57,8 @@ impl CpuDef
 		
 		cpudef_parser.parse_rules()?;
 		
-		let pattern_matcher = RulePatternMatcher::new(&cpudef_parser.rules, &cpudef_parser.custom_token_defs);
+		let pattern_matcher = RulePatternMatcher::new(report, &cpudef_parser.rules, &cpudef_parser.custom_token_defs)?;
+		println!("{:#?}", pattern_matcher);
 		
 		let cpudef = CpuDef
 		{
@@ -197,6 +200,8 @@ impl<'t> CpuDefParser<'t>
 	{
 		let mut rule = Rule::new();
 		
+		let pattern_span_start = self.parser.next().span.clone();
+	
 		self.parse_rule_pattern(&mut rule)?;
 		
 		if rule.pattern_parts.len() == 0
@@ -204,6 +209,8 @@ impl<'t> CpuDefParser<'t>
 			let span = self.parser.next().span.before();
 			return Err(self.parser.report.error_span("empty rule pattern", &span));
 		}
+		
+		rule.pattern_span = pattern_span_start.join(&self.parser.prev().span);
 		
 		self.parser.expect(TokenKind::Arrow)?;
 		self.parse_rule_production(&mut rule)?;

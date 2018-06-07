@@ -7,6 +7,7 @@ use expr::{Expression, ExpressionValue};
 pub struct Rule
 {
 	pub pattern_parts: Vec<RulePatternPart>,
+	pub pattern_span: Span,
 	pub params: Vec<RuleParameter>,
 	pub production: Expression
 }
@@ -43,6 +44,7 @@ impl Rule
 		Rule
 		{
 			pattern_parts: Vec::new(),
+			pattern_span: Span::new_dummy(),
 			params: Vec::new(),
 			production: Expression::Literal(Span::new_dummy(), ExpressionValue::Bool(false))
 		}

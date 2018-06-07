@@ -153,16 +153,30 @@ fn test_tokendef()
 	
 	test("#tokendef reg1 { r1 = 1 } \n #tokendef reg2 { r1 = 2 } \n mov1 {a: reg1} -> 0xff @ a[7:0] \n mov2 {a: reg2} -> 0xee @ a[7:0]", "mov1 r1 \n mov2 r1", Pass((4, "ff01ee02")));
 	
-	test("#tokendef reg1 { r1 = 1 } \n #tokendef reg2 { r1 = 2 } \n mov {a: reg1} -> 0xff @ a[7:0] \n mov {a: reg2} -> 0xee @ a[7:0]", "mov r1 \n mov r1", Pass((4, "ff01ff01")));
 	test("#tokendef reg1 { r1 = 1 } \n #tokendef reg2 { r2 = 2 } \n mov {a: reg1} -> 0xff @ a[7:0] \n mov {a: reg2} -> 0xee @ a[7:0]", "mov r1 \n mov r2", Pass((4, "ff01ee02")));
+	test("#tokendef reg1 { r1 = 1 } \n #tokendef reg2 { r1 = 2 } \n mov {a: reg1} -> 0xff @ a[7:0] \n mov {a: reg2} -> 0xee @ a[7:0]", "mov r1 \n mov r1", Fail(("cpu", 4, "clashes")));
+	test("#tokendef reg1 { r1 = 1 } \n                           \n mov {a: reg1} -> 0xff @ a[7:0] \n mov r1        -> 0xee @ a[7:0]", "mov r1 \n mov r1", Fail(("cpu", 4, "clashes")));
+	test("#tokendef reg1 { r1 = 1 } \n                           \n mov r1        -> 0xff @ a[7:0] \n mov {a: reg1} -> 0xee @ a[7:0]", "mov r1 \n mov r1", Fail(("cpu", 4, "clashes")));
 	
 	test("#tokendef reg { r1 = 1 } \n mov [{a: reg} + {offset}] -> 0xff @ a[7:0] @ offset[7:0]", "mov [r1 + 8]", Pass((4, "ff0108")));
+	
+	test("#tokendef reg { r1 = 1 } \n mov {a: reg}, {b: reg} -> 0xff @ a[7:0] @ b[7:0] \n mov {a: reg}, {value} -> 0xee @ a[7:0] @ value[7:0]", "mov r1, r1 \n mov r1, 0x55",            Pass((4, "ff0101ee0155")));
+	test("#tokendef reg { r1 = 1 } \n mov {a: reg}, {b: reg} -> 0xff @ a[7:0] @ b[7:0] \n mov {a: reg}, {value} -> 0xee @ a[7:0] @ value[7:0]", "mov r1, r1 \n mov r1, label \n label:", Pass((4, "ff0101ee0106")));
 	
 	test("#tokendef reg { r1 = 0xbc } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r2", Fail(("asm", 1, "no match")));
 	
 	test("#tokendef reg { r1 = 1, r1 = 2 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Fail(("cpu", 1, "duplicate tokendef entry")));
 	test("#tokendef 123 { r1 = 1, r2 = 2 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Fail(("cpu", 1, "identifier")));
 	test("#tokendef reg { r1 = 1 } \n #tokendef reg { r2 = 1 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Fail(("cpu", 2, "duplicate tokendef name")));
+
+	test("#tokendef reg { r1 = 1 } \n mov {dest: reg}, {src: reg} -> 0x55 @ dest[3:0] @ src[3:0] \n mov {dest: reg}, r2 -> 0x88 @ dest[7:0]", "mov r1, r1", Pass((4, "5511")));
+	test("#tokendef reg { r1 = 1 } \n mov {dest: reg}, {src: reg} -> 0x55 @ dest[3:0] @ src[3:0] \n mov {dest: reg}, r2 -> 0x88 @ dest[7:0]", "mov r1, r2", Pass((4, "8801")));
+	
+	test("#tokendef reg { r1 = 1 } \n mov {dest: reg}, {src: reg} -> 0x55 @ dest[3:0] @ src[3:0] \n mov r1, r2 -> 0x88", "mov r1, r2", Fail(("cpu", 3, "clashes")));
+	test("#tokendef reg { r1 = 1 } \n mov r1, r2 -> 0x88 \n mov {dest: reg}, {src: reg} -> 0x55 @ dest[3:0] @ src[3:0]", "mov r1, r2", Fail(("cpu", 3, "clashes")));
+	
+	test("#tokendef reg { r1 = 1 } \n mov r1, {src: reg} -> 0x88 @ src[7:0] \n mov r1, r1 -> 0x55", "mov r1, r2", Fail(("cpu", 3, "clashes")));
+	test("#tokendef reg { r1 = 1 } \n mov r1, r1 -> 0x55 \n mov r1, {src: reg} -> 0x88 @ src[7:0]", "mov r1, r2", Fail(("cpu", 3, "clashes")));
 }
 
 
