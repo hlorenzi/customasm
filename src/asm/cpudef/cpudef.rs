@@ -9,6 +9,7 @@ use std::collections::HashMap;
 pub struct CpuDef
 {
 	pub bits: usize,
+	pub label_align: Option<usize>,
 	pub rules: Vec<Rule>,
 	pub pattern_matcher: RulePatternMatcher,
 	pub custom_token_defs: Vec<CustomTokenDef>
@@ -20,6 +21,7 @@ struct CpuDefParser<'t>
 	parser: &'t mut Parser,
 	
 	bits: Option<usize>,
+	label_align: Option<usize>,
 	rules: Vec<Rule>,
 	custom_token_defs: Vec<CustomTokenDef>
 }
@@ -41,6 +43,7 @@ impl CpuDef
 		{
 			parser: parser,
 			bits: None,
+			label_align: None,
 			rules: Vec::new(),
 			custom_token_defs: Vec::new()
 		};
@@ -57,6 +60,7 @@ impl CpuDef
 		let cpudef = CpuDef
 		{
 			bits: cpudef_parser.bits.unwrap(),
+			label_align: cpudef_parser.label_align,
 			rules: cpudef_parser.rules,
 			pattern_matcher: pattern_matcher,
 			custom_token_defs: cpudef_parser.custom_token_defs
@@ -76,9 +80,10 @@ impl<'t> CpuDefParser<'t>
 			let tk_name = self.parser.expect_msg(TokenKind::Identifier, "expected directive name")?;
 			match tk_name.excerpt.as_ref().unwrap().as_ref()
 			{
-				"align"    => self.parse_directive_align(&tk_name)?,
-				"bits"     => self.parse_directive_bits(&tk_name)?,
-				"tokendef" => self.parse_directive_tokendef(&tk_name)?,
+				"align"      => self.parse_directive_align(&tk_name)?,
+				"bits"       => self.parse_directive_bits(&tk_name)?,
+				"labelalign" => self.parse_directive_labelalign(&tk_name)?,
+				"tokendef"   => self.parse_directive_tokendef(&tk_name)?,
 				
 				_ => return Err(self.parser.report.error_span("unknown directive", &tk_name.span))
 			}
@@ -108,6 +113,22 @@ impl<'t> CpuDefParser<'t>
 			{ return Err(self.parser.report.error_span("invalid byte size", &tk_bits.span)); }
 		
 		self.bits = Some(bits);
+		
+		Ok(())
+	}
+	
+	
+	fn parse_directive_labelalign(&mut self, tk_name: &Token) -> Result<(), ()>
+	{
+		let (tk_value, value) = self.parser.expect_usize()?;
+		
+		if self.label_align.is_some()
+			{ return Err(self.parser.report.error_span("duplicate `labelalign` directive", &tk_name.span)); }
+			
+		if value == 0
+			{ return Err(self.parser.report.error_span("invalid alignment", &tk_value.span)); }
+		
+		self.label_align = Some(value);
 		
 		Ok(())
 	}

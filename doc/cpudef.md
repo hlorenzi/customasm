@@ -32,6 +32,11 @@ The size of each instruction's binary representation must be
 some multiple of the byte size. So, with 8-bit bytes, valid
 instruction sizes are 8 bits, 16 bits, 24 bits, and so on.
 
+- `#labelalign <value>`
+Whenever a label is defined in the source code, the assembler will
+align the current address to be a multiple of this value. Equivalent
+of using `#align` before every label.
+
 - `#tokendef <name>`
 Creates a group of tokens with associated values, which can
 be used in place of arguments (e.g. for named registers).

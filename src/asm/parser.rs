@@ -355,6 +355,12 @@ impl<'a> AssemblerParser<'a>
 		{
 			self.parser.expect(TokenKind::Colon)?;
 			
+			self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
+			
+			let label_align = self.state.cpudef.as_ref().unwrap().label_align;
+			if label_align.is_some()
+				{ self.state.output_bits_until_aligned(self.parser.report.clone(), label_align.unwrap(), &tk_name.span)?; }
+			
 			let addr = self.state.get_cur_address(self.parser.report.clone(), &tk_name.span)?;
 			ExpressionValue::Integer(BigInt::from(addr))
 		};

@@ -43,13 +43,18 @@ fn test_directives()
 	test("#bits 128",  Pass(()));
 	test("#bits 1024", Pass(()));
 	
+	test("#labelalign 1", Pass(()));
+	
 	test("#bits 0xffff_ffff_ffff_ffff", Pass(()));
 	
-	test("#unknown",                       Fail(("test", 1, "unknown")));
+	test("#unknown", Fail(("test", 1, "unknown")));
 	
 	test("#bits 0",                       Fail(("test", 1, "invalid")));
-	test("#bits 8\n #bits 8",            Fail(("test", 2, "duplicate")));
+	test("#bits 8\n #bits 8",             Fail(("test", 2, "duplicate")));
 	test("#bits 0x1_0000_0000_0000_0000", Fail(("test", 1, "large")));
+	
+	test("#labelalign 0",                 Fail(("test", 1, "invalid")));
+	test("#labelalign 4\n #labelalign 8", Fail(("test", 2, "duplicate")));
 }
 
 

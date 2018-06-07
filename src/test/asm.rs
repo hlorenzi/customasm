@@ -206,6 +206,31 @@ fn test_addr_directive()
 
 
 #[test]
+fn test_labelalign()
+{
+	test("#labelalign 1 \n halt -> 0x12", "label: halt", Pass((4, "12")));
+	test("#labelalign 2 \n halt -> 0x12", "label: halt", Pass((4, "12")));
+	test("#labelalign 3 \n halt -> 0x12", "label: halt", Pass((4, "12")));
+	test("#labelalign 4 \n halt -> 0x12", "label: halt", Pass((4, "12")));
+	
+	test("#labelalign 1 \n halt -> 0x12", "halt \n label: halt", Pass((4, "1212")));
+	test("#labelalign 2 \n halt -> 0x12", "halt \n label: halt", Pass((4, "120012")));
+	test("#labelalign 3 \n halt -> 0x12", "halt \n label: halt", Pass((4, "12000012")));
+	test("#labelalign 4 \n halt -> 0x12", "halt \n label: halt", Pass((4, "1200000012")));
+	
+	test("#labelalign 1 \n halt -> 0x12", "#d1 0, 0, 0 \n label: halt", Pass((4, "0012")));
+	test("#labelalign 2 \n halt -> 0x12", "#d1 0, 0, 0 \n label: halt", Pass((4, "000012")));
+	test("#labelalign 3 \n halt -> 0x12", "#d1 0, 0, 0 \n label: halt", Pass((4, "00000012")));
+	test("#labelalign 4 \n halt -> 0x12", "#d1 0, 0, 0 \n label: halt", Pass((4, "0000000012")));
+	
+	test("#labelalign 1 \n halt -> 0x12", "#d8 0, 0, 0 \n halt \n label: halt", Pass((4, "0000001212")));
+	test("#labelalign 2 \n halt -> 0x12", "#d8 0, 0, 0 \n halt \n label: halt", Pass((4, "0000001212")));
+	test("#labelalign 3 \n halt -> 0x12", "#d8 0, 0, 0 \n halt \n label: halt", Pass((4, "00000012000012")));
+	test("#labelalign 4 \n halt -> 0x12", "#d8 0, 0, 0 \n halt \n label: halt", Pass((4, "0000001212")));
+}
+
+
+#[test]
 fn test_align_directive()
 {
 	test("halt -> 0x12", "#align 1 \n halt", Pass((4, "12")));
@@ -222,6 +247,11 @@ fn test_align_directive()
 	test("halt -> 0x12", "#d8 0, 0, 0 \n halt \n #align 2 \n halt", Pass((4, "0000001212")));
 	test("halt -> 0x12", "#d8 0, 0, 0 \n halt \n #align 3 \n halt", Pass((4, "00000012000012")));
 	test("halt -> 0x12", "#d8 0, 0, 0 \n halt \n #align 4 \n halt", Pass((4, "0000001212")));
+	
+	test("halt -> 0x12", "#d1 0, 0, 0 \n #align 1 \n halt", Pass((4, "0012")));
+	test("halt -> 0x12", "#d1 0, 0, 0 \n #align 2 \n halt", Pass((4, "000012")));
+	test("halt -> 0x12", "#d1 0, 0, 0 \n #align 3 \n halt", Pass((4, "00000012")));
+	test("halt -> 0x12", "#d1 0, 0, 0 \n #align 4 \n halt", Pass((4, "0000000012")));
 	
 	test("halt -> 0x12", "halt \n #align 0                       \n halt", Fail(("asm", 2, "invalid")));
 	test("halt -> 0x12", "halt \n #align 0x1_0000_0000_0000_0000 \n halt", Fail(("asm", 2, "large")));
