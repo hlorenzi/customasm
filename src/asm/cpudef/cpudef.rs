@@ -58,7 +58,10 @@ impl CpuDef
 		cpudef_parser.parse_rules()?;
 		
 		let pattern_matcher = RulePatternMatcher::new(report, &cpudef_parser.rules, &cpudef_parser.custom_token_defs)?;
-		println!("{:#?}", pattern_matcher);
+		
+		//println!("[pattern tree for cpudef]");
+		//pattern_matcher.print_debug();
+		//println!();
 		
 		let cpudef = CpuDef
 		{

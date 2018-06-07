@@ -164,6 +164,15 @@ impl TokenKind
 			TokenKind::GreaterThanEqual => "`>=`"
 		}
 	}
+	
+	
+	pub fn printable_excerpt(self, excerpt: Option<&str>) -> String
+	{
+		if self.needs_excerpt()
+			{ format!("`{}`", excerpt.unwrap()) }
+		else
+			{ self.printable().to_string() }
+	}
 }
 
 

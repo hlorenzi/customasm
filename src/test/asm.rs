@@ -160,8 +160,9 @@ fn test_tokendef()
 	
 	test("#tokendef reg { r1 = 1 } \n mov [{a: reg} + {offset}] -> 0xff @ a[7:0] @ offset[7:0]", "mov [r1 + 8]", Pass((4, "ff0108")));
 	
-	test("#tokendef reg { r1 = 1 } \n mov {a: reg}, {b: reg} -> 0xff @ a[7:0] @ b[7:0] \n mov {a: reg}, {value} -> 0xee @ a[7:0] @ value[7:0]", "mov r1, r1 \n mov r1, 0x55",            Pass((4, "ff0101ee0155")));
-	test("#tokendef reg { r1 = 1 } \n mov {a: reg}, {b: reg} -> 0xff @ a[7:0] @ b[7:0] \n mov {a: reg}, {value} -> 0xee @ a[7:0] @ value[7:0]", "mov r1, r1 \n mov r1, label \n label:", Pass((4, "ff0101ee0106")));
+	test("#tokendef reg { r1 = 1, r2 = 2 } \n mov {a: reg}, {b: reg} -> 0xff @ a[7:0] @ b[7:0] \n mov {a: reg}, {value} -> 0xee @ a[7:0] @ value[7:0]", "mov r1, r1 \n mov r1, 0x55",            Pass((4, "ff0101ee0155")));
+	test("#tokendef reg { r1 = 1, r2 = 2 } \n mov {a: reg}, {b: reg} -> 0xff @ a[7:0] @ b[7:0] \n mov {a: reg}, {value} -> 0xee @ a[7:0] @ value[7:0]", "mov r1, r1 \n mov r1, label \n label:", Pass((4, "ff0101ee0106")));
+	test("#tokendef reg { r1 = 1, r2 = 2 } \n mov {a: reg}, {b: reg} -> 0xff @ a[7:0] @ b[7:0] \n mov {a: reg}, {value} -> 0xee @ a[7:0] @ value[7:0]", "mov r1, r1 \n mov r2, label \n label:", Pass((4, "ff0101ee0206")));
 	
 	test("#tokendef reg { r1 = 0xbc } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r2", Fail(("asm", 1, "no match")));
 	

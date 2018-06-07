@@ -97,7 +97,8 @@ impl RulePatternMatcher
 							if current_value.is_none() || (current_value.is_some() && current_value.as_ref().unwrap() != value)
 								{ return Err(report.error_span("pattern clashes with a previous instruction pattern", &rule.pattern_span)); }
 							
-							return RulePatternMatcher::build_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
+							RulePatternMatcher::build_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
+							continue;
 						}
 						
 						let mut next_step = MatchStep::new();
@@ -106,7 +107,7 @@ impl RulePatternMatcher
 					}
 				}
 				else
-				{			
+				{
 					let step_kind = MatchStepParameter;
 					
 					if let Some(next_step) = step.children_param.get_mut(&step_kind)
@@ -204,6 +205,54 @@ impl RulePatternMatcher
 		
 		// Else, return no match.
 		None
+	}
+	
+	
+	pub fn print_debug(&self)
+	{
+		self.print_debug_inner(&self.root_step, 1);
+	}
+	
+	
+	fn print_debug_inner(&self, step: &MatchStep, indent: usize)
+	{
+		for rule_index in &step.rule_indices
+		{
+			for _ in 0..indent
+				{ print!("   "); }
+				
+			println!("match #{}", rule_index);
+		}
+			
+		for (key, next_step) in &step.children_exact
+		{
+			for _ in 0..indent
+				{ print!("   "); }
+			
+			print!("{}", key.0.printable_excerpt(key.1.as_ref().map(|s| s as &str)));
+			
+			if next_step.0.is_some()
+			{
+				match &next_step.0.as_ref().unwrap()
+				{
+					&ExpressionValue::Integer(ref bigint) => print!(" (= {})", bigint),
+					_ => unreachable!()
+				}
+			}
+			
+			println!();
+			
+			self.print_debug_inner(&next_step.1, indent + 1);
+		}
+		
+		for (_, next_step) in &step.children_param
+		{
+			for _ in 0..indent
+				{ print!("   "); }
+				
+			println!("expr");
+			self.print_debug_inner(&next_step, indent + 1);
+		}
 	}
 }
 
