@@ -217,6 +217,7 @@ impl<'t> CpuDefParser<'t>
 	fn parse_rule_pattern(&mut self, rule: &mut Rule) -> Result<(), ()>
 	{
 		let mut prev_was_parameter = false;
+		let mut prev_was_expr_parameter = false;
 		
 		
 		while !self.parser.next_is(0, TokenKind::Arrow) && !self.parser.next_is(0, TokenKind::ColonColon)
@@ -239,19 +240,20 @@ impl<'t> CpuDefParser<'t>
 				if prev_was_parameter
 					{ return Err(self.parser.report.error_span("expected a separating token between parameters", &tk.span.before())); }
 			
-				self.parse_rule_parameter(rule)?;
 				prev_was_parameter = true;
+				prev_was_expr_parameter = self.parse_rule_parameter(rule)?;
 			}
 			
 			// Read an exact pattern part.
 			else if tk.kind.is_allowed_pattern_token()
 			{
-				// Check for a stricter set of tokens if a parameter came just before.
-				if prev_was_parameter && !tk.kind.is_allowed_after_pattern_parameter()
+				// Check for a stricter set of tokens if an expression parameter came just before.
+				if prev_was_expr_parameter && !tk.kind.is_allowed_after_pattern_parameter()
 					{ return Err(self.parser.report.error_span("ambiguous pattern token after parameter", &tk.span)); }
 				
 				rule.pattern_add_exact(&tk);
 				prev_was_parameter = false;
+				prev_was_expr_parameter = false;
 			}
 			
 			// Check for end of file.
@@ -267,7 +269,7 @@ impl<'t> CpuDefParser<'t>
 	}
 	
 
-	fn parse_rule_parameter(&mut self, rule: &mut Rule) -> Result<(), ()>
+	fn parse_rule_parameter(&mut self, rule: &mut Rule) -> Result<bool, ()>
 	{
 		let tk_name = self.parser.expect(TokenKind::Identifier)?;
 		
@@ -279,7 +281,7 @@ impl<'t> CpuDefParser<'t>
 		if rule.param_exists(&name)
 			{ return Err(self.parser.report.error_span("duplicate parameter name", &tk_name.span)); }
 			
-		let typ =
+		let (is_expr_parameter, typ) =
 			if self.parser.maybe_expect(TokenKind::Colon).is_some()
 			{
 				let tk_type = self.parser.expect(TokenKind::Identifier)?;
@@ -295,16 +297,16 @@ impl<'t> CpuDefParser<'t>
 				if tokendef_index.is_none()
 					{ return Err(self.parser.report.error_span("unknown parameter type", &tk_type.span)); }
 						
-				RuleParameterType::CustomTokenDef(tokendef_index.unwrap())
+				(false, RuleParameterType::CustomTokenDef(tokendef_index.unwrap()))
 			}
 			else
-				{ RuleParameterType::Expression };
+				{ (true, RuleParameterType::Expression) };
 			
 		rule.pattern_add_param(name, typ);
 		
 		self.parser.expect(TokenKind::BraceClose)?;
 		
-		Ok(())
+		Ok(is_expr_parameter)
 	}
 	
 

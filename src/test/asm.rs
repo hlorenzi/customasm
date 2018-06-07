@@ -156,6 +156,8 @@ fn test_tokendef()
 	test("#tokendef reg1 { r1 = 1 } \n #tokendef reg2 { r1 = 2 } \n mov {a: reg1} -> 0xff @ a[7:0] \n mov {a: reg2} -> 0xee @ a[7:0]", "mov r1 \n mov r1", Pass((4, "ff01ff01")));
 	test("#tokendef reg1 { r1 = 1 } \n #tokendef reg2 { r2 = 2 } \n mov {a: reg1} -> 0xff @ a[7:0] \n mov {a: reg2} -> 0xee @ a[7:0]", "mov r1 \n mov r2", Pass((4, "ff01ee02")));
 	
+	test("#tokendef reg { r1 = 1 } \n mov [{a: reg} + {offset}] -> 0xff @ a[7:0] @ offset[7:0]", "mov [r1 + 8]", Pass((4, "ff0108")));
+	
 	test("#tokendef reg { r1 = 0xbc } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r2", Fail(("asm", 1, "no match")));
 	
 	test("#tokendef reg { r1 = 1, r1 = 2 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Fail(("cpu", 1, "duplicate tokendef entry")));
