@@ -9,6 +9,7 @@ use std::io::Write;
 const C_DEFAULT:  &'static str = "\u{1B}[0m";
 const C_LOCATION: &'static str = "\u{1B}[0m\u{1B}[90m";
 const C_ERROR:    &'static str = "\u{1B}[0m\u{1B}[91m";
+const C_WARNING:  &'static str = "\u{1B}[0m\u{1B}[93m";
 const C_LINENUM:  &'static str = "\u{1B}[0m\u{1B}[90m";
 const C_SRC:      &'static str = "\u{1B}[0m\u{1B}[97m"; //"
 
@@ -23,8 +24,17 @@ pub struct Report
 struct Message
 {
 	pub descr: String,
+	pub kind: MessageKind,
 	pub span: Option<Span>,
 	pub inner: Option<Box<Message>>
+}
+
+
+#[derive(Copy, Clone)]
+enum MessageKind
+{
+	Error,
+	Warning
 }
 
 
@@ -56,7 +66,7 @@ impl Report
 	fn message(&mut self, mut msg: Message)
 	{
 		for parent in self.parents.iter().rev()
-			{ msg = Message{ descr: parent.descr.clone(), span: parent.span.clone(), inner: Some(Box::new(msg)) }; }
+			{ msg = Message{ descr: parent.descr.clone(), kind: parent.kind, span: parent.span.clone(), inner: Some(Box::new(msg)) }; }
 		
 		self.messages.push(msg);
 	}
@@ -65,7 +75,7 @@ impl Report
 	pub fn error<S>(&mut self, descr: S)
 	where S: Into<String>
 	{
-		let msg = Message{ descr: descr.into(), span: None, inner: None };
+		let msg = Message{ descr: descr.into(), kind: MessageKind::Error, span: None, inner: None };
 		self.message(msg);
 	}
 	
@@ -73,7 +83,23 @@ impl Report
 	pub fn error_span<S>(&mut self, descr: S, span: &Span)
 	where S: Into<String>
 	{
-		let msg = Message{ descr: descr.into(), span: Some(span.clone()), inner: None };
+		let msg = Message{ descr: descr.into(), kind: MessageKind::Error, span: Some(span.clone()), inner: None };
+		self.message(msg);
+	}
+	
+	
+	pub fn warning<S>(&mut self, descr: S)
+	where S: Into<String>
+	{
+		let msg = Message{ descr: descr.into(), kind: MessageKind::Warning, span: None, inner: None };
+		self.message(msg);
+	}
+	
+	
+	pub fn warning_span<S>(&mut self, descr: S, span: &Span)
+	where S: Into<String>
+	{
+		let msg = Message{ descr: descr.into(), kind: MessageKind::Warning, span: Some(span.clone()), inner: None };
 		self.message(msg);
 	}
 	
@@ -81,7 +107,7 @@ impl Report
 	pub fn push_parent<S>(&mut self, descr: S, span: &Span)
 	where S: Into<String>
 	{
-		let msg = Message{ descr: descr.into(), span: Some(span.clone()), inner: None };
+		let msg = Message{ descr: descr.into(), kind: MessageKind::Error, span: Some(span.clone()), inner: None };
 		self.parents.push(msg);
 	}
 	
@@ -169,13 +195,16 @@ impl Report
 	
 	fn print_msg(&self, writer: &mut Write, fileserver: &FileServer, msg: &Message, indent: usize)
 	{
+		let kind_label = msg.kind.get_label();
+		let highlight_color = msg.kind.get_color();
+		
 		match msg.span
 		{
 			None =>
 			{
 				// Print description without location information.
-				write!(writer, "{}", C_ERROR).unwrap();
-				writeln!(writer, "error: {}", msg.descr).unwrap();
+				write!(writer, "{}", highlight_color).unwrap();
+				writeln!(writer, "{}: {}", kind_label, msg.descr).unwrap();
 				write!(writer, "{}", C_DEFAULT).unwrap();
 			}
 			
@@ -189,8 +218,8 @@ impl Report
 						self.print_indent(writer, indent);
 						write!(writer, "{}", C_LOCATION).unwrap();
 						writeln!(writer, "{}:", *span.file).unwrap();
-						write!(writer, "{}", C_ERROR).unwrap();
-						writeln!(writer, "error: {}", msg.descr).unwrap();
+						write!(writer, "{}", highlight_color).unwrap();
+						writeln!(writer, "{}: {}", kind_label, msg.descr).unwrap();
 						write!(writer, "{}", C_DEFAULT).unwrap();
 					}
 					
@@ -211,12 +240,12 @@ impl Report
 							line2 + 1, col2 + 1).unwrap();
 							
 						self.print_indent(writer, indent);
-						write!(writer, "{}", C_ERROR).unwrap();
-						writeln!(writer, "error: {}", msg.descr).unwrap();
+						write!(writer, "{}", highlight_color).unwrap();
+						writeln!(writer, "{}: {}", kind_label, msg.descr).unwrap();
 						write!(writer, "{}", C_DEFAULT).unwrap();
 						
 						// Print annotated source code.
-						self.print_msg_src(writer, &counter, line1, col1, line2, col2, indent);
+						self.print_msg_src(writer, &counter, msg.kind.get_color(), line1, col1, line2, col2, indent);
 					}
 				}
 			}
@@ -237,7 +266,7 @@ impl Report
 	}
 	
 	
-	fn print_msg_src(&self, writer: &mut Write, counter: &CharCounter, line1: usize, col1: usize, line2: usize, col2: usize, indent: usize)
+	fn print_msg_src(&self, writer: &mut Write, counter: &CharCounter, highlight_color: &'static str, line1: usize, col1: usize, line2: usize, col2: usize, indent: usize)
 	{
 		let first_line = if (line1 as isize - 2) < 0
 			{ 0 }
@@ -287,9 +316,9 @@ impl Report
 				self.print_indent(writer, indent);
 				write!(writer, "{}", C_LINENUM).unwrap();
 				write!(writer, "     | ").unwrap();
-				write!(writer, "{}", C_ERROR).unwrap();
+				write!(writer, "{}", highlight_color).unwrap();
 				
-				for p in 0..excerpt.len()
+				for p in 0..(excerpt.len() + 1)
 				{
 					// Print markings for spans of zero characters.
 					if p == col1 && p == col2
@@ -300,7 +329,7 @@ impl Report
 					else
 						{ " " };
 				
-					if excerpt[p] == '\t'
+					if p < excerpt.len() && excerpt[p] == '\t'
 						{ write!(writer, "{0}{0}", marking).unwrap(); }
 					else
 						{ write!(writer, "{}", marking).unwrap(); }
@@ -334,6 +363,20 @@ impl RcReport
 	where S: Into<String>
 	{
 		self.report.borrow_mut().error_span(descr, span);
+	}
+	
+	
+	pub fn warning<S>(&self, descr: S)
+	where S: Into<String>
+	{
+		self.report.borrow_mut().warning(descr);
+	}
+	
+	
+	pub fn warning_span<S>(&self, descr: S, span: &Span)
+	where S: Into<String>
+	{
+		self.report.borrow_mut().warning_span(descr, span);
 	}
 	
 	
@@ -384,5 +427,28 @@ impl Drop for ReportParentGuard
 	fn drop(&mut self)
 	{
 		self.report.pop_parent();
+	}
+}
+
+
+impl MessageKind
+{
+	fn get_label(&self) -> &'static str
+	{
+		match self
+		{
+			&MessageKind::Error => "error",
+			&MessageKind::Warning => "warning"
+		}
+	}
+	
+	
+	fn get_color(&self) -> &'static str
+	{
+		match self
+		{
+			&MessageKind::Error => C_ERROR,
+			&MessageKind::Warning => C_WARNING
+		}
 	}
 }

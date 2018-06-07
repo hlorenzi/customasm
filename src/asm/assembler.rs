@@ -107,20 +107,20 @@ impl AssemblerState
 			let bankdef_index = self.find_bankdef(&block.bank_name).unwrap();
 			let bankdef = &self.bankdefs[bankdef_index];
 			
-			let align = if bankdef_index == 0
+			let bits = if bankdef_index == 0
 				{ 1 }
 			else
-				{ self.cpudef.as_ref().unwrap().align };
+				{ self.cpudef.as_ref().unwrap().bits };
 			
 			if let Some(output_index) = bankdef.outp
 			{
 				for i in 0..block.len()
-					{ output.write(output_index * align + i, block.read(i)); }
+					{ output.write(output_index * bits + i, block.read(i)); }
 				
 				if bankdef.fill
 				{
-					for i in block.len()..(bankdef.size * align)
-						{ output.write(output_index * align + i, false); }
+					for i in block.len()..(bankdef.size * bits)
+						{ output.write(output_index * bits + i, false); }
 				}
 			}
 		}
@@ -192,13 +192,13 @@ impl AssemblerState
 	{
 		self.check_cpudef_active(report.clone(), span)?;
 		
-		let align = self.cpudef.as_ref().unwrap().align;
+		let bits = self.cpudef.as_ref().unwrap().bits;
 		let block = &self.blocks[self.cur_block];
 		
-		let excess_bits = block.len() % align;
+		let excess_bits = block.len() % bits;
 		if excess_bits != 0
 		{
-			let bits_short = align - excess_bits;
+			let bits_short = bits - excess_bits;
 			let plural = if bits_short > 1 { "bits" } else { "bit" };
 			return Err(report.error_span(format!("address is not aligned to a word boundary ({} {} short)", bits_short, plural), span));
 		}
@@ -206,7 +206,7 @@ impl AssemblerState
 		let bankdef_index = self.find_bankdef(&block.bank_name).unwrap();
 		let bankdef = &self.bankdefs[bankdef_index];
 		
-		let block_offset = block.len() / align;
+		let block_offset = block.len() / bits;
 		let addr = match block_offset.checked_add(bankdef.addr)
 		{
 			Some(addr) => addr,
@@ -243,9 +243,9 @@ impl AssemblerState
 		
 		self.check_cpudef_active(report.clone(), span)?;
 		
-		let align = self.cpudef.as_ref().unwrap().align;
+		let bits = self.cpudef.as_ref().unwrap().bits;
 		
-		while self.blocks[self.cur_block].len() % (align * multiple_of) != 0
+		while self.blocks[self.cur_block].len() % (bits * multiple_of) != 0
 			{ self.output_bit(report.clone(), false, true, span)?; }
 			
 		Ok(())
@@ -265,7 +265,7 @@ impl AssemblerState
 			{
 				self.check_cpudef_active(report.clone(), span)?;
 				
-				if block.len() / self.cpudef.as_ref().unwrap().align >= bankdef.size
+				if block.len() / self.cpudef.as_ref().unwrap().bits >= bankdef.size
 					{ return Err(report.error_span("data overflowed bank size", span)); }
 			}
 		}
@@ -452,15 +452,15 @@ impl ExpressionContext
 		if let Err(_) = state.check_cpudef_active(report.clone(), span)
 			{ return Err(true); }
 	
-		let align = state.cpudef.as_ref().unwrap().align;
+		let bits = state.cpudef.as_ref().unwrap().bits;
 		let block = &state.blocks[self.block];
 		
-		if block.len() % align != 0
+		if block.len() % bits != 0
 			{ return Err({ report.error_span("address is not aligned to a byte", span); true }); }
 			
 		let bankdef = state.find_bankdef(&block.bank_name).unwrap();
 		
-		let block_offset = self.offset / align;
+		let block_offset = self.offset / bits;
 		match block_offset.checked_add(state.bankdefs[bankdef].addr)
 		{
 			Some(addr) => Ok(addr),

@@ -1,6 +1,6 @@
 #cpudef "6502"
 {
-	#align 8
+	#bits 8
 
 	sei -> 0x78
 	cld -> 0xd8

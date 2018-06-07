@@ -182,7 +182,7 @@ impl<'a> AssemblerParser<'a>
 			
 		self.state.check_valid_address(self.parser.report.clone(), self.state.cur_block, new_addr, &tk_name.span)?;
 		
-		let align = self.state.cpudef.as_ref().unwrap().align;
+		let bits = self.state.cpudef.as_ref().unwrap().bits;
 		
 		if new_addr < cur_addr
 		{
@@ -191,12 +191,12 @@ impl<'a> AssemblerParser<'a>
 			if bankdef.outp.is_some()
 				{ return Err(self.parser.report.error_span("cannot seek to previous address", &tk_name.span)); }
 			
-			self.state.blocks[self.state.cur_block].truncate(new_addr * align);
+			self.state.blocks[self.state.cur_block].truncate(new_addr * bits);
 			Ok(())
 		}
 		else
 		{
-			let bits_to_skip = (new_addr - cur_addr) * align;
+			let bits_to_skip = (new_addr - cur_addr) * bits;
 			self.state.output_zero_bits(self.parser.report.clone(), bits_to_skip, true, &tk_name.span)
 		}
 	}
@@ -216,7 +216,7 @@ impl<'a> AssemblerParser<'a>
 	{
 		self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
 		
-		let bits = self.parse_usize()? * self.state.cpudef.as_ref().unwrap().align;
+		let bits = self.parse_usize()? * self.state.cpudef.as_ref().unwrap().bits;
 		
 		self.state.output_zero_bits(self.parser.report.clone(), bits, true, &tk_name.span)
 	}

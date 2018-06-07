@@ -34,22 +34,22 @@ fn test_directives()
 {
 	test("", Pass(()));
 	
-	test("#align 1",    Pass(()));
-	test("#align 3",    Pass(()));
-	test("#align 8",    Pass(()));
-	test("#align 16",   Pass(()));
-	test("#align 32",   Pass(()));
-	test("#align 64",   Pass(()));
-	test("#align 128",  Pass(()));
-	test("#align 1024", Pass(()));
+	test("#bits 1",    Pass(()));
+	test("#bits 3",    Pass(()));
+	test("#bits 8",    Pass(()));
+	test("#bits 16",   Pass(()));
+	test("#bits 32",   Pass(()));
+	test("#bits 64",   Pass(()));
+	test("#bits 128",  Pass(()));
+	test("#bits 1024", Pass(()));
 	
-	test("#align 0xffff_ffff_ffff_ffff", Pass(()));
+	test("#bits 0xffff_ffff_ffff_ffff", Pass(()));
 	
 	test("#unknown",                       Fail(("test", 1, "unknown")));
 	
-	test("#align 0",                       Fail(("test", 1, "invalid")));
-	test("#align 8\n #align 8",            Fail(("test", 2, "duplicate")));
-	test("#align 0x1_0000_0000_0000_0000", Fail(("test", 1, "large")));
+	test("#bits 0",                       Fail(("test", 1, "invalid")));
+	test("#bits 8\n #bits 8",            Fail(("test", 2, "duplicate")));
+	test("#bits 0x1_0000_0000_0000_0000", Fail(("test", 1, "large")));
 }
 
 
@@ -63,22 +63,22 @@ fn test_rules_simple()
 	test("halt    -> 0b00000000", Pass(()));
 	test("halt    -> 0o00000000", Pass(()));
 	
-	test("#align 1 \n halt -> 1'0",     Pass(()));
-	test("#align 1 \n halt -> 0b0",     Pass(()));
-	test("#align 1 \n halt -> 0o0",     Pass(()));
-	test("#align 1 \n halt -> 0x0",     Pass(()));
-	test("#align 1 \n halt -> 2'0b10",  Pass(()));
-	test("#align 1 \n halt -> 0b10",    Pass(()));
-	test("#align 1 \n halt -> 0o10",    Pass(()));
-	test("#align 1 \n halt -> 0x10",    Pass(()));
-	test("#align 3 \n halt -> 3'0b101", Pass(()));
-	test("#align 3 \n halt -> 0b101",   Pass(()));
-	test("#align 3 \n halt -> 0o101",   Pass(()));
-	test("#align 3 \n halt -> 0x101",   Pass(()));
-	test("#align 5 \n halt -> 5'0x13",  Pass(()));
-	test("#align 5 \n halt -> 0b10011", Pass(()));
-	test("#align 5 \n halt -> 0o13",    Fail(("test", 2, "width")));
-	test("#align 5 \n halt -> 0x13",    Fail(("test", 2, "width")));
+	test("#bits 1 \n halt -> 1'0",     Pass(()));
+	test("#bits 1 \n halt -> 0b0",     Pass(()));
+	test("#bits 1 \n halt -> 0o0",     Pass(()));
+	test("#bits 1 \n halt -> 0x0",     Pass(()));
+	test("#bits 1 \n halt -> 2'0b10",  Pass(()));
+	test("#bits 1 \n halt -> 0b10",    Pass(()));
+	test("#bits 1 \n halt -> 0o10",    Pass(()));
+	test("#bits 1 \n halt -> 0x10",    Pass(()));
+	test("#bits 3 \n halt -> 3'0b101", Pass(()));
+	test("#bits 3 \n halt -> 0b101",   Pass(()));
+	test("#bits 3 \n halt -> 0o101",   Pass(()));
+	test("#bits 3 \n halt -> 0x101",   Pass(()));
+	test("#bits 5 \n halt -> 5'0x13",  Pass(()));
+	test("#bits 5 \n halt -> 0b10011", Pass(()));
+	test("#bits 5 \n halt -> 0o13",    Fail(("test", 2, "width")));
+	test("#bits 5 \n halt -> 0x13",    Fail(("test", 2, "width")));
 	
 	
 	test("halt    -> 0x_0_0",        Pass(()));
@@ -104,7 +104,7 @@ fn test_rules_simple()
 	test("halt -> 0x0",        Fail(("test", 1, "width")));
 	test("halt -> 1 + 1",      Fail(("test", 1, "width")));
 	test("halt -> 1 + 1[7:0]", Fail(("test", 1, "width")));
-	test("halt -> 7'0",        Fail(("test", 1, "align")));
+	test("halt -> 7'0",        Fail(("test", 1, "multiple")));
 	test("halt -> 8'0 8'0",    Fail(("test", 1, "line break")));
 	
 	test("halt -> 1 == 1 ? 0x12",        Fail(("test", 1, "width")));
@@ -140,24 +140,4 @@ fn test_rules_parameters()
 	
 	test("load          -> 8'0 @ a[7:0]", Pass(()));
 	test("load {a}, {b} -> 8'0 @ c[7:0]", Pass(()));
-}
-
-
-#[test]
-fn test_rules_constraints()
-{
-	/*test("halt :: 1 == 1            -> 8'0", Pass(()));
-	test("halt :: 1 == 1, \"descr\" -> 8'0", Pass(()));
-	test("halt :: 1 != 1, \"descr\" -> 8'0", Pass(()));
-	
-	test("halt    :: 1 == 1    :: 2 == 2, \"descr\"    :: 3 == 3    -> 8'0", Pass(()));
-	test("halt \n :: 1 == 1 \n :: 2 == 2, \"descr\" \n :: 3 == 3 \n -> 8'0", Pass(()));
-	
-	test("halt          :: pc == 0           -> 8'0", Pass(()));
-	test("load {a}      :: a  == 0           -> 8'0", Pass(()));
-	test("load {a}, {b} :: a  == 0 :: b == 0 -> 8'0", Pass(()));
-	test("load {a}, {b} :: b  == a :: a == b -> 8'0", Pass(()));
-	
-	test("halt :: 123          -> 8'0", Fail(("test", 1, "bool")));
-	test("halt :: unknown == 0 -> 8'0", Fail(("test", 1, "unknown")));*/
 }

@@ -6,7 +6,7 @@ defines mnemonics for its instruction set.
 ```asm
 #cpudef
 {
-    #align 8
+    #bits 8
     
     lda {value} -> 0x10 @ value[7:0]
     add {value} -> 0xad @ value[7:0]
@@ -21,15 +21,15 @@ defines mnemonics for its instruction set.
 The syntax first expects a list of configuration directives, one per line.
 The currently available configurations are:
 
-- `#align <bit_num>`  
-Sets the number of bits per byte for the target machine.  
-For example, `#align 8` is the usual configuration for
+- `#bits <num>`  
+Sets the number of bits-per-byte for the target machine.  
+For example, `#bits 8` is the usual configuration for
 most modern CPUs.  
 Memory addresses are counted in bytes, so, with 8-bit bytes,
-address 0x01 actually refers to the bits 8 through 15 in
-memory, inclusive.  
-Machine instructions must be aligned to a byte boundary,
-hence the directive's name. So, with 8-bit bytes, valid
+address 0x01 refers to the bits 8 through 15 in
+memory, 0-indexed, inclusive.  
+The size of each instruction's binary representation must be
+some multiple of the byte size. So, with 8-bit bytes, valid
 instruction sizes are 8 bits, 16 bits, 24 bits, and so on.
 
 - `#tokendef <name>`
@@ -69,11 +69,11 @@ example above).
 ### Output
 
 The output part of a rule defines its binary representation.
-It consists of a single expression, the integer result of which is
+It consists of a single expression, whose integer result is
 sent to the output. Note is that this integer result
 must have a known width (number of bits) to allow for advancing
 the current address while assembling, and to allow for verification
-of word alignment.
+to byte alignment.
 
 - For literals (like fixed opcodes), like `0x7f`, the width is derived automatically
 from the radix and number of digits used. If it's necessary to explicitly state the
@@ -137,7 +137,7 @@ without error (and without any assertion failures).
 For example, we can write:
 
 ```asm
-#align 8
+#bits 8
 
 mov {value} -> { assert(value <=     0xff), 0x10 @ value[ 7:0] }
 mov {value} -> { assert(value <=   0xffff), 0x11 @ value[15:0] }
@@ -153,7 +153,7 @@ cascading, it may be convenient to specify unambiguous rules for all
 forms, like:
 
 ```asm
-#align 8
+#bits 8
 
 mov.b {value} -> { assert(value <=     0xff), 0x10 @ value[ 7:0] }
 mov.w {value} -> { assert(value <=   0xffff), 0x11 @ value[15:0] }
@@ -166,7 +166,7 @@ mov {value} -> { assert(value <= 0xffffff), 0x12 @ value[23:0] }
 
 ### Rule Examples
 
-With `#align 8`:
+With `#bits 8`:
 
 Rule | Used as | Output
 -----|---------|--------
@@ -186,7 +186,7 @@ Rule | Used as | Output
 ```asm
 #cpudef
 {
-    #align 8
+    #bits 8
     
     ; we can write the entire rule in one line:
     
@@ -219,7 +219,7 @@ Rule | Used as | Output
 {
     ; you can have unusual counts of bits-per-byte too!
 	
-    #align 3
+    #bits 3
     
     lda #{value} -> 0b001 @ value[2:0]
     ldx #{value} -> 0b010 @ value[2:0]
@@ -234,7 +234,7 @@ Rule | Used as | Output
 {
     ; example with named registers
     
-    #align 8
+    #bits 8
     
     #tokendef reg
     {

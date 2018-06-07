@@ -8,7 +8,7 @@ use std::collections::HashMap;
 #[derive(Debug)]
 pub struct CpuDef
 {
-	pub align: usize,
+	pub bits: usize,
 	pub rules: Vec<Rule>,
 	pub pattern_matcher: RulePatternMatcher,
 	pub custom_token_defs: Vec<CustomTokenDef>
@@ -19,7 +19,7 @@ struct CpuDefParser<'t>
 {
 	parser: &'t mut Parser,
 	
-	align: Option<usize>,
+	bits: Option<usize>,
 	rules: Vec<Rule>,
 	custom_token_defs: Vec<CustomTokenDef>
 }
@@ -40,15 +40,15 @@ impl CpuDef
 		let mut cpudef_parser = CpuDefParser
 		{
 			parser: parser,
-			align: None,
+			bits: None,
 			rules: Vec::new(),
 			custom_token_defs: Vec::new()
 		};
 		
 		cpudef_parser.parse_directives()?;	
 		
-		if cpudef_parser.align.is_none()
-			{ cpudef_parser.align = Some(8); }
+		if cpudef_parser.bits.is_none()
+			{ cpudef_parser.bits = Some(8); }
 		
 		cpudef_parser.parse_rules()?;
 		
@@ -56,7 +56,7 @@ impl CpuDef
 		
 		let cpudef = CpuDef
 		{
-			align: cpudef_parser.align.unwrap(),
+			bits: cpudef_parser.bits.unwrap(),
 			rules: cpudef_parser.rules,
 			pattern_matcher: pattern_matcher,
 			custom_token_defs: cpudef_parser.custom_token_defs
@@ -76,7 +76,8 @@ impl<'t> CpuDefParser<'t>
 			let tk_name = self.parser.expect_msg(TokenKind::Identifier, "expected directive name")?;
 			match tk_name.excerpt.as_ref().unwrap().as_ref()
 			{
-				"align" => self.parse_directive_align(&tk_name)?,
+				"align"    => self.parse_directive_align(&tk_name)?,
+				"bits"     => self.parse_directive_bits(&tk_name)?,
 				"tokendef" => self.parse_directive_tokendef(&tk_name)?,
 				
 				_ => return Err(self.parser.report.error_span("unknown directive", &tk_name.span))
@@ -91,15 +92,22 @@ impl<'t> CpuDefParser<'t>
 	
 	fn parse_directive_align(&mut self, tk_name: &Token) -> Result<(), ()>
 	{
-		let (tk_align, align) = self.parser.expect_usize()?;
+		self.parser.report.warning_span("deprecated directive; use `#bits`", &tk_name.span);
+		self.parse_directive_bits(tk_name)
+	}
+	
+	
+	fn parse_directive_bits(&mut self, tk_name: &Token) -> Result<(), ()>
+	{
+		let (tk_bits, bits) = self.parser.expect_usize()?;
 		
-		if self.align.is_some()
-			{ return Err(self.parser.report.error_span("duplicate align directive", &tk_name.span)); }
+		if self.bits.is_some()
+			{ return Err(self.parser.report.error_span("duplicate `bits` directive", &tk_name.span)); }
 			
-		if align == 0
-			{ return Err(self.parser.report.error_span("invalid alignment", &tk_align.span)); }
+		if bits == 0
+			{ return Err(self.parser.report.error_span("invalid byte size", &tk_bits.span)); }
 		
-		self.align = Some(align);
+		self.bits = Some(bits);
 		
 		Ok(())
 	}
@@ -112,7 +120,7 @@ impl<'t> CpuDefParser<'t>
 		let defname = tk_defname.excerpt.unwrap().clone();
 		
 		if self.custom_token_defs.iter().find(|def| def.name == defname).is_some()
-			{ return Err(self.parser.report.error_span("duplicate custom token def name", &tk_defname.span)); }
+			{ return Err(self.parser.report.error_span("duplicate tokendef name", &tk_defname.span)); }
 		
 		let mut tokendef = CustomTokenDef
 		{
@@ -128,7 +136,7 @@ impl<'t> CpuDefParser<'t>
 			let token_excerpt = tk_token.excerpt.unwrap().clone();
 			
 			if tokendef.excerpt_to_value_map.contains_key(&token_excerpt)
-				{ return Err(self.parser.report.error_span("duplicate token in group", &tk_token.span)); }
+				{ return Err(self.parser.report.error_span("duplicate tokendef entry", &tk_token.span)); }
 			
 			self.parser.expect(TokenKind::Equal)?;
 			let value = ExpressionValue::Integer(BigInt::from(self.parser.expect_usize()?.1));
@@ -289,8 +297,8 @@ impl<'t> CpuDefParser<'t>
 			None => return Err(self.parser.report.error_span("width of expression not known; use bit slices", &expr.span()))
 		};
 		
-		if width % self.align.unwrap() != 0
-			{ return Err(self.parser.report.error_span(format!("binary representation (width = {}) does not align with a word boundary", width), &expr.span())); }
+		if width % self.bits.unwrap() != 0
+			{ return Err(self.parser.report.error_span(format!("binary representation width (= {}) is not a multiple of the byte width (= {})", width, self.bits.unwrap()), &expr.span())); }
 		
 		rule.production = expr;
 		

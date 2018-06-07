@@ -86,25 +86,25 @@ fn test_simple()
 	test("halt -> (1 + 1)[7:0]", "halt", Pass((4, "02")));
 	test("halt -> pc[7:0]",      "halt", Pass((4, "00")));
 	
-	test("#align 1 \n halt -> 1'0",     "halt", Pass((1, "0")));
-	test("#align 1 \n halt -> 0b0",     "halt", Pass((1, "0")));
-	test("#align 1 \n halt -> 0o0",     "halt", Pass((1, "000")));
-	test("#align 1 \n halt -> 0x0",     "halt", Pass((1, "0000")));
-	test("#align 1 \n halt -> 2'0b10",  "halt", Pass((1, "10")));
-	test("#align 1 \n halt -> 0b10",    "halt", Pass((1, "10")));
-	test("#align 1 \n halt -> 0o10",    "halt", Pass((1, "001000")));
-	test("#align 1 \n halt -> 0x10",    "halt", Pass((1, "00010000")));
-	test("#align 3 \n halt -> 3'0b101", "halt", Pass((1, "101")));
-	test("#align 3 \n halt -> 0b101",   "halt", Pass((1, "101")));
-	test("#align 3 \n halt -> 0o101",   "halt", Pass((1, "001000001")));
-	test("#align 3 \n halt -> 0x101",   "halt", Pass((1, "000100000001")));
-	test("#align 5 \n halt -> 5'0x13",  "halt", Pass((1, "10011")));
-	test("#align 5 \n halt -> 0b10011", "halt", Pass((1, "10011")));
+	test("#bits 1 \n halt -> 1'0",     "halt", Pass((1, "0")));
+	test("#bits 1 \n halt -> 0b0",     "halt", Pass((1, "0")));
+	test("#bits 1 \n halt -> 0o0",     "halt", Pass((1, "000")));
+	test("#bits 1 \n halt -> 0x0",     "halt", Pass((1, "0000")));
+	test("#bits 1 \n halt -> 2'0b10",  "halt", Pass((1, "10")));
+	test("#bits 1 \n halt -> 0b10",    "halt", Pass((1, "10")));
+	test("#bits 1 \n halt -> 0o10",    "halt", Pass((1, "001000")));
+	test("#bits 1 \n halt -> 0x10",    "halt", Pass((1, "00010000")));
+	test("#bits 3 \n halt -> 3'0b101", "halt", Pass((1, "101")));
+	test("#bits 3 \n halt -> 0b101",   "halt", Pass((1, "101")));
+	test("#bits 3 \n halt -> 0o101",   "halt", Pass((1, "001000001")));
+	test("#bits 3 \n halt -> 0x101",   "halt", Pass((1, "000100000001")));
+	test("#bits 5 \n halt -> 5'0x13",  "halt", Pass((1, "10011")));
+	test("#bits 5 \n halt -> 0b10011", "halt", Pass((1, "10011")));
 	
-	test("#align 128 \n halt -> ((1 << 256) / 0xfedc)[255:0]", "halt", Pass((4, "000101254e8d998319892068f7ba90cd2a03ec79bad91fa81bbfa69a07b0c5a1")));
+	test("#bits 128 \n halt -> ((1 << 256) / 0xfedc)[255:0]", "halt", Pass((4, "000101254e8d998319892068f7ba90cd2a03ec79bad91fa81bbfa69a07b0c5a1")));
 	
-	test("#align 3 \n halt -> 3'0b101 \n cli -> 3'0b110", "halt \n cli \n halt \n cli", Pass((1, "101110101110")));
-	test("#align 8 \n halt -> 8'0x12  \n cli -> 8'0x34",  "halt \n cli \n halt \n cli", Pass((4, "12341234")));
+	test("#bits 3 \n halt -> 3'0b101 \n cli -> 3'0b110", "halt \n cli \n halt \n cli", Pass((1, "101110101110")));
+	test("#bits 8 \n halt -> 8'0x12  \n cli -> 8'0x34",  "halt \n cli \n halt \n cli", Pass((4, "12341234")));
 	
 	test("halt -> 0x00", "unknown",         Fail(("asm", 1, "no match")));
 	test("halt -> 0x00", "halt \n unknown", Fail(("asm", 2, "no match")));
@@ -158,9 +158,9 @@ fn test_tokendef()
 	
 	test("#tokendef reg { r1 = 0xbc } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r2", Fail(("asm", 1, "no match")));
 	
-	test("#tokendef reg { r1 = 1, r1 = 2 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Fail(("cpu", 1, "duplicate token")));
+	test("#tokendef reg { r1 = 1, r1 = 2 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Fail(("cpu", 1, "duplicate tokendef entry")));
 	test("#tokendef 123 { r1 = 1, r2 = 2 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Fail(("cpu", 1, "identifier")));
-	test("#tokendef reg { r1 = 1 } \n #tokendef reg { r2 = 1 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Fail(("cpu", 2, "duplicate custom token")));
+	test("#tokendef reg { r1 = 1 } \n #tokendef reg { r2 = 1 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Fail(("cpu", 2, "duplicate tokendef name")));
 }
 
 
@@ -270,14 +270,14 @@ fn test_data_directive()
 	test("", "#d16 0x1ffff[15:0]", Pass((4, "ffff")));
 	test("", "#d16 -0x8001[15:0]", Pass((4, "7fff")));
 	
-	test("#align 3", "#d3 0",      Pass((1, "000")));
-	test("#align 3", "#d3 0b111",  Pass((1, "111")));
-	test("#align 3", "#d3 -1",     Pass((1, "111")));
-	test("#align 3", "#d3 0b100",  Pass((1, "100")));
-	test("#align 3", "#d3 -0b011", Pass((1, "101")));
-	test("#align 3", "#d3 -0b100", Pass((1, "100")));
-	test("#align 3", "#d3 1 + 1",  Pass((1, "010")));
-	test("#align 3", "#d3 pc",     Pass((1, "000")));
+	test("#bits 3", "#d3 0",      Pass((1, "000")));
+	test("#bits 3", "#d3 0b111",  Pass((1, "111")));
+	test("#bits 3", "#d3 -1",     Pass((1, "111")));
+	test("#bits 3", "#d3 0b100",  Pass((1, "100")));
+	test("#bits 3", "#d3 -0b011", Pass((1, "101")));
+	test("#bits 3", "#d3 -0b100", Pass((1, "100")));
+	test("#bits 3", "#d3 1 + 1",  Pass((1, "010")));
+	test("#bits 3", "#d3 pc",     Pass((1, "000")));
 	
 	test("", "#d8 1,    2,    3", Pass((4, "010203")));
 	test("", "#d8 1, \n 2, \n 3", Pass((4, "010203")));
@@ -287,12 +287,12 @@ fn test_data_directive()
 	test("", "#d32  1,  2,  3", Pass((4, "000000010000000200000003")));
 	test("", "#d32 -1, -2, -3", Pass((4, "fffffffffffffffefffffffd")));
 	
-	test("#align 1", "#d1 1, 0, 1, -1", Pass((1, "1011")));
-	test("#align 2", "#d2 1, 2, 3, -1", Pass((1, "01101111")));
-	test("#align 3", "#d3 1, 2, 3, -1", Pass((1, "001010011111")));
-	test("#align 5", "#d5 1, 2, 3, -1", Pass((1, "00001000100001111111")));
-	test("#align 7", "#d7 1, 2, 3, -1", Pass((1, "0000001000001000000111111111")));
-	test("#align 9", "#d9 1, 2, 3, -1", Pass((1, "000000001000000010000000011111111111")));
+	test("#bits 1", "#d1 1, 0, 1, -1", Pass((1, "1011")));
+	test("#bits 2", "#d2 1, 2, 3, -1", Pass((1, "01101111")));
+	test("#bits 3", "#d3 1, 2, 3, -1", Pass((1, "001010011111")));
+	test("#bits 5", "#d5 1, 2, 3, -1", Pass((1, "00001000100001111111")));
+	test("#bits 7", "#d7 1, 2, 3, -1", Pass((1, "0000001000001000000111111111")));
+	test("#bits 9", "#d9 1, 2, 3, -1", Pass((1, "000000001000000010000000011111111111")));
 	
 	test("", "#d8  x \n  x =  0x12", Pass((4, "12")));
 	test("", "#d8  x \n  x = 0x100", Fail(("asm", 1, "large")));
@@ -312,8 +312,8 @@ fn test_data_directive()
 	test("", "#d16 0x10000", Fail(("asm", 1, "large")));
 	test("", "#d16 -0x8001", Fail(("asm", 1, "large")));
 	
-	test("#align 1", "#d1 2",  Fail(("asm", 1, "large")));
-	test("#align 1", "#d1 -2", Fail(("asm", 1, "large")));
+	test("#bits 1", "#d1 2",  Fail(("asm", 1, "large")));
+	test("#bits 1", "#d1 -2", Fail(("asm", 1, "large")));
 	
 	test("", "#d1 0", Pass((1, "0")));
 	test("", "#d2 0", Pass((1, "00")));
@@ -352,10 +352,10 @@ fn test_str_directive()
 	test("", "#str \"\\x00\\x01\\x02\"",    Pass((4, "000102")));
 	test("", "#str \"\\u{0}\\u{1}\\u{2}\"", Pass((4, "000102")));
 	
-	test("#align 16", "#str \"\"",                         Pass((4, "")));
-	test("#align 16", "#str \"hello\\r\\n\\0\"",           Pass((4, "68656c6c6f0d0a00")));
-	test("#align 32", "#str \"\\x00\\x01\\x02\\x03\"",     Pass((4, "00010203")));
-	test("#align 32", "#str \"\\u{0}\\u{1}\\u{2}\\u{3}\"", Pass((4, "00010203")));
+	test("#bits 16", "#str \"\"",                         Pass((4, "")));
+	test("#bits 16", "#str \"hello\\r\\n\\0\"",           Pass((4, "68656c6c6f0d0a00")));
+	test("#bits 32", "#str \"\\x00\\x01\\x02\\x03\"",     Pass((4, "00010203")));
+	test("#bits 32", "#str \"\\u{0}\\u{1}\\u{2}\\u{3}\"", Pass((4, "00010203")));
 	
 	test("", "#str \"\\u{7f}\\u{80}\\u{ff}\\u{10ffff}\"", Pass((4, "7fc280c3bff48fbfbf")));
 	
@@ -363,11 +363,11 @@ fn test_str_directive()
 	
 	test("", "#str \"\\z\"", Fail(("asm", 1, "invalid")));
 	
-	test("#align 5",  "#str \"abc\" \n #d1 0    \n #str \"defgh\" \n label:", Pass((1, "01100001011000100110001100110010001100101011001100110011101101000")));
-	test("#align 32", "#str \"ab\"  \n #d8 0xff \n #str \"d\"     \n label:", Pass((4, "6162ff64")));
+	test("#bits 5",  "#str \"abc\" \n #d1 0    \n #str \"defgh\" \n label:", Pass((1, "01100001011000100110001100110010001100101011001100110011101101000")));
+	test("#bits 32", "#str \"ab\"  \n #d8 0xff \n #str \"d\"     \n label:", Pass((4, "6162ff64")));
 	
-	test("#align 5",  "#str \"abc\" \n label:", Fail(("asm", 2, "align")));
-	test("#align 32", "#str \"abc\" \n label:", Fail(("asm", 2, "align")));
+	test("#bits 5",  "#str \"abc\" \n label:", Fail(("asm", 2, "align")));
+	test("#bits 32", "#str \"abc\" \n label:", Fail(("asm", 2, "align")));
 }
 
 
@@ -569,9 +569,9 @@ fn test_incbin_directive()
 {
 	static INSTRSET1: &'static str = "#cpudef { }";
 
-	static INSTRSET2: &'static str = "#cpudef { \n #align 5 \n }";
+	static INSTRSET2: &'static str = "#cpudef { \n #bits 5 \n }";
 	
-	static INSTRSET3: &'static str = "#cpudef { \n #align 32 \n }";
+	static INSTRSET3: &'static str = "#cpudef { \n #bits 32 \n }";
 	
 	static MAIN1_1: &'static str = "#include \"instrset1\" \n #incbin \"binary1\" \n label:";
 	static MAIN1_2: &'static str = "#include \"instrset1\" \n #incbin \"binary2\" \n label:";
@@ -633,9 +633,9 @@ fn test_incstr_directives()
 {
 	static INSTRSET1: &'static str = "#cpudef { }";
 
-	static INSTRSET2: &'static str = "#cpudef { \n #align 5 \n }";
+	static INSTRSET2: &'static str = "#cpudef { \n #bits 5 \n }";
 	
-	static INSTRSET3: &'static str = "#cpudef { \n #align 32 \n }";
+	static INSTRSET3: &'static str = "#cpudef { \n #bits 32 \n }";
 	
 	static MAIN1_1: &'static str = "#include \"instrset1\" \n #incbinstr \"str1\" \n label:";
 	static MAIN1_2: &'static str = "#include \"instrset1\" \n #inchexstr \"str1\" \n label:";

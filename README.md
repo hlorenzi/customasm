@@ -41,7 +41,7 @@ Given the following file:
 ```asm
 #cpudef
 {
-    #align 8
+    #bits 8
     
     load r1, {value} -> 0x11 @ value[7:0]
     load r2, {value} -> 0x12 @ value[7:0]
