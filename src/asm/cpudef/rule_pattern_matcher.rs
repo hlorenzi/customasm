@@ -208,12 +208,14 @@ impl RulePatternMatcher
 	}
 	
 	
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn print_debug(&self)
 	{
 		self.print_debug_inner(&self.root_step, 1);
 	}
 	
 	
+	#[cfg(not(target_arch = "wasm32"))]
 	fn print_debug_inner(&self, step: &MatchStep, indent: usize)
 	{
 		for rule_index in &step.rule_indices
