@@ -241,6 +241,10 @@ fn test_ops_concat()
 	test("4'0x0 @ 4'0x0 @ 4'0x8 @ 4'0x9", Pass(ExpressionValue::Integer(BigInt::from(0x89))));
 	test("0x1 @ (4'0x0 @ 4'0x0 @ 4'0x8 @ 4'0x9)", Pass(ExpressionValue::Integer(BigInt::from(0x10089))));
 	
+	test("0x0 @ 0x8000[19:0]", Pass(ExpressionValue::Integer(BigInt::from(0x8000))));
+	test("0x1 @ 0x8000[19:0]", Pass(ExpressionValue::Integer(BigInt::from(0x108000))));
+	test("0x1 @ 0x9000[19:0]", Pass(ExpressionValue::Integer(BigInt::from(0x109000))));
+	
 	test("  0 @   0", Fail(("test", 1, "known width")));
 	test("8'0 @   0", Fail(("test", 1, "known width")));
 	test("  0 @ 8'0", Fail(("test", 1, "known width")));

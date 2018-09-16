@@ -384,10 +384,10 @@ where F: Fn(u8, u8) -> u8
 	let mut rhs_bytes = rhs.to_signed_bytes_le();
 	let mut rhs_sign = rhs.sign();
 	
-	if lhs_sign != Sign::Minus && (lhs_bytes[0] & 0x80) != 0
+	if lhs_sign != Sign::Minus
 		{ lhs_bytes.push(0); }
 	
-	if rhs_sign != Sign::Minus && (rhs_bytes[0] & 0x80) != 0
+	if rhs_sign != Sign::Minus
 		{ rhs_bytes.push(0); }
 		
 	if rhs_bytes.len() > lhs_bytes.len()
