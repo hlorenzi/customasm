@@ -178,6 +178,9 @@ pub fn excerpt_as_bigint(report: RcReport, excerpt: &str, span: &Span) -> Result
 			{ return Err(report.error_span(format!("value (width = {}) is larger than specified", value.bits()), span)); }
 	}
 	
+	if digit_num == 0
+		{ return Err(report.error_span(format!("invalid value"), span)); }
+		
 	Ok((value, width, radix, digit_num))
 }
 

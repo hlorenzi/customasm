@@ -48,6 +48,8 @@ fn test_literals()
 	test("0b1_0", Pass(ExpressionValue::Integer(BigInt::from(2))));
 	test("0x1_0", Pass(ExpressionValue::Integer(BigInt::from(16))));
 	
+	test("0x", Fail(("test", 1, "invalid")));
+	
 	test("10a",   Fail(("test", 1, "invalid")));
 	test("0b102", Fail(("test", 1, "invalid")));
 	test("0b10a", Fail(("test", 1, "invalid")));
