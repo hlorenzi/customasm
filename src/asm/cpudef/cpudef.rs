@@ -240,7 +240,7 @@ impl<'t> CpuDefParser<'t>
 			{
 				// Check for consecutive parameters without a separating token.
 				if prev_was_expr_parameter
-					{ return Err(self.parser.report.error_span("expected a separating token between parameters", &tk.span.before())); }
+					{ return Err(self.parser.report.error_span("expected a separating token between parameters; try using a `,`", &tk.span.before())); }
 			
 				prev_was_expr_parameter = self.parse_rule_parameter(rule)?;
 				
@@ -252,7 +252,7 @@ impl<'t> CpuDefParser<'t>
 			{
 				// Check for a stricter set of tokens if an expression parameter came just before.
 				if prev_was_expr_parameter && !tk.kind.is_allowed_after_pattern_parameter()
-					{ return Err(self.parser.report.error_span("ambiguous pattern token after parameter", &tk.span)); }
+					{ return Err(self.parser.report.error_span("potentially ambiguous token after parameter; try using a separating `,`", &tk.span)); }
 					
 				if tk.kind == TokenKind::Identifier
 					{ is_allowed_at_beginning = true; }
@@ -326,11 +326,11 @@ impl<'t> CpuDefParser<'t>
 		let width = match expr.width()
 		{
 			Some(w) => w,
-			None => return Err(self.parser.report.error_span("width of expression not known; use bit slices", &expr.span()))
+			None => return Err(self.parser.report.error_span("width of expression not known; try using a bit slice like `x[hi:lo]`", &expr.returned_value_span()))
 		};
 		
 		if width % self.bits.unwrap() != 0
-			{ return Err(self.parser.report.error_span(format!("binary representation width (= {}) is not a multiple of the byte width (= {})", width, self.bits.unwrap()), &expr.span())); }
+			{ return Err(self.parser.report.error_span(format!("expression width (= {}) is not a multiple of the CPU's byte width (= {})", width, self.bits.unwrap()), &expr.returned_value_span())); }
 		
 		rule.production = expr;
 		

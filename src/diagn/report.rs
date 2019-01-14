@@ -321,10 +321,10 @@ impl Report
 				for p in 0..(excerpt.len() + 1)
 				{
 					// Print markings for spans of zero characters.
-					if p == col1 && p == col2
+					if p == col1 && p == col2 && line1 == line2
 						{ write!(writer, "^").unwrap(); }
 						
-					let marking = if p >= col1 && p < col2
+					let marking = if (line > line1 || p >= col1) && (line < line2 || p < col2)
 						{ "^" }
 					else
 						{ " " };

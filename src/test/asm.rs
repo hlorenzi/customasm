@@ -115,6 +115,14 @@ fn test_simple()
 	test("HALT -> 0x00", "halt", Pass((4, "00")));
 	test("Halt -> 0x00", "hALT", Pass((4, "00")));
 	test("hALT -> 0x00", "Halt", Pass((4, "00")));
+	
+	test("halt -> pc % 2 == 0 ? 0x12 : 0x34", "halt \n halt \n halt", Pass((4, "123412")));
+	test("halt -> pc          ? 0x12 : 0x34", "halt \n halt \n halt", Fail(("cpu", 1, "type")));
+	
+	test("halt ->  pc % 2 == 0 ? 0x12",              "halt \n halt \n halt", Fail(("cpu", 1, "width")));
+	test("halt ->  pc          ? 0x12",              "halt \n halt \n halt", Fail(("cpu", 1, "width")));
+	test("halt -> (pc % 2 == 0 ? 0x12       )[7:0]", "halt \n halt \n halt", Fail(("cpu", 1, "type")));
+	test("halt -> (pc          ? 0x12       )[7:0]", "halt \n halt \n halt", Fail(("cpu", 1, "type")));
 }
 
 

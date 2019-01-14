@@ -114,13 +114,16 @@ fn test_rules_simple()
 	test("halt -> 7'0",        Fail(("test", 1, "multiple")));
 	test("halt -> 8'0 8'0",    Fail(("test", 1, "line break")));
 	
-	test("halt -> 1 == 1 ? 0x12",        Fail(("test", 1, "width")));
-	test("halt -> 1 == 1 ? 0x12 : 0x34", Fail(("test", 1, "width")));
-	
 	test("halt = 0 -> 8'0x12", Fail(("test", 1, "token")));
 	test("halt : 0 -> 8'0x12", Fail(("test", 1, "token")));
 	
-	//test("halt -> (1 == 1)", Fail(("test", 1, "integer")));
+	test("halt -> pc % 2 == 0 ? 0x12 : 0x34",  Pass(()));
+	test("halt -> pc % 2 == 0 ? 0x12 : 0x345", Fail(("test", 1, "width")));
+	test("halt -> pc % 2 == 0 ?   12 : 0x34",  Fail(("test", 1, "width")));
+	test("halt -> pc % 2 == 0 ? 0x12",         Fail(("test", 1, "width")));
+	
+	test("halt -> (pc % 2 == 0 ? 0x12        )[7:0]", Pass(()));
+	test("halt -> (pc % 2 == 0 ? 0x12 : 0x345)[7:0]", Pass(()));
 }
 
 
