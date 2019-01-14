@@ -8,7 +8,6 @@ function main()
 	onResize()
 	
 	document.body.onresize = onResize
-	window.onresize = onResize
 	window.onkeydown = onKeyDown
 	window.onbeforeunload = onBeforeUnload
 	
@@ -19,6 +18,7 @@ function main()
 		{
 			g_wasm = wasm
 			document.getElementById("buttonAssemble").disabled = false
+			setupVersionString()
 		})
 }
 
@@ -36,6 +36,25 @@ function setupEditor()
 		.then(r => g_codeEditor.setValue(r))
 	
 	g_codeEditor.refresh()
+}
+
+
+function setupVersionString()
+{
+	let outputPtr = null
+	try
+	{
+		outputPtr = g_wasm.instance.exports.wasm_get_version()
+	}
+	catch (e)
+	{
+		throw e
+	}
+	
+	let output = readRustString(outputPtr)
+	dropRustString(outputPtr)
+	
+	document.getElementById("spanVersion").innerHTML = "v" + output
 }
 
 

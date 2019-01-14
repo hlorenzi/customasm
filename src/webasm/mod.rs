@@ -48,6 +48,13 @@ pub unsafe extern fn wasm_assemble(format: u32, src: *mut String) -> *mut String
 
 
 #[no_mangle]
+pub unsafe extern fn wasm_get_version() -> *mut String
+{
+	wasm_string_new_with(env!("CARGO_PKG_VERSION"))
+}
+
+
+#[no_mangle]
 pub unsafe extern fn wasm_string_new(len: u32) -> *mut String
 {
 	let mut s = Box::new(String::new());
