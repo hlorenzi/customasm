@@ -103,6 +103,8 @@ fn test_rules_simple()
 	test("halt -> { x = 0x1234, x[15:0] }", Pass(()));
 	
 	test("+halt",              Fail(("test", 1, "identifier")));
+	test("{a} halt",           Fail(("test", 1, "identifier")));
+	test("123 halt",           Fail(("test", 1, "identifier")));
 	test("halt",               Fail(("test", 1, "->")));
 	test("-> 8'0",             Fail(("test", 1, "empty")));
 	test("halt -> 0",          Fail(("test", 1, "width")));

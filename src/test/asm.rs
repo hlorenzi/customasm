@@ -178,6 +178,8 @@ fn test_tokendef()
 	
 	test("#tokendef reg { r1 = 1 } \n mov r1, {src: reg} -> 0x88 @ src[7:0] \n mov r1, r1 -> 0x55", "mov r1, r2", Fail(("cpu", 3, "clashes")));
 	test("#tokendef reg { r1 = 1 } \n mov r1, r1 -> 0x55 \n mov r1, {src: reg} -> 0x88 @ src[7:0]", "mov r1, r2", Fail(("cpu", 3, "clashes")));
+	
+	test("#tokendef alu { add = 0x10, sub = 0x20 } \n {op: alu} {x} -> op[7:0] @ x[7:0]", "add 0xef \n sub 0xfe", Pass((4, "10ef20fe")));
 }
 
 

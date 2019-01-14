@@ -226,32 +226,25 @@ impl<'t> CpuDefParser<'t>
 
 	fn parse_rule_pattern(&mut self, rule: &mut Rule) -> Result<(), ()>
 	{
-		let mut prev_was_parameter = false;
 		let mut prev_was_expr_parameter = false;
-		
 		
 		while !self.parser.next_is(0, TokenKind::Arrow) && !self.parser.next_is(0, TokenKind::ColonColon)
 		{
 			let tk = self.parser.advance();
 			
-			// Force read an identifier at the start of the pattern.
-			if rule.pattern_parts.len() == 0
-			{
-				if tk.kind != TokenKind::Identifier
-					{ return Err(self.parser.report.error_span("expected identifier as first pattern token", &tk.span)); }
-					
-				rule.pattern_add_exact(&tk);
-			}
+			let is_beginning_of_pattern = rule.pattern_parts.len() == 0;
+			let mut is_allowed_at_beginning = false;
 			
 			// Read a parameter.
-			else if tk.kind == TokenKind::BraceOpen
+			if tk.kind == TokenKind::BraceOpen
 			{
 				// Check for consecutive parameters without a separating token.
-				if prev_was_parameter
+				if prev_was_expr_parameter
 					{ return Err(self.parser.report.error_span("expected a separating token between parameters", &tk.span.before())); }
 			
-				prev_was_parameter = true;
 				prev_was_expr_parameter = self.parse_rule_parameter(rule)?;
+				
+				is_allowed_at_beginning = !prev_was_expr_parameter;
 			}
 			
 			// Read an exact pattern part.
@@ -260,9 +253,11 @@ impl<'t> CpuDefParser<'t>
 				// Check for a stricter set of tokens if an expression parameter came just before.
 				if prev_was_expr_parameter && !tk.kind.is_allowed_after_pattern_parameter()
 					{ return Err(self.parser.report.error_span("ambiguous pattern token after parameter", &tk.span)); }
+					
+				if tk.kind == TokenKind::Identifier
+					{ is_allowed_at_beginning = true; }
 				
 				rule.pattern_add_exact(&tk);
-				prev_was_parameter = false;
 				prev_was_expr_parameter = false;
 			}
 			
@@ -273,6 +268,10 @@ impl<'t> CpuDefParser<'t>
 			// Else, it's illegal to appear in a pattern.
 			else
 				{ return Err(self.parser.report.error_span("invalid pattern token", &tk.span)); }
+				
+			// Error if the pattern didn't start with an identifier or tokendef parameter.
+			if is_beginning_of_pattern && !is_allowed_at_beginning
+				{ return Err(self.parser.report.error_span("expected identifier as first pattern token", &tk.span.before())); }
 		}
 	
 		Ok(())
