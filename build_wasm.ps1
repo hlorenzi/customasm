@@ -5,5 +5,5 @@ cargo +nightly build --target wasm32-unknown-unknown --release
 wasm-gc "./target/wasm32-unknown-unknown/release/customasm.wasm" -o "./target/wasm32-unknown-unknown/release/customasm.gc.wasm"
 
 # Copy to web folder
-Copy-Item -Path "./target/wasm32-unknown-unknown/release/customasm.gc.wasm" -Destination "./webasm/customasm.gc.wasm"
+Copy-Item -Path "./target/wasm32-unknown-unknown/release/customasm.gc.wasm" -Destination "./web/customasm.gc.wasm"
 

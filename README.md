@@ -5,14 +5,17 @@ This can be useful if you'd like to test out a new virtual machine's bytecode,
 or even if you're eager to write programs for that new processor architecture 
 you just implemented in FPGA!
 
-[Try it right now on your browser!](https://hlorenzi.github.io/customasm/webasm/)
+[📱 Try it right now on your browser!](https://hlorenzi.github.io/customasm/web/)
+ 
+[🎁 Check out the Releases section](https://github.com/hlorenzi/customasm/releases) 
+for pre-built binaries.
 
-[Check out the Releases section](https://github.com/hlorenzi/customasm/releases) 
-for pre-built binaries.  
+[📖 Check out the User Guide](https://github.com/hlorenzi/customasm/wiki/User-Guide)
+on how to use the main features!
 
-[Check out the documentation](/doc/index.md) for user instructions.
+[📋 Check out the documentation](/doc/index.md) for more in-depth instructions.
 
-Also, [check out an example project](/examples/nes/) which targets the NES!
+🕹 Also, [check out an example project](/examples/nes/) which targets the NES!
 
 You can compile from source by simply doing `cargo build`. There's also a
 battery of tests available at `cargo test`.
