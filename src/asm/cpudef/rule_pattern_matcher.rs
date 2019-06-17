@@ -16,7 +16,7 @@ pub struct RulePatternMatcher
 struct MatchStep
 {
 	rule_indices: Vec<usize>,
-	children_exact: HashMap<MatchStepExact, (Option<ExpressionValue>, MatchStep)>,
+	children_exact: HashMap<MatchStepExact, Vec<(Option<ExpressionValue>, MatchStep)>>,
 	children_param: HashMap<MatchStepParameter, MatchStep>
 }
 
@@ -69,17 +69,27 @@ impl RulePatternMatcher
 			{
 				let step_kind = MatchStepExact(kind, excerpt.as_ref().map(|s| s.to_ascii_lowercase()));
 				
-				if let Some(&mut (ref current_value, ref mut next_step)) = step.children_exact.get_mut(&step_kind)
 				{
-					if current_value.is_some()
-						{ return Err(report.error_span("pattern clashes with a previous instruction pattern", &rule.pattern_span)); }
-				
-					return RulePatternMatcher::build_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs);
+					let mut maybe_next_steps = step.children_exact.get_mut(&step_kind);
+					
+					if let Some(ref mut next_steps) = maybe_next_steps
+					{
+						if let Some(&mut (_, ref mut next_step)) = next_steps.iter_mut().find(|s| s.0 == None)
+						{
+							RulePatternMatcher::build_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
+							return Ok(());
+						}
+						
+						let mut next_step = MatchStep::new();
+						RulePatternMatcher::build_step(report.clone(), &mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
+						next_steps.push((None, next_step));
+						return Ok(());
+					}
 				}
 				
 				let mut next_step = MatchStep::new();
 				RulePatternMatcher::build_step(report.clone(), &mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
-				step.children_exact.insert(step_kind, (None, next_step));
+				step.children_exact.insert(step_kind, vec![(None, next_step)]);
 			}
 			
 			RulePatternPart::Parameter(param_index) =>
@@ -92,18 +102,27 @@ impl RulePatternMatcher
 					{
 						let step_kind = MatchStepExact(TokenKind::Identifier, Some(excerpt.to_ascii_lowercase()));
 						
-						if let Some(&mut (ref current_value, ref mut next_step)) = step.children_exact.get_mut(&step_kind)
 						{
-							if current_value.is_none() || (current_value.is_some() && current_value.as_ref().unwrap() != value)
-								{ return Err(report.error_span("pattern clashes with a previous instruction pattern", &rule.pattern_span)); }
+							let mut maybe_next_steps = step.children_exact.get_mut(&step_kind);
 							
-							RulePatternMatcher::build_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
-							continue;
+							if let Some(ref mut next_steps) = maybe_next_steps
+							{
+								if let Some(&mut (_, ref mut next_step)) = next_steps.iter_mut().find(|s| s.0.as_ref() == Some(value))
+								{
+									RulePatternMatcher::build_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
+									continue;
+								}
+								
+								let mut next_step = MatchStep::new();
+								RulePatternMatcher::build_step(report.clone(), &mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
+								next_steps.push((Some(value.clone()), next_step));
+								continue;
+							}
 						}
 						
 						let mut next_step = MatchStep::new();
 						RulePatternMatcher::build_step(report.clone(), &mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
-						step.children_exact.insert(step_kind, (Some(value.clone()), next_step));
+						step.children_exact.insert(step_kind, vec![(Some(value.clone()), next_step)]);
 					}
 				}
 				else
@@ -146,7 +165,7 @@ impl RulePatternMatcher
 	}
 	
 	
-	fn parse_match_step<'s>(&'s self, parser: &mut Parser, step: &'s MatchStep, exprs: &mut Vec<Expression>) -> Option<&'s [usize]>
+	fn parse_match_step<'s, 't: 's>(&'s self, parser: &mut Parser, step: &'t MatchStep, exprs: &mut Vec<Expression>) -> Option<&'t [usize]>
 	{
 		if !parser.next_is_linebreak()
 		{
@@ -157,18 +176,21 @@ impl RulePatternMatcher
 			
 			let step_exact = MatchStepExact(tk.kind, tk.excerpt.map(|s| s.to_ascii_lowercase()));
 			
-			if let Some(&(ref value, ref next_step)) = step.children_exact.get(&step_exact)
+			if let Some(ref next_steps) = step.children_exact.get(&step_exact)
 			{
-				if value.is_some()
-					{ exprs.push(value.as_ref().unwrap().make_literal()); }
-				
-				if let Some(result) = self.parse_match_step(parser, next_step, exprs)
+				for (ref value, ref next_step) in next_steps.iter()
 				{
-					return Some(result);
+					if value.is_some()
+						{ exprs.push(value.as_ref().unwrap().make_literal()); }
+					
+					if let Some(result) = self.parse_match_step(parser, next_step, exprs)
+					{
+						return Some(result);
+					}
+					
+					if value.is_some()
+						{ exprs.pop(); }
 				}
-				
-				if value.is_some()
-					{ exprs.pop(); }
 			}
 			
 			parser.restore(parser_state);
@@ -226,25 +248,28 @@ impl RulePatternMatcher
 			println!("match #{}", rule_index);
 		}
 			
-		for (key, next_step) in &step.children_exact
+		for (key, next_steps) in &step.children_exact
 		{
-			for _ in 0..indent
-				{ print!("   "); }
-			
-			print!("{}", key.0.printable_excerpt(key.1.as_ref().map(|s| s as &str)));
-			
-			if next_step.0.is_some()
+			for (ref value, ref next_step) in next_steps
 			{
-				match &next_step.0.as_ref().unwrap()
+				for _ in 0..indent
+					{ print!("   "); }
+				
+				print!("{}", key.0.printable_excerpt(key.1.as_ref().map(|s| s as &str)));
+				
+				if value.is_some()
 				{
-					&ExpressionValue::Integer(ref bigint) => print!(" (= {})", bigint),
-					_ => unreachable!()
+					match &value.as_ref().unwrap()
+					{
+						&ExpressionValue::Integer(ref bigint) => print!(" (= {})", bigint),
+						_ => unreachable!()
+					}
 				}
+				
+				println!();
+				
+				self.print_debug_inner(&next_step, indent + 1);
 			}
-			
-			println!();
-			
-			self.print_debug_inner(&next_step.1, indent + 1);
 		}
 		
 		for (_, next_step) in &step.children_param
