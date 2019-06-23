@@ -9,7 +9,7 @@ use super::{ExpectedResult, expect_result};
 fn test<S>(src: S, expected: ExpectedResult<()>)
 where S: Into<Vec<u8>>
 {
-	let compile = |report: RcReport, fileserver: &FileServer| -> Result<(), ()>
+	let compile = |report: RcReport, fileserver: &dyn FileServer| -> Result<(), ()>
 	{
 		let chars = fileserver.get_chars(report.clone(), "test", None)?;
 		let tokens = tokenize(report.clone(), "test", &chars)?;

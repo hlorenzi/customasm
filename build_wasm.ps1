@@ -1,5 +1,5 @@
 # Build wasm binary
-cargo +nightly build --target wasm32-unknown-unknown --release
+cargo +nightly build --lib --target wasm32-unknown-unknown --release
 
 # Reduce binary size
 wasm-gc "./target/wasm32-unknown-unknown/release/customasm.wasm" -o "./target/wasm32-unknown-unknown/release/customasm.gc.wasm"

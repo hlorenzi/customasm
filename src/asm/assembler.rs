@@ -71,7 +71,7 @@ impl AssemblerState
 	}
 	
 	
-	pub fn process_file<S>(&mut self, report: RcReport, fileserver: &FileServer, filename: S) -> Result<(), ()>
+	pub fn process_file<S>(&mut self, report: RcReport, fileserver: &dyn FileServer, filename: S) -> Result<(), ()>
 	where S: Into<String>
 	{
 		AssemblerParser::parse_file(report.clone(), self, fileserver, filename, None)?;

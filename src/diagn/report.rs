@@ -130,7 +130,7 @@ impl Report
 	}
 	
 	
-	pub fn has_error_at(&self, fileserver: &FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	pub fn has_error_at(&self, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
 	{
 		for msg in &self.messages
 		{
@@ -142,7 +142,7 @@ impl Report
 	}
 	
 	
-	fn msg_has_error_at(&self, msg: &Message, fileserver: &FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	fn msg_has_error_at(&self, msg: &Message, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
 	{
 		match msg.inner
 		{
@@ -183,7 +183,7 @@ impl Report
 	}
 	
 	
-	pub fn print_all(&self, writer: &mut Write, fileserver: &FileServer)
+	pub fn print_all(&self, writer: &mut dyn Write, fileserver: &dyn FileServer)
 	{
 		for msg in &self.messages
 		{
@@ -193,7 +193,7 @@ impl Report
 	}
 	
 	
-	fn print_msg(&self, writer: &mut Write, fileserver: &FileServer, msg: &Message, indent: usize)
+	fn print_msg(&self, writer: &mut dyn Write, fileserver: &dyn FileServer, msg: &Message, indent: usize)
 	{
 		let kind_label = msg.kind.get_label();
 		let highlight_color = msg.kind.get_color();
@@ -259,14 +259,14 @@ impl Report
 	}
 	
 	
-	fn print_indent(&self, writer: &mut Write, indent: usize)
+	fn print_indent(&self, writer: &mut dyn Write, indent: usize)
 	{
 		for _ in 0..indent
 			{ write!(writer, "     ").unwrap(); }
 	}
 	
 	
-	fn print_msg_src(&self, writer: &mut Write, counter: &CharCounter, highlight_color: &'static str, line1: usize, col1: usize, line2: usize, col2: usize, indent: usize)
+	fn print_msg_src(&self, writer: &mut dyn Write, counter: &CharCounter, highlight_color: &'static str, line1: usize, col1: usize, line2: usize, col2: usize, indent: usize)
 	{
 		let first_line = if (line1 as isize - 2) < 0
 			{ 0 }
@@ -409,13 +409,13 @@ impl RcReport
 	}
 	
 	
-	pub fn has_error_at(&self, fileserver: &FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	pub fn has_error_at(&self, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
 	{
 		self.report.borrow_mut().has_error_at(fileserver, filename, line, error_excerpt)
 	}
 	
 	
-	pub fn print_all(&self, writer: &mut Write, fileserver: &FileServer)
+	pub fn print_all(&self, writer: &mut dyn Write, fileserver: &dyn FileServer)
 	{
 		self.report.borrow_mut().print_all(writer, fileserver);
 	}

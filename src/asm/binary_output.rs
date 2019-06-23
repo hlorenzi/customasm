@@ -220,6 +220,8 @@ impl BinaryOutput
 		let mut index = start_bit;
 		while index < end_bit
 		{
+			result.push_str(&format!(" {:1$X}: ", index / 8, addr_max_width));
+			
 			let mut byte: u8 = 0;
 			for _ in 0..8
 			{
@@ -228,7 +230,6 @@ impl BinaryOutput
 				index += 1;
 			}
 			
-			result.push_str(&format!("{:1$X}: ", index / 8, addr_max_width));
 			result.push_str(&format!("{:02X};\n", byte));
 		}
 		
@@ -278,6 +279,112 @@ impl BinaryOutput
 		}
 		
 		result.push_str(":00000001FF");
+		result
+	}
+	
+	
+	pub fn generate_comma(&self, start_bit: usize, end_bit: usize, radix: usize) -> String
+	{
+		let mut result = String::new();
+		
+		let mut index = start_bit;
+		while index < end_bit
+		{
+			let mut byte: u8 = 0;
+			for _ in 0..8
+			{
+				byte <<= 1;
+				byte |= if self.read(index) { 1 } else { 0 };
+				index += 1;
+			}
+			
+			match radix
+			{
+				10 => result.push_str(&format!("{}", byte)),
+				16 => result.push_str(&format!("0x{:02x}", byte)),
+				_  => panic!("invalid radix")
+			}
+			
+			if index < end_bit
+			{ 
+				result.push_str(", ");
+				
+				if (index / 8) % 16 == 0
+					{ result.push('\n'); }
+			}
+		}
+		
+		result
+	}
+	
+	
+	pub fn generate_c_array(&self, start_bit: usize, end_bit: usize, radix: usize) -> String
+	{
+		let mut result = String::new();
+		
+		result.push_str("const unsigned char data[] = {\n");
+		
+		let byte_num = (end_bit - start_bit) / 8 + if (end_bit - start_bit) % 8 != 0 { 1 } else { 0 };
+		let addr_max_width = format!("{:x}", byte_num - 1).len();
+		
+		let mut index = start_bit;
+		result.push_str(&format!("\t/* 0x{:01$x} */ ", 0, addr_max_width));
+		
+		while index < end_bit
+		{
+			let mut byte: u8 = 0;
+			for _ in 0..8
+			{
+				byte <<= 1;
+				byte |= if self.read(index) { 1 } else { 0 };
+				index += 1;
+			}
+			
+			match radix
+			{
+				10 => result.push_str(&format!("{}", byte)),
+				16 => result.push_str(&format!("0x{:02x}", byte)),
+				_  => panic!("invalid radix")
+			}
+			
+			if index < end_bit
+			{ 
+				result.push_str(", ");
+				
+				if (index / 8) % 16 == 0
+				{
+					result.push_str(&format!("\n\t/* 0x{:01$x} */ ", index / 8, addr_max_width));
+				}
+			}
+		}
+		
+		result.push_str("\n};");
+		result
+	}
+	
+	
+	// From: https://github.com/milanvidakovic/customasm/blob/master/src/asm/binary_output.rs#L84
+	pub fn generate_logisim(&self, start_bit: usize, end_bit: usize, bits_per_chunk: usize) -> String
+	{
+		let mut result = String::new();
+		result.push_str("v2.0 raw\n");
+		
+		let mut index = start_bit;
+		while index < end_bit
+		{
+			let mut value: u16 = 0;
+			for _ in 0..bits_per_chunk
+			{
+				value <<= 1;
+				value |= if self.read(index) { 1 } else { 0 };
+				index += 1;
+			}
+			
+			result.push_str(&format!("{:01$x} ", value, bits_per_chunk / 4));
+			if (index / 8) % 16 == 0
+				{ result.push('\n'); }
+		}
+		
 		result
 	}
 }

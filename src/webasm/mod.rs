@@ -22,12 +22,18 @@ pub unsafe extern fn wasm_assemble(format: u32, src: *mut String) -> *mut String
 		let output = asm.get_binary_output();
 		match format
 		{
-			0 => Ok(output.generate_hexdump (0, output.len())),
-			1 => Ok(output.generate_bindump (0, output.len())),
-			2 => Ok(output.generate_hexstr  (0, output.len())),
-			3 => Ok(output.generate_binstr  (0, output.len())),
-			4 => Ok(output.generate_mif     (0, output.len())),
-			5 => Ok(output.generate_intelhex(0, output.len())),
+			 0 => Ok(output.generate_hexdump (0, output.len())),
+			 1 => Ok(output.generate_bindump (0, output.len())),
+			 2 => Ok(output.generate_hexstr  (0, output.len())),
+			 3 => Ok(output.generate_binstr  (0, output.len())),
+			 4 => Ok(output.generate_mif     (0, output.len())),
+			 5 => Ok(output.generate_intelhex(0, output.len())),
+			 6 => Ok(output.generate_comma   (0, output.len(), 10)),
+			 7 => Ok(output.generate_comma   (0, output.len(), 16)),
+			 8 => Ok(output.generate_c_array (0, output.len(), 10)),
+			 9 => Ok(output.generate_c_array (0, output.len(), 16)),
+			10 => Ok(output.generate_logisim (0, output.len(), 8)),
+			11 => Ok(output.generate_logisim (0, output.len(), 16)),
 			_ => unreachable!()
 		}
 	};

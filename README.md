@@ -28,7 +28,8 @@ Usage: customasm [options] <asm-file-1> ... <asm-file-N>
 Options:
     -f, --format FORMAT The format of the output file. Possible formats:
                         binary, binstr, hexstr, bindump, hexdump,
-						mif, intelhex
+						mif, intelhex, deccomma, hexcomma, decc, hexc,
+						logisim8, logisim16
 						
     -o, --output FILE   The name of the output file.
     -p, --print         Print output to stdout instead of writing to a file.

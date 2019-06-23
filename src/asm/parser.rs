@@ -14,7 +14,7 @@ use num_traits::ToPrimitive;
 
 pub struct AssemblerParser<'a>
 {
-	pub fileserver: &'a FileServer,
+	pub fileserver: &'a dyn FileServer,
 	pub state: &'a mut AssemblerState,
 	pub cur_filename: String,
 	pub parser: Parser
@@ -23,12 +23,12 @@ pub struct AssemblerParser<'a>
 	
 impl<'a> AssemblerParser<'a>
 {
-	pub fn parse_file<S>(report: RcReport, state: &mut AssemblerState, fileserver: &FileServer, filename: S, filename_span: Option<&Span>) -> Result<(), ()>
+	pub fn parse_file<S>(report: RcReport, state: &mut AssemblerState, fileserver: &dyn FileServer, filename: S, filename_span: Option<&Span>) -> Result<(), ()>
 	where S: Into<String>
 	{
 		let filename_owned = filename.into();
 		let chars = fileserver.get_chars(report.clone(), &filename_owned, filename_span)?;
-		let tokens = tokenize(report.clone(), filename_owned.as_ref(), &chars)?;
+		let tokens = tokenize(report.clone(), AsRef::<str>::as_ref(&filename_owned), &chars)?;
 		
 		let mut parser = AssemblerParser
 		{

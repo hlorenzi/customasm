@@ -39,7 +39,7 @@ where S: Into<Vec<u8>>
 }
 
 
-fn test_fileserver<S>(fileserver: &FileServer, asm_filename: S, expected: ExpectedResult<(usize, &'static str)>)
+fn test_fileserver<S>(fileserver: &dyn FileServer, asm_filename: S, expected: ExpectedResult<(usize, &'static str)>)
 where S: Into<String>
 {
 	let bits = if let Pass(expected) = expected
@@ -47,7 +47,7 @@ where S: Into<String>
 	else
 		{ 4 };
 		
-	let assemble = |report: RcReport, fileserver: &FileServer, filename: S| -> Result<(usize, String), ()>
+	let assemble = |report: RcReport, fileserver: &dyn FileServer, filename: S| -> Result<(usize, String), ()>
 	{
 		let mut asm = AssemblerState::new();
 		asm.process_file(report.clone(), fileserver, filename)?;

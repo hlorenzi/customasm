@@ -121,7 +121,7 @@ function assemble()
 	
 	let divText = document.getElementById("divOutputText")
 	divText.innerHTML = output
-	divText.style.whiteSpace = (isError || format <= 1) ? "pre" : "normal"
+	divText.style.whiteSpace = (isError || format <= 1) ? "pre" : "no-wrap"
 }
 
 

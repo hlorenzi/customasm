@@ -16,10 +16,16 @@ enum OutputFormat
 	HexDump,
 	Mif,
 	IntelHex,
+	DecComma,
+	HexComma,
+	DecC,
+	HexC,
+	LogiSim8,
+	LogiSim16,
 }
 
 
-pub fn drive(args: &Vec<String>, fileserver: &mut FileServer) -> Result<(), ()>
+pub fn drive(args: &Vec<String>, fileserver: &mut dyn FileServer) -> Result<(), ()>
 {
 	let opts = make_opts();
 	
@@ -43,7 +49,7 @@ pub fn drive(args: &Vec<String>, fileserver: &mut FileServer) -> Result<(), ()>
 }
 
 
-fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fileserver: &mut FileServer) -> Result<(), bool>
+fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fileserver: &mut dyn FileServer) -> Result<(), bool>
 {
 	let matches = parse_opts(report.clone(), opts, args).map_err(|_| true)?;
 	
@@ -64,13 +70,20 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 	
 	let out_format = match matches.opt_str("f").as_ref().map(|s| s.as_ref())
 	{
-		Some("binstr")   => OutputFormat::BinStr,
-		Some("bindump")  => OutputFormat::BinDump,
-		Some("hexstr")   => OutputFormat::HexStr,
-		Some("hexdump")  => OutputFormat::HexDump,
-		Some("binary")   => OutputFormat::Binary,
-		Some("mif")      => OutputFormat::Mif,
-		Some("intelhex") => OutputFormat::IntelHex,
+		Some("binstr")    => OutputFormat::BinStr,
+		Some("bindump")   => OutputFormat::BinDump,
+		Some("hexstr")    => OutputFormat::HexStr,
+		Some("hexdump")   => OutputFormat::HexDump,
+		Some("binary")    => OutputFormat::Binary,
+		Some("mif")       => OutputFormat::Mif,
+		Some("intelhex")  => OutputFormat::IntelHex,
+		Some("deccomma")  => OutputFormat::DecComma,
+		Some("hexcomma")  => OutputFormat::HexComma,
+		Some("decc")      => OutputFormat::DecC,
+		Some("hexc")      => OutputFormat::HexC,
+		Some("c")         => OutputFormat::HexC,
+		Some("logisim8")  => OutputFormat::LogiSim8,
+		Some("logisim16") => OutputFormat::LogiSim16,
 		
 		None => if out_stdout
 			{ OutputFormat::HexDump }
@@ -110,13 +123,19 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 	
 	let output_data = match out_format
 	{
-		OutputFormat::Binary   => assembled.generate_binary  (0, assembled.len()),
-		OutputFormat::BinStr   => assembled.generate_binstr  (0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::BinDump  => assembled.generate_bindump (0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexStr   => assembled.generate_hexstr  (0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexDump  => assembled.generate_hexdump (0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::Mif      => assembled.generate_mif     (0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::IntelHex => assembled.generate_intelhex(0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::Binary    => assembled.generate_binary  (0, assembled.len()),
+		OutputFormat::BinStr    => assembled.generate_binstr  (0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::BinDump   => assembled.generate_bindump (0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::HexStr    => assembled.generate_hexstr  (0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::HexDump   => assembled.generate_hexdump (0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::Mif       => assembled.generate_mif     (0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::IntelHex  => assembled.generate_intelhex(0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::DecComma  => assembled.generate_comma   (0, assembled.len(), 10).bytes().collect::<Vec<u8>>(),
+		OutputFormat::HexComma  => assembled.generate_comma   (0, assembled.len(), 16).bytes().collect::<Vec<u8>>(),
+		OutputFormat::DecC      => assembled.generate_c_array (0, assembled.len(), 10).bytes().collect::<Vec<u8>>(),
+		OutputFormat::HexC      => assembled.generate_c_array (0, assembled.len(), 16).bytes().collect::<Vec<u8>>(),
+		OutputFormat::LogiSim8  => assembled.generate_logisim (0, assembled.len(), 8).bytes().collect::<Vec<u8>>(),
+		OutputFormat::LogiSim16 => assembled.generate_logisim (0, assembled.len(), 16).bytes().collect::<Vec<u8>>(),
 	};
 	
 	if out_stdout
@@ -145,7 +164,7 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 fn make_opts() -> getopts::Options
 {
     let mut opts = getopts::Options::new();
-    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, binstr, hexstr, bindump, hexdump, mif, intelhex", "FORMAT");
+    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16", "FORMAT");
     opts.optmulti("i", "include", "Specifies an additional file for processing before the given <asm-files>. [deprecated]", "FILE");
     opts.optopt("o", "output", "The name of the output file.", "FILE");
     opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
@@ -201,7 +220,7 @@ fn get_default_output_filename(report: RcReport, input_filename: &str) -> Result
 }
 
 
-pub fn assemble(report: RcReport, fileserver: &FileServer, filenames: &[String], quiet: bool) -> Result<BinaryOutput, ()>
+pub fn assemble(report: RcReport, fileserver: &dyn FileServer, filenames: &[String], quiet: bool) -> Result<BinaryOutput, ()>
 {
 	if !quiet
 		{ print_header(); }

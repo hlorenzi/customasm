@@ -19,7 +19,7 @@ pub enum ExpectedResult<T>
 }
 
 
-pub fn expect_result<T>(report: RcReport, fileserver: &FileServer, got: Option<T>, expected: ExpectedResult<T>)
+pub fn expect_result<T>(report: RcReport, fileserver: &dyn FileServer, got: Option<T>, expected: ExpectedResult<T>)
 where T: Debug + PartialEq
 {
 	enable_windows_ansi_support();
