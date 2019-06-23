@@ -5,7 +5,7 @@ This can be useful if you'd like to test out a new virtual machine's bytecode,
 or even if you're eager to write programs for that new processor architecture 
 you just implemented in FPGA!
 
-[📱 Try it right now on your browser!](https://hlorenzi.github.io/customasm/web/)
+[📱 Try it right now in your browser!](https://hlorenzi.github.io/customasm/web/)
  
 [🎁 Check out the Releases section](https://github.com/hlorenzi/customasm/releases) 
 for pre-built binaries.
@@ -15,7 +15,7 @@ on how to use the main features!
 
 [📋 Check out the documentation](/doc/index.md) for more in-depth instructions.
 
-🕹 Also, [check out an example project](/examples/nes/) which targets the NES!
+[🕹 Check out an example project](/examples/nes/) which targets the NES!
 
 You can compile from source by simply doing `cargo build`. There's also a
 battery of tests available at `cargo test`.
@@ -27,9 +27,7 @@ Usage: customasm [options] <asm-file-1> ... <asm-file-N>
 
 Options:
     -f, --format FORMAT The format of the output file. Possible formats:
-                        binary, binstr, hexstr, bindump, hexdump
-    -i, --include FILE  Specifies an additional file for processing before the
-                        given <asm-files>.
+                        binary, binstr, hexstr, bindump, hexdump, mif
     -o, --output FILE   The name of the output file.
     -p, --print         Print output to stdout instead of writing to a file.
     -q, --quiet         Suppress progress reports.
@@ -73,11 +71,11 @@ multiply3x4:
 ...the assembler would use the `#cpudef` rules to convert the instructions into binary code:
 
 ```
-0x0100: 11 00
-0x0102: 12 03
-0x0104: 13 04
-0x0106: 21
-0x0107: 33 01
-0x0109: 40 01 06
-0x010c: 50
+0x0100: 11 00     ; load r1, 0
+0x0102: 12 03     ; load r2, 3
+0x0104: 13 04     ; load r3, 4
+0x0106: 21        ; add r1, r2
+0x0107: 33 01     ; sub r3, 1
+0x0109: 40 01 06  ; jnz .loop
+0x010c: 50        ; ret
 ```

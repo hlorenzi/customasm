@@ -13,7 +13,8 @@ enum OutputFormat
 	BinStr,
 	HexStr,
 	BinDump,
-	HexDump
+	HexDump,
+	Mif,
 }
 
 
@@ -67,6 +68,7 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 		Some("hexstr")  => OutputFormat::HexStr,
 		Some("hexdump") => OutputFormat::HexDump,
 		Some("binary")  => OutputFormat::Binary,
+		Some("mif")  => OutputFormat::Mif,
 		
 		None => if out_stdout
 			{ OutputFormat::HexDump }
@@ -106,11 +108,12 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 	
 	let output_data = match out_format
 	{
+		OutputFormat::Binary  => assembled.generate_binary (0, assembled.len()),
 		OutputFormat::BinStr  => assembled.generate_binstr (0, assembled.len()).bytes().collect::<Vec<u8>>(),
 		OutputFormat::BinDump => assembled.generate_bindump(0, assembled.len()).bytes().collect::<Vec<u8>>(),
 		OutputFormat::HexStr  => assembled.generate_hexstr (0, assembled.len()).bytes().collect::<Vec<u8>>(),
 		OutputFormat::HexDump => assembled.generate_hexdump(0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::Binary  => assembled.generate_binary (0, assembled.len())
+		OutputFormat::Mif     => assembled.generate_mif    (0, assembled.len()).bytes().collect::<Vec<u8>>(),
 	};
 	
 	if out_stdout
@@ -139,8 +142,8 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 fn make_opts() -> getopts::Options
 {
     let mut opts = getopts::Options::new();
-    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, binstr, hexstr, bindump, hexdump", "FORMAT");
-    opts.optmulti("i", "include", "Specifies an additional file for processing before the given <asm-files>.", "FILE");
+    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, binstr, hexstr, bindump, hexdump, mif", "FORMAT");
+    opts.optmulti("i", "include", "Specifies an additional file for processing before the given <asm-files>. [deprecated]", "FILE");
     opts.optopt("o", "output", "The name of the output file.", "FILE");
     opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
     opts.optflag("q", "quiet", "Suppress progress reports.");

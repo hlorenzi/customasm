@@ -24,8 +24,9 @@ pub unsafe extern fn wasm_assemble(format: u32, src: *mut String) -> *mut String
 		{
 			0 => Ok(output.generate_hexdump(0, output.len())),
 			1 => Ok(output.generate_bindump(0, output.len())),
-			2 => Ok(output.generate_hexstr(0, output.len())),
-			3 => Ok(output.generate_binstr(0, output.len())),
+			2 => Ok(output.generate_hexstr (0, output.len())),
+			3 => Ok(output.generate_binstr (0, output.len())),
+			4 => Ok(output.generate_mif    (0, output.len())),
 			_ => unreachable!()
 		}
 	};

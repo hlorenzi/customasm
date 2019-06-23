@@ -199,4 +199,40 @@ impl BinaryOutput
 		
 		result
 	}
+	
+	
+	pub fn generate_mif(&self, start_bit: usize, end_bit: usize) -> String
+	{
+		let mut result = String::new();
+		
+		let byte_num = (end_bit - start_bit) / 8 + if (end_bit - start_bit) % 8 != 0 { 1 } else { 0 };
+		
+		result.push_str(&format!("DEPTH = {};\n", byte_num));
+		result.push_str("WIDTH = 8;\n");
+		result.push_str("ADDRESS_RADIX = HEX;\n");
+		result.push_str("DATA_RADIX = HEX;\n");
+		result.push_str("\n");
+		result.push_str("CONTENT\n");
+		result.push_str("BEGIN\n");
+		
+		let addr_max_width = format!("{:x}", byte_num - 1).len();
+		
+		let mut index = start_bit;
+		while index < end_bit
+		{
+			let mut byte: u8 = 0;
+			for _ in 0..8
+			{
+				byte <<= 1;
+				byte |= if self.read(index) { 1 } else { 0 };
+				index += 1;
+			}
+			
+			result.push_str(&format!("{:1$X}: ", index / 8, addr_max_width));
+			result.push_str(&format!("{:02X};\n", byte));
+		}
+		
+		result.push_str("END;");
+		result
+	}
 }
