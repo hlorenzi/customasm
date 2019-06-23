@@ -235,4 +235,49 @@ impl BinaryOutput
 		result.push_str("END;");
 		result
 	}
+	
+	
+	pub fn generate_intelhex(&self, start_bit: usize, end_bit: usize) -> String
+	{
+		let mut result = String::new();
+		
+		let mut bytes_left = (end_bit - start_bit) / 8 + if (end_bit - start_bit) % 8 != 0 { 1 } else { 0 };
+		
+		let mut index = start_bit;
+		while index < end_bit
+		{
+			let bytes_in_row = if bytes_left > 32 { 32 } else { bytes_left };
+			
+			result.push(':');
+			result.push_str(&format!("{:02X}", bytes_in_row));
+			result.push_str(&format!("{:04X}", index / 8));
+			result.push_str("00");
+			
+			let mut checksum = 0_u8;
+			checksum = checksum.wrapping_add(bytes_in_row as u8);
+			checksum = checksum.wrapping_add(((index / 8) >> 8) as u8);
+			checksum = checksum.wrapping_add((index / 8) as u8);
+			
+			for _ in 0..bytes_in_row
+			{
+				let mut byte: u8 = 0;
+				for _ in 0..8
+				{
+					byte <<= 1;
+					byte |= if self.read(index) { 1 } else { 0 };
+					index += 1;
+				}
+				
+				result.push_str(&format!("{:02X}", byte));
+				checksum = checksum.wrapping_add(byte);
+			}
+			
+			bytes_left -= bytes_in_row;
+			result.push_str(&format!("{:02X}", (!checksum).wrapping_add(1)));
+			result.push('\n');
+		}
+		
+		result.push_str(":00000001FF");
+		result
+	}
 }
