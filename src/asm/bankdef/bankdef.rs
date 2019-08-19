@@ -1,5 +1,5 @@
-use diagn::Span;
-use syntax::{Token, TokenKind, Parser};
+use crate::diagn::Span;
+use crate::syntax::{Token, TokenKind, Parser};
 
 
 pub struct BankDef

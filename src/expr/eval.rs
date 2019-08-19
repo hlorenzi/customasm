@@ -1,4 +1,4 @@
-use diagn::{RcReport, Span};
+use crate::diagn::{RcReport, Span};
 use super::Expression;
 use super::ExpressionValue;
 use super::UnaryOp;

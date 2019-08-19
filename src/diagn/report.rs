@@ -1,6 +1,6 @@
-use diagn::Span;
-use util::CharCounter;
-use util::FileServer;
+use crate::diagn::Span;
+use crate::util::CharCounter;
+use crate::util::FileServer;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::io::Write;

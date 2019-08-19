@@ -1,6 +1,6 @@
-use asm::AssemblerState;
-use diagn::RcReport;
-use util::FileServerMock;
+use crate::asm::AssemblerState;
+use crate::diagn::RcReport;
+use crate::util::FileServerMock;
 use std::mem;
 use std::ptr;
 

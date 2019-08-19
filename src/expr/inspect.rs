@@ -1,4 +1,4 @@
-use diagn::Span;
+use crate::diagn::Span;
 use super::Expression;
 use super::BinaryOp;
 

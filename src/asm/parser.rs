@@ -1,13 +1,13 @@
-use diagn::{Span, RcReport};
-use syntax::{Token, TokenKind, tokenize, Parser};
-use syntax::excerpt_as_string_contents;
-use expr::{Expression, ExpressionValue, ExpressionEvalContext};
-use asm::{AssemblerState, ParsedInstruction, ParsedExpression};
-use asm::cpudef::CpuDef;
-use asm::BankDef;
-use asm::BinaryBlock;
-use util::filename_navigate;
-use util::FileServer;
+use crate::diagn::{Span, RcReport};
+use crate::syntax::{Token, TokenKind, tokenize, Parser};
+use crate::syntax::excerpt_as_string_contents;
+use crate::expr::{Expression, ExpressionValue, ExpressionEvalContext};
+use crate::asm::{AssemblerState, ParsedInstruction, ParsedExpression};
+use crate::asm::cpudef::CpuDef;
+use crate::asm::BankDef;
+use crate::asm::BinaryBlock;
+use crate::util::filename_navigate;
+use crate::util::FileServer;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 

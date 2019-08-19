@@ -1,4 +1,4 @@
-use syntax::{TokenKind, Parser, excerpt_as_usize, excerpt_as_bigint};
+use crate::syntax::{TokenKind, Parser, excerpt_as_usize, excerpt_as_bigint};
 use super::{Expression, ExpressionValue, UnaryOp, BinaryOp};
 
 

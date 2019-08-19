@@ -1,6 +1,6 @@
-use diagn::RcReport;
-use asm::AssemblerState;
-use util::{FileServer, FileServerMock};
+use crate::diagn::RcReport;
+use crate::asm::AssemblerState;
+use crate::util::{FileServer, FileServerMock};
 use super::ExpectedResult::*;
 use super::{ExpectedResult, expect_result};
 

@@ -1,7 +1,7 @@
-use diagn::RcReport;
-use syntax::{tokenize, Parser};
-use expr::{Expression, ExpressionValue, ExpressionEvalContext};
-use util::{FileServer, FileServerMock};
+use crate::diagn::RcReport;
+use crate::syntax::{tokenize, Parser};
+use crate::expr::{Expression, ExpressionValue, ExpressionEvalContext};
+use crate::util::{FileServer, FileServerMock};
 use super::ExpectedResult::*;
 use super::{ExpectedResult, expect_result};
 use num_bigint::BigInt;
@@ -10,7 +10,7 @@ use num_bigint::BigInt;
 fn test<S>(src: S, expected: ExpectedResult<ExpressionValue>)
 where S: Into<Vec<u8>>
 {
-	fn compile(report: RcReport, fileserver: &FileServer) -> Result<ExpressionValue, ()>
+	fn compile(report: RcReport, fileserver: &dyn FileServer) -> Result<ExpressionValue, ()>
 	{
 		let chars = fileserver.get_chars(report.clone(), "test", None)?;
 		let tokens = tokenize(report.clone(), "test", &chars)?;

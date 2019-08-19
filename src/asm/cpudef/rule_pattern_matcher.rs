@@ -1,7 +1,7 @@
-use diagn::RcReport;
-use syntax::{TokenKind, Parser};
-use expr::{Expression, ExpressionValue};
-use asm::cpudef::{Rule, RuleParameterType, RulePatternPart, CustomTokenDef};
+use crate::diagn::RcReport;
+use crate::syntax::{TokenKind, Parser};
+use crate::expr::{Expression, ExpressionValue};
+use crate::asm::cpudef::{Rule, RuleParameterType, RulePatternPart, CustomTokenDef};
 use std::collections::HashMap;
 
 

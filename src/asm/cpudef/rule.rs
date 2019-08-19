@@ -1,6 +1,6 @@
-use diagn::Span;
-use syntax::{Token, TokenKind};
-use expr::{Expression, ExpressionValue};
+use crate::diagn::Span;
+use crate::syntax::{Token, TokenKind};
+use crate::expr::{Expression, ExpressionValue};
 
 
 #[derive(Debug)]

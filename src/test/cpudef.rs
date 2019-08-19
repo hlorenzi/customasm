@@ -1,7 +1,7 @@
-use diagn::RcReport;
-use asm::cpudef::CpuDef;
-use syntax::{Parser, tokenize};
-use util::{FileServer, FileServerMock};
+use crate::diagn::RcReport;
+use crate::asm::cpudef::CpuDef;
+use crate::syntax::{Parser, tokenize};
+use crate::util::{FileServer, FileServerMock};
 use super::ExpectedResult::*;
 use super::{ExpectedResult, expect_result};
 

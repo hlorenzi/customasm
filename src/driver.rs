@@ -1,8 +1,8 @@
-use diagn::RcReport;
-use util::FileServer;
-use util::enable_windows_ansi_support;
-use asm::BinaryOutput;
-use asm::AssemblerState;
+use crate::diagn::RcReport;
+use crate::util::FileServer;
+use crate::util::enable_windows_ansi_support;
+use crate::asm::BinaryOutput;
+use crate::asm::AssemblerState;
 use std::io::stdout;
 use getopts;
 

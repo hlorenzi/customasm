@@ -1,4 +1,4 @@
-use diagn::{Span, RcReport};
+use crate::diagn::{Span, RcReport};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write};

@@ -1,10 +1,10 @@
-use diagn::{Span, RcReport};
-use expr::{Expression, ExpressionValue, ExpressionEvalContext};
-use asm::{AssemblerParser, BinaryOutput, LabelManager, LabelContext};
-use asm::BankDef;
-use asm::BinaryBlock;
-use asm::cpudef::CpuDef;
-use util::FileServer;
+use crate::diagn::{Span, RcReport};
+use crate::expr::{Expression, ExpressionValue, ExpressionEvalContext};
+use crate::asm::{AssemblerParser, BinaryOutput, LabelManager, LabelContext};
+use crate::asm::BankDef;
+use crate::asm::BinaryBlock;
+use crate::asm::cpudef::CpuDef;
+use crate::util::FileServer;
 use num_bigint::ToBigInt;
 
 

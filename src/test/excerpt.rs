@@ -1,6 +1,6 @@
-use diagn::{Span, RcReport};
-use syntax::excerpt_as_string_contents;
-use util::FileServerMock;
+use crate::diagn::{Span, RcReport};
+use crate::syntax::excerpt_as_string_contents;
+use crate::util::FileServerMock;
 use super::ExpectedResult::*;
 use super::{ExpectedResult, expect_result};
 use std::rc::Rc;

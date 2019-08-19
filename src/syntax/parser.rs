@@ -1,5 +1,5 @@
-use diagn::RcReport;
-use syntax::{Token, TokenKind, excerpt_as_usize};
+use crate::diagn::RcReport;
+use crate::syntax::{Token, TokenKind, excerpt_as_usize};
 
 
 pub struct Parser
