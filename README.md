@@ -27,9 +27,9 @@ Usage: customasm [options] <asm-file-1> ... <asm-file-N>
 
 Options:
     -f, --format FORMAT The format of the output file. Possible formats:
-                        binary, binstr, hexstr, bindump, hexdump,
-                        mif, intelhex, deccomma, hexcomma, decc, hexc,
-                        logisim8, logisim16
+                        binary, annotated, annotatedbin, binstr, hexstr,
+                        bindump, hexdump, mif, intelhex, deccomma, hexcomma,
+                        decc, hexc, logisim8, logisim16
                         
     -o, --output FILE   The name of the output file.
     -p, --print         Print output to stdout instead of writing to a file.
@@ -73,12 +73,16 @@ multiply3x4:
 
 ...the assembler would use the `#cpudef` rules to convert the instructions into binary code:
 
-```
-0x0100: 11 00     ; load r1, 0
-0x0102: 12 03     ; load r2, 3
-0x0104: 13 04     ; load r3, 4
-0x0106: 21        ; add r1, r2
-0x0107: 33 01     ; sub r3, 1
-0x0109: 40 01 06  ; jnz .loop
-0x010c: 50        ; ret
+```asm
+  outp | addr | data
+
+ 100:0 |  100 |          ; multiply3x4:
+ 100:0 |  100 | 11 00    ; load r1, 0
+ 102:0 |  102 | 12 03    ; load r2, 3
+ 104:0 |  104 | 13 04    ; load r3, 4
+ 106:0 |  106 |          ; .loop:
+ 106:0 |  106 | 21       ; add r1, r2
+ 107:0 |  107 | 33 01    ; sub r3, 1
+ 109:0 |  109 | 40 01 06 ; jnz .loop
+ 10c:0 |  10c | 50       ; ret
 ```

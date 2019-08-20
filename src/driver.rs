@@ -1,7 +1,7 @@
 use crate::diagn::RcReport;
 use crate::util::FileServer;
 use crate::util::enable_windows_ansi_support;
-use crate::asm::BinaryOutput;
+use crate::asm::BinaryBlock;
 use crate::asm::AssemblerState;
 use std::io::stdout;
 use getopts;
@@ -10,6 +10,8 @@ use getopts;
 enum OutputFormat
 {
 	Binary,
+	AnnotatedHex,
+	AnnotatedBin,
 	BinStr,
 	HexStr,
 	BinDump,
@@ -70,6 +72,10 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 	
 	let out_format = match matches.opt_str("f").as_ref().map(|s| s.as_ref())
 	{
+		Some("annotated")    => OutputFormat::AnnotatedHex,
+		Some("annotatedhex") => OutputFormat::AnnotatedHex,
+		Some("annotatedbin") => OutputFormat::AnnotatedBin,
+		
 		Some("binstr")    => OutputFormat::BinStr,
 		Some("bindump")   => OutputFormat::BinDump,
 		Some("hexstr")    => OutputFormat::HexStr,
@@ -86,7 +92,7 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 		Some("logisim16") => OutputFormat::LogiSim16,
 		
 		None => if out_stdout
-			{ OutputFormat::HexDump }
+			{ OutputFormat::AnnotatedHex }
 		else
 			{ OutputFormat::Binary },
 		
@@ -123,7 +129,8 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 	
 	let output_data = match out_format
 	{
-		OutputFormat::Binary    => assembled.generate_binary  (0, assembled.len()),
+		OutputFormat::Binary    => assembled.generate_binary(0, assembled.len()),
+		
 		OutputFormat::BinStr    => assembled.generate_binstr  (0, assembled.len()).bytes().collect::<Vec<u8>>(),
 		OutputFormat::BinDump   => assembled.generate_bindump (0, assembled.len()).bytes().collect::<Vec<u8>>(),
 		OutputFormat::HexStr    => assembled.generate_hexstr  (0, assembled.len()).bytes().collect::<Vec<u8>>(),
@@ -136,6 +143,9 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 		OutputFormat::HexC      => assembled.generate_c_array (0, assembled.len(), 16).bytes().collect::<Vec<u8>>(),
 		OutputFormat::LogiSim8  => assembled.generate_logisim (0, assembled.len(), 8).bytes().collect::<Vec<u8>>(),
 		OutputFormat::LogiSim16 => assembled.generate_logisim (0, assembled.len(), 16).bytes().collect::<Vec<u8>>(),
+		
+		OutputFormat::AnnotatedHex => assembled.generate_annotated_hex(fileserver, 0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::AnnotatedBin => assembled.generate_annotated_bin(fileserver, 0, assembled.len()).bytes().collect::<Vec<u8>>(),
 	};
 	
 	if out_stdout
@@ -164,7 +174,7 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 fn make_opts() -> getopts::Options
 {
     let mut opts = getopts::Options::new();
-    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16", "FORMAT");
+    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16", "FORMAT");
     opts.optmulti("i", "include", "Specifies an additional file for processing before the given <asm-files>. [deprecated]", "FILE");
     opts.optopt("o", "output", "The name of the output file.", "FILE");
     opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
@@ -220,7 +230,7 @@ fn get_default_output_filename(report: RcReport, input_filename: &str) -> Result
 }
 
 
-pub fn assemble(report: RcReport, fileserver: &dyn FileServer, filenames: &[String], quiet: bool) -> Result<BinaryOutput, ()>
+pub fn assemble(report: RcReport, fileserver: &dyn FileServer, filenames: &[String], quiet: bool) -> Result<BinaryBlock, ()>
 {
 	if !quiet
 		{ print_header(); }

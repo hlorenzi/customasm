@@ -94,3 +94,12 @@ impl Span
 		}
 	}
 }
+
+
+impl PartialEq for Span
+{
+	fn eq(&self, other: &Self) -> bool
+	{
+		self.file == other.file && self.location == other.location
+	}
+}

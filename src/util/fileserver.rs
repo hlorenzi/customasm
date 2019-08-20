@@ -1,4 +1,5 @@
 use crate::diagn::{Span, RcReport};
+use crate::util::CharCounter;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -19,6 +20,15 @@ pub trait FileServer
 	
 	
 	fn write_bytes(&mut self, report: RcReport, filename: &str, data: &Vec<u8>, span: Option<&Span>) -> Result<(), ()>;
+	
+	
+	fn get_excerpt(&self, span: &Span) -> String
+	{
+		let chars = self.get_chars(RcReport::new(), &*span.file, None).ok().unwrap();
+		let counter = CharCounter::new(&chars);
+		let location = span.location.unwrap();
+		counter.get_excerpt(location.0, location.1).iter().collect()
+	}
 }
 
 

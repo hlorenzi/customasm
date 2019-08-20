@@ -1,7 +1,8 @@
 use crate::diagn::{Span, RcReport};
 use crate::expr::{Expression, ExpressionValue, ExpressionEvalContext};
-use crate::asm::{AssemblerParser, BinaryOutput, LabelManager, LabelContext};
+use crate::asm::{AssemblerParser, LabelManager, LabelContext};
 use crate::asm::BankDef;
+use crate::asm::Bank;
 use crate::asm::BinaryBlock;
 use crate::asm::cpudef::CpuDef;
 use crate::util::FileServer;
@@ -16,7 +17,7 @@ pub struct AssemblerState
 	pub parsed_exprs: Vec<ParsedExpression>,
 	
 	pub bankdefs: Vec<BankDef>,
-	pub blocks: Vec<BinaryBlock>,
+	pub blocks: Vec<Bank>,
 	pub cur_bank: usize,
 	pub cur_block: usize
 }
@@ -48,6 +49,16 @@ pub struct ParsedExpression
 }
 
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct BitRangeSpan
+{
+	pub start: usize,
+	pub end: usize,
+	pub addr: usize,
+	pub span: Span
+}
+
+
 impl AssemblerState
 {
 	pub fn new() -> AssemblerState
@@ -66,7 +77,7 @@ impl AssemblerState
 		};
 		
 		state.bankdefs.push(BankDef::new("", 0, 0, Some(0), false, None));
-		state.blocks.push(BinaryBlock::new(""));
+		state.blocks.push(Bank::new(""));
 		state
 	}
 	
@@ -90,6 +101,9 @@ impl AssemblerState
 		self.resolve_exprs(report.clone())?;
 		self.check_bank_overlap(report.clone());
 		
+		//for block in &self.blocks
+		//	{ println!("{:#?}", block.bits.spans); }
+		
 		match report.has_errors()
 		{
 			true => Err(()),
@@ -98,9 +112,9 @@ impl AssemblerState
 	}
 	
 	
-	pub fn get_binary_output(&self) -> BinaryOutput
+	pub fn get_binary_output(&self) -> BinaryBlock
 	{
-		let mut output = BinaryOutput::new();
+		let mut output = BinaryBlock::new();
 		
 		for block in &self.blocks
 		{
@@ -114,13 +128,32 @@ impl AssemblerState
 			
 			if let Some(output_index) = bankdef.outp
 			{
-				for i in 0..block.len()
-					{ output.write(output_index * bits + i, block.read(i)); }
+				let mut sorted_spans = block.bits.spans.clone();
+				sorted_spans.sort_by(|a, b| a.start.cmp(&b.start));
+				
+				let mut sorted_span_index = 0;
+				
+				for i in 0..block.bits.len()
+				{ 
+					let bitrange_index = sorted_spans[sorted_span_index..].iter().position(|s| i >= s.start && i < s.end);
+					let bitrange = bitrange_index.map(|i| &sorted_spans[sorted_span_index + i]);
+					
+					if let Some(bitrange_index) = bitrange_index
+						{ sorted_span_index += bitrange_index; }
+					
+					if let Some(bitrange) = bitrange
+						{ output.write(output_index * bits + i, block.bits.read(i), Some((bitrange.addr, &bitrange.span))); }
+					else
+						{ output.write(output_index * bits + i, block.bits.read(i), None); }
+				}
+				
+				for bitrange in block.bits.spans.iter().filter(|s| s.start == s.end)
+					{ output.mark_label(output_index * bits + bitrange.start, bitrange.addr, &bitrange.span); }
 				
 				if bankdef.fill
 				{
-					for i in block.len()..(bankdef.size * bits)
-						{ output.write(output_index * bits + i, false); }
+					for i in block.bits.len()..(bankdef.size * bits)
+						{ output.write(output_index * bits + i, false, None); }
 				}
 			}
 		}
@@ -148,7 +181,7 @@ impl AssemblerState
 		ExpressionContext
 		{
 			block: self.cur_block,
-			offset: block.len(),
+			offset: block.bits.len(),
 			label_ctx: self.labels.get_cur_context()
 		}
 	}
@@ -195,7 +228,7 @@ impl AssemblerState
 		let bits = self.cpudef.as_ref().unwrap().bits;
 		let block = &self.blocks[self.cur_block];
 		
-		let excess_bits = block.len() % bits;
+		let excess_bits = block.bits.len() % bits;
 		if excess_bits != 0
 		{
 			let bits_short = bits - excess_bits;
@@ -206,7 +239,7 @@ impl AssemblerState
 		let bankdef_index = self.find_bankdef(&block.bank_name).unwrap();
 		let bankdef = &self.bankdefs[bankdef_index];
 		
-		let block_offset = block.len() / bits;
+		let block_offset = block.bits.len() / bits;
 		let addr = match block_offset.checked_add(bankdef.addr)
 		{
 			Some(addr) => addr,
@@ -216,6 +249,28 @@ impl AssemblerState
 		if bankdef_index != 0 && addr >= bankdef.addr + bankdef.size
 			{ return Err(report.error_span("address is out of bank range", span)); }
 			
+		Ok(addr)
+	}
+	
+	
+	fn get_bitrange_address(&self, report: RcReport, span: &Span) -> Result<usize, ()>
+	{
+		if self.cpudef.is_none()
+			{ return Ok(0); }
+		
+		let bits = self.cpudef.as_ref().unwrap().bits;
+		let block = &self.blocks[self.cur_block];
+		
+		let bankdef_index = self.find_bankdef(&block.bank_name).unwrap();
+		let bankdef = &self.bankdefs[bankdef_index];
+		
+		let block_offset = block.bits.len() / bits;
+		let addr = match block_offset.checked_add(bankdef.addr)
+		{
+			Some(addr) => addr,
+			None => return Err(report.error_span("address overflowed valid range", span))
+		};
+		
 		Ok(addr)
 	}
 	
@@ -236,51 +291,68 @@ impl AssemblerState
 	}
 	
 	
-	pub fn output_bits_until_aligned(&mut self, report: RcReport, multiple_of: usize, span: &Span) -> Result<(), ()>
+	pub fn output_bits_until_aligned(&mut self, report: RcReport, multiple_of: usize, report_span: &Span, output_span: Option<&Span>) -> Result<(), ()>
 	{
 		if multiple_of == 0
-			{ return Err(report.error_span("invalid alignment", span)); }
+			{ return Err(report.error_span("invalid alignment", report_span)); }
 		
-		self.check_cpudef_active(report.clone(), span)?;
+		self.check_cpudef_active(report.clone(), report_span)?;
 		
 		let bits = self.cpudef.as_ref().unwrap().bits;
 		
-		while self.blocks[self.cur_block].len() % (bits * multiple_of) != 0
-			{ self.output_bit(report.clone(), false, true, span)?; }
+		while self.blocks[self.cur_block].bits.len() % (bits * multiple_of) != 0
+			{ self.output_bit(report.clone(), false, true, report_span, output_span)?; }
 			
 		Ok(())
 	}
 	
 	
-	pub fn output_bit(&mut self, report: RcReport, bit: bool, skipping: bool, span: &Span) -> Result<(), ()>
+	pub fn output_bit(&mut self, report: RcReport, bit: bool, skipping: bool, report_span: &Span, output_span: Option<&Span>) -> Result<(), ()>
 	{
 		{
 			let block = &self.blocks[self.cur_block];
 			let bankdef = &self.bankdefs[self.cur_bank];
 			
 			if bankdef.outp.is_none() && !skipping
-				{ return Err(report.error_span("attempt to place data in non-writable bank", span)); }
+				{ return Err(report.error_span("attempt to place data in non-writable bank", report_span)); }
 			
 			if self.cur_bank != 0
 			{
-				self.check_cpudef_active(report.clone(), span)?;
+				self.check_cpudef_active(report.clone(), report_span)?;
 				
-				if block.len() / self.cpudef.as_ref().unwrap().bits >= bankdef.size
-					{ return Err(report.error_span("data overflowed bank size", span)); }
+				if block.bits.len() / self.cpudef.as_ref().unwrap().bits >= bankdef.size
+					{ return Err(report.error_span("data overflowed bank size", report_span)); }
 			}
 		}
 		
-		self.blocks[self.cur_block].append(bit);
+		let bitrange = match output_span
+		{
+			Some(output_span) =>
+			{
+				let addr = self.get_bitrange_address(report, output_span)?;
+				Some((addr, output_span))
+			}
+			None => None
+		};
+		
+		self.blocks[self.cur_block].bits.append(bit, bitrange);
 		Ok(())
 	}
 	
 	
-	pub fn output_zero_bits(&mut self, report: RcReport, num: usize, skipping: bool, span: &Span) -> Result<(), ()>
+	pub fn output_zero_bits(&mut self, report: RcReport, num: usize, skipping: bool, report_span: &Span, output_span: Option<&Span>) -> Result<(), ()>
 	{
 		for _ in 0..num
-			{ self.output_bit(report.clone(), false, skipping, span)?; }
+			{ self.output_bit(report.clone(), false, skipping, report_span, output_span)?; }
 			
 		Ok(())
+	}
+	
+	
+	pub fn mark_label(&mut self, addr: usize, output_span: &Span)
+	{
+		let index = self.blocks[self.cur_block].bits.len();
+		self.blocks[self.cur_block].bits.mark_label(index, addr, output_span);
 	}
 
 	
@@ -342,12 +414,14 @@ impl AssemblerState
 		
 		let value = self.expr_eval(report.clone(), &instr.ctx, &rule.production, &mut args_eval_ctx)?;
 		
+		let addr = self.get_bitrange_address(report, &instr.span)?;
+		
 		let block = &mut self.blocks[instr.ctx.block];
 		
 		for i in 0..(left - right + 1)
 		{
 			let bit = value.get_bit(left - right - i);
-			block.write(instr.ctx.offset + i, bit);
+			block.bits.write(instr.ctx.offset + i, bit, Some((addr, &instr.span)));
 		}
 		
 		Ok(())
@@ -374,7 +448,7 @@ impl AssemblerState
 		for i in 0..expr.width
 		{
 			let bit = value.get_bit(expr.width - i - 1);
-			block.write(expr.ctx.offset + i, bit);
+			block.bits.write(expr.ctx.offset + i, bit, None);
 		}
 		
 		Ok(())
@@ -455,7 +529,7 @@ impl ExpressionContext
 		let bits = state.cpudef.as_ref().unwrap().bits;
 		let block = &state.blocks[self.block];
 		
-		if block.len() % bits != 0
+		if block.bits.len() % bits != 0
 			{ return Err({ report.error_span("address is not aligned to a byte", span); true }); }
 			
 		let bankdef = state.find_bankdef(&block.bank_name).unwrap();

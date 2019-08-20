@@ -5,7 +5,7 @@ use crate::expr::{Expression, ExpressionValue, ExpressionEvalContext};
 use crate::asm::{AssemblerState, ParsedInstruction, ParsedExpression};
 use crate::asm::cpudef::CpuDef;
 use crate::asm::BankDef;
-use crate::asm::BinaryBlock;
+use crate::asm::Bank;
 use crate::util::filename_navigate;
 use crate::util::FileServer;
 use num_bigint::BigInt;
@@ -83,7 +83,7 @@ impl<'a> AssemblerParser<'a>
 	
 	fn parse_directive(&mut self) -> Result<(), ()>
 	{
-		self.parser.expect(TokenKind::Hash)?;
+		let tk_hash = self.parser.expect(TokenKind::Hash)?;
 		
 		let tk_name = self.parser.expect(TokenKind::Identifier)?;
 		let name = tk_name.excerpt.clone().unwrap();
@@ -91,7 +91,7 @@ impl<'a> AssemblerParser<'a>
 		if name.chars().next() == Some('d')
 		{
 			if let Ok(elem_width) = usize::from_str_radix(&name[1..], 10)
-				{ return self.parse_directive_data(elem_width, &tk_name); }
+				{ return self.parse_directive_data(elem_width, &tk_hash, &tk_name); }
 		}
 		
 		match name.as_ref()
@@ -140,7 +140,7 @@ impl<'a> AssemblerParser<'a>
 		if self.state.find_bankdef(&bankname).is_some()
 			{ return Err(self.parser.report.error_span("duplicate bank name", &tk_bankname.span)); }
 			
-		if self.state.blocks[0].len() > 0
+		if self.state.blocks[0].bits.len() > 0
 			{ return Err(self.parser.report.error_span("cannot define bank after using the default bank", &tk_bankname.span)); }
 		
 		self.parser.expect(TokenKind::BraceOpen)?;
@@ -148,7 +148,7 @@ impl<'a> AssemblerParser<'a>
 		self.parser.expect(TokenKind::BraceClose)?;
 		
 		self.state.bankdefs.push(bankdef);
-		self.state.blocks.push(BinaryBlock::new(bankname));
+		self.state.blocks.push(Bank::new(bankname));
 		self.state.cur_bank = self.state.bankdefs.len() - 1;
 		self.state.cur_block = self.state.bankdefs.len() - 1;
 		Ok(())
@@ -191,13 +191,13 @@ impl<'a> AssemblerParser<'a>
 			if bankdef.outp.is_some()
 				{ return Err(self.parser.report.error_span("cannot seek to previous address", &tk_name.span)); }
 			
-			self.state.blocks[self.state.cur_block].truncate(new_addr * bits);
+			self.state.blocks[self.state.cur_block].bits.truncate(new_addr * bits);
 			Ok(())
 		}
 		else
 		{
 			let bits_to_skip = (new_addr - cur_addr) * bits;
-			self.state.output_zero_bits(self.parser.report.clone(), bits_to_skip, true, &tk_name.span)
+			self.state.output_zero_bits(self.parser.report.clone(), bits_to_skip, true, &tk_name.span, None)
 		}
 	}
 	
@@ -208,7 +208,7 @@ impl<'a> AssemblerParser<'a>
 		
 		let addr_multiple_of = self.parse_usize()?;
 		
-		self.state.output_bits_until_aligned(self.parser.report.clone(), addr_multiple_of, &tk_name.span)
+		self.state.output_bits_until_aligned(self.parser.report.clone(), addr_multiple_of, &tk_name.span, None)
 	}
 	
 	
@@ -218,7 +218,7 @@ impl<'a> AssemblerParser<'a>
 		
 		let bits = self.parse_usize()? * self.state.cpudef.as_ref().unwrap().bits;
 		
-		self.state.output_zero_bits(self.parser.report.clone(), bits, true, &tk_name.span)
+		self.state.output_zero_bits(self.parser.report.clone(), bits, true, &tk_name.span, Some(&tk_name.span))
 	}
 	
 	
@@ -232,7 +232,7 @@ impl<'a> AssemblerParser<'a>
 			for _ in 0..8
 			{
 				let bit = byte & 0x80 != 0;
-				self.state.output_bit(self.parser.report.clone(), bit, false, &tk_string.span)?;
+				self.state.output_bit(self.parser.report.clone(), bit, false, &tk_string.span, Some(&tk_string.span))?;
 				byte <<= 1;
 			}
 		}
@@ -266,7 +266,7 @@ impl<'a> AssemblerParser<'a>
 			for _ in 0..8
 			{
 				let bit = byte & 0x80 != 0;
-				self.state.output_bit(self.parser.report.clone(), bit, false, &tk_filename.span)?;
+				self.state.output_bit(self.parser.report.clone(), bit, false, &tk_filename.span, Some(&tk_filename.span))?;
 				byte <<= 1;
 			}
 		}
@@ -295,7 +295,7 @@ impl<'a> AssemblerParser<'a>
 			for _ in 0..bits_per_char
 			{
 				let bit = digit & (1 << (bits_per_char - 1)) != 0;
-				self.state.output_bit(self.parser.report.clone(), bit, false, &tk_filename.span)?;
+				self.state.output_bit(self.parser.report.clone(), bit, false, &tk_filename.span, Some(&tk_filename.span))?;
 				digit <<= 1;
 			}
 		}
@@ -304,16 +304,22 @@ impl<'a> AssemblerParser<'a>
 	}
 	
 	
-	fn parse_directive_data(&mut self, elem_width: usize, tk_name: &Token) -> Result<(), ()>
+	fn parse_directive_data(&mut self, elem_width: usize, tk_hash: &Token, tk_name: &Token) -> Result<(), ()>
 	{
 		if elem_width == 0
 			{ return Err(self.parser.report.error_span("invalid element width", &tk_name.span)); }
+		
+		let mut is_first = true;
 		
 		loop
 		{
 			let ctx = self.state.get_cur_context();
 			let expr = Expression::parse(&mut self.parser)?;
 			let span = expr.span();
+			let output_span = if is_first
+				{ expr.span().join(&tk_hash.span) }
+			else
+				{ expr.span() };
 			
 			let parsed_expr = ParsedExpression
 			{
@@ -324,10 +330,12 @@ impl<'a> AssemblerParser<'a>
 			
 			self.state.parsed_exprs.push(parsed_expr);
 			
-			self.state.output_zero_bits(self.parser.report.clone(), elem_width, false, &span)?;
+			self.state.output_zero_bits(self.parser.report.clone(), elem_width, false, &span, Some(&output_span))?;
 			
 			if self.parser.maybe_expect(TokenKind::Comma).is_none()
 				{ break; }
+				
+			is_first = false;
 		}
 		
 		Ok(())
@@ -336,7 +344,8 @@ impl<'a> AssemblerParser<'a>
 	
 	fn parse_label(&mut self) -> Result<(), ()>
 	{
-		let is_local = self.parser.maybe_expect(TokenKind::Dot).is_some();
+		let tk_dot = self.parser.maybe_expect(TokenKind::Dot);
+		let is_local = tk_dot.is_some();
 		let mut name = if is_local { "." } else { "" }.to_string();
 	
 		let tk_name = self.parser.expect(TokenKind::Identifier)?;
@@ -353,15 +362,20 @@ impl<'a> AssemblerParser<'a>
 		}
 		else
 		{
-			self.parser.expect(TokenKind::Colon)?;
+			let tk_colon = self.parser.expect(TokenKind::Colon)?;
 			
-			self.state.check_cpudef_active(self.parser.report.clone(), &tk_name.span)?;
+			let mut span_full = tk_name.span.join(&tk_colon.span);
+			if let Some(tk_dot) = tk_dot
+				{ span_full = span_full.join(&tk_dot.span); }
+			
+			self.state.check_cpudef_active(self.parser.report.clone(), &span_full)?;
 			
 			let label_align = self.state.cpudef.as_ref().unwrap().label_align;
 			if label_align.is_some()
-				{ self.state.output_bits_until_aligned(self.parser.report.clone(), label_align.unwrap(), &tk_name.span)?; }
+				{ self.state.output_bits_until_aligned(self.parser.report.clone(), label_align.unwrap(), &span_full, None)?; }
 			
-			let addr = self.state.get_cur_address(self.parser.report.clone(), &tk_name.span)?;
+			let addr = self.state.get_cur_address(self.parser.report.clone(), &span_full)?;
+			self.state.mark_label(addr, &span_full);
 			ExpressionValue::Integer(BigInt::from(addr))
 		};
 
@@ -442,7 +456,7 @@ impl<'a> AssemblerParser<'a>
 				rule.production.width().unwrap()
 			};
 			
-			self.state.output_zero_bits(self.parser.report.clone(), instr_width, false, &instr_span)
+			self.state.output_zero_bits(self.parser.report.clone(), instr_width, false, &instr_span, Some(&instr_span))
 		}
 		
 		// ...or if all arguments could be resolved, output instruction now.
