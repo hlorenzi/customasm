@@ -160,6 +160,43 @@ impl AssemblerState
 		
 		output
 	}
+
+
+	pub fn get_symbol_output(&self) -> String
+	{
+		let mut result = String::new();
+
+		for global_label in &self.labels.name_to_index_map
+		{
+			let global_value = &self.labels.global_labels[*global_label.1];
+
+			if global_label.0 != ""
+			{
+				match global_value.value
+				{
+					ExpressionValue::Integer(ref integer) =>
+					{
+						result.push_str(&format!("{} = {:#x}\n", global_label.0, integer));
+					}
+					_ => {}
+				}
+			}
+
+			for local_label in &global_value.local_labels
+			{
+				match local_label.1
+				{
+					ExpressionValue::Integer(ref integer) =>
+					{
+						result.push_str(&format!("{}{} = {:#x}\n", global_label.0, local_label.0, integer));
+					}
+					_ => {}
+				}
+			}
+		}
+
+		result
+	}
 }
 
 

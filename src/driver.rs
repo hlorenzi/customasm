@@ -1,7 +1,6 @@
 use crate::diagn::RcReport;
 use crate::util::FileServer;
 use crate::util::enable_windows_ansi_support;
-use crate::asm::BinaryBlock;
 use crate::asm::AssemblerState;
 use std::io::stdout;
 use getopts;
@@ -63,7 +62,7 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 	
 	if matches.opt_present("v")
 	{
-		print_version();
+		print_info();
 		return Ok(());
 	}
 	
@@ -108,44 +107,54 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 	
 	let main_asm_file = matches.free[0].clone();
 	
+	let output_symbol_requested = matches.opt_present("s");
+	let output_requested = matches.opt_present("o");
+
+	let output_symbol_file = matches.opt_str("s");
 	let output_file = match matches.opt_str("o")
 	{
-		Some(f) => f,
+		Some(f) => Some(f),
 		None =>
 		{
-			match get_default_output_filename(report.clone(), &main_asm_file)
+			if output_symbol_requested || output_symbol_file.is_some()
+				{ None }
+			else
 			{
-				Ok(f) => f,
-				Err(_) => return Err(true)
+				match get_default_output_filename(report.clone(), &main_asm_file)
+				{
+					Ok(f) => Some(f),
+					Err(_) => None,
+				}
 			}
 		}
 	};
-	
+
 	let mut filenames = matches.opt_strs("i");
 	for filename in matches.free
 		{ filenames.push(filename); }
 	
 	let assembled = assemble(report.clone(), fileserver, &filenames, quiet).map_err(|_| false)?;
-	
+	let output = assembled.get_binary_output();
+	let output_symbol_data = assembled.get_symbol_output();
 	let output_data = match out_format
 	{
-		OutputFormat::Binary    => assembled.generate_binary(0, assembled.len()),
+		OutputFormat::Binary    => output.generate_binary(0, output.len()),
 		
-		OutputFormat::BinStr    => assembled.generate_binstr  (0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::BinDump   => assembled.generate_bindump (0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexStr    => assembled.generate_hexstr  (0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexDump   => assembled.generate_hexdump (0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::Mif       => assembled.generate_mif     (0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::IntelHex  => assembled.generate_intelhex(0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::DecComma  => assembled.generate_comma   (0, assembled.len(), 10).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexComma  => assembled.generate_comma   (0, assembled.len(), 16).bytes().collect::<Vec<u8>>(),
-		OutputFormat::DecC      => assembled.generate_c_array (0, assembled.len(), 10).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexC      => assembled.generate_c_array (0, assembled.len(), 16).bytes().collect::<Vec<u8>>(),
-		OutputFormat::LogiSim8  => assembled.generate_logisim (0, assembled.len(), 8).bytes().collect::<Vec<u8>>(),
-		OutputFormat::LogiSim16 => assembled.generate_logisim (0, assembled.len(), 16).bytes().collect::<Vec<u8>>(),
+		OutputFormat::BinStr    => output.generate_binstr  (0, output.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::BinDump   => output.generate_bindump (0, output.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::HexStr    => output.generate_hexstr  (0, output.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::HexDump   => output.generate_hexdump (0, output.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::Mif       => output.generate_mif     (0, output.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::IntelHex  => output.generate_intelhex(0, output.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::DecComma  => output.generate_comma   (0, output.len(), 10).bytes().collect::<Vec<u8>>(),
+		OutputFormat::HexComma  => output.generate_comma   (0, output.len(), 16).bytes().collect::<Vec<u8>>(),
+		OutputFormat::DecC      => output.generate_c_array (0, output.len(), 10).bytes().collect::<Vec<u8>>(),
+		OutputFormat::HexC      => output.generate_c_array (0, output.len(), 16).bytes().collect::<Vec<u8>>(),
+		OutputFormat::LogiSim8  => output.generate_logisim (0, output.len(), 8).bytes().collect::<Vec<u8>>(),
+		OutputFormat::LogiSim16 => output.generate_logisim (0, output.len(), 16).bytes().collect::<Vec<u8>>(),
 		
-		OutputFormat::AnnotatedHex => assembled.generate_annotated_hex(fileserver, 0, assembled.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::AnnotatedBin => assembled.generate_annotated_bin(fileserver, 0, assembled.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::AnnotatedHex => output.generate_annotated_hex(fileserver, 0, output.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::AnnotatedBin => output.generate_annotated_bin(fileserver, 0, output.len()).bytes().collect::<Vec<u8>>(),
 	};
 	
 	if out_stdout
@@ -155,14 +164,34 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 			println!("success");
 			println!("");
 		}
+		
+		if output_requested || output_file.is_some()
+			{ println!("{}", String::from_utf8_lossy(&output_data)); }
 			
-		println!("{}", String::from_utf8_lossy(&output_data));
+		if output_symbol_requested || output_symbol_file.is_some()
+			{ println!("{}", &output_symbol_data); }
 	}
 	else
 	{
-		println!("writing `{}`...", &output_file);
-		fileserver.write_bytes(report.clone(), &output_file, &output_data, None).map_err(|_| false)?;
-		
+		let mut any_files_written = false;
+
+		if let Some(ref output_file) = output_file
+		{
+			println!("writing `{}`...", &output_file);
+			fileserver.write_bytes(report.clone(), &output_file, &output_data, None).map_err(|_| false)?;
+			any_files_written = true;
+		}
+
+		if let Some(ref output_symbol_file) = output_symbol_file
+		{
+			println!("writing `{}`...", &output_symbol_file);
+			fileserver.write_bytes(report.clone(), &output_symbol_file, &output_symbol_data.bytes().collect::<Vec<u8>>(), None).map_err(|_| false)?;
+			any_files_written = true;
+		}
+
+		if !any_files_written
+			{ println!("no files written"); }
+
 		if !quiet
 			{ println!("success"); }
 	}
@@ -176,7 +205,8 @@ fn make_opts() -> getopts::Options
     let mut opts = getopts::Options::new();
     opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16", "FORMAT");
     opts.optmulti("i", "include", "Specifies an additional file for processing before the given <asm-files>. [deprecated]", "FILE");
-    opts.optopt("o", "output", "The name of the output file.", "FILE");
+    opts.opt("o", "output", "The name of the output file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
+    opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
     opts.optflag("q", "quiet", "Suppress progress reports.");
     opts.optflag("v", "version", "Display version information.");
@@ -198,6 +228,8 @@ fn parse_opts(report: RcReport, opts: &getopts::Options, args: &Vec<String>) -> 
 
 fn print_usage(opts: &getopts::Options)
 {
+	print_info();
+	println!("");
 	println!("{}", opts.usage(&format!("Usage: {} [options] <asm-file-1> ... <asm-file-N>", env!("CARGO_PKG_NAME"))));
 }
 
@@ -208,9 +240,10 @@ fn print_version()
 }
 
 
-fn print_header()
+fn print_info()
 {
 	print_version();
+	println!("https://github.com/hlorenzi/customasm");
 }
 
 
@@ -230,10 +263,10 @@ fn get_default_output_filename(report: RcReport, input_filename: &str) -> Result
 }
 
 
-pub fn assemble(report: RcReport, fileserver: &dyn FileServer, filenames: &[String], quiet: bool) -> Result<BinaryBlock, ()>
+pub fn assemble(report: RcReport, fileserver: &dyn FileServer, filenames: &[String], quiet: bool) -> Result<AssemblerState, ()>
 {
 	if !quiet
-		{ print_header(); }
+		{ print_version(); }
 	
 	let mut asm = AssemblerState::new();
 	
@@ -248,5 +281,5 @@ pub fn assemble(report: RcReport, fileserver: &dyn FileServer, filenames: &[Stri
 	}
 	
 	asm.wrapup(report)?;
-	Ok(asm.get_binary_output())
+	Ok(asm)
 }

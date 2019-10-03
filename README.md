@@ -32,6 +32,7 @@ Options:
                         decc, hexc, logisim8, logisim16
                         
     -o, --output FILE   The name of the output file.
+    -s, --symbol FILE   The name of the output symbol file.
     -p, --print         Print output to stdout instead of writing to a file.
     -q, --quiet         Suppress progress reports.
     -v, --version       Display version information.

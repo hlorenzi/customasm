@@ -6,8 +6,8 @@ use std::collections::HashMap;
 
 pub struct LabelManager
 {
-	global_labels: Vec<GlobalLabel>,
-	name_to_index_map: HashMap<String, usize>
+	pub global_labels: Vec<GlobalLabel>,
+	pub name_to_index_map: HashMap<String, usize>
 }
 
 
@@ -16,8 +16,8 @@ pub type LabelContext = usize;
 
 pub struct GlobalLabel
 {
-	value: ExpressionValue,
-	local_labels: HashMap<String, ExpressionValue>
+	pub value: ExpressionValue,
+	pub local_labels: HashMap<String, ExpressionValue>
 }
 
 
