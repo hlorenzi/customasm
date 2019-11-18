@@ -369,9 +369,12 @@ fn bigint_not(x: BigInt) -> BigInt
 {
 	let mut x_bytes = x.to_signed_bytes_le();
 	
+	if x.sign() != Sign::Minus
+		{ x_bytes.push(0); }
+	
 	for i in 0..x_bytes.len()
 		{ x_bytes[i] = !x_bytes[i]; }
-		
+	
 	BigInt::from_signed_bytes_le(&x_bytes)
 }
 

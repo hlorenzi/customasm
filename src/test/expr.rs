@@ -146,6 +146,24 @@ fn test_ops_bitmanipulation()
 	test("! 1", Pass(ExpressionValue::Integer(BigInt::from(-2))));
 	test("!-1", Pass(ExpressionValue::Integer(BigInt::from(0))));
 	
+	test("!7", Pass(ExpressionValue::Integer(BigInt::from(-8))));
+	test("!8", Pass(ExpressionValue::Integer(BigInt::from(-9))));
+	test("!9", Pass(ExpressionValue::Integer(BigInt::from(-10))));
+	test("!16", Pass(ExpressionValue::Integer(BigInt::from(-17))));
+	test("!32", Pass(ExpressionValue::Integer(BigInt::from(-33))));
+	test("!64", Pass(ExpressionValue::Integer(BigInt::from(-65))));
+	test("!128", Pass(ExpressionValue::Integer(BigInt::from(-129))));
+	test("!256", Pass(ExpressionValue::Integer(BigInt::from(-257))));
+
+	test("!-8", Pass(ExpressionValue::Integer(BigInt::from(7))));
+	test("!-9", Pass(ExpressionValue::Integer(BigInt::from(8))));
+	test("!-10", Pass(ExpressionValue::Integer(BigInt::from(9))));
+	test("!-17", Pass(ExpressionValue::Integer(BigInt::from(16))));
+	test("!-33", Pass(ExpressionValue::Integer(BigInt::from(32))));
+	test("!-65", Pass(ExpressionValue::Integer(BigInt::from(64))));
+	test("!-129", Pass(ExpressionValue::Integer(BigInt::from(128))));
+	test("!-257", Pass(ExpressionValue::Integer(BigInt::from(256))));
+	
 	test("0b1100 & 0b1010", Pass(ExpressionValue::Integer(BigInt::from(0b1000))));
 	test("0b1100 | 0b1010", Pass(ExpressionValue::Integer(BigInt::from(0b1110))));
 	test("0b1100 ^ 0b1010", Pass(ExpressionValue::Integer(BigInt::from(0b0110))));

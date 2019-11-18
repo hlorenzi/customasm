@@ -1,6 +1,6 @@
 [package]
 name = "customasm"
-version = "0.10.2"
+version = "0.10.3"
 edition = "2018"
 authors = ["Henrique Lorenzi <hlorenzi12@gmail.com>"]
 
