@@ -176,6 +176,54 @@ impl TokenKind
 }
 
 
+impl Token
+{
+	pub fn text(&self) -> &str
+	{
+		match self.kind
+		{
+			TokenKind::ParenOpen => "(",
+			TokenKind::ParenClose => ")",
+			TokenKind::BracketOpen => "[",
+			TokenKind::BracketClose => "]",
+			TokenKind::BraceOpen => "{",
+			TokenKind::BraceClose => "}",
+			TokenKind::Dot => ".",
+			TokenKind::Comma => ",",
+			TokenKind::Colon => ":",
+			TokenKind::ColonColon => "::",
+			TokenKind::Arrow => "->",
+			TokenKind::Hash => "#",
+			TokenKind::Equal => "=",
+			TokenKind::Plus => "+",
+			TokenKind::Minus => "-",
+			TokenKind::Asterisk => "*",
+			TokenKind::Slash => "/",
+			TokenKind::Percent => "%",
+			TokenKind::Question => "?",
+			TokenKind::Exclamation => "!",
+			TokenKind::Ampersand => "&",
+			TokenKind::VerticalBar => "|",
+			TokenKind::Circumflex => "^",
+			TokenKind::Tilde => "~",
+			TokenKind::At => "@",
+			TokenKind::AmpersandAmpersand => "&&",
+			TokenKind::VerticalBarVerticalBar => "||",
+			TokenKind::EqualEqual => "==",
+			TokenKind::ExclamationEqual => "!=",
+			TokenKind::LessThan => "<",
+			TokenKind::LessThanLessThan => "<<",
+			TokenKind::LessThanEqual => "<=",
+			TokenKind::GreaterThan => ">",
+			TokenKind::GreaterThanGreaterThan => ">>",
+			TokenKind::GreaterThanGreaterThanGreaterThan => ">>>",
+			TokenKind::GreaterThanEqual => ">=",
+			_ => self.excerpt.as_ref().unwrap()
+		}
+	}
+}
+
+
 pub fn tokenize<S>(report: RcReport, src_filename: S, src: &[char]) -> Result<Vec<Token>, ()>
 where S: Into<String>
 {

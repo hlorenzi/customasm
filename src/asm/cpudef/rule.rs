@@ -1,5 +1,5 @@
 use crate::diagn::Span;
-use crate::syntax::{Token, TokenKind};
+use crate::syntax::Token;
 use crate::expr::{Expression, ExpressionValue};
 
 
@@ -16,7 +16,7 @@ pub struct Rule
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum RulePatternPart
 {
-	Exact(TokenKind, Option<String>),
+	Exact(char),
 	Parameter(usize)
 }
 
@@ -53,8 +53,11 @@ impl Rule
 	
 	pub fn pattern_add_exact(&mut self, token: &Token)
 	{
-		let part = RulePatternPart::Exact(token.kind, token.excerpt.clone());
-		self.pattern_parts.push(part);
+		for c in token.text().chars()
+		{
+			let part = RulePatternPart::Exact(c);
+			self.pattern_parts.push(part);
+		}
 	}
 	
 	

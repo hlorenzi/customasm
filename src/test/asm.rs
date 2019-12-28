@@ -115,6 +115,9 @@ fn test_simple()
 	test("HALT -> 0x00", "halt", Pass((4, "00")));
 	test("Halt -> 0x00", "hALT", Pass((4, "00")));
 	test("hALT -> 0x00", "Halt", Pass((4, "00")));
+
+	test("halt -> 0x00", "h a l t", Pass((4, "00")));
+	test("halt -> 0x00", "ha lt",   Pass((4, "00")));
 	
 	test("halt -> pc % 2 == 0 ? 0x12 : 0x34", "halt \n halt \n halt", Pass((4, "123412")));
 	test("halt -> pc          ? 0x12 : 0x34", "halt \n halt \n halt", Fail(("cpu", 1, "type")));
@@ -191,6 +194,12 @@ fn test_tokendef()
 	test("#tokendef reg { r1 = 1 } \n mov r1, r1 -> 0x55 \n mov r1, {src: reg} -> 0x88 @ src[7:0]", "mov r1, r2", Fail(("asm", 1, "no match")));
 	
 	test("#tokendef alu { add = 0x10, sub = 0x20 } \n {op: alu} {x} -> op[7:0] @ x[7:0]", "add 0xef \n sub 0xfe", Pass((4, "10ef20fe")));
+	
+	test("#tokendef cond { z = 0x10, ne = 0x20 } \n j{c: cond} {x} -> c[7:0] @ x[7:0]", "jz 0x50 \n jne 0x60", Pass((4, "10502060")));
+	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "j t e s t", Pass((4, "10")));
+	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "jtestx",    Fail(("asm", 1, "no match")));
+	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "jtes",      Fail(("asm", 1, "no match")));
+	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "jtes\nt",   Fail(("asm", 1, "no match")));
 }
 
 

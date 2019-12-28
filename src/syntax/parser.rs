@@ -8,7 +8,8 @@ pub struct Parser
 	tokens: Vec<Token>,
 	index: usize,
 	index_prev: usize,
-	read_linebreak: bool
+	read_linebreak: bool,
+	partial_index: usize
 }
 
 
@@ -16,7 +17,8 @@ pub struct ParserState
 {
 	index: usize,
 	index_prev: usize,
-	read_linebreak: bool
+	read_linebreak: bool,
+	partial_index: usize
 }
 
 
@@ -32,7 +34,8 @@ impl Parser
 			tokens: tokens,
 			index: 0,
 			index_prev: 0,
-			read_linebreak: false
+			read_linebreak: false,
+			partial_index: 0
 		};
 		
 		parser.skip_ignorable();
@@ -46,7 +49,8 @@ impl Parser
 		{
 			index: self.index,
 			index_prev: self.index_prev,
-			read_linebreak: self.read_linebreak
+			read_linebreak: self.read_linebreak,
+			partial_index: self.partial_index
 		}
 	}
 	
@@ -56,6 +60,7 @@ impl Parser
 		self.index = state.index;
 		self.index_prev = state.index_prev;
 		self.read_linebreak = state.read_linebreak;
+		self.partial_index = state.partial_index;
 	}
 	
 	
@@ -80,6 +85,9 @@ impl Parser
 	
 	pub fn advance(&mut self) -> Token
 	{
+		if self.is_at_partial()
+			{ panic!("at partial"); }
+
 		self.index_prev = self.index;
 	
 		let token = self.tokens[self.index].clone();
@@ -90,6 +98,29 @@ impl Parser
 		self.read_linebreak = false;
 		self.skip_ignorable();
 		token
+	}
+
+
+	pub fn advance_partial(&mut self) -> char
+	{
+		if self.tokens[self.index].kind == TokenKind::End
+			{ return '\0'; }
+
+		let sliced = unsafe { self.tokens[self.index].text().get_unchecked(self.partial_index..) };
+		let mut char_indices = sliced.char_indices();
+		let c = char_indices.next().unwrap().1;
+
+		if let Some((index, _)) = char_indices.next()
+		{
+			self.partial_index += index;
+		}
+		else
+		{
+			self.partial_index = 0;
+			self.advance();
+		}
+
+		c
 	}
 	
 	
@@ -115,6 +146,12 @@ impl Parser
 	pub fn clear_linebreak(&mut self)
 	{
 		self.read_linebreak = false;
+	}
+
+
+	pub fn is_at_partial(&self) -> bool
+	{
+		self.partial_index != 0
 	}
 	
 	

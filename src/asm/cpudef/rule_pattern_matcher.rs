@@ -1,5 +1,5 @@
 use crate::diagn::RcReport;
-use crate::syntax::{TokenKind, Parser};
+use crate::syntax::Parser;
 use crate::expr::{Expression, ExpressionValue};
 use crate::asm::cpudef::{Rule, RuleParameterType, RulePatternPart, CustomTokenDef};
 use std::collections::HashMap;
@@ -16,17 +16,9 @@ pub struct RulePatternMatcher
 struct MatchStep
 {
 	rule_indices: Vec<usize>,
-	children_exact: HashMap<MatchStepExact, Vec<(Option<ExpressionValue>, MatchStep)>>,
-	children_param: HashMap<MatchStepParameter, MatchStep>
+	children_exact: HashMap<char, Vec<(Option<ExpressionValue>, Box<MatchStep>)>>,
+	children_param: Option<Box<MatchStep>>
 }
-
-
-#[derive(Debug, Eq, PartialEq, Hash)]
-struct MatchStepExact(TokenKind, Option<String>);
-
-
-#[derive(Debug, Eq, PartialEq, Hash)]
-struct MatchStepParameter;
 
 
 #[derive(Debug)]
@@ -44,8 +36,7 @@ impl RulePatternMatcher
 		let mut root_step = MatchStep::new();
 		
 		for i in 0..rules.len()
-			{ RulePatternMatcher::build_step(report.clone(), &mut root_step, &rules[i], &rules[i].pattern_parts, i, custom_token_defs)?; }
-		
+			{ RulePatternMatcher::add_tree_step(report.clone(), &mut root_step, &rules[i], &rules[i].pattern_parts, i, custom_token_defs)?; }
 		
 		Ok(RulePatternMatcher
 		{
@@ -54,7 +45,7 @@ impl RulePatternMatcher
 	}
 	
 
-	fn build_step(report: RcReport, step: &mut MatchStep, rule: &Rule, next_parts: &[RulePatternPart], rule_index: usize, custom_token_defs: &Vec<CustomTokenDef>) -> Result<(), ()>
+	fn add_tree_step(report: RcReport, step: &mut MatchStep, rule: &Rule, next_parts: &[RulePatternPart], rule_index: usize, custom_token_defs: &Vec<CustomTokenDef>) -> Result<(), ()>
 	{
 		if next_parts.len() == 0
 		{
@@ -65,31 +56,10 @@ impl RulePatternMatcher
 		
 		match next_parts[0]
 		{
-			RulePatternPart::Exact(kind, ref excerpt) =>
+			RulePatternPart::Exact(c) =>
 			{
-				let step_kind = MatchStepExact(kind, excerpt.as_ref().map(|s| s.to_ascii_lowercase()));
-				
-				{
-					let mut maybe_next_steps = step.children_exact.get_mut(&step_kind);
-					
-					if let Some(ref mut next_steps) = maybe_next_steps
-					{
-						if let Some(&mut (_, ref mut next_step)) = next_steps.iter_mut().find(|s| s.0 == None)
-						{
-							RulePatternMatcher::build_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
-							return Ok(());
-						}
-						
-						let mut next_step = MatchStep::new();
-						RulePatternMatcher::build_step(report.clone(), &mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
-						next_steps.push((None, next_step));
-						return Ok(());
-					}
-				}
-				
-				let mut next_step = MatchStep::new();
-				RulePatternMatcher::build_step(report.clone(), &mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
-				step.children_exact.insert(step_kind, vec![(None, next_step)]);
+				let next_step = Self::make_step_exact(step, c.to_ascii_lowercase(), None);
+				RulePatternMatcher::add_tree_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
 			}
 			
 			RulePatternPart::Parameter(param_index) =>
@@ -100,49 +70,73 @@ impl RulePatternMatcher
 					
 					for (excerpt, value) in &custom_token_def.excerpt_to_value_map
 					{
-						let step_kind = MatchStepExact(TokenKind::Identifier, Some(excerpt.to_ascii_lowercase()));
-						
+						let chars = excerpt.chars().collect::<Vec<char>>();
+						let mut next_step = Self::make_step_exact(
+							step,
+							chars[0].to_ascii_lowercase(),
+							Some(value.clone()));
+
+						if chars.len() > 1
 						{
-							let mut maybe_next_steps = step.children_exact.get_mut(&step_kind);
-							
-							if let Some(ref mut next_steps) = maybe_next_steps
+							for c in &chars[1..chars.len()]
 							{
-								if let Some(&mut (_, ref mut next_step)) = next_steps.iter_mut().find(|s| s.0.as_ref() == Some(value))
-								{
-									RulePatternMatcher::build_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
-									continue;
-								}
-								
-								let mut next_step = MatchStep::new();
-								RulePatternMatcher::build_step(report.clone(), &mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
-								next_steps.push((Some(value.clone()), next_step));
-								continue;
+								next_step = Self::make_step_exact(
+									next_step,
+									c.to_ascii_lowercase(),
+									None);
 							}
 						}
-						
-						let mut next_step = MatchStep::new();
-						RulePatternMatcher::build_step(report.clone(), &mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
-						step.children_exact.insert(step_kind, vec![(Some(value.clone()), next_step)]);
+
+						RulePatternMatcher::add_tree_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
 					}
 				}
 				else
 				{
-					let step_kind = MatchStepParameter;
-					
-					if let Some(next_step) = step.children_param.get_mut(&step_kind)
-						{ return RulePatternMatcher::build_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs); }
-					
-					let mut next_step = MatchStep::new();
-					RulePatternMatcher::build_step(report.clone(), &mut next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
-					step.children_param.insert(step_kind, next_step);
+					let next_step = Self::make_step_param(step);
+					RulePatternMatcher::add_tree_step(report.clone(), next_step, rule, &next_parts[1..], rule_index, custom_token_defs)?;
 				}
 			}
 		}
 		
 		return Ok(());
 	}
-	
-	
+
+
+	fn make_step_exact(step: &mut MatchStep, c: char, value: Option<ExpressionValue>) -> &mut MatchStep
+	{
+		if !step.children_exact.contains_key(&c)
+		{
+			step.children_exact.insert(c, vec![(value, Box::new(MatchStep::new()))]);
+			return &mut step.children_exact.get_mut(&c).unwrap().last_mut().unwrap().1;
+		}
+
+		let next_steps = step.children_exact.get_mut(&c).unwrap();
+
+		if next_steps.iter_mut().find(|s| s.0 == value).is_none()
+		{
+			next_steps.push((value, Box::new(MatchStep::new())));
+			return &mut next_steps.last_mut().unwrap().1;
+		}
+		
+		&mut next_steps.iter_mut().find(|s| s.0 == value).unwrap().1
+	}
+
+
+	fn make_step_param(step: &mut MatchStep) -> &mut MatchStep
+	{
+		if step.children_param.is_none()
+		{
+			let next_step = MatchStep::new();
+			step.children_param = Some(Box::new(next_step));
+			step.children_param.as_mut().unwrap()
+		}
+		else
+		{
+			step.children_param.as_mut().unwrap()
+		}
+	}
+
+
 	pub fn parse_match(&self, parser: &mut Parser) -> Option<Match>
 	{
 		let mut exprs = Vec::new();
@@ -172,11 +166,9 @@ impl RulePatternMatcher
 			// Try to match fixed tokens first, if some rule accepts that.
 			let parser_state = parser.save(); 
 			
-			let tk = parser.advance();
+			let c = parser.advance_partial();
 			
-			let step_exact = MatchStepExact(tk.kind, tk.excerpt.map(|s| s.to_ascii_lowercase()));
-			
-			if let Some(ref next_steps) = step.children_exact.get(&step_exact)
+			if let Some(ref next_steps) = step.children_exact.get(&c.to_ascii_lowercase())
 			{
 				for (ref value, ref next_step) in next_steps.iter()
 				{
@@ -196,7 +188,7 @@ impl RulePatternMatcher
 			parser.restore(parser_state);
 			
 			// Then try to match argument expressions, if some rule accepts that.
-			if let Some(next_step) = step.children_param.get(&MatchStepParameter)
+			if let Some(ref next_step) = step.children_param
 			{
 				let parser_state = parser.save(); 
 				
@@ -219,7 +211,7 @@ impl RulePatternMatcher
 		// Finally, return a match if some rule ends here.
 		if step.rule_indices.len() != 0
 		{
-			if !parser.next_is_linebreak()
+			if parser.is_at_partial() || !parser.next_is_linebreak()
 				{ return None }
 			
 			return Some(&step.rule_indices);
@@ -255,7 +247,7 @@ impl RulePatternMatcher
 				for _ in 0..indent
 					{ print!("   "); }
 				
-				print!("{}", key.0.printable_excerpt(key.1.as_ref().map(|s| s as &str)));
+				print!("{}", key);
 				
 				if value.is_some()
 				{
@@ -272,7 +264,7 @@ impl RulePatternMatcher
 			}
 		}
 		
-		for (_, next_step) in &step.children_param
+		if let Some(ref next_step) = step.children_param
 		{
 			for _ in 0..indent
 				{ print!("   "); }
@@ -292,7 +284,7 @@ impl MatchStep
 		{
 			rule_indices: Vec::new(),
 			children_exact: HashMap::new(),
-			children_param: HashMap::new()
+			children_param: None
 		}
 	}
 }
