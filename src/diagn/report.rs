@@ -350,6 +350,12 @@ impl RcReport
 	{
 		RcReport { report: Rc::new(RefCell::new(Report::new())) }
 	}
+
+
+	pub fn into_inner(self) -> Report
+	{
+		Rc::try_unwrap(self.report).ok().unwrap().into_inner()
+	}
 	
 	
 	pub fn error<S>(&self, descr: S)
