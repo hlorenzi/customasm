@@ -190,12 +190,23 @@ impl RulePatternMatcher
 			// Then try to match argument expressions, if some rule accepts that.
 			if let Some(ref next_step) = step.children_param
 			{
-				let parser_state = parser.save(); 
-				
-				let expr = match Expression::parse(parser)
+				let parser_state = parser.save();
+
+				let expr = if parser.is_at_partial()
 				{
-					Ok(expr) => expr,
-					Err(()) => return None
+					match parser.maybe_expect_partial_usize()
+					{
+						Some(value) => ExpressionValue::make_integer_from_usize(value).make_literal(),
+						None => return None
+					}
+				}
+				else
+				{
+					match Expression::parse(parser)
+					{
+						Ok(expr) => expr,
+						Err(()) => return None
+					}
 				};
 				
 				exprs.push(expr);

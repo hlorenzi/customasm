@@ -135,6 +135,17 @@ impl Parser
 	{
 		self.tokens[self.index].clone()
 	}
+
+
+	pub fn next_partial(&mut self) -> char
+	{
+		if self.tokens[self.index].kind == TokenKind::End
+			{ return '\0'; }
+
+		let sliced = unsafe { self.tokens[self.index].text().get_unchecked(self.partial_index..) };
+		let mut char_indices = sliced.char_indices();
+		char_indices.next().unwrap().1
+	}
 	
 	
 	pub fn prev(&self) -> Token
@@ -239,5 +250,43 @@ impl Parser
 		let tk = self.expect(TokenKind::Number)?;
 		let value = excerpt_as_usize(self.report.clone(), &tk.excerpt.as_ref().unwrap(), &tk.span)?;
 		Ok((tk, value))
+	}
+	
+	
+	pub fn maybe_expect_partial_usize(&mut self) -> Option<usize>
+	{
+		let mut value: usize = 0;
+		let mut advance_count: usize = 0;
+
+		while !self.is_over()
+		{
+			let c = self.next_partial();
+
+			let digit = match c.to_digit(10)
+			{
+				Some(d) => d,
+				None => break
+			};
+			
+			value = match value.checked_mul(10)
+			{
+				Some(v) => v,
+				None => break
+			};
+			
+			value = match value.checked_add(digit as usize)
+			{
+				Some(v) => v,
+				None => break
+			};
+			
+			self.advance_partial();
+			advance_count += 1;
+		}
+
+		if advance_count == 0
+			{ return None; }
+
+		Some(value)
 	}
 }

@@ -79,4 +79,10 @@ impl ExpressionValue
 	{
 		Expression::Literal(Span::new_dummy(), self.clone())
 	}
+
+
+	pub fn make_integer_from_usize(value: usize) -> ExpressionValue
+	{
+		ExpressionValue::Integer(BigInt::from(value))
+	}
 }

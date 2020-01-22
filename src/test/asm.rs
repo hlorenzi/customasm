@@ -195,11 +195,30 @@ fn test_tokendef()
 	
 	test("#tokendef alu { add = 0x10, sub = 0x20 } \n {op: alu} {x} -> op[7:0] @ x[7:0]", "add 0xef \n sub 0xfe", Pass((4, "10ef20fe")));
 	
-	test("#tokendef cond { z = 0x10, ne = 0x20 } \n j{c: cond} {x} -> c[7:0] @ x[7:0]", "jz 0x50 \n jne 0x60", Pass((4, "10502060")));
-	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "j t e s t", Pass((4, "10")));
-	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "jtestx",    Fail(("asm", 1, "no match")));
-	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "jtes",      Fail(("asm", 1, "no match")));
-	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "jtes\nt",   Fail(("asm", 1, "no match")));
+	test("#tokendef cond { z = 0x10, ne = 0x20 } \n j{c: cond} {x} -> c[7:0] @ x[7:0]", "jz 0x50  \n jne 0x60",   Pass((4, "10502060")));
+	test("#tokendef cond { z = 0x10, ne = 0x20 } \n j{c: cond} {x} -> c[7:0] @ x[7:0]", "j z 0x50 \n j ne 0x60",  Pass((4, "10502060")));
+	test("#tokendef cond { z = 0x10, ne = 0x20 } \n j{c: cond} {x} -> c[7:0] @ x[7:0]", "j z 0x50 \n j n e 0x60", Pass((4, "10502060")));
+	test("#tokendef cond { z = 0x10 } \n j{c: cond} {x} -> c[7:0] @ x[7:0]", "j ztest", Fail(("asm", 1, "no match")));
+	
+	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "j t e s t",   Pass((4, "10")));
+	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "jtestx",      Fail(("asm", 1, "no match")));
+	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "jtes",        Fail(("asm", 1, "no match")));
+	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "jtes\nt",     Fail(("asm", 1, "no match")));
+	test("#tokendef cond { test = 0x10 } \n j{c: cond} -> c[7:0]", "jtes\njtest", Fail(("asm", 1, "no match")));
+	
+	test("ld r{reg} -> 0x55 @ reg[7:0]", "ld r1",  Pass((4, "5501")));
+	test("ld r{reg} -> 0x55 @ reg[7:0]", "ld r1  \n ld r3  \n ld r18",   Pass((4, "550155035512")));
+	test("ld r{reg} -> 0x55 @ reg[7:0]", "ld r 1 \n ld r 3 \n ld r 18",  Pass((4, "550155035512")));
+	test("ld r{reg} -> 0x55 @ reg[7:0]", "ld r 1 \n ld r 3 \n ld r 1 8", Fail(("asm", 3, "no match")));
+	test("ld r{reg} -> 0x55 @ reg[7:0]", "ld r 0x1", Pass((4, "5501")));
+	test("ld r{reg} -> 0x55 @ reg[7:0]", "ld r 1+1", Pass((4, "5502")));
+	test("ld r{reg} -> 0x55 @ reg[7:0]", "ld r0x1",  Fail(("asm", 1, "no match")));
+	test("ld r{reg} -> 0x55 @ reg[7:0]", "ld r1+1",  Fail(("asm", 1, "no match")));
+	test("ld r{reg} -> 0x55 @ reg[7:0]", "ld ra",    Fail(("asm", 1, "no match")));
+	
+	test("ld r{reg}, {val} -> 0x55 @ reg[7:0] @ val[7:0]", "ld r1, 5",  Pass((4, "550105")));
+	test("ld r{reg}, {val} -> 0x55 @ reg[7:0] @ val[7:0]", "ld r 1, 5", Pass((4, "550105")));
+	test("ld r{reg}, {val} -> 0x55 @ reg[7:0] @ val[7:0]", "ld r0x1, 5", Fail(("asm", 1, "no match")));
 }
 
 
