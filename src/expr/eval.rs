@@ -313,7 +313,7 @@ impl ExpressionValue
 }
 
 
-fn bigint_bits(x: &BigInt) -> usize
+pub fn bigint_bits(x: &BigInt) -> usize
 {
 	if x.is_zero()
 		{ return 1; }

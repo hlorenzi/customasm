@@ -469,12 +469,20 @@ impl<'a> AssemblerParser<'a>
 				// Evaluate the instruction's production and check whether it
 				// generates an error, in which case, just try the next instruction in the series.
 				let rule = &self.state.cpudef.as_ref().unwrap().rules[instr_match.rule_indices[best_match]];
+
+				let report = RcReport::new();
 				
 				let mut args_eval_ctx = ExpressionEvalContext::new();
 				for i in 0..args.len()
-					{ args_eval_ctx.set_local(rule.params[i].name.clone(), args[i].clone().unwrap()); }
+				{
+					let arg = args[i].clone().unwrap();
+					self.state.check_expr_constraint(report.clone(), &arg, &rule.params[i].typ, &Span::new_dummy()).ok();
+					args_eval_ctx.set_local(rule.params[i].name.clone(), arg);
+				}
+
+				self.state.expr_eval(report.clone(), &ctx, &rule.production, &mut args_eval_ctx).ok();
 				
-				if self.state.expr_eval(RcReport::new(), &ctx, &rule.production, &mut args_eval_ctx).is_ok()
+				if !report.has_errors()
 					{ break; }
 				
 				best_match += 1;

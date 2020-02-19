@@ -155,6 +155,88 @@ fn test_parameters()
 
 
 #[test]
+fn test_parameter_types()
+{
+	test("load {a: u}   -> 0x12 @ a[7:0]", "load 0x00", Fail(("cpu", 1, "type")));
+	test("load {a: u1f} -> 0x12 @ a[7:0]", "load 0x00", Fail(("cpu", 1, "type")));
+	test("load {a: u-1} -> 0x12 @ a[7:0]", "load 0x00", Fail(("cpu", 1, "type")));
+
+	test("load {a: u0} -> 0x12 @ a[7:0]", "load 0x00",  Fail(("asm", 1, "out of range")));
+
+	test("load {a: u1} -> 0x12 @ a[7:0]", "load 0b00",  Pass((4, "1200")));
+	test("load {a: u1} -> 0x12 @ a[7:0]", "load 0b01",  Pass((4, "1201")));
+	test("load {a: u1} -> 0x12 @ a[7:0]", "load 0b10",  Fail(("asm", 1, "out of range")));
+	test("load {a: u1} -> 0x12 @ a[7:0]", "load -0b01", Fail(("asm", 1, "out of range")));
+
+	test("load {a: u8} -> 0x12 @ a[7:0]", "load 0x00",  Pass((4, "1200")));
+	test("load {a: u8} -> 0x12 @ a[7:0]", "load 0x34",  Pass((4, "1234")));
+	test("load {a: u8} -> 0x12 @ a[7:0]", "load 0xff",  Pass((4, "12ff")));
+	test("load {a: u8} -> 0x12 @ a[7:0]", "load 0x100", Fail(("asm", 1, "out of range")));
+	test("load {a: u8} -> 0x12 @ a[7:0]", "load -0x01", Fail(("asm", 1, "out of range")));
+	
+	test("load {a: u16} -> 0x12 @ a[15:0]", "load 0x0000",  Pass((4, "120000")));
+	test("load {a: u16} -> 0x12 @ a[15:0]", "load 0x3456",  Pass((4, "123456")));
+	test("load {a: u16} -> 0x12 @ a[15:0]", "load 0xffff",  Pass((4, "12ffff")));
+	test("load {a: u16} -> 0x12 @ a[15:0]", "load 0x10000", Fail(("asm", 1, "out of range")));
+	test("load {a: u16} -> 0x12 @ a[15:0]", "load -0x0001", Fail(("asm", 1, "out of range")));
+	
+	test("load {a: s0} -> 0x12 @ a[7:0]", "load 0x00",  Fail(("asm", 1, "out of range")));
+
+	test("load {a: s1} -> 0x12 @ a[7:0]", "load 0b00",  Pass((4, "1200")));
+	test("load {a: s1} -> 0x12 @ a[7:0]", "load -0b01", Pass((4, "12ff")));
+	test("load {a: s1} -> 0x12 @ a[7:0]", "load 0b01",  Fail(("asm", 1, "out of range")));
+	test("load {a: s1} -> 0x12 @ a[7:0]", "load -0b10", Fail(("asm", 1, "out of range")));
+
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load 0x00",  Pass((4, "1200")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load 0x34",  Pass((4, "1234")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load 0x7e",  Pass((4, "127e")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load 0x7f",  Pass((4, "127f")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load -0x01", Pass((4, "12ff")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load -0x7f", Pass((4, "1281")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load -0x80", Pass((4, "1280")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load 0x80",  Fail(("asm", 1, "out of range")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load -0x81", Fail(("asm", 1, "out of range")));
+	
+	test("load {a: s8} -> 0x12 @ a[15:0]", "load -0x01", Pass((4, "12ffff")));
+	
+	test("load {a: i0} -> 0x12 @ a[7:0]", "load 0x00",  Fail(("asm", 1, "out of range")));
+
+	test("load {a: i1} -> 0x12 @ a[7:0]", "load 0b00",  Pass((4, "1200")));
+	test("load {a: i1} -> 0x12 @ a[7:0]", "load 0b01",  Pass((4, "1201")));
+	test("load {a: i1} -> 0x12 @ a[7:0]", "load -0b01", Pass((4, "12ff")));
+	test("load {a: i1} -> 0x12 @ a[7:0]", "load 0b10",  Fail(("asm", 1, "out of range")));
+	test("load {a: i1} -> 0x12 @ a[7:0]", "load -0b10", Fail(("asm", 1, "out of range")));
+
+	test("load {a: i8} -> 0x12 @ a[7:0]", "load 0x00",  Pass((4, "1200")));
+	test("load {a: i8} -> 0x12 @ a[7:0]", "load 0x34",  Pass((4, "1234")));
+	test("load {a: i8} -> 0x12 @ a[7:0]", "load 0xff",  Pass((4, "12ff")));
+	test("load {a: i8} -> 0x12 @ a[7:0]", "load -0x01", Pass((4, "12ff")));
+	test("load {a: i8} -> 0x12 @ a[7:0]", "load -0x7f", Pass((4, "1281")));
+	test("load {a: i8} -> 0x12 @ a[7:0]", "load -0x80", Pass((4, "1280")));
+	test("load {a: i8} -> 0x12 @ a[7:0]", "load 0x100", Fail(("asm", 1, "out of range")));
+	test("load {a: i8} -> 0x12 @ a[7:0]", "load -0x81", Fail(("asm", 1, "out of range")));
+	
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load  0x05 - 0x05", Pass((4, "1200")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load  0x30 + 0x04", Pass((4, "1234")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load  0x70 + 0x0f", Pass((4, "127f")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load  0x00 - 0x01", Pass((4, "12ff")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load -0x70 - 0x0f", Pass((4, "1281")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load -0x70 - 0x10", Pass((4, "1280")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load  0x70 + 0x10", Fail(("asm", 1, "out of range")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load -0x70 - 0x11", Fail(("asm", 1, "out of range")));
+
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load x \n x = 0x00",  Pass((4, "1200")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load x \n x = 0x34",  Pass((4, "1234")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load x \n x = 0x7f",  Pass((4, "127f")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load x \n x = -0x01", Pass((4, "12ff")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load x \n x = -0x7f", Pass((4, "1281")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load x \n x = -0x80", Pass((4, "1280")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load x \n x = 0x80",  Fail(("asm", 1, "out of range")));
+	test("load {a: s8} -> 0x12 @ a[7:0]", "load x \n x = -0x81", Fail(("asm", 1, "out of range")));
+}
+
+
+#[test]
 fn test_tokendef()
 {
 	test("#tokendef reg { r1 = 1    } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Pass((4, "ff01")));
@@ -565,6 +647,66 @@ fn test_cascading()
 	test(INSTRSET, "            b = 0x15 \n add a, b \n a = 0x25",             Pass((4, "dd2515")));
 	test(INSTRSET, "                        add a, b \n a = 0x07 \n b = 0x07", Pass((4, "dd0707")));
 	test(INSTRSET, "                        add a, b \n a = 0x25 \n b = 0x25", Pass((4, "dd2525")));
+	
+	static INSTRSET2: &'static str = "
+		load {a: u4} -> 0x10 @ a[7:0] \n
+		load {a: u8} -> 0x20 @ a[7:0] \n
+		load {a}     -> 0xff @ a[7:0] \n
+		
+		store {a: u4 } -> 0x30 @ a[7:0] \n
+		store {a: u8 } -> 0x40 @ a[7:0] \n
+		store {a: u16} -> 0x50 @ a[7:0] \n
+		
+		add {a: u4}, {b: u4} -> 0xaa @ a[7:0] @ b[7:0] \n
+		add {a: u8}, {b}     -> 0xbb @ a[7:0] @ b[7:0] \n
+		add {a},     {b: u8} -> 0xcc @ a[7:0] @ b[7:0] \n 
+		add {a},     {b}     -> 0xdd @ a[7:0] @ b[7:0]";
+
+	test(INSTRSET2, "load 0x005", Pass((4, "1005")));
+	test(INSTRSET2, "load 0x015", Pass((4, "2015")));
+	test(INSTRSET2, "load 0x125", Pass((4, "ff25")));
+
+	test(INSTRSET2, "value = 0x005 \n load value", Pass((4, "1005")));
+	test(INSTRSET2, "value = 0x015 \n load value", Pass((4, "2015")));
+	test(INSTRSET2, "value = 0x125 \n load value", Pass((4, "ff25")));
+	
+	test(INSTRSET2, "load value \n value = 0x005", Pass((4, "ff05")));
+	test(INSTRSET2, "load value \n value = 0x015", Pass((4, "ff15")));
+	test(INSTRSET2, "load value \n value = 0x125", Pass((4, "ff25")));
+	
+	test(INSTRSET2, "store 0x00005",  Pass((4, "3005")));
+	test(INSTRSET2, "store 0x00015",  Pass((4, "4015")));
+	test(INSTRSET2, "store 0x00125",  Pass((4, "5025")));
+	test(INSTRSET2, "store 0x11135", Fail(("asm", 1, "out of range")));
+	
+	test(INSTRSET2, "value = 0x00005 \n store value", Pass((4, "3005")));
+	test(INSTRSET2, "value = 0x00015 \n store value", Pass((4, "4015")));
+	test(INSTRSET2, "value = 0x00125 \n store value", Pass((4, "5025")));
+	test(INSTRSET2, "value = 0x11135 \n store value", Fail(("asm", 2, "out of range")));
+	
+	test(INSTRSET2, "store value \n value = 0x00005", Pass((4, "5005")));
+	test(INSTRSET2, "store value \n value = 0x00015", Pass((4, "5015")));
+	test(INSTRSET2, "store value \n value = 0x00125", Pass((4, "5025")));
+	test(INSTRSET2, "store value \n value = 0x11135", Fail(("asm", 1, "out of range")));
+	
+	test(INSTRSET2, "add 0x005, 0x007", Pass((4, "aa0507")));
+	test(INSTRSET2, "add 0x015, 0x025", Pass((4, "bb1525")));
+	test(INSTRSET2, "add 0x125, 0x015", Pass((4, "cc2515")));
+	test(INSTRSET2, "add 0x125, 0x125", Pass((4, "dd2525")));
+	
+	test(INSTRSET2, "a = 0x005 \n b = 0x007 \n add a, b", Pass((4, "aa0507")));
+	test(INSTRSET2, "a = 0x005 \n b = 0x125 \n add a, b", Pass((4, "bb0525")));
+	test(INSTRSET2, "a = 0x015 \n b = 0x007 \n add a, b", Pass((4, "bb1507")));
+	test(INSTRSET2, "a = 0x015 \n b = 0x125 \n add a, b", Pass((4, "bb1525")));
+	test(INSTRSET2, "a = 0x125 \n b = 0x015 \n add a, b", Pass((4, "cc2515")));
+	test(INSTRSET2, "a = 0x125 \n b = 0x125 \n add a, b", Pass((4, "dd2525")));
+	
+	test(INSTRSET2, "a = 0x005 \n             add a, b \n b = 0x007",              Pass((4, "dd0507")));
+	test(INSTRSET2, "a = 0x015 \n             add a, b \n b = 0x125",              Pass((4, "dd1525")));
+	test(INSTRSET2, "            b = 0x007 \n add a, b \n a = 0x005",              Pass((4, "dd0507")));
+	test(INSTRSET2, "            b = 0x015 \n add a, b \n a = 0x125",              Pass((4, "dd2515")));
+	test(INSTRSET2, "                         add a, b \n a = 0x007 \n b = 0x007", Pass((4, "dd0707")));
+	test(INSTRSET2, "                         add a, b \n a = 0x125 \n b = 0x125", Pass((4, "dd2525")));
 }
 
 

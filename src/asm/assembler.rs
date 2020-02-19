@@ -5,6 +5,7 @@ use crate::asm::BankDef;
 use crate::asm::Bank;
 use crate::asm::BinaryBlock;
 use crate::asm::cpudef::CpuDef;
+use crate::asm::cpudef::RuleParameterType;
 use crate::util::FileServer;
 use num_bigint::ToBigInt;
 
@@ -427,6 +428,48 @@ impl AssemblerState
 		
 		Ok(())
 	}
+
+
+	pub fn check_expr_constraint(&self, report: RcReport, value: &ExpressionValue, typ: &RuleParameterType, span: &Span) -> Result<(), ()>
+	{
+		use crate::expr::bigint_bits;
+
+		if let RuleParameterType::Unsigned(width) = typ
+		{
+			if let ExpressionValue::Integer(value_int) = value
+			{
+				if value_int.sign() == num_bigint::Sign::Minus ||
+					bigint_bits(&value_int) > *width
+					{ return Err(report.error_span(&format!("argument out of range for type `u{}`", width), &span)); }
+			}
+			else
+				{ return Err(report.error_span(&format!("wrong argument for type `u{}`", width), &span)); }
+		}
+		else if let RuleParameterType::Signed(width) = typ
+		{
+			if let ExpressionValue::Integer(value_int) = value
+			{
+				if (value_int.sign() == num_bigint::Sign::NoSign && *width == 0) ||
+					(value_int.sign() == num_bigint::Sign::Plus && bigint_bits(&value_int) >= *width) ||
+					(value_int.sign() == num_bigint::Sign::Minus && bigint_bits(&value_int) > *width)
+					{ return Err(report.error_span(&format!("argument out of range for type `s{}`", width), &span)); }
+			}
+			else
+				{ return Err(report.error_span(&format!("wrong argument for type `s{}`", width), &span)); }
+		}
+		else if let RuleParameterType::Integer(width) = typ
+		{
+			if let ExpressionValue::Integer(value_int) = value
+			{
+				if bigint_bits(&value_int) > *width
+					{ return Err(report.error_span(&format!("argument out of range for type `i{}`", width), &span)); }
+			}
+			else
+				{ return Err(report.error_span(&format!("wrong argument for type `i{}`", width), &span)); }
+		}
+
+		Ok(())
+	}
 	
 	
 	pub fn output_parsed_instr(&mut self, report: RcReport, instr: &mut ParsedInstruction) -> Result<(), ()>
@@ -442,7 +485,11 @@ impl AssemblerState
 		let rule = &self.cpudef.as_ref().unwrap().rules[instr.rule_index];
 		let mut args_eval_ctx = ExpressionEvalContext::new();
 		for i in 0..instr.args.len()
-			{ args_eval_ctx.set_local(rule.params[i].name.clone(), instr.args[i].clone().unwrap()); }
+		{
+			let arg = instr.args[i].clone().unwrap();
+			self.check_expr_constraint(report.clone(), &arg, &rule.params[i].typ, &instr.exprs[i].span())?;
+			args_eval_ctx.set_local(rule.params[i].name.clone(), arg);
+		}
 		
 		// Output binary representation.
 		let (left, right) = rule.production.slice().unwrap();

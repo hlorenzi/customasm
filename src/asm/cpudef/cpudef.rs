@@ -292,22 +292,7 @@ impl<'t> CpuDefParser<'t>
 			
 		let (is_expr_parameter, typ) =
 			if self.parser.maybe_expect(TokenKind::Colon).is_some()
-			{
-				let tk_type = self.parser.expect(TokenKind::Identifier)?;
-				let typename = tk_type.excerpt.unwrap().clone();
-				
-				let mut tokendef_index = None;
-				for i in 0..self.custom_token_defs.len()
-				{
-					if typename == self.custom_token_defs[i].name
-						{ tokendef_index = Some(i); }
-				}
-				
-				if tokendef_index.is_none()
-					{ return Err(self.parser.report.error_span("unknown parameter type", &tk_type.span)); }
-						
-				(false, RuleParameterType::CustomTokenDef(tokendef_index.unwrap()))
-			}
+				{ (false, self.parse_rule_parameter_type()?) }
 			else
 				{ (true, RuleParameterType::Expression) };
 			
@@ -316,6 +301,42 @@ impl<'t> CpuDefParser<'t>
 		self.parser.expect(TokenKind::BraceClose)?;
 		
 		Ok(is_expr_parameter)
+	}
+
+
+	fn parse_rule_parameter_type(&mut self) -> Result<RuleParameterType, ()>
+	{
+		let tk_type = self.parser.expect(TokenKind::Identifier)?;
+		let typename = tk_type.excerpt.unwrap().clone();
+		let typename_first_char = typename.chars().next();
+
+		if typename_first_char == Some('u') ||
+			typename_first_char == Some('s') ||
+			typename_first_char == Some('i')
+		{
+			if let Ok(type_width) = usize::from_str_radix(&typename[1..], 10)
+			{
+				match typename_first_char
+				{
+					Some('u') => return Ok(RuleParameterType::Unsigned(type_width)),
+					Some('s') => return Ok(RuleParameterType::Signed(type_width)),
+					Some('i') => return Ok(RuleParameterType::Integer(type_width)),
+					_ => unreachable!()
+				}
+			}
+		}
+		
+		let mut tokendef_index = None;
+		for i in 0..self.custom_token_defs.len()
+		{
+			if typename == self.custom_token_defs[i].name
+				{ tokendef_index = Some(i); }
+		}
+
+		if let Some(tokendef_index) = tokendef_index
+			{ Ok(RuleParameterType::CustomTokenDef(tokendef_index)) }
+		else
+			{ Err(self.parser.report.error_span("unknown parameter type", &tk_type.span)) }
 	}
 	
 

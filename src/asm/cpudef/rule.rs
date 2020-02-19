@@ -25,7 +25,10 @@ pub enum RulePatternPart
 pub enum RuleParameterType
 {
 	Expression,
-	CustomTokenDef(usize)
+	CustomTokenDef(usize),
+	Unsigned(usize),
+	Signed(usize),
+	Integer(usize),
 }
 
 
