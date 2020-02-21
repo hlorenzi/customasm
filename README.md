@@ -5,6 +5,19 @@ This can be useful if you'd like to test out a new virtual machine's bytecode,
 or even if you're eager to write programs for that new processor architecture 
 you just implemented in FPGA!
 
+[![Latest Release][badge-latest-img]][badge-latest-url]
+[![Releases][badge-downloads-img]][badge-downloads-url]
+[![Discord][badge-discord-img]][badge-discord-url]
+
+[badge-latest-img]: https://img.shields.io/github/v/release/hlorenzi/customasm
+[badge-latest-url]: https://github.com/hlorenzi/customasm/releases
+
+[badge-downloads-img]: https://img.shields.io/github/downloads/hlorenzi/customasm/total
+[badge-downloads-url]: https://github.com/hlorenzi/customasm/releases
+
+[badge-discord-img]: https://img.shields.io/discord/394999035540275222?label=Discord&logo=discord
+[badge-discord-url]: https://discord.gg/JYbhDtp
+
 [📱 Try it right now in your browser!](https://hlorenzi.github.io/customasm/web/)
  
 [🎁 Check out the Releases section](https://github.com/hlorenzi/customasm/releases) 
@@ -19,25 +32,6 @@ on how to use the main features!
 
 You can compile from source by simply doing `cargo build`. There's also a
 battery of tests available at `cargo test`.
-
-## Command Line Usage
-
-```
-Usage: customasm [options] <asm-file-1> ... <asm-file-N>
-
-Options:
-    -f, --format FORMAT The format of the output file. Possible formats:
-                        binary, annotated, annotatedbin, binstr, hexstr,
-                        bindump, hexdump, mif, intelhex, deccomma, hexcomma,
-                        decc, hexc, logisim8, logisim16
-                        
-    -o, --output FILE   The name of the output file.
-    -s, --symbol FILE   The name of the output symbol file.
-    -p, --print         Print output to stdout instead of writing to a file.
-    -q, --quiet         Suppress progress reports.
-    -v, --version       Display version information.
-    -h, --help          Display this information.
-```
 
 ## Example
 
@@ -86,4 +80,23 @@ multiply3x4:
  107:0 |  107 | 33 01    ; sub r3, 1
  109:0 |  109 | 40 01 06 ; jnz .loop
  10c:0 |  10c | 50       ; ret
+```
+
+## Command Line Usage
+
+```
+Usage: customasm [options] <asm-file-1> ... <asm-file-N>
+
+Options:
+    -f, --format FORMAT The format of the output file. Possible formats:
+                        binary, annotated, annotatedbin, binstr, hexstr,
+                        bindump, hexdump, mif, intelhex, deccomma, hexcomma,
+                        decc, hexc, logisim8, logisim16
+                        
+    -o, --output FILE   The name of the output file.
+    -s, --symbol FILE   The name of the output symbol file.
+    -p, --print         Print output to stdout instead of writing to a file.
+    -q, --quiet         Suppress progress reports.
+    -v, --version       Display version information.
+    -h, --help          Display this information.
 ```
