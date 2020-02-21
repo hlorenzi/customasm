@@ -237,6 +237,25 @@ fn test_parameter_types()
 
 
 #[test]
+fn test_parameter_soft_slices()
+{
+	test("load {a: u3} -> 0b11111 @ a", "load 0x5", Pass((4, "fd")));
+
+	test("load {a: u8 } -> 0x12 @ a", "load 0x34",   Pass((4, "1234")));
+	test("load {a: u16} -> 0x12 @ a", "load 0x3456", Pass((4, "123456")));
+	
+	test("load {a: s8 } -> 0x12 @ a", "load 0x34",    Pass((4, "1234")));
+	test("load {a: s8 } -> 0x12 @ a", "load -0x01",   Pass((4, "12ff")));
+	test("load {a: s8 } -> 0x12 @ a", "load -0x80",   Pass((4, "1280")));
+	test("load {a: s16} -> 0x12 @ a", "load -0x8000", Pass((4, "128000")));
+	
+	test("load {a: s8} -> 0x12 @ a[15:0]", "load -1", Pass((4, "12ffff")));
+
+	test("load {a: s8} -> 0x12 @ (a + a)[15:0]", "load -1", Pass((4, "12fffe")));
+}
+
+
+#[test]
 fn test_tokendef()
 {
 	test("#tokendef reg { r1 = 1    } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Pass((4, "ff01")));

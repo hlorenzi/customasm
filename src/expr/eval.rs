@@ -186,9 +186,19 @@ impl Expression
 								
 								BinaryOp::Concat =>
 								{
+									// FIXME: wrongly evaluates lhs and rhs again, with possible duplicated side-effects
+									let lhs_sliced = lhs_expr.eval_slice(report.clone(), ctx, eval_var, eval_fn)?;
+									let rhs_sliced = rhs_expr.eval_slice(report.clone(), ctx, eval_var, eval_fn)?;
+
+									let (lhs_sliced, rhs_sliced) = match (lhs_sliced, rhs_sliced)
+									{
+										(ExpressionValue::Integer(lhs), ExpressionValue::Integer(rhs)) => (lhs, rhs),
+										_ => unreachable!()
+									};
+
 									match (lhs_expr.width(), rhs_expr.width())
 									{
-										(Some(lhs_width), Some(rhs_width)) => Ok(ExpressionValue::Integer(bigint_concat(lhs, lhs_width, rhs, rhs_width))),
+										(Some(lhs_width), Some(rhs_width)) => Ok(ExpressionValue::Integer(bigint_concat(lhs_sliced, (lhs_width - 1, 0), rhs_sliced, (rhs_width - 1, 0)))),
 										(None, _) => Err(report.error_span("argument to concatenation with no known width", &lhs_expr.span())),
 										(_, None) => Err(report.error_span("argument to concatenation with no known width", &rhs_expr.span()))
 									}							
@@ -235,6 +245,11 @@ impl Expression
 				}
 			}
 			
+			&Expression::SoftSlice(_, _, _, _, ref inner) =>
+			{
+				inner.eval(report, ctx, eval_var, eval_fn)
+			}
+			
 			&Expression::Block(_, ref exprs) =>
 			{
 				let mut result = ExpressionValue::Void;
@@ -265,6 +280,27 @@ impl Expression
 					_ => Err(report.error_span("expression is not callable", &target.span()))
 				}
 			}
+		}
+	}
+
+
+	pub fn eval_slice<FVar, FFn>(&self, report: RcReport, ctx: &mut ExpressionEvalContext, eval_var: &FVar, eval_fn: &FFn) -> Result<ExpressionValue, ()>
+		where
+		FVar: Fn(RcReport, &str, &Span) -> Result<ExpressionValue, bool>,
+		FFn: Fn(RcReport, usize, Vec<ExpressionValue>, &Span) -> Result<ExpressionValue, bool>
+	{
+		match self
+		{
+			&Expression::SoftSlice(ref span, _, left, right, ref inner) =>
+			{
+				match inner.eval(report.clone(), ctx, eval_var, eval_fn)?
+				{
+					ExpressionValue::Integer(x) => Ok(ExpressionValue::Integer(bigint_slice(x, left, right))),
+					_ => Err(report.error_span("invalid argument type to slice", &span))
+				}
+			}
+
+			_ => self.eval(report, ctx, eval_var, eval_fn)
 		}
 	}
 }
@@ -359,9 +395,11 @@ fn bigint_shr(lhs: BigInt, rhs: BigInt) -> Option<BigInt>
 }
 
 
-fn bigint_concat(lhs: BigInt, _lhs_width: usize, rhs: BigInt, rhs_width: usize) -> BigInt
+fn bigint_concat(lhs: BigInt, lhs_slice: (usize, usize), rhs: BigInt, rhs_slice: (usize, usize)) -> BigInt
 {
-	bigint_or(lhs << rhs_width, rhs)
+	bigint_or(
+		bigint_slice(lhs, lhs_slice.0, lhs_slice.1) << (rhs_slice.0 + 1 - rhs_slice.1),
+		bigint_slice(rhs, rhs_slice.0, rhs_slice.1))
 }
 
 

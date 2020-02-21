@@ -1,10 +1,12 @@
 use crate::syntax::{TokenKind, Parser, excerpt_as_usize, excerpt_as_bigint};
+use crate::asm::cpudef::{RuleParameter, RuleParameterType};
 use super::{Expression, ExpressionValue, UnaryOp, BinaryOp};
 
 
 pub struct ExpressionParser<'a>
 {
-	parser: &'a mut Parser
+	parser: &'a mut Parser,
+	rule_params: Option<&'a [RuleParameter]>,
 }
 
 
@@ -12,18 +14,25 @@ impl Expression
 {
 	pub fn parse(parser: &mut Parser) -> Result<Expression, ()>
 	{
-		ExpressionParser::new(parser).parse_expr()
+		ExpressionParser::new(parser, None).parse_expr()
+	}
+
+
+	pub fn parse_for_rule(parser: &mut Parser, rule_params: &[RuleParameter]) -> Result<Expression, ()>
+	{
+		ExpressionParser::new(parser, Some(rule_params)).parse_expr()
 	}
 }
 
 
 impl<'a> ExpressionParser<'a>
 {
-	pub fn new(parser: &mut Parser) -> ExpressionParser
+	pub fn new(parser: &'a mut Parser, rule_params: Option<&'a [RuleParameter]>) -> ExpressionParser<'a>
 	{
 		ExpressionParser
 		{
-			parser: parser
+			parser,
+			rule_params,
 		}
 	}
 	
@@ -390,10 +399,34 @@ impl<'a> ExpressionParser<'a>
 		let tk_name = self.parser.expect(TokenKind::Identifier)?;
 		name.push_str(&tk_name.excerpt.clone().unwrap());
 		
-		if let Some(tk_dot) = tk_dot
-			{ Ok(Expression::Variable(tk_dot.span.join(&tk_name.span), name)) }
+		let expr_span = if let Some(tk_dot) = tk_dot
+			{ tk_dot.span.join(&tk_name.span) }
 		else
-			{ Ok(Expression::Variable(tk_name.span.clone(), name)) }
+			{ tk_name.span.clone() };
+		
+		let expr_var = Expression::Variable(expr_span.clone(), name.clone());
+
+		if let Some(rule_params) = self.rule_params
+		{
+			if let Some(rule_param) = rule_params.iter().find(|p| p.name == name)
+			{
+				let width = match rule_param.typ
+				{
+					RuleParameterType::Unsigned(w) => Some(w),
+					RuleParameterType::Signed(w) => Some(w),
+					RuleParameterType::Integer(w) => Some(w),
+					_ => None
+				};
+
+				if let Some(width) = width
+				{
+					if width > 0
+						{ return Ok(Expression::SoftSlice(expr_span.clone(), expr_span.clone(), width - 1, 0, Box::new(expr_var))); }
+				}
+			}
+		}
+
+		Ok(expr_var)
 	}
 	
 	

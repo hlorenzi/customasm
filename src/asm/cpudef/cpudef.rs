@@ -342,7 +342,7 @@ impl<'t> CpuDefParser<'t>
 
 	fn parse_rule_production(&mut self, rule: &mut Rule) -> Result<(), ()>
 	{
-		let expr = Expression::parse(&mut self.parser)?;
+		let expr = Expression::parse_for_rule(&mut self.parser, &rule.params)?;
 		
 		let width = match expr.width()
 		{

@@ -7,6 +7,15 @@ impl Expression
 {
 	pub fn width(&self) -> Option<usize>
 	{
+		if let Some(slice) = self.slice()
+			{ Some(slice.0 + 1 - slice.1) }
+		else
+			{ None }
+	}
+	
+	
+	pub fn slice(&self) -> Option<(usize, usize)>
+	{
 		match self
 		{
 			&Expression::BinaryOp(_, _, BinaryOp::Concat, ref lhs, ref rhs) =>
@@ -17,10 +26,11 @@ impl Expression
 				if lhs_width.is_none() || rhs_width.is_none()
 					{ return None; }
 					
-				Some(lhs_width.unwrap() + rhs_width.unwrap())
+				Some((lhs_width.unwrap() + rhs_width.unwrap() - 1, 0))
 			}
 			
-			&Expression::BitSlice(_, _, left, right, _) => Some(left + 1 - right),
+			&Expression::BitSlice(_, _, left, right, _) => Some((left, right)),
+			&Expression::SoftSlice(_, _, left, right, _) => Some((left, right)),
 			
 			&Expression::TernaryOp(_, _, ref true_branch, ref false_branch) =>
 			{
@@ -33,31 +43,8 @@ impl Expression
 				if true_width.unwrap() != false_width.unwrap()
 					{ return None; }
 					
-				Some(true_width.unwrap())
+				Some((true_width.unwrap() - 1, 0))
 			}
-			
-			&Expression::Block(_, ref exprs) =>
-			{
-				match exprs.last()
-				{
-					None => None,
-					Some(expr) => expr.width()
-				}
-			}
-			
-			_ => None
-		}
-	}
-	
-	
-	pub fn slice(&self) -> Option<(usize, usize)>
-	{
-		match self
-		{
-			&Expression::BinaryOp(_, _, BinaryOp::Concat, _, _) => self.width().map(|w| (w - 1, 0)),
-			&Expression::BitSlice(_, _, left, right, _) => Some((left, right)),
-			
-			&Expression::TernaryOp(_, _, _, _) => self.width().map(|w| (w - 1, 0)),
 			
 			&Expression::Block(_, ref exprs) =>
 			{

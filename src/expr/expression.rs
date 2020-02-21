@@ -11,6 +11,7 @@ pub enum Expression
 	BinaryOp(Span, Span, BinaryOp, Box<Expression>, Box<Expression>),
 	TernaryOp(Span, Box<Expression>, Box<Expression>, Box<Expression>),
 	BitSlice(Span, Span, usize, usize, Box<Expression>),
+	SoftSlice(Span, Span, usize, usize, Box<Expression>),
 	Block(Span, Vec<Expression>),
 	Call(Span, Box<Expression>, Vec<Expression>)
 }
@@ -66,6 +67,7 @@ impl Expression
 			&Expression::BinaryOp (ref span, ..) => span.clone(),
 			&Expression::TernaryOp(ref span, ..) => span.clone(),
 			&Expression::BitSlice (ref span, ..) => span.clone(),
+			&Expression::SoftSlice(ref span, ..) => span.clone(),
 			&Expression::Block    (ref span, ..) => span.clone(),
 			&Expression::Call     (ref span, ..) => span.clone()
 		}
