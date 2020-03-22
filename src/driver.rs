@@ -1,8 +1,9 @@
+use crate::start_flame;
 use crate::diagn::RcReport;
 use crate::util::FileServer;
 use crate::util::enable_windows_ansi_support;
 use crate::asm::AssemblerState;
-use std::io::stdout;
+use std::io::{stdout, Read, Write};
 use getopts;
 
 
@@ -129,11 +130,16 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 		}
 	};
 
+	let flame_name = matches.opt_str("flame");
+
 	let mut filenames = matches.opt_strs("i");
 	for filename in matches.free
 		{ filenames.push(filename); }
 	
+	let mut _flame = start_flame("assemble");
 	let assembled = assemble(report.clone(), fileserver, &filenames, quiet).map_err(|_| false)?;
+
+	_flame.drop_start("format output");
 	let output = assembled.get_binary_output();
 	let output_symbol_data = assembled.get_symbol_output();
 	let output_data = match out_format
@@ -156,7 +162,8 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 		OutputFormat::AnnotatedHex => output.generate_annotated_hex(fileserver, 0, output.len()).bytes().collect::<Vec<u8>>(),
 		OutputFormat::AnnotatedBin => output.generate_annotated_bin(fileserver, 0, output.len()).bytes().collect::<Vec<u8>>(),
 	};
-	
+
+	_flame.drop_start("write output");
 	if out_stdout
 	{
 		if !quiet
@@ -195,6 +202,34 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 		if !quiet
 			{ println!("success"); }
 	}
+	drop(_flame);
+
+    if let Some(filename) = flame_name {
+        print!("writing flame `{}`...", &filename);
+        std::io::stdout().flush().map_err(|_| false)?;
+
+        if filename.to_lowercase().ends_with("html") {
+			let mut html: Vec<u8> = Vec::new();
+            flame::dump_html(&mut html).unwrap();
+			let mut buf = String::from_utf8_lossy(html.as_slice()).into_owned();
+			buf = buf.replacen("width: 100%;", "width: calc(100% - 6px);", 1);
+			buf = buf.replacen("margin: 0;", "margin: 0 3px;", 1);
+			// buf = buf.replacen("head,", "html { width: 100%; height: 100%; margin: 0; padding: 0; }", 1);
+            fileserver.write_bytes(report.clone(), &filename, &buf.bytes().collect::<Vec<u8>>(), None).map_err(|_| false)?;
+        } else if filename.to_lowercase().ends_with("json") {
+			let mut json: Vec<u8> = Vec::new();
+            flame::dump_json(&mut json).unwrap();
+            fileserver.write_bytes(report.clone(), &filename, &json, None).map_err(|_| false)?;
+        } else {
+			let mut text: Vec<u8> = Vec::new();
+            flame::dump_text_to_writer(&mut text).unwrap();
+            fileserver.write_bytes(report.clone(), &filename, &text, None).map_err(|_| false)?;
+        }
+
+        if !quiet {
+            println!("success");
+        }
+    }
 	
 	Ok(())
 }
@@ -206,7 +241,8 @@ fn make_opts() -> getopts::Options
     opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16", "FORMAT");
     opts.optmulti("i", "include", "Specifies an additional file for processing before the given <asm-files>. [deprecated]", "FILE");
     opts.opt("o", "output", "The name of the output file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
-    opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
+	opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
+    opts.optopt("", "flame", "The output flame graph. Can export .json, .html, or text (any other extension)", "FLAME");
     opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
     opts.optflag("q", "quiet", "Suppress progress reports.");
     opts.optflag("v", "version", "Display version information.");
