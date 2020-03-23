@@ -1,3 +1,4 @@
+use crate::start_flame;
 use crate::diagn::{Span, RcReport};
 use crate::expr::{Expression, ExpressionValue, ExpressionEvalContext};
 use crate::asm::{AssemblerParser, LabelManager, LabelContext};

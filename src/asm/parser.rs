@@ -1,3 +1,4 @@
+use crate::start_flame;
 use crate::diagn::{Span, RcReport};
 use crate::syntax::{Token, TokenKind, tokenize, Parser};
 use crate::syntax::excerpt_as_string_contents;
@@ -27,9 +28,13 @@ impl<'a> AssemblerParser<'a>
 	where S: Into<String>
 	{
 		let filename_owned = filename.into();
+		let _fn_flame = start_flame(format!("parse file `{}`", &filename_owned));
+		let mut _flame = start_flame("read file");
 		let chars = fileserver.get_chars(report.clone(), &filename_owned, filename_span)?;
+		_flame.drop_start("tokenize");
 		let tokens = tokenize(report.clone(), AsRef::<str>::as_ref(&filename_owned), &chars)?;
 		
+		_flame.drop_start("parse");
 		let mut parser = AssemblerParser
 		{
 			fileserver: fileserver,
@@ -75,6 +80,7 @@ impl<'a> AssemblerParser<'a>
 		
 		else
 		{
+			let _flame = start_flame("parse instruction");
 			self.parse_instruction()?;
 			self.parser.expect_linebreak()
 		}
@@ -87,11 +93,13 @@ impl<'a> AssemblerParser<'a>
 		
 		let tk_name = self.parser.expect(TokenKind::Identifier)?;
 		let name = tk_name.excerpt.clone().unwrap();
-		
+		let _flame = start_flame(format!("parse directive #{}", name));
+
 		if name.chars().next() == Some('d')
 		{
-			if let Ok(elem_width) = usize::from_str_radix(&name[1..], 10)
-				{ return self.parse_directive_data(elem_width, &tk_hash, &tk_name); }
+			if let Ok(elem_width) = usize::from_str_radix(&name[1..], 10) {
+				return self.parse_directive_data(elem_width, &tk_hash, &tk_name); 
+			}
 		}
 		
 		match name.as_ref()

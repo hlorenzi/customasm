@@ -312,7 +312,6 @@ pub fn assemble(report: RcReport, fileserver: &dyn FileServer, filenames: &[Stri
 		
 		if !quiet
 			{ println!("assembling `{}`...", &filename_owned); }
-	
 		asm.process_file(report.clone(), fileserver, filename_owned)?;
 	}
 	

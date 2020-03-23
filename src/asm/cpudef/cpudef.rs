@@ -1,3 +1,4 @@
+use crate::start_flame;
 use crate::syntax::{Token, TokenKind, Parser};
 use crate::expr::{Expression, ExpressionValue};
 use crate::asm::cpudef::{Rule, RuleParameterType, RulePatternMatcher};
@@ -50,14 +51,18 @@ impl CpuDef
 			custom_token_defs: Vec::new()
 		};
 		
+		let mut _flame = start_flame("parse directives");
 		cpudef_parser.parse_directives()?;	
 		
 		if cpudef_parser.bits.is_none()
 			{ cpudef_parser.bits = Some(8); }
-		
+
+		_flame.drop_start("parse rules");
 		cpudef_parser.parse_rules()?;
 		
+		_flame.drop_start("build pattern matcher");
 		let pattern_matcher = RulePatternMatcher::new(report, &cpudef_parser.rules, &cpudef_parser.custom_token_defs)?;
+		drop(_flame);
 		
 		//println!("[pattern tree for cpudef]");
 		//pattern_matcher.print_debug();
