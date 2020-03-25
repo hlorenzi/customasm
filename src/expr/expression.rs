@@ -2,7 +2,7 @@ use crate::diagn::Span;
 use num_bigint::BigInt;
 
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Expression
 {
 	Literal(Span, ExpressionValue),

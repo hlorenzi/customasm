@@ -1,25 +1,31 @@
 use std::cmp::Reverse;
 use core::cmp::Ordering;
 use crate::syntax::TokenKind;
-use crate::diagn::RcReport;
+use crate::diagn::{Span, RcReport};
 use crate::syntax::Parser;
 use crate::expr::{Expression, ExpressionValue};
 use crate::asm::cpudef::{Rule, RuleParameterType, RulePatternPart, CustomTokenDef};
 use std::{rc::Rc, collections::HashMap, cmp::max};
 
+pub struct Match
+{
+	pub rule_indices: Vec<usize>,
+	pub exprs: Vec<Rc<Expression>>
+}
 
 /// there is no "sequence" pattern, since how that sequence becomes an output expression varies
 #[derive(Debug, Eq, PartialEq)]
 enum PatternComponent {
 	End,
 	Exact(TokenKind, Option<String>),
-	Expression
+	Expression,
+	TokenDef(Vec<TokenDefCase>)
 }
 
-pub struct Match
-{
-	pub rule_indices: Vec<usize>,
-	pub exprs: Vec<Expression>
+#[derive(Debug, Eq, PartialEq)]
+struct TokenDefCase {
+	pattern: PatternComponent,
+	value: Rc<Expression>
 }
 
 impl PatternComponent {
@@ -39,7 +45,17 @@ impl PatternComponent {
 					RuleParameterType::CustomTokenDef(def_index) => {
 						let token_def: &CustomTokenDef = &custom_token_defs[def_index];
 
-						PatternComponent::Expression
+						let mut cases: Vec<TokenDefCase> = Vec::new();
+
+						for (key, value) in token_def.excerpt_to_value_map.iter() {
+							let pattern = PatternComponent::Exact(TokenKind::Identifier, key.to_ascii_lowercase().into());
+							cases.push(TokenDefCase {
+								pattern,
+								value: Rc::new(Expression::Literal(Span::new_dummy(), value.clone())),
+							});
+						}
+
+						PatternComponent::TokenDef(cases)
 					},
 				}
 			}
@@ -47,22 +63,37 @@ impl PatternComponent {
 	}
 
 	/// Ok(_) means there was a match, Err(()) means there wasn't
-	fn get_match(&self, parser: &mut Parser) -> Result<Option<Expression>, ()> {
+	fn get_match(&self, parser: &mut Parser) -> Result<Option<Rc<Expression>>, ()> {
 		match self {
 			PatternComponent::End => {
 				if parser.next_is_linebreak() {
 					return Ok(None);
 				}
 			},
-			PatternComponent::Exact(kind, ref exceprt) => {
+			PatternComponent::Exact(kind, ref excerpt) => {
 				let tk = parser.advance();
-				if tk.kind == *kind && tk.excerpt == *exceprt {
-					return Ok(None);
+				if tk.kind == *kind {
+					if match (tk.excerpt, excerpt) {
+						(Some(ref tk_excerpt), Some(excerpt)) => tk_excerpt.eq_ignore_ascii_case(&excerpt),
+						(None, None) => true,
+						_ => false
+					} {
+						return Ok(None);
+					}
 				}
 			},
 			PatternComponent::Expression => {
 				if let Ok(expr) = Expression::parse(parser) {
-					return Ok(Some(expr));
+					return Ok(Some(Rc::new(expr)));
+				}
+			},
+			PatternComponent::TokenDef(ref cases) => {
+				let state = parser.save();
+				if let Some(case) = cases.iter().find(|case| {
+					parser.restore(state);
+					case.pattern.get_match(parser).is_ok()
+				}) {
+					return Ok(Some(case.value.clone()));
 				}
 			}
 		}
@@ -170,7 +201,7 @@ impl RulePatternMatcher
 	{
 		let starting_state = parser.save();
 		'patterns: for pattern in self.patterns.iter() {
-			let mut expressions: Vec<Expression> = Vec::new();
+			let mut expressions: Vec<Rc<Expression>> = Vec::new();
 			for component in &pattern.components {
 				match component.get_match(parser) {
 					Err(_) => {

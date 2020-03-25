@@ -267,7 +267,7 @@ fn test_tokendef()
 	
 	test("#tokendef reg1 { r1 = 1 } \n #tokendef reg2 { r2 = 2 } \n mov {a: reg1} -> 0xff @ a[7:0] \n mov {a: reg2} -> 0xee @ a[7:0]", "mov r1 \n mov r2", Pass((4, "ff01ee02")));
 	test("#tokendef reg1 { r1 = 1 } \n #tokendef reg2 { r1 = 2 } \n mov {a: reg1} -> 0xff @ a[7:0] \n mov {a: reg2} -> 0xee @ a[7:0]", "mov r1 \n mov r1", Pass((4, "ff01ff01")));
-	test("#tokendef reg1 { r1 = 1 } \n                           \n mov {a: reg1} -> 0xff @ a[7:0] \n mov r1        -> 0xee @ 0x01  ", "mov r1 \n mov r1", Pass((4, "ff01ff01")));
+	test("#tokendef reg1 { r1 = 1 } \n                           \n mov {a: reg1} -> 0xff @ a[7:0] \n mov r1        -> 0xee @ 0x01  ", "mov r1 \n mov r1", Pass((4, "ee01ee01")));
 	test("#tokendef reg1 { r1 = 1 } \n                           \n mov r1        -> 0xff @ 0x01   \n mov {a: reg1} -> 0xee @ a[7:0]", "mov r1 \n mov r1", Pass((4, "ff01ff01")));
 	
 	test("#tokendef reg { r1 = 1 } \n mov [{a: reg} + {offset}] -> 0xff @ a[7:0] @ offset[7:0]", "mov [r1 + 8]", Pass((4, "ff0108")));
@@ -287,7 +287,7 @@ fn test_tokendef()
 	test("#tokendef reg { r1 = 1 } \n mov {dest: reg}, {src: reg} -> 0x55 @ dest[3:0] @ src[3:0] \n mov {dest: reg}, r2 -> 0x88 @ dest[7:0]", "mov r1, r2", Pass((4, "8801")));
 	
 	test("#tokendef reg { r1 = 1         } \n mov {dest: reg}, {src: reg} -> 0x55 @ dest[3:0] @ src[3:0] \n mov r1, r2 -> 0x88", "mov r1, r2",  Pass((4, "88")));
-	test("#tokendef reg { r1 = 1, r2 = 2 } \n mov {dest: reg}, {src: reg} -> 0x55 @ dest[3:0] @ src[3:0] \n mov r1, r2 -> 0x88", "mov r1, r2",  Pass((4, "5512")));
+	test("#tokendef reg { r1 = 1, r2 = 2 } \n mov {dest: reg}, {src: reg} -> 0x55 @ dest[3:0] @ src[3:0] \n mov r1, r2 -> 0x88", "mov r1, r2",  Pass((4, "88")));
 	test("#tokendef reg { r1 = 1         } \n mov r1, r2 -> 0x88 \n mov {dest: reg}, {src: reg} -> 0x55 @ dest[3:0] @ src[3:0]", "mov r1, r2",  Pass((4, "88")));
 	test("#tokendef reg { r1 = 1, r2 = 2 } \n mov r1, r2 -> 0x88 \n mov {dest: reg}, {src: reg} -> 0x55 @ dest[3:0] @ src[3:0]", "mov r1, r2",  Pass((4, "88")));
 	

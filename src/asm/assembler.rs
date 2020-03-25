@@ -9,6 +9,7 @@ use crate::asm::cpudef::CpuDef;
 use crate::asm::cpudef::RuleParameterType;
 use crate::util::FileServer;
 use num_bigint::ToBigInt;
+use std::rc::Rc;
 
 
 pub struct AssemblerState
@@ -38,7 +39,7 @@ pub struct ParsedInstruction
 	pub rule_index: usize,
 	pub ctx: ExpressionContext,
 	pub span: Span,
-	pub exprs: Vec<Expression>,
+	pub exprs: Vec<Rc<Expression>>,
 	pub args: Vec<Option<ExpressionValue>>
 }
 
