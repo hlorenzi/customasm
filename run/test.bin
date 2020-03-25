@@ -1,0 +1,5 @@
+ outp | addr | data
+
+  0:0 |    0 | 0f 3c f0       ; thing with 0b00111100
+  3:0 |    3 | 02             ; thing with constants
+  4:0 |    4 | 03             ; thing with more constants
