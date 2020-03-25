@@ -1,9 +1,11 @@
+use std::cmp::Reverse;
+use core::cmp::Ordering;
 use crate::syntax::TokenKind;
 use crate::diagn::RcReport;
 use crate::syntax::Parser;
 use crate::expr::{Expression, ExpressionValue};
 use crate::asm::cpudef::{Rule, RuleParameterType, RulePatternPart, CustomTokenDef};
-use std::{rc::Rc, collections::HashMap};
+use std::{rc::Rc, collections::HashMap, cmp::max};
 
 
 /// there is no "sequence" pattern, since how that sequence becomes an output expression varies
@@ -75,6 +77,57 @@ struct InstrPattern {
 	components: Vec<PatternComponent>,
 }
 
+#[derive(PartialEq, Eq)]
+struct InstrSpecificity {
+	param_indices: Vec<usize>
+}
+
+impl InstrSpecificity {
+	fn create(pattern: &InstrPattern) -> InstrSpecificity {
+		let mut param_indices: Vec<usize> = vec![];
+		for i in 0 .. pattern.components.len() {
+			match pattern.components[i] {
+				PatternComponent::End | PatternComponent::Exact(_, _) => {},
+				_ => param_indices.push(i)
+			}
+		}
+		InstrSpecificity {
+			param_indices
+		}
+	}
+}
+
+impl Ord for InstrSpecificity {
+    fn cmp(&self, other: &Self) -> Ordering {
+		let self_count = self.param_indices.len();
+		let other_count = other.param_indices.len();
+		for i in 0 .. max(self_count, other_count) {
+			if i < self_count && i < other_count {
+				match self.param_indices[i].cmp(&other.param_indices[i]) {
+					Ordering::Less => return Ordering::Less,
+					Ordering::Equal => {},
+					Ordering::Greater => return Ordering::Greater,
+				}
+			}
+			if i < self_count && i >= other_count {
+				return Ordering::Less;
+			}
+			if i < other_count && i >= self_count {
+				return Ordering::Greater;
+			}
+		}
+		Ordering::Equal
+    }
+}
+
+impl PartialOrd for InstrSpecificity {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+
+
 // matcher
 
 #[derive(Debug)]
@@ -94,7 +147,7 @@ impl RulePatternMatcher
 			let components = rule.pattern_parts.iter()
 				.map(|part| PatternComponent::part(part, rule, custom_token_defs))
 				.chain(vec![PatternComponent::End]).collect::<Vec<PatternComponent>>();
-			if let Some(mut pattern) = patterns.iter_mut().find_map(|pattern| if pattern.components == components { Some(pattern) } else { None }) {
+			if let Some(pattern) = patterns.iter_mut().find_map(|pattern| if pattern.components == components { Some(pattern) } else { None }) {
 				pattern.rule_indices.push(i);
 			} else {
 				patterns.push(InstrPattern {
@@ -104,6 +157,8 @@ impl RulePatternMatcher
 			}
 
 		}
+
+		patterns.sort_by_cached_key(|it| Reverse(InstrSpecificity::create(it)));
 		
 		Ok(RulePatternMatcher
 		{

@@ -36,9 +36,9 @@
     ;slow {arg0: lots} {arg1: lots} {arg2: lots} -> 8'0
     ;slow {arg0: lots} {arg1: lots} {arg2: lots} {arg3: lots} -> 8'0
 
+    thing with {expr} -> 0x0F @ expr[7:0] @ 0xF0
     thing with constants -> 0x02
     thing with more constants -> 0x03
-    thing with {expr} -> 0x0F @ expr[7:0] @ 0xF0
 }
 
 ;slow 
