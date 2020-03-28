@@ -16,7 +16,7 @@ you just implemented in FPGA!
 [badge-downloads-url]: https://github.com/hlorenzi/customasm/releases
 
 [badge-discord-img]: https://img.shields.io/discord/394999035540275222?label=Discord&logo=discord
-[badge-discord-url]: https://discord.gg/JYbhDtp
+[badge-discord-url]: https://discord.gg/pXeDXGD
 
 [📱 Try it right now in your browser!](https://hlorenzi.github.io/customasm/web/)
  

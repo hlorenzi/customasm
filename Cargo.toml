@@ -2,7 +2,15 @@
 name = "customasm"
 version = "0.10.6"
 edition = "2018"
-authors = ["Henrique Lorenzi <hlorenzi12@gmail.com>"]
+authors = ["Henrique Lorenzi <https://hlorenzi.com>"]
+description = "An assembler for custom, user-defined instruction sets!"
+homepage = "https://github.com/hlorenzi/customasm"
+repository = "https://github.com/hlorenzi/customasm"
+readme = "README.md"
+license = "Apache-2.0"
+keywords = ["asm", "assembler", "assembly", "custom"]
+categories = ["command-line-utilities", "hardware-support"]
+exclude = ["web/*"]
 
 [lib]
 crate-type = ["lib", "cdylib"]

@@ -447,7 +447,7 @@ fn is_identifier_mid(c: char) -> bool
 
 fn is_number_start(c: char) -> bool
 {
-	(c >= '0' && c <= '9')
+	c >= '0' && c <= '9'
 }
 
 
