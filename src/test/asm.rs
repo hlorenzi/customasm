@@ -111,6 +111,9 @@ fn test_simple()
 	
 	test("halt -> 0x00", "#unknown \n halt", Fail(("asm", 1, "unknown")));
 	
+	test("$halt -> 0x00",   "$halt",   Pass((4, "00")));
+	test("$ha$lt$ -> 0x00", "$ha$lt$", Pass((4, "00")));
+
 	test("halt -> 0x00", "HALT", Pass((4, "00")));
 	test("HALT -> 0x00", "halt", Pass((4, "00")));
 	test("Halt -> 0x00", "hALT", Pass((4, "00")));
@@ -136,6 +139,8 @@ fn test_parameters()
 	test("load {a} -> 0x12 @ a[7:0]",          "load pc",   Pass((4, "1200")));
 	test("load {a} -> 0x12 @ a[3:0] @ a[7:4]", "load 0x34", Pass((4, "1243")));
 	test("load {a} -> 0x12 @ a[15:0]",         "load 0x34", Pass((4, "120034")));
+
+	test("load {$a} -> 0x12 @ $a[7:0]",        "load 0x34", Pass((4, "1234")));
 	
 	test("load {a}, {b} -> 0x12 @ a[7:0] @ b[7:0]", "load 0x34, 0x56", Pass((4, "123456")));
 	test("load {a}, {b} -> 0x12 @ b[7:0] @ a[7:0]", "load 0x34, 0x56", Pass((4, "125634")));
@@ -260,6 +265,8 @@ fn test_tokendef()
 {
 	test("#tokendef reg { r1 = 1    } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Pass((4, "ff01")));
 	test("#tokendef reg { r1 = 0xbc } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1", Pass((4, "ffbc")));
+	
+	test("#tokendef reg { $r1 = 1   } \n mov {a: reg} -> 0xff @ a[7:0]", "mov $r1", Pass((4, "ff01")));
 	
 	test("#tokendef reg { r1 = 1, r2 = 2 } \n mov {a: reg} -> 0xff @ a[7:0]", "mov r1 \n mov r2", Pass((4, "ff01ff02")));
 	
@@ -571,6 +578,9 @@ fn test_labels()
 	test(INSTRSET, "       halt \n jump label \n label: halt", Pass((4, "12770312")));
 	test(INSTRSET, "       halt \n jump label",                Fail(("asm", 2, "unknown")));
 	
+	test(INSTRSET, "$label: halt  \n jump $label",         Pass((4, "127700")));
+	test(INSTRSET, "$label = 0x55 \n halt \n jump $label", Pass((4, "127755")));
+
 	test(INSTRSET, "label = 0x55 \n halt \n jump label",                 Pass((4, "127755")));
 	test(INSTRSET, "                halt \n jump label \n label = 0x55", Pass((4, "127755")));
 	
