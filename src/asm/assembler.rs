@@ -308,6 +308,9 @@ impl AssemblerState
 			Some(addr) => addr,
 			None => return Err(report.error_span("address overflowed valid range", span))
 		};
+
+		if bankdef_index != 0 && addr >= bankdef.addr + bankdef.size
+			{ return Err(report.error_span("address is out of bank range", span)); }
 		
 		Ok(addr)
 	}

@@ -1008,6 +1008,8 @@ fn test_banks()
 	
 	test("", "#bankdef \"hello\" { #addr  0, #size 10 } \n #res 1 \n #addr 0 \n #res 1", Pass((4, "")));
 	test("", "#bankdef \"hello\" { #addr 10, #size 10 } \n #res 1 \n #addr 0 \n #res 1", Fail(("asm", 3, "out of bank range")));
+	test("test -> 0x12", "#bankdef \"hello\" { #addr 0, #size 3, #outp 0 } \n #res 1 \n test \n test",  Pass((4, "001212")));
+	test("test -> 0x12", "#bankdef \"hello\" { #addr 0, #size 2, #outp 0 } \n #res 1 \n test \n test",  Fail(("asm", 4, "out of bank range")));
 	
 	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 0 }
 	          #bankdef \"world\" { #addr 0, #size 4, #outp 0 }",
