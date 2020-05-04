@@ -43,7 +43,10 @@ pub fn drive(args: &Vec<String>, fileserver: &mut dyn FileServer) -> Result<(), 
 	if let Err(show_usage) = result
 	{
 		if show_usage
-			{ print_usage(&opts); }
+		{
+			print_version_short();
+			print_usage(&opts);
+		}
 	}
 	
 	result.map_err(|_| ())
@@ -56,13 +59,14 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 	
 	if matches.opt_present("h")
 	{
+		print_version_full();
 		print_usage(&opts);
 		return Ok(());
 	}
 	
 	if matches.opt_present("v")
 	{
-		print_info();
+		print_version_full();
 		return Ok(());
 	}
 	
@@ -210,7 +214,7 @@ fn make_opts() -> getopts::Options
     opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
     opts.optflag("q", "quiet", "Suppress progress reports.");
     opts.optflag("v", "version", "Display version information.");
-    opts.optflag("h", "help", "Display this information.");
+	opts.optflag("h", "help", "Display this information.");
 	
 	opts
 }
@@ -228,21 +232,28 @@ fn parse_opts(report: RcReport, opts: &getopts::Options, args: &Vec<String>) -> 
 
 fn print_usage(opts: &getopts::Options)
 {
-	print_info();
 	println!("");
 	println!("{}", opts.usage(&format!("Usage: {} [options] <asm-file-1> ... <asm-file-N>", env!("CARGO_PKG_NAME"))));
 }
 
 
-fn print_version()
+fn print_version_short()
 {
-	println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+	println!("{} {} ({}, {})",
+		env!("CARGO_PKG_NAME"),
+		env!("VERGEN_SEMVER_LIGHTWEIGHT"),
+		env!("VERGEN_COMMIT_DATE"),
+		env!("VERGEN_TARGET_TRIPLE"));
 }
 
 
-fn print_info()
+fn print_version_full()
 {
-	print_version();
+	println!("{} {} ({}, {})",
+		env!("CARGO_PKG_NAME"),
+		env!("VERGEN_SEMVER_LIGHTWEIGHT"),
+		env!("VERGEN_COMMIT_DATE"),
+		env!("VERGEN_TARGET_TRIPLE"));
 	println!("https://github.com/hlorenzi/customasm");
 }
 
@@ -266,7 +277,7 @@ fn get_default_output_filename(report: RcReport, input_filename: &str) -> Result
 pub fn assemble(report: RcReport, fileserver: &dyn FileServer, filenames: &[String], quiet: bool) -> Result<AssemblerState, ()>
 {
 	if !quiet
-		{ print_version(); }
+		{ print_version_short(); }
 	
 	let mut asm = AssemblerState::new();
 	

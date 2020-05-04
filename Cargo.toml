@@ -11,6 +11,7 @@ license = "Apache-2.0"
 keywords = ["asm", "assembler", "assembly", "custom"]
 categories = ["command-line-utilities", "hardware-support"]
 exclude = ["web/*"]
+build = "src/build.rs"
 
 [lib]
 crate-type = ["lib", "cdylib"]
@@ -26,3 +27,6 @@ getopts = "0.2.17"
 num-bigint = { version = "0.1", default_features = false }
 num-traits = { version = "0.1", default_features = false }
 num-integer = { version = "0.1", default_features = false }
+
+[build-dependencies]
+vergen = "3.1.0"
