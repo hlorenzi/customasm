@@ -291,32 +291,29 @@ impl AssemblerState
 	}
 	
 	
-	fn get_bitrange_address(&self, report: RcReport, span: &Span) -> Result<usize, ()>
+	fn get_bitrange_address(&self, report: RcReport, block_index: usize, offset: usize, span: &Span) -> Result<usize, ()>
 	{
 		if self.cpudef.is_none()
 			{ return Ok(0); }
 		
 		let bits = self.cpudef.as_ref().unwrap().bits;
-		let block = &self.blocks[self.cur_block];
+		let block = &self.blocks[block_index];
 		
 		let bankdef_index = self.find_bankdef(&block.bank_name).unwrap();
 		let bankdef = &self.bankdefs[bankdef_index];
 		
-		let block_offset = block.bits.len() / bits;
+		let block_offset = offset / bits;
 		let addr = match block_offset.checked_add(bankdef.addr)
 		{
 			Some(addr) => addr,
 			None => return Err(report.error_span("address overflowed valid range", span))
 		};
 
-		if bankdef_index != 0 && addr >= bankdef.addr + bankdef.size
-			{ return Err(report.error_span("address is out of bank range", span)); }
-		
 		Ok(addr)
 	}
 	
 	
-	pub fn check_valid_address(&self, report: RcReport, block_index: usize, addr: usize, span: &Span) -> Result<(), ()>
+	pub fn check_valid_address(&self, report: RcReport, block_index: usize, addr: usize, allow_one_past: bool, span: &Span) -> Result<(), ()>
 	{
 		let block = &self.blocks[block_index];
 		let bankdef_index = self.find_bankdef(&block.bank_name).unwrap();
@@ -325,9 +322,28 @@ impl AssemblerState
 		if bankdef_index == 0
 			{ return Ok(()); }
 		
-		if addr < bankdef.addr || addr > bankdef.addr + bankdef.size
+		if addr < bankdef.addr || addr > bankdef.addr + bankdef.size ||
+			(addr >= bankdef.addr + bankdef.size && !allow_one_past)
 			{ return Err(report.error_span("address is out of bank range", span)); }
 			
+		Ok(())
+	}
+	
+	
+	pub fn check_valid_bit_output(&self, report: RcReport, block_index: usize, bit_offset: usize, report_span: &Span) -> Result<(), ()>
+	{
+		let block = &self.blocks[block_index];
+		let bankdef_index = self.find_bankdef(&block.bank_name).unwrap();
+		let bankdef = &self.bankdefs[bankdef_index];
+		
+		if bankdef_index != 0
+		{
+			self.check_cpudef_active(report.clone(), report_span)?;
+			
+			if bit_offset / self.cpudef.as_ref().unwrap().bits >= bankdef.size
+				{ return Err(report.error_span("data overflowed bank size", report_span)); }
+		}
+
 		Ok(())
 	}
 	
@@ -370,7 +386,8 @@ impl AssemblerState
 		{
 			Some(output_span) =>
 			{
-				let addr = self.get_bitrange_address(report, output_span)?;
+				let offset = self.blocks[self.cur_block].bits.len();
+				let addr = self.get_bitrange_address(report, self.cur_block, offset, output_span)?;
 				Some((addr, output_span))
 			}
 			None => None
@@ -501,8 +518,10 @@ impl AssemblerState
 		
 		let value = self.expr_eval(report.clone(), &instr.ctx, &rule.production, &mut args_eval_ctx)?;
 		
-		let addr = self.get_bitrange_address(report, &instr.span)?;
-		
+		let addr = self.get_bitrange_address(report.clone(), instr.ctx.block, instr.ctx.offset, &instr.span)?;
+		self.check_valid_bit_output(report.clone(), instr.ctx.block, instr.ctx.offset, &instr.span)?;
+		self.check_valid_bit_output(report.clone(), instr.ctx.block, instr.ctx.offset + left - right, &instr.span)?;
+
 		let block = &mut self.blocks[instr.ctx.block];
 		
 		for i in 0..(left - right + 1)

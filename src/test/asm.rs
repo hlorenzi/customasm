@@ -1032,7 +1032,11 @@ fn test_banks()
 	test("", "#bankdef \"hello\" { #addr  0, #size 10 } \n #res 1 \n #addr 0 \n #res 1", Pass((4, "")));
 	test("", "#bankdef \"hello\" { #addr 10, #size 10 } \n #res 1 \n #addr 0 \n #res 1", Fail(("asm", 3, "out of bank range")));
 	test("test -> 0x12", "#bankdef \"hello\" { #addr 0, #size 3, #outp 0 } \n #res 1 \n test \n test",  Pass((4, "001212")));
-	test("test -> 0x12", "#bankdef \"hello\" { #addr 0, #size 2, #outp 0 } \n #res 1 \n test \n test",  Fail(("asm", 4, "out of bank range")));
+	test("test -> 0x12", "#bankdef \"hello\" { #addr 0, #size 2, #outp 0 } \n #res 1 \n test \n test",  Fail(("asm", 4, "overflowed bank size")));
+
+	test("test -> 0x12 \n test16 -> 0x1234", "#bankdef \"hello\" { #addr 0, #size 3, #outp 0 } \n #res 1 \n test \n test16",  Fail(("asm", 4, "overflowed bank size")));
+	
+	test("load {x} -> 0x12 @ x[7:0]", "#bankdef \"hello\" { #addr 0, #size 3, #outp 0 } \n load x \n x: \n #d8 0x55", Pass((4, "120255")));
 	
 	test("", "#bankdef \"hello\" { #addr 0, #size 4, #outp 0 }
 	          #bankdef \"world\" { #addr 0, #size 4, #outp 0 }",
@@ -1132,6 +1136,5 @@ fn test_banks()
 			  z:
 			  #d8 0xee, 0xff
 			  #d8 x, y, z",
-	          Pass((4, "aabbeeff001002000000ccdd")));
-	
+			  Pass((4, "aabbeeff001002000000ccdd")));
 }

@@ -181,7 +181,7 @@ impl<'a> AssemblerParser<'a>
 		
 		let cur_addr = self.state.get_cur_address(self.parser.report.clone(), &tk_name.span)?;
 			
-		self.state.check_valid_address(self.parser.report.clone(), self.state.cur_block, new_addr, &tk_name.span)?;
+		self.state.check_valid_address(self.parser.report.clone(), self.state.cur_block, new_addr, true, &tk_name.span)?;
 		
 		let bits = self.state.cpudef.as_ref().unwrap().bits;
 		
