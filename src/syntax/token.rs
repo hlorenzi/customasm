@@ -230,6 +230,7 @@ where S: Into<String>
 	let filename = Rc::new(src_filename.into());
 	let mut tokens = Vec::new();
 	let mut index = 0;
+	let mut had_error = false;
 	
 	while index < src.len()
 	{
@@ -254,7 +255,10 @@ where S: Into<String>
 		
 		// Report unexpected characters.
 		if kind == TokenKind::Error
-			{ report.error_span("unexpected character", &span); }
+		{
+			report.error_span("unexpected character", &span);
+			had_error = true;
+		}
 		
 		// Add to the token list.
 		let token = Token
@@ -268,6 +272,9 @@ where S: Into<String>
 		
 		index += length;
 	}
+
+	if had_error
+		{ return Err(()); }
 	
 	// Add an end token.
 	let end_token = Token

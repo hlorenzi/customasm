@@ -160,6 +160,8 @@ fn test_parameters()
 	test("load {a} -> 0x12 @ a[7:0] \n load #{a} -> 0x34 @ a[7:0]", "load #0x56", Pass((4, "3456")));
 	test("load {a} -> 0x12 @ a[7:0] \n load #{a} -> 0x34 @ a[7:0]", "load )0x56", Fail(("asm", 1, "no match")));
 	test("load {a} -> 0x12 @ a[7:0]",                               "load #0x56", Fail(("asm", 1, "no match")));
+	
+	test("load {a} -> 0x12 @ a[7:0]", "load 'h'", Fail(("asm", 1, "unexpected character")));
 }
 
 
