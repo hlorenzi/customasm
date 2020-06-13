@@ -42,6 +42,7 @@ fn test_directives()
 	test("#bits 64",   Pass(()));
 	test("#bits 128",  Pass(()));
 	test("#bits 1024", Pass(()));
+	test("#BIts 1024", Pass(()));
 	
 	test("#labelalign 1", Pass(()));
 	

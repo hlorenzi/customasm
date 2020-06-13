@@ -355,6 +355,9 @@ fn test_addr_directive()
 	test("halt -> 0x12", "#addr 0x01 \n halt", Pass((4, "0012")));
 	test("halt -> 0x12", "#addr 0x10 \n halt", Pass((4, "0000000000000000000000000000000012")));
 	
+	test("halt -> 0x12", "#ADDR 0x01 \n halt", Pass((4, "0012")));
+	test("halt -> 0x12", "#aDdR 0x01 \n halt", Pass((4, "0012")));
+
 	test("halt -> 0x12", "#addr 0x10 \n halt \n #addr 0x00", Fail(("asm", 3, "previous")));
 	test("halt -> 0x12", "#addr 0x10 \n halt \n #addr 0x10", Fail(("asm", 3, "previous")));
 	test("halt -> 0x12", "#addr 0x10 \n halt \n #addr 0x11", Pass((4, "0000000000000000000000000000000012")));
@@ -455,6 +458,8 @@ fn test_data_directive()
 	test("", "#d8 1 + 1", Pass((4, "02")));
 	test("", "#d8 pc",    Pass((4, "00")));
 	
+	test("", "#D8 0",     Pass((4, "00")));
+
 	test("", "#d8 0x1ff[7:0]", Pass((4, "ff")));
 	test("", "#d8 -0x81[7:0]", Pass((4, "7f")));
 	
@@ -1006,6 +1011,8 @@ fn test_banks()
 	test("", "#bankdef \"hello\" { #addr 0, #size 0, #outp 0 }",        Pass((4, "")));
 	test("", "#bankdef \"hello\" { #addr 0, #size 0,          #fill }", Pass((4, "")));
 	test("", "#bankdef \"hello\" { #addr 0, #size 0, #outp 0, #fill }", Pass((4, "")));
+
+	test("", "#BANKDEF \"hello\" { #ADDR 0, #SIze 0, #ouTP 0, #FilL }", Pass((4, "")));
 	
 	test("", "#bankdef \"hello\"    {    #addr 0     #size 0     #outp 0    }", Fail(("asm", 1, ",")));
 	test("", "#bankdef \"hello\"    {    #addr 0  \n #size 0  \n #outp 0    }", Pass((4, "")));

@@ -84,7 +84,7 @@ impl<'t> CpuDefParser<'t>
 		while self.parser.maybe_expect(TokenKind::Hash).is_some()
 		{
 			let tk_name = self.parser.expect_msg(TokenKind::Identifier, "expected directive name")?;
-			match tk_name.excerpt.as_ref().unwrap().as_ref()
+			match tk_name.excerpt.as_ref().unwrap().to_ascii_lowercase().as_ref()
 			{
 				"align"      => self.parse_directive_align(&tk_name)?,
 				"bits"       => self.parse_directive_bits(&tk_name)?,

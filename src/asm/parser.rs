@@ -86,7 +86,8 @@ impl<'a> AssemblerParser<'a>
 		let tk_hash = self.parser.expect(TokenKind::Hash)?;
 		
 		let tk_name = self.parser.expect(TokenKind::Identifier)?;
-		let name = tk_name.excerpt.clone().unwrap();
+		let mut name = tk_name.excerpt.clone().unwrap();
+		name.make_ascii_lowercase();
 		
 		if name.chars().next() == Some('d')
 		{

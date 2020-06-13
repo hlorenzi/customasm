@@ -105,7 +105,7 @@ impl<'p> BankDefParser<'p>
 		self.parser.expect(TokenKind::Hash)?;
 		
 		let tk_attrb_name = self.parser.expect(TokenKind::Identifier)?;
-		let attrb_name = tk_attrb_name.excerpt.clone().unwrap();
+		let attrb_name = tk_attrb_name.excerpt.clone().unwrap().to_ascii_lowercase();
 		
 		match attrb_name.as_ref()
 		{
