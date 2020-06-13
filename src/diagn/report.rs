@@ -142,6 +142,15 @@ impl Report
 	}
 	
 	
+	pub fn has_first_error_at(&self, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	{
+		if self.messages.len() == 0
+			{ return false; }
+			
+		self.msg_has_error_at(&self.messages[0], fileserver, filename, line, error_excerpt)
+	}
+	
+	
 	fn msg_has_error_at(&self, msg: &Message, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
 	{
 		match msg.inner
@@ -418,6 +427,12 @@ impl RcReport
 	pub fn has_error_at(&self, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
 	{
 		self.report.borrow_mut().has_error_at(fileserver, filename, line, error_excerpt)
+	}
+	
+	
+	pub fn has_first_error_at(&self, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	{
+		self.report.borrow_mut().has_first_error_at(fileserver, filename, line, error_excerpt)
 	}
 	
 	

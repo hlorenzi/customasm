@@ -59,7 +59,7 @@ where T: Debug + PartialEq
 			panic!("expected to fail but passed");
 		}
 		
-		if !report.has_error_at(fileserver, err.0, err.1 - 1, err.2)
+		if !report.has_first_error_at(fileserver, err.0, err.1 - 1, err.2)
 		{
 			panic!("expected a certain error but got other errors\nexpected: ({:?}, {}, {:?})", err.0, err.1, err.2);
 		}

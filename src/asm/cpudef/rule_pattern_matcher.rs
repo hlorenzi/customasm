@@ -202,7 +202,12 @@ impl RulePatternMatcher
 				}
 				else
 				{
-					match Expression::parse(parser)
+					// Suppress reports for expression errors
+					let report_original = std::mem::replace(&mut parser.report, RcReport::new());
+					let maybe_expr = Expression::parse(parser);
+					parser.report = report_original;
+
+					match maybe_expr
 					{
 						Ok(expr) => expr,
 						Err(()) => return None
