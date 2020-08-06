@@ -1,12 +1,12 @@
 use crate::syntax::{TokenKind, Parser, excerpt_as_usize, excerpt_as_bigint};
-use crate::asm::cpudef::{RuleParameter, RuleParameterType};
+//use crate::asm::cpudef::{RuleParameter, RuleParameterType};
 use super::{Expression, ExpressionValue, UnaryOp, BinaryOp};
 
 
 pub struct ExpressionParser<'a>
 {
 	parser: &'a mut Parser,
-	rule_params: Option<&'a [RuleParameter]>,
+	//rule_params: Option<&'a [RuleParameter]>,
 }
 
 
@@ -14,25 +14,25 @@ impl Expression
 {
 	pub fn parse(parser: &mut Parser) -> Result<Expression, ()>
 	{
-		ExpressionParser::new(parser, None).parse_expr()
+		ExpressionParser::new(parser).parse_expr()
 	}
 
 
-	pub fn parse_for_rule(parser: &mut Parser, rule_params: &[RuleParameter]) -> Result<Expression, ()>
+	/*pub fn parse_for_rule(parser: &mut Parser, rule_params: &[RuleParameter]) -> Result<Expression, ()>
 	{
 		ExpressionParser::new(parser, Some(rule_params)).parse_expr()
-	}
+	}*/
 }
 
 
 impl<'a> ExpressionParser<'a>
 {
-	pub fn new(parser: &'a mut Parser, rule_params: Option<&'a [RuleParameter]>) -> ExpressionParser<'a>
+	pub fn new(parser: &'a mut Parser/*, rule_params: Option<&'a [RuleParameter]>*/) -> ExpressionParser<'a>
 	{
 		ExpressionParser
 		{
 			parser,
-			rule_params,
+			//rule_params,
 		}
 	}
 	
@@ -406,7 +406,7 @@ impl<'a> ExpressionParser<'a>
 		
 		let expr_var = Expression::Variable(expr_span.clone(), name.clone());
 
-		if let Some(rule_params) = self.rule_params
+		/*if let Some(rule_params) = self.rule_params
 		{
 			if let Some(rule_param) = rule_params.iter().find(|p| p.name == name)
 			{
@@ -424,7 +424,7 @@ impl<'a> ExpressionParser<'a>
 						{ return Ok(Expression::SoftSlice(expr_span.clone(), expr_span.clone(), width - 1, 0, Box::new(expr_var))); }
 				}
 			}
-		}
+		}*/
 
 		Ok(expr_var)
 	}
@@ -444,20 +444,26 @@ impl<'a> ExpressionParser<'a>
 			16 => Some(4),
 			_ => None
 		};
-		
-		let span = tk_number.span;
-		let expr = Expression::Literal(span.clone(), ExpressionValue::Integer(bigint));
-		
-		match width
+
+		let size = match width
 		{
-			Some(width) => Ok(Expression::BitSlice(span.clone(), span, width - 1, 0, Box::new(expr))),
-			
+			Some(width) => Some(width),
 			None => match radix_bits
 			{
-				None => Ok(expr),
-				
-				Some(radix_bits) => Ok(Expression::BitSlice(span.clone(), span, radix_bits * digit_num - 1, 0, Box::new(expr)))
+				None => None,
+				Some(radix_bits) => Some(radix_bits * digit_num)
 			}
-		}
+		};
+		
+		let span = tk_number.span;
+		let expr = Expression::Literal(
+			span.clone(),
+			ExpressionValue::Integer
+			{
+				bigint,
+				size,
+			});
+
+		Ok(expr)
 	}
 }

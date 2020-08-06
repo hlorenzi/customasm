@@ -32,7 +32,9 @@ pub enum TokenKind
 	Comma,
 	Colon,
 	ColonColon,
-	Arrow,
+	ArrowRight,
+	ArrowLeft,
+	HeavyArrowRight,
 	Hash,
 	Equal,
 	Plus,
@@ -89,6 +91,8 @@ impl TokenKind
 		self == TokenKind::BracketClose ||
 		self == TokenKind::Dot ||
 		self == TokenKind::Comma ||
+		self == TokenKind::ArrowLeft ||
+		self == TokenKind::ArrowRight ||
 		self == TokenKind::Hash ||
 		self == TokenKind::Plus ||
 		self == TokenKind::Minus ||
@@ -103,6 +107,13 @@ impl TokenKind
 		self == TokenKind::At ||
 		self == TokenKind::LessThan ||
 		self == TokenKind::GreaterThan
+	}
+	
+	
+	pub fn is_allowed_first_pattern_token(self) -> bool
+	{
+		self.is_allowed_pattern_token() &&
+		self != TokenKind::Hash
 	}
 	
 	
@@ -136,7 +147,9 @@ impl TokenKind
 			TokenKind::Comma => "`,`",
 			TokenKind::Colon => "`:`",
 			TokenKind::ColonColon => "`::`",
-			TokenKind::Arrow => "`->`",
+			TokenKind::ArrowRight => "`->`",
+			TokenKind::ArrowLeft => "`<-`",
+			TokenKind::HeavyArrowRight => "`=>`",
 			TokenKind::Hash => "`#`",
 			TokenKind::Equal => "`=`",
 			TokenKind::Plus => "`+`",
@@ -192,7 +205,9 @@ impl Token
 			TokenKind::Comma => ",",
 			TokenKind::Colon => ":",
 			TokenKind::ColonColon => "::",
-			TokenKind::Arrow => "->",
+			TokenKind::ArrowRight => "->",
+			TokenKind::ArrowLeft => "<-",
+			TokenKind::HeavyArrowRight => "=>",
 			TokenKind::Hash => "#",
 			TokenKind::Equal => "=",
 			TokenKind::Plus => "+",
@@ -372,7 +387,7 @@ fn check_for_string(src: &[char]) -> Option<(TokenKind, usize)>
 
 fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 {
-	static POSSIBLE_TOKENS: [(&str, TokenKind); 37] =
+	static POSSIBLE_TOKENS: [(&str, TokenKind); 39] =
 	[
 		("\n",  TokenKind::LineBreak),
 		("(",   TokenKind::ParenOpen),
@@ -385,7 +400,9 @@ fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 		(",",   TokenKind::Comma),
 		("::",  TokenKind::ColonColon),
 		(":",   TokenKind::Colon),
-		("->",  TokenKind::Arrow),
+		("->",  TokenKind::ArrowRight),
+		("<-",  TokenKind::ArrowLeft),
+		("=>",  TokenKind::HeavyArrowRight),
 		("#",   TokenKind::Hash),
 		("+",   TokenKind::Plus),
 		("-",   TokenKind::Minus),

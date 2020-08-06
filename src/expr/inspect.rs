@@ -1,5 +1,6 @@
 use crate::diagn::Span;
 use super::Expression;
+use super::ExpressionValue;
 use super::BinaryOp;
 
 
@@ -12,12 +13,26 @@ impl Expression
 		else
 			{ None }
 	}
+
+
+	pub fn has_size(&self) -> bool
+	{
+		if let Some(_) = self.slice()
+			{ true }
+		else
+			{ false }
+	}
 	
 	
 	pub fn slice(&self) -> Option<(usize, usize)>
 	{
 		match self
 		{
+			&Expression::Literal(_, ExpressionValue::Integer{ size: Some(size), .. }) =>
+			{
+				Some((size - 1, 0))
+			}
+			
 			&Expression::BinaryOp(_, _, BinaryOp::Concat, ref lhs, ref rhs) =>
 			{
 				let lhs_width = lhs.width();

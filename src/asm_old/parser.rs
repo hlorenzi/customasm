@@ -377,7 +377,7 @@ impl<'a> AssemblerParser<'a>
 			
 			let addr = self.state.get_cur_address(self.parser.report.clone(), &span_full)?;
 			self.state.mark_label(addr, &span_full);
-			ExpressionValue::Integer(BigInt::from(addr))
+			ExpressionValue::make_integer(BigInt::from(addr))
 		};
 
 		if is_local
@@ -511,7 +511,7 @@ impl<'a> AssemblerParser<'a>
 		
 		let value = match self.state.expr_eval(self.parser.report.clone(), &ctx, &expr, &mut ExpressionEvalContext::new())
 		{
-			Ok(ExpressionValue::Integer(value)) => value,
+			Ok(ExpressionValue::Integer{ bigint: value }) => value,
 			Ok(_) => return Err(self.parser.report.error_span("expected integer value", &expr.span())),
 			Err(()) => return Err(())
 		};

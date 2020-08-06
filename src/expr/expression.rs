@@ -21,7 +21,11 @@ pub enum Expression
 pub enum ExpressionValue
 {
 	Void,
-	Integer(BigInt),
+	Integer
+	{
+		bigint: BigInt,
+		size: Option<usize>,
+	},
 	Bool(bool),
 	String(String),
 	Function(usize)
@@ -57,6 +61,12 @@ pub enum BinaryOp
 
 impl Expression
 {
+	pub fn new_dummy() -> Expression
+	{
+		Expression::Literal(Span::new_dummy(), ExpressionValue::Bool(false))
+	}
+
+	
 	pub fn span(&self) -> Span
 	{
 		match self
@@ -83,8 +93,22 @@ impl ExpressionValue
 	}
 
 
+	pub fn make_integer<T: Into<BigInt>>(value: T) -> ExpressionValue
+	{
+		ExpressionValue::Integer
+		{
+			bigint: value.into(),
+			size: None,
+		}
+	}
+
+
 	pub fn make_integer_from_usize(value: usize) -> ExpressionValue
 	{
-		ExpressionValue::Integer(BigInt::from(value))
+		ExpressionValue::Integer
+		{
+			bigint: BigInt::from(value),
+			size: None,
+		}
 	}
 }
