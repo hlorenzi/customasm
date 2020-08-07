@@ -3,9 +3,9 @@ use crate::syntax::{TokenKind, Parser, excerpt_as_usize, excerpt_as_bigint};
 use super::{Expression, ExpressionValue, UnaryOp, BinaryOp};
 
 
-pub struct ExpressionParser<'a>
+pub struct ExpressionParser<'a, 'parser: 'a>
 {
-	parser: &'a mut Parser,
+	parser: &'a mut Parser<'parser>,
 	//rule_params: Option<&'a [RuleParameter]>,
 }
 
@@ -25,9 +25,9 @@ impl Expression
 }
 
 
-impl<'a> ExpressionParser<'a>
+impl<'a, 'parser> ExpressionParser<'a, 'parser>
 {
-	pub fn new(parser: &'a mut Parser/*, rule_params: Option<&'a [RuleParameter]>*/) -> ExpressionParser<'a>
+	pub fn new(parser: &'a mut Parser<'parser>/*, rule_params: Option<&'a [RuleParameter]>*/) -> ExpressionParser<'a, 'parser>
 	{
 		ExpressionParser
 		{
@@ -44,7 +44,7 @@ impl<'a> ExpressionParser<'a>
 	
 	
 	fn parse_unary_ops<F>(&mut self, ops: &[(TokenKind, UnaryOp)], parse_inner: F) -> Result<Expression, ()>
-	where F: Fn(&mut ExpressionParser<'a>) -> Result<Expression, ()>
+	where F: Fn(&mut ExpressionParser<'a, 'parser>) -> Result<Expression, ()>
 	{
 		for op in ops
 		{
@@ -65,7 +65,7 @@ impl<'a> ExpressionParser<'a>
 	
 
 	fn parse_binary_ops<F>(&mut self, ops: &[(TokenKind, BinaryOp)], parse_inner: F) -> Result<Expression, ()>
-	where F: Fn(&mut ExpressionParser<'a>) -> Result<Expression, ()>
+	where F: Fn(&mut ExpressionParser<'a, 'parser>) -> Result<Expression, ()>
 	{
 		let mut lhs = parse_inner(self)?;
 		
@@ -98,7 +98,7 @@ impl<'a> ExpressionParser<'a>
 	
 
 	fn parse_right_associative_binary_ops<F>(&mut self, ops: &[(TokenKind, BinaryOp)], parse_inner: F) -> Result<Expression, ()>
-	where F: Fn(&mut ExpressionParser<'a>) -> Result<Expression, ()>
+	where F: Fn(&mut ExpressionParser<'a, 'parser>) -> Result<Expression, ()>
 	{
 		let mut lhs = parse_inner(self)?;
 		
@@ -289,7 +289,13 @@ impl<'a> ExpressionParser<'a>
 		let span = inner.span().join(&tk_close.span);
 		
 		if leftmost < rightmost
-			{ return Err(self.parser.report.error_span("invalid bit slice range", &slice_span)); }
+		{
+			if let Some(ref report) = self.parser.report
+			{
+				report.error_span("invalid bit slice range", &slice_span);
+			}
+			return Err(());
+		}
 			
 		Ok(Expression::BitSlice(span, slice_span, leftmost, rightmost, Box::new(inner)))
 	}
@@ -353,7 +359,11 @@ impl<'a> ExpressionParser<'a>
 		else
 		{
 			let span = self.parser.prev().span.after();
-			Err(self.parser.report.error_span("expected expression", &span))
+			if let Some(ref report) = self.parser.report
+			{
+				report.error_span("expected expression", &span);
+			}
+			Err(())
 		}
 	}
 	

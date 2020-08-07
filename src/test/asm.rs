@@ -36,4 +36,6 @@ fn test_files()
             test_file(contents).unwrap();
         }
     }
+
+    panic!("");
 }

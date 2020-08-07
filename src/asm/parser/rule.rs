@@ -19,6 +19,32 @@ pub fn parse_rule(
             {
                 rule.pattern_add_exact(&tk);
             }
+            else if tk.kind == syntax::TokenKind::BraceOpen
+            {
+                let tk_param_name = state.parser.expect(syntax::TokenKind::Identifier)?;
+                let param_name = tk_param_name.excerpt.as_ref().unwrap().clone();
+
+                let param_type = if let Some(_) = state.parser.maybe_expect(syntax::TokenKind::Colon)
+                {
+                    let tk_param_type_name = state.parser.expect(syntax::TokenKind::Identifier)?;
+                    let param_type_name = tk_param_type_name.excerpt.as_ref().unwrap().clone();
+                    
+                    asm::PatternParameterType::RuleGroup
+                    {
+                        name: param_type_name
+                    }
+                }
+                else
+                {
+                    asm::PatternParameterType::Unspecified
+                };
+
+                rule.pattern_add_parameter(asm::PatternParameter
+                {
+                    name: param_name,
+                    typ: param_type,
+                });
+            }
             else
             {
                 state.report.error_span(

@@ -8,5 +8,5 @@ pub struct State<'a>
     pub fileserver: &'a dyn util::FileServer,
     pub filename: String,
 
-    pub parser: syntax::Parser,
+    pub parser: syntax::Parser<'a>,
 }

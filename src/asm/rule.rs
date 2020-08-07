@@ -1,17 +1,40 @@
 use crate::*;
 
 
+#[derive(Debug)]
 pub struct Rule
 {
     pub span: diagn::Span,
     pub pattern: Vec<PatternPart>,
+    pub parameters: Vec<PatternParameter>,
     pub production: expr::Expression,
 }
 
 
+#[derive(Debug)]
 pub enum PatternPart
 {
     Exact(char),
+    Parameter(usize),
+}
+
+
+#[derive(Debug)]
+pub struct PatternParameter
+{
+    pub name: String,
+    pub typ: PatternParameterType
+}
+
+
+#[derive(Debug)]
+pub enum PatternParameterType
+{
+    Unspecified,
+    RuleGroup
+    {
+        name: String,
+    }
 }
 
 
@@ -23,6 +46,7 @@ impl Rule
         {
             span: diagn::Span::new_dummy(),
             pattern: Vec::new(),
+            parameters: Vec::new(),
             production: expr::Expression::new_dummy(),
         }
     }
@@ -35,5 +59,13 @@ impl Rule
 			let part = PatternPart::Exact(c);
 			self.pattern.push(part);
 		}
+	}
+	
+	
+	pub fn pattern_add_parameter(&mut self, param: PatternParameter)
+	{
+        let param_index = self.parameters.len();
+        self.parameters.push(param);
+		self.pattern.push(PatternPart::Parameter(param_index));
 	}
 }

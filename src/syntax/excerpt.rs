@@ -24,7 +24,7 @@ pub fn excerpt_as_string_contents(report: RcReport, excerpt: &str, span: &Span) 
 				Some('r')  => '\r',
 				Some('n')  => '\n',
 				Some('\'') => '\'',
-				Some('\"') => '\"', // "
+				Some('\"') => '\"',
 				Some('\\') => '\\',
 				
 				Some('x') =>
@@ -102,7 +102,7 @@ pub fn excerpt_as_string_contents(report: RcReport, excerpt: &str, span: &Span) 
 
 
 
-pub fn excerpt_as_usize(report: RcReport, excerpt: &str, span: &Span) -> Result<usize, ()>
+pub fn excerpt_as_usize(report: Option<RcReport>, excerpt: &str, span: &Span) -> Result<usize, ()>
 {
 	let chars: Vec<char> = excerpt.chars().collect();
 	assert!(chars.len() >= 1);
@@ -121,19 +121,40 @@ pub fn excerpt_as_usize(report: RcReport, excerpt: &str, span: &Span) -> Result<
 		let digit = match c.to_digit(radix as u32)
 		{
 			Some(d) => d,
-			None => return Err(report.error_span("invalid digits", span))
+			None => 
+			{
+				if let Some(report) = report
+				{
+					report.error_span("invalid digits", span);
+				}
+				return Err(());
+			}
 		};
 		
 		value = match value.checked_mul(radix)
 		{
 			Some(v) => v,
-			None => return Err(report.error_span("value is too large", span))
+			None =>
+			{
+				if let Some(report) = report
+				{
+					report.error_span("value is too large", span);
+				}
+				return Err(());
+			}
 		};
 		
 		value = match value.checked_add(digit as usize)
 		{
 			Some(v) => v,
-			None => return Err(report.error_span("value is too large", span))
+			None =>
+			{
+				if let Some(report) = report
+				{
+					report.error_span("value is too large", span);
+				}
+				return Err(());
+			}
 		};
 	}
 	
@@ -141,12 +162,12 @@ pub fn excerpt_as_usize(report: RcReport, excerpt: &str, span: &Span) -> Result<
 }
 
 
-pub fn excerpt_as_bigint(report: RcReport, excerpt: &str, span: &Span) -> Result<(BigInt, Option<usize>, usize, usize), ()>
+pub fn excerpt_as_bigint(report: Option<RcReport>, excerpt: &str, span: &Span) -> Result<(BigInt, Option<usize>, usize, usize), ()>
 {
 	let chars: Vec<char> = excerpt.chars().collect();
 	assert!(chars.len() >= 1);
 
-	let (width,     index) = parse_width(report.clone(), &chars, span)?;
+	let (width,     index) = (None, 0);// parse_width(report.clone(), &chars, span)?;
 	let (radix, mut index) = parse_radix(&chars, index);
 	
 	let mut digit_num = 0;
@@ -163,7 +184,14 @@ pub fn excerpt_as_bigint(report: RcReport, excerpt: &str, span: &Span) -> Result
 		let digit = match c.to_digit(radix as u32)
 		{
 			Some(d) => d,
-			None => return Err(report.error_span("invalid digits", span))
+			None => 
+			{
+				if let Some(report) = report
+				{
+					report.error_span("invalid digits", span);
+				}
+				return Err(());
+			}
 		};
 		
 		digit_num += 1;
@@ -175,11 +203,25 @@ pub fn excerpt_as_bigint(report: RcReport, excerpt: &str, span: &Span) -> Result
 	if let Some(width) = width
 	{
 		if value.bits() > width
-			{ return Err(report.error_span(format!("value (width = {}) is larger than specified", value.bits()), span)); }
+		{
+			if let Some(report) = report
+			{
+				report.error_span(
+					format!("value (width = {}) is larger than specified", value.bits()),
+					span);
+			}
+			return Err(());
+		}
 	}
 	
 	if digit_num == 0
-		{ return Err(report.error_span(format!("invalid value"), span)); }
+	{
+		if let Some(report) = report
+		{
+			report.error_span("invalid value", span);
+		}
+		return Err(());
+	}
 		
 	Ok((value, width, radix, digit_num))
 }

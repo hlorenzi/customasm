@@ -1,11 +1,13 @@
+use crate::*;
 use crate::diagn::RcReport;
 use crate::syntax::{Token, TokenKind, excerpt_as_usize};
 
 
-pub struct Parser
+#[derive(Clone)]
+pub struct Parser<'a>
 {
-	pub report: RcReport,
-	tokens: Vec<Token>,
+	pub report: Option<RcReport>,
+	tokens: &'a [Token],
 	index: usize,
 	index_prev: usize,
 	read_linebreak: bool,
@@ -22,11 +24,11 @@ pub struct ParserState
 }
 
 
-impl Parser
+impl<'a> Parser<'a>
 {
-	pub fn new(report: RcReport, tokens: Vec<Token>) -> Parser
+	pub fn new(report: Option<RcReport>, tokens: &[Token]) -> Parser
 	{
-		assert!(tokens[tokens.len() - 1].kind == TokenKind::End);
+		//assert!(tokens[tokens.len() - 1].kind == TokenKind::End);
 	
 		let mut parser = Parser
 		{
@@ -40,6 +42,36 @@ impl Parser
 		
 		parser.skip_ignorable();
 		parser
+	}
+
+
+	pub fn suppress_reports(&mut self)
+	{
+		self.report = None;
+	}
+
+
+	pub fn get_current_token_index(&self) -> usize
+	{
+		self.index
+	}
+
+
+	pub fn get_previous_token_index(&self) -> usize
+	{
+		self.index_prev
+	}
+
+
+	pub fn get_full_span(&self) -> diagn::Span
+	{
+		self.tokens[0].span.join(&self.tokens.last().unwrap().span)
+	}
+
+
+	pub fn clone_slice(&self, start: usize, end: usize) -> Parser
+	{
+		Parser::new(self.report.clone(), &self.tokens[start..end])
 	}
 	
 	
@@ -200,7 +232,10 @@ impl Parser
 			{
 				let descr = format!("expected {}", kind.printable());
 				let span = self.tokens[self.index_prev].span.after();
-				self.report.error_span(descr, &span);
+				if let Some(ref report) = self.report
+				{
+					report.error_span(descr, &span);
+				}
 				Err(())
 			}
 		}
@@ -213,7 +248,14 @@ impl Parser
 		match self.maybe_expect(kind)
 		{
 			Some(token) => Ok(token),
-			None => Err(self.report.error_span(descr, &self.tokens[self.index_prev].span.after()))
+			None =>
+			{
+				if let Some(ref report) = self.report
+				{
+					report.error_span(descr, &self.tokens[self.index_prev].span.after());
+				}
+				Err(())
+			}
 		}
 	}
 	
@@ -241,7 +283,13 @@ impl Parser
 		if self.maybe_expect_linebreak().is_some()
 			{ Ok(()) }
 		else
-			{ Err(self.report.error_span("expected line break", &self.tokens[self.index_prev].span.after())) }
+		{
+			if let Some(ref report) = self.report
+			{
+				report.error_span("expected line break", &self.tokens[self.index_prev].span.after());
+			}
+			Err(())
+		}
 	}
 	
 	
