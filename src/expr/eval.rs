@@ -3,12 +3,6 @@ use super::Expression;
 use super::ExpressionValue;
 use super::UnaryOp;
 use super::BinaryOp;
-use num_bigint::BigInt;
-use num_bigint::Sign;
-use num_traits::Zero;
-use num_traits::One;
-use num_traits::ToPrimitive;
-use std::mem::swap;
 use std::collections::HashMap;
 
 
@@ -78,10 +72,10 @@ impl Expression
 			{
 				match inner_expr.eval(report.clone(), ctx, eval_var, eval_fn)?
 				{
-					ExpressionValue::Integer{ bigint: x, .. } => match op
+					ExpressionValue::Integer(ref x) => match op
 					{
 						UnaryOp::Neg => Ok(ExpressionValue::make_integer(-x)),
-						UnaryOp::Not => Ok(ExpressionValue::make_integer(bigint_not(x)))
+						UnaryOp::Not => Ok(ExpressionValue::make_integer(!x))
 					},
 					
 					ExpressionValue::Bool(b) => match op
@@ -142,7 +136,7 @@ impl Expression
 				{
 					match (lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?, rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?)
 					{
-						(ExpressionValue::Integer{ bigint: lhs, .. }, ExpressionValue::Integer{ bigint: rhs, .. }) =>
+						(ExpressionValue::Integer(ref lhs), ExpressionValue::Integer(ref rhs)) =>
 						{
 							match op
 							{
@@ -150,33 +144,33 @@ impl Expression
 								BinaryOp::Sub => Ok(ExpressionValue::make_integer(lhs - rhs)),
 								BinaryOp::Mul => Ok(ExpressionValue::make_integer(lhs * rhs)),
 								
-								BinaryOp::Div => match lhs.checked_div(&rhs)
+								BinaryOp::Div => match lhs.checked_div(rhs)
 								{
 									Some(x) => Ok(ExpressionValue::make_integer(x)),
 									None => Err(report.error_span("division by zero", &op_span.join(&rhs_expr.span())))
 								},
 								
-								BinaryOp::Mod => match bigint_checked_rem(lhs, rhs)
+								BinaryOp::Mod => match lhs.checked_rem(rhs)
 								{
 									Some(x) => Ok(ExpressionValue::make_integer(x)),
 									None => Err(report.error_span("modulo by zero", &op_span.join(&rhs_expr.span())))
 								},
 								
-								BinaryOp::Shl => match bigint_shl(lhs, rhs)
+								BinaryOp::Shl => match lhs.checked_shl(rhs)
 								{
 									Some(x) => Ok(ExpressionValue::make_integer(x)),
 									None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
 								},
 								
-								BinaryOp::Shr => match bigint_shr(lhs, rhs)
+								BinaryOp::Shr => match lhs.checked_shr(rhs)
 								{
 									Some(x) => Ok(ExpressionValue::make_integer(x)),
 									None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
 								},
 								
-								BinaryOp::And  => Ok(ExpressionValue::make_integer(bigint_and(lhs, rhs))),
-								BinaryOp::Or   => Ok(ExpressionValue::make_integer(bigint_or (lhs, rhs))),
-								BinaryOp::Xor  => Ok(ExpressionValue::make_integer(bigint_xor(lhs, rhs))),
+								BinaryOp::And  => Ok(ExpressionValue::make_integer(lhs & rhs)),
+								BinaryOp::Or   => Ok(ExpressionValue::make_integer(lhs | rhs)),
+								BinaryOp::Xor  => Ok(ExpressionValue::make_integer(lhs ^ rhs)),
 								BinaryOp::Eq   => Ok(ExpressionValue::Bool(lhs == rhs)),
 								BinaryOp::Ne   => Ok(ExpressionValue::Bool(lhs != rhs)),
 								BinaryOp::Lt   => Ok(ExpressionValue::Bool(lhs <  rhs)),
@@ -192,13 +186,13 @@ impl Expression
 
 									let (lhs_sliced, rhs_sliced) = match (lhs_sliced, rhs_sliced)
 									{
-										(ExpressionValue::Integer{ bigint: lhs, .. }, ExpressionValue::Integer{ bigint: rhs, .. }) => (lhs, rhs),
+										(ExpressionValue::Integer(lhs), ExpressionValue::Integer(rhs)) => (lhs, rhs),
 										_ => unreachable!()
 									};
 
 									match (lhs_expr.width(), rhs_expr.width())
 									{
-										(Some(lhs_width), Some(rhs_width)) => Ok(ExpressionValue::make_integer(bigint_concat(lhs_sliced, (lhs_width - 1, 0), rhs_sliced, (rhs_width - 1, 0)))),
+										(Some(lhs_width), Some(rhs_width)) => Ok(ExpressionValue::make_integer(lhs_sliced.concat((lhs_width - 1, 0), &rhs_sliced, (rhs_width - 1, 0)))),
 										(None, _) => Err(report.error_span("argument to concatenation with no known width", &lhs_expr.span())),
 										(_, None) => Err(report.error_span("argument to concatenation with no known width", &rhs_expr.span()))
 									}							
@@ -240,7 +234,7 @@ impl Expression
 			{
 				match inner.eval(report.clone(), ctx, eval_var, eval_fn)?
 				{
-					ExpressionValue::Integer{ bigint: x, .. } => Ok(ExpressionValue::make_integer(bigint_slice(x, left, right))),
+					ExpressionValue::Integer(ref x) => Ok(ExpressionValue::make_integer(x.slice(left, right))),
 					_ => Err(report.error_span("invalid argument type to slice", &span))
 				}
 			}
@@ -295,7 +289,7 @@ impl Expression
 			{
 				match inner.eval(report.clone(), ctx, eval_var, eval_fn)?
 				{
-					ExpressionValue::Integer{ bigint: x, .. } => Ok(ExpressionValue::make_integer(bigint_slice(x, left, right))),
+					ExpressionValue::Integer(ref x) => Ok(ExpressionValue::make_integer(x.slice(left, right))),
 					_ => Err(report.error_span("invalid argument type to slice", &span))
 				}
 			}
@@ -310,10 +304,9 @@ impl ExpressionValue
 {
 	pub fn bits(&self) -> usize
 	{
-		match self
+		match &self
 		{
-			&ExpressionValue::Integer{ ref bigint, .. } => bigint_bits(&bigint),
-			
+			&ExpressionValue::Integer(bigint) => bigint.min_size(),
 			_ => panic!("not an integer")
 		}
 	}
@@ -323,161 +316,8 @@ impl ExpressionValue
 	{
 		match self
 		{
-			&ExpressionValue::Integer{ ref bigint, .. } =>
-			{
-				let bytes = bigint.to_signed_bytes_le();
-				
-				let byte_index = index / 8;
-				if byte_index >= bytes.len()
-					{ return bigint.sign() == Sign::Minus; }
-					
-				let mut byte = bytes[byte_index];
-				
-				let mut bit_index = index % 8;
-				while bit_index > 0
-				{
-					byte >>= 1;
-					bit_index -= 1;
-				}
-				
-				(byte & 0b1) != 0
-			}
-			
+			&ExpressionValue::Integer(ref bigint) => bigint.get_bit(index),
 			_ => panic!("not an integer")
 		}
 	}
-}
-
-
-pub fn bigint_bits(x: &BigInt) -> usize
-{
-	if x.is_zero()
-		{ return 1; }
-
-	if x < &BigInt::zero()
-	{
-		let y: BigInt = x + 1;
-		y.bits() + 1
-	}
-	else
-		{ x.bits() }
-}
-
-
-fn bigint_checked_rem(lhs: BigInt, rhs: BigInt) -> Option<BigInt>
-{
-	if rhs == BigInt::zero()
-		{ None }
-	else
-		{ Some(lhs % rhs) }
-}
-
-
-fn bigint_shl(lhs: BigInt, rhs: BigInt) -> Option<BigInt>
-{
-	rhs.to_usize().map(|rhs| lhs << rhs)
-}
-
-
-fn bigint_shr(lhs: BigInt, rhs: BigInt) -> Option<BigInt>
-{
-	let lhs_sign = lhs.sign();
-	
-	match rhs.to_usize().map(|rhs| lhs >> rhs)
-	{
-		None => None,
-		Some(result) =>
-			if lhs_sign == Sign::Minus && result.sign() == Sign::NoSign
-				{ Some(BigInt::from(-1)) }
-			else
-				{ Some(result) }
-	}
-}
-
-
-fn bigint_concat(lhs: BigInt, lhs_slice: (usize, usize), rhs: BigInt, rhs_slice: (usize, usize)) -> BigInt
-{
-	bigint_or(
-		bigint_slice(lhs, lhs_slice.0, lhs_slice.1) << (rhs_slice.0 + 1 - rhs_slice.1),
-		bigint_slice(rhs, rhs_slice.0, rhs_slice.1))
-}
-
-
-fn bigint_not(x: BigInt) -> BigInt
-{
-	let mut x_bytes = x.to_signed_bytes_le();
-	
-	if x.sign() != Sign::Minus
-		{ x_bytes.push(0); }
-	
-	for i in 0..x_bytes.len()
-		{ x_bytes[i] = !x_bytes[i]; }
-	
-	BigInt::from_signed_bytes_le(&x_bytes)
-}
-
-
-fn bigint_bitmanipulate<F>(lhs: BigInt, rhs: BigInt, f: F) -> BigInt
-where F: Fn(u8, u8) -> u8
-{
-	let mut lhs_bytes = lhs.to_signed_bytes_le();
-	let mut lhs_sign = lhs.sign();
-	let mut rhs_bytes = rhs.to_signed_bytes_le();
-	let mut rhs_sign = rhs.sign();
-	
-	if lhs_sign != Sign::Minus
-		{ lhs_bytes.push(0); }
-	
-	if rhs_sign != Sign::Minus
-		{ rhs_bytes.push(0); }
-		
-	if rhs_bytes.len() > lhs_bytes.len()
-	{
-		swap(&mut lhs_bytes, &mut rhs_bytes);
-		swap(&mut lhs_sign, &mut rhs_sign);
-	}
-	
-	for i in 0..lhs_bytes.len()
-	{
-		let rhs_byte = if i < rhs_bytes.len()
-			{ rhs_bytes[i] }
-		else if rhs_sign == Sign::Minus
-			{ 0xff }
-		else
-			{ 0 };
-		
-		lhs_bytes[i] = f(lhs_bytes[i], rhs_byte);
-	}
-	
-	BigInt::from_signed_bytes_le(&lhs_bytes)
-}
-
-
-fn bigint_and(lhs: BigInt, rhs: BigInt) -> BigInt
-{
-	bigint_bitmanipulate(lhs, rhs, |a, b| a & b)
-}
-
-
-fn bigint_or(lhs: BigInt, rhs: BigInt) -> BigInt
-{
-	bigint_bitmanipulate(lhs, rhs, |a, b| a | b)
-}
-
-
-fn bigint_xor(lhs: BigInt, rhs: BigInt) -> BigInt
-{
-	bigint_bitmanipulate(lhs, rhs, |a, b| a ^ b)
-}
-
-
-fn bigint_slice(x: BigInt, left: usize, right: usize) -> BigInt
-{
-	let mut mask = BigInt::zero();
-	for _ in 0..(left - right + 1)
-		{ mask = (mask << 1) + BigInt::one(); }
-	
-	let shifted = bigint_shr(x, BigInt::from(right)).unwrap();
-	
-	bigint_and(shifted, mask)	
 }

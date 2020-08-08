@@ -14,7 +14,6 @@ pub struct Token
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub enum TokenKind
 {
-	End,
 	Error,
 	Whitespace,
 	Comment,
@@ -110,13 +109,6 @@ impl TokenKind
 	}
 	
 	
-	pub fn is_allowed_first_pattern_token(self) -> bool
-	{
-		self.is_allowed_pattern_token() &&
-		self != TokenKind::Hash
-	}
-	
-	
 	pub fn is_allowed_after_pattern_parameter(self) -> bool
 	{
 		self == TokenKind::ParenClose ||
@@ -129,7 +121,6 @@ impl TokenKind
 	{
 		match self
 		{
-			TokenKind::End => "end",
 			TokenKind::Error => "error",
 			TokenKind::Whitespace => "whitespace",
 			TokenKind::Comment => "comment",
@@ -290,16 +281,6 @@ where S: Into<String>
 
 	if had_error
 		{ return Err(()); }
-	
-	// Add an end token.
-	let end_token = Token
-	{
-		span: Span::new(filename.clone(), index, index),
-		kind: TokenKind::End,
-		excerpt: None
-	};
-	
-	tokens.push(end_token);
 	
 	Ok(tokens)
 }

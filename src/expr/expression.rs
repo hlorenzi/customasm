@@ -1,19 +1,18 @@
-use crate::diagn::Span;
-use num_bigint::BigInt;
+use crate::*;
 
 
 #[derive(Debug)]
 pub enum Expression
 {
-	Literal(Span, ExpressionValue),
-	Variable(Span, String),
-	UnaryOp(Span, Span, UnaryOp, Box<Expression>),
-	BinaryOp(Span, Span, BinaryOp, Box<Expression>, Box<Expression>),
-	TernaryOp(Span, Box<Expression>, Box<Expression>, Box<Expression>),
-	BitSlice(Span, Span, usize, usize, Box<Expression>),
-	SoftSlice(Span, Span, usize, usize, Box<Expression>),
-	Block(Span, Vec<Expression>),
-	Call(Span, Box<Expression>, Vec<Expression>)
+	Literal(diagn::Span, ExpressionValue),
+	Variable(diagn::Span, String),
+	UnaryOp(diagn::Span, diagn::Span, UnaryOp, Box<Expression>),
+	BinaryOp(diagn::Span, diagn::Span, BinaryOp, Box<Expression>, Box<Expression>),
+	TernaryOp(diagn::Span, Box<Expression>, Box<Expression>, Box<Expression>),
+	BitSlice(diagn::Span, diagn::Span, usize, usize, Box<Expression>),
+	SoftSlice(diagn::Span, diagn::Span, usize, usize, Box<Expression>),
+	Block(diagn::Span, Vec<Expression>),
+	Call(diagn::Span, Box<Expression>, Vec<Expression>)
 }
 
 
@@ -21,11 +20,7 @@ pub enum Expression
 pub enum ExpressionValue
 {
 	Void,
-	Integer
-	{
-		bigint: BigInt,
-		size: Option<usize>,
-	},
+	Integer(util::BigInt),
 	Bool(bool),
 	String(String),
 	Function(usize)
@@ -63,11 +58,11 @@ impl Expression
 {
 	pub fn new_dummy() -> Expression
 	{
-		Expression::Literal(Span::new_dummy(), ExpressionValue::Bool(false))
+		Expression::Literal(diagn::Span::new_dummy(), ExpressionValue::Bool(false))
 	}
 
 	
-	pub fn span(&self) -> Span
+	pub fn span(&self) -> diagn::Span
 	{
 		match self
 		{
@@ -89,26 +84,18 @@ impl ExpressionValue
 {
 	pub fn make_literal(&self) -> Expression
 	{
-		Expression::Literal(Span::new_dummy(), self.clone())
+		Expression::Literal(diagn::Span::new_dummy(), self.clone())
 	}
 
 
-	pub fn make_integer<T: Into<BigInt>>(value: T) -> ExpressionValue
+	pub fn make_integer<T: Into<util::BigInt>>(value: T) -> ExpressionValue
 	{
-		ExpressionValue::Integer
-		{
-			bigint: value.into(),
-			size: None,
-		}
+		ExpressionValue::Integer(value.into())
 	}
 
 
 	pub fn make_integer_from_usize(value: usize) -> ExpressionValue
 	{
-		ExpressionValue::Integer
-		{
-			bigint: BigInt::from(value),
-			size: None,
-		}
+		ExpressionValue::Integer(value.into())
 	}
 }

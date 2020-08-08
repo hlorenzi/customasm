@@ -1,3 +1,4 @@
+use crate::*;
 use crate::diagn::Span;
 use super::Expression;
 use super::ExpressionValue;
@@ -7,6 +8,15 @@ use super::BinaryOp;
 impl Expression
 {
 	pub fn width(&self) -> Option<usize>
+	{
+		if let Some(slice) = self.slice()
+			{ Some(slice.0 + 1 - slice.1) }
+		else
+			{ None }
+	}
+
+
+	pub fn size(&self) -> Option<usize>
 	{
 		if let Some(slice) = self.slice()
 			{ Some(slice.0 + 1 - slice.1) }
@@ -28,7 +38,7 @@ impl Expression
 	{
 		match self
 		{
-			&Expression::Literal(_, ExpressionValue::Integer{ size: Some(size), .. }) =>
+			&Expression::Literal(_, ExpressionValue::Integer(util::BigInt { size: Some(size), .. })) =>
 			{
 				Some((size - 1, 0))
 			}

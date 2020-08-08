@@ -31,10 +31,7 @@ pub struct PatternParameter
 pub enum PatternParameterType
 {
     Unspecified,
-    RuleGroup
-    {
-        name: String,
-    }
+    RuleGroup(asm::RuleGroupRef),
 }
 
 

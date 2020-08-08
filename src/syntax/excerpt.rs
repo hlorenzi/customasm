@@ -1,6 +1,6 @@
+use crate::*;
 use crate::diagn::{Span, RcReport};
-use num_bigint::BigInt;
-use num_traits::Zero;
+use num_bigint;
 
 
 pub fn excerpt_as_string_contents(report: RcReport, excerpt: &str, span: &Span) -> Result<String, ()>
@@ -162,17 +162,18 @@ pub fn excerpt_as_usize(report: Option<RcReport>, excerpt: &str, span: &Span) ->
 }
 
 
-pub fn excerpt_as_bigint(report: Option<RcReport>, excerpt: &str, span: &Span) -> Result<(BigInt, Option<usize>, usize, usize), ()>
+pub fn excerpt_as_bigint(report: Option<RcReport>, excerpt: &str, span: &Span) -> Result<util::BigInt, ()>
 {
+	use num_traits::Zero;
+
 	let chars: Vec<char> = excerpt.chars().collect();
 	assert!(chars.len() >= 1);
 
-	let (width,     index) = (None, 0);// parse_width(report.clone(), &chars, span)?;
-	let (radix, mut index) = parse_radix(&chars, index);
+	let (radix, mut index) = parse_radix(&chars, 0);
 	
 	let mut digit_num = 0;
 	
-	let mut value = BigInt::zero();
+	let mut value = num_bigint::BigInt::zero();
 	while index < chars.len()
 	{
 		let c = chars[index];
@@ -200,20 +201,6 @@ pub fn excerpt_as_bigint(report: Option<RcReport>, excerpt: &str, span: &Span) -
 		value = value + digit;
 	}
 	
-	if let Some(width) = width
-	{
-		if value.bits() > width
-		{
-			if let Some(report) = report
-			{
-				report.error_span(
-					format!("value (width = {}) is larger than specified", value.bits()),
-					span);
-			}
-			return Err(());
-		}
-	}
-	
 	if digit_num == 0
 	{
 		if let Some(report) = report
@@ -223,7 +210,21 @@ pub fn excerpt_as_bigint(report: Option<RcReport>, excerpt: &str, span: &Span) -
 		return Err(());
 	}
 		
-	Ok((value, width, radix, digit_num))
+	let radix_bits = match radix
+	{
+		2 => Some(1),
+		8 => Some(3),
+		16 => Some(4),
+		_ => None
+	};
+
+	let size = match radix_bits
+	{
+		None => None,
+		Some(radix_bits) => Some(radix_bits * digit_num)
+	};
+	
+	Ok(util::BigInt::new(value, size))
 }
 
 

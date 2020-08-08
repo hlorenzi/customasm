@@ -8,6 +8,9 @@ use std::path::Path;
 
 pub trait FileServer
 {
+	fn exists(&self, filename: &str) -> bool;
+
+
 	fn get_bytes(&self, report: RcReport, filename: &str, span: Option<&Span>) -> Result<Vec<u8>, ()>;
 	
 	
@@ -24,10 +27,16 @@ pub trait FileServer
 	
 	fn get_excerpt(&self, span: &Span) -> String
 	{
-		let chars = self.get_chars(RcReport::new(), &*span.file, None).ok().unwrap();
-		let counter = CharCounter::new(&chars);
-		let location = span.location.unwrap();
-		counter.get_excerpt(location.0, location.1).iter().collect()
+		if let Ok(chars) = self.get_chars(RcReport::new(), &*span.file, None)
+		{
+			let counter = CharCounter::new(&chars);
+			let location = span.location.unwrap();
+			counter.get_excerpt(location.0, location.1).iter().collect()
+		}
+		else
+		{
+			"".to_string()
+		}
 	}
 }
 
@@ -71,6 +80,12 @@ impl FileServerReal
 
 impl FileServer for FileServerMock
 {
+	fn exists(&self, filename: &str) -> bool
+	{
+		self.files.get(filename).is_some()
+	}
+
+
 	fn get_bytes(&self, report: RcReport, filename: &str, span: Option<&Span>) -> Result<Vec<u8>, ()>
 	{
 		match self.files.get(filename)
@@ -91,6 +106,12 @@ impl FileServer for FileServerMock
 
 impl FileServer for FileServerReal
 {
+	fn exists(&self, _filename: &str) -> bool
+	{
+		unimplemented!()
+	}
+
+
 	fn get_bytes(&self, report: RcReport, filename: &str, span: Option<&Span>) -> Result<Vec<u8>, ()>
 	{
 		let filename_path = &Path::new(filename);

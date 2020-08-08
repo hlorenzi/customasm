@@ -7,7 +7,7 @@ use crate::syntax::{Token, TokenKind, excerpt_as_usize};
 pub struct Parser<'a>
 {
 	pub report: Option<RcReport>,
-	tokens: &'a [Token],
+	pub tokens: &'a [Token],
 	index: usize,
 	index_prev: usize,
 	read_linebreak: bool,
@@ -65,13 +65,133 @@ impl<'a> Parser<'a>
 
 	pub fn get_full_span(&self) -> diagn::Span
 	{
-		self.tokens[0].span.join(&self.tokens.last().unwrap().span)
+		if self.tokens.len() == 0
+		{
+			diagn::Span::new_dummy()
+		}
+		else
+		{
+			self.tokens[0].span.join(&self.tokens.last().unwrap().span)
+		}
 	}
 
 
-	pub fn clone_slice(&self, start: usize, end: usize) -> Parser
+	pub fn get_next_spans(&self, count: usize) -> diagn::Span
+	{
+		if self.index >= self.tokens.len()
+		{
+			return diagn::Span::new_dummy();
+		}
+
+		let mut span = self.tokens[self.index].span.clone();
+
+		let mut i = 1;
+		while i <= count && self.index + i < self.tokens.len()
+		{
+			span = span.join(&self.tokens[self.index + i].span);
+			i += 1;
+		}
+
+		span
+	}
+
+
+	pub fn clone_slice<'b>(&'b self, start: usize, end: usize) -> Parser<'a>
 	{
 		Parser::new(self.report.clone(), &self.tokens[start..end])
+	}
+
+
+	pub fn slice_until_linebreak<'b>(&'b mut self) -> Parser<'a>
+	{
+		let start = self.get_current_token_index();
+		let mut end = start;
+		while !self.is_over() && !self.next_is_linebreak()
+		{
+			self.advance();
+			end = self.get_previous_token_index() + 1;
+		}
+
+		self.clone_slice(start, end)
+	}
+
+
+	pub fn slice_until_token<'b>(&'b mut self, kind: TokenKind) -> Parser<'a>
+	{
+		let start = self.get_current_token_index();
+		let mut end = start;
+		while !self.is_over() && !self.next_is(0, kind)
+		{
+			self.advance();
+			end = self.get_previous_token_index() + 1;
+		}
+
+		self.clone_slice(start, end)
+	}
+
+
+	pub fn slice_until_char<'b>(&'b mut self, c: char) -> Option<Parser<'a>>
+	{
+		let start = self.get_current_token_index();
+		let mut end = start;
+		while !self.is_over() && self.next_partial() != c
+		{
+			self.advance_partial();
+			end = self.get_previous_token_index() + 1;
+		}
+
+		if self.is_at_partial()
+		{
+			None
+		}
+		else
+		{
+			Some(self.clone_slice(start, end))
+		}
+	}
+
+
+	pub fn slice_until_char_or_nesting<'b>(&'b mut self, c: char) -> Option<Parser<'a>>
+	{
+		let start = self.get_current_token_index();
+
+		let mut paren_nesting = 0;
+
+		while !self.is_over() && (paren_nesting > 0 || self.next_partial() != c)
+		{
+			if self.next_is(0, TokenKind::ParenOpen)
+			{
+				paren_nesting += 1;
+				self.advance();
+				continue;
+			}
+			
+			if self.next_is(0, TokenKind::ParenClose) && paren_nesting > 0
+			{
+				paren_nesting -= 1;
+				self.advance();
+				continue;
+			}
+
+			if paren_nesting > 0
+			{
+				self.advance();
+				continue;
+			}
+
+			self.advance_partial();
+		}
+
+		let end = self.get_previous_token_index() + 1;
+
+		if self.is_at_partial()
+		{
+			None
+		}
+		else
+		{
+			Some(self.clone_slice(start, end))
+		}
 	}
 	
 	
@@ -98,18 +218,18 @@ impl<'a> Parser<'a>
 	
 	pub fn is_over(&self) -> bool
 	{
-		self.index >= self.tokens.len() - 1
+		self.index >= self.tokens.len()
 	}
 	
 	
 	fn skip_ignorable(&mut self)
 	{
-		while self.index < self.tokens.len() - 1 &&
+		while self.index < self.tokens.len() &&
 			self.tokens[self.index].kind.ignorable()
 		{
 			if self.tokens[self.index].kind == TokenKind::LineBreak
 				{ self.read_linebreak = true; }
-				
+			
 			self.index += 1;
 		}
 	}
@@ -124,7 +244,7 @@ impl<'a> Parser<'a>
 	
 		let token = self.tokens[self.index].clone();
 		
-		if self.index < self.tokens.len() - 1
+		if self.index < self.tokens.len()
 			{ self.index += 1; }
 		
 		self.read_linebreak = false;
@@ -135,7 +255,7 @@ impl<'a> Parser<'a>
 
 	pub fn advance_partial(&mut self) -> char
 	{
-		if self.tokens[self.index].kind == TokenKind::End
+		if self.index >= self.tokens.len()
 			{ return '\0'; }
 
 		let sliced = unsafe { self.tokens[self.index].text().get_unchecked(self.partial_index..) };
@@ -171,8 +291,11 @@ impl<'a> Parser<'a>
 
 	pub fn next_partial(&mut self) -> char
 	{
-		if self.tokens[self.index].kind == TokenKind::End
+		if self.index >= self.tokens.len()
 			{ return '\0'; }
+
+		if self.tokens[self.index].kind == TokenKind::Whitespace
+			{ return ' '; }
 
 		let sliced = unsafe { self.tokens[self.index].text().get_unchecked(self.partial_index..) };
 		let mut char_indices = sliced.char_indices();
@@ -200,13 +323,18 @@ impl<'a> Parser<'a>
 	
 	pub fn next_is(&self, mut nth: usize, kind: TokenKind) -> bool
 	{
+		if self.index >= self.tokens.len()
+		{
+			return false;
+		}
+
 		let mut index = self.index;
 		
-		while nth > 0 && index < self.tokens.len() - 1
+		while nth > 0 && index < self.tokens.len()
 		{
 			nth -= 1;
 			index += 1;
-			while self.tokens[index].kind.ignorable() && index < self.tokens.len() - 1
+			while self.tokens[index].kind.ignorable() && index < self.tokens.len()
 				{ index += 1; }
 		}
 		

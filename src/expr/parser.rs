@@ -71,6 +71,9 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 		
 		loop
 		{
+			if self.parser.next_is_linebreak()
+				{ break; }
+
 			let mut op_match = None;
 			
 			for op in ops
@@ -445,34 +448,12 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 		let tk_number = self.parser.expect(TokenKind::Number)?;
 		let number = tk_number.excerpt.clone().unwrap();
 		
-		let (bigint, width, radix, digit_num) = excerpt_as_bigint(self.parser.report.clone(), &number, &tk_number.span)?;
-		
-		let radix_bits = match radix
-		{
-			2 => Some(1),
-			8 => Some(3),
-			16 => Some(4),
-			_ => None
-		};
-
-		let size = match width
-		{
-			Some(width) => Some(width),
-			None => match radix_bits
-			{
-				None => None,
-				Some(radix_bits) => Some(radix_bits * digit_num)
-			}
-		};
+		let bigint = excerpt_as_bigint(self.parser.report.clone(), &number, &tk_number.span)?;
 		
 		let span = tk_number.span;
 		let expr = Expression::Literal(
 			span.clone(),
-			ExpressionValue::Integer
-			{
-				bigint,
-				size,
-			});
+			ExpressionValue::Integer(bigint));
 
 		Ok(expr)
 	}

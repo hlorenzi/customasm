@@ -1,12 +1,27 @@
 use crate::*;
-use std::collections::HashMap;
 use std::collections::HashSet;
 
 
 pub struct State
 {
-	pub rule_groups: HashMap<String, asm::RuleGroup>,
-	pub active_rule_groups: HashSet<String>,
+	pub banks: Vec<asm::Bank>,
+	pub rule_groups: Vec<asm::RuleGroup>,
+	pub active_rule_groups: HashSet<RuleGroupRef>,
+}
+
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct RuleGroupRef
+{
+	pub index: usize,
+}
+
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct RuleRef
+{
+	pub rule_group_ref: RuleGroupRef,
+	pub index: usize,
 }
 
 
@@ -14,11 +29,18 @@ impl State
 {
 	pub fn new() -> State
 	{
-		let state = State
+		let mut state = State
 		{
-			rule_groups: HashMap::new(),
+			banks: Vec::new(),
+			rule_groups: Vec::new(),
 			active_rule_groups: HashSet::new(),
 		};
+
+		state.banks.push(asm::Bank
+		{
+			cur_bit_offset: 0,
+			rule_invokations: Vec::new(),
+		});
 		
 		state
 	}
@@ -39,18 +61,45 @@ impl State
 			false => Ok(())
 		}
 	}
+
+
+	pub fn resolve_bank(
+		&self,
+		report: diagn::RcReport,
+		bank: &asm::Bank)
+		-> Result<util::BitVec, ()>
+	{
+		let mut bitvec = util::BitVec::new();
+
+		for rule_invokation in &bank.rule_invokations
+		{
+			let candidate = &rule_invokation.candidates[0];
+			let rule = self.get_rule(candidate.rule_ref).unwrap();
+			let resolved = rule.production.eval(
+				report.clone(), &mut expr::ExpressionEvalContext::new(),
+				&|_, _, _| Err(false),
+				&|_, _, _, _| Err(false))?;
+			
+			if let expr::ExpressionValue::Integer(bigint) = resolved
+			{
+				bitvec.write_bigint(rule_invokation.bit_offset, bigint);
+			}
+		}
+
+		Ok(bitvec)
+	}
 	
 
-	pub fn get_rule_group<TName: std::borrow::Borrow<str>>(
+	pub fn find_rule_group<TName: std::borrow::Borrow<str>>(
 		&self,
 		name: TName,
 		report: diagn::RcReport,
 		span: &diagn::Span)
-		-> Result<&asm::RuleGroup, ()>
+		-> Result<RuleGroupRef, ()>
 	{
-		match self.rule_groups.get(name.borrow())
+		match self.rule_groups.iter().position(|rg| rg.name == name.borrow())
 		{
-			Some(rule_group) => Ok(rule_group),
+			Some(index) => Ok(RuleGroupRef{ index }),
 			None =>
 			{
 				report.error_span("unknown rule group", span);
@@ -60,16 +109,25 @@ impl State
 	}
 	
 
-	pub fn activate_rule_group<TName: Into<String> + std::borrow::Borrow<str>>(
+	pub fn activate_rule_group<TName: std::borrow::Borrow<str>>(
 		&mut self,
 		name: TName,
 		report: diagn::RcReport,
 		span: &diagn::Span)
 		-> Result<(), ()>
 	{
-		let _ = self.get_rule_group(name.borrow(), report, span)?;
+		let rg_ref = self.find_rule_group(name.borrow(), report, span)?;
 
-		self.active_rule_groups.insert(name.into());
+		self.active_rule_groups.insert(rg_ref);
 		Ok(())
+	}
+	
+
+	pub fn get_rule(
+		&self,
+		rule_ref: asm::RuleRef)
+		-> Option<&asm::Rule>
+	{
+		Some(&self.rule_groups[rule_ref.rule_group_ref.index].rules[rule_ref.index])
 	}
 }

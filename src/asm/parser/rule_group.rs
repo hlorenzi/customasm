@@ -10,7 +10,11 @@ pub fn parse_directive_rulesdef(
 
     state.parser.expect(syntax::TokenKind::BraceOpen)?;
 
-    let mut rule_group = asm::RuleGroup::new();
+    let mut rule_group = asm::RuleGroup
+    {
+        name,
+        rules: Vec::new(),
+    };
 
     while !state.parser.next_is(0, syntax::TokenKind::BraceClose)
     {
@@ -20,7 +24,7 @@ pub fn parse_directive_rulesdef(
 
     state.parser.expect(syntax::TokenKind::BraceClose)?;
 
-    state.asm_state.rule_groups.insert(name, rule_group);
+    state.asm_state.rule_groups.push(rule_group);
 
     Ok(())
 }

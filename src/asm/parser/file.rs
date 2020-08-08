@@ -23,6 +23,8 @@ pub fn parse_file<TFilename: Into<String>>(
         parser,
     };
 
+    //println!("{:#?}", state.parser.tokens.iter().map(|t| t.kind).collect::<Vec<_>>());
+
     while !state.parser.is_over()
     {
         parse_line(&mut state)?;
@@ -38,6 +40,10 @@ pub fn parse_line(state: &mut asm::parser::State)
     if state.parser.next_is(0, syntax::TokenKind::Hash)
     {
         parse_directive(state)?;
+    }
+    else if state.parser.maybe_expect_linebreak().is_some()
+    {
+        return Ok(());
     }
     else
     {

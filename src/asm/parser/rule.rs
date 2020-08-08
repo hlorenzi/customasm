@@ -11,48 +11,31 @@ pub fn parse_rule(
     {
         let tk = state.parser.advance();
         
-        let is_beginning_of_pattern = rule.pattern.len() == 0;
-
-        if is_beginning_of_pattern
+        if tk.kind == syntax::TokenKind::BraceOpen
         {
-            if tk.kind.is_allowed_first_pattern_token()
-            {
-                rule.pattern_add_exact(&tk);
-            }
-            else if tk.kind == syntax::TokenKind::BraceOpen
-            {
-                let tk_param_name = state.parser.expect(syntax::TokenKind::Identifier)?;
-                let param_name = tk_param_name.excerpt.as_ref().unwrap().clone();
+            let tk_param_name = state.parser.expect(syntax::TokenKind::Identifier)?;
+            let param_name = tk_param_name.excerpt.as_ref().unwrap().clone();
 
-                let param_type = if let Some(_) = state.parser.maybe_expect(syntax::TokenKind::Colon)
-                {
-                    let tk_param_type_name = state.parser.expect(syntax::TokenKind::Identifier)?;
-                    let param_type_name = tk_param_type_name.excerpt.as_ref().unwrap().clone();
-                    
-                    asm::PatternParameterType::RuleGroup
-                    {
-                        name: param_type_name
-                    }
-                }
-                else
-                {
-                    asm::PatternParameterType::Unspecified
-                };
+            let param_type = if let Some(_) = state.parser.maybe_expect(syntax::TokenKind::Colon)
+            {
+                let tk_param_type_name = state.parser.expect(syntax::TokenKind::Identifier)?;
+                let param_type_name = tk_param_type_name.excerpt.as_ref().unwrap().clone();
 
-                rule.pattern_add_parameter(asm::PatternParameter
-                {
-                    name: param_name,
-                    typ: param_type,
-                });
+                let rule_group_ref = state.asm_state.find_rule_group(param_type_name, state.report.clone(), &tk_param_type_name.span)?;
+                asm::PatternParameterType::RuleGroup(rule_group_ref)
             }
             else
             {
-                state.report.error_span(
-                    "token is not allowed as the start of a pattern",
-                    &tk.span);
-                
-                return Err(());
-            }
+                asm::PatternParameterType::Unspecified
+            };
+
+            state.parser.expect(syntax::TokenKind::BraceClose)?;
+
+            rule.pattern_add_parameter(asm::PatternParameter
+            {
+                name: param_name,
+                typ: param_type,
+            });
         }
         
         else if tk.kind.is_allowed_pattern_token()
