@@ -1,13 +1,13 @@
---- include
+; ::: include
 
-#rulesdef op
+#subruledef op
 {
     {x} => x[7:0]
     &{x} => 0x66 @ x[7:0]
     {x}$ => 0x77 @ x[7:0]
 }
 
-#rulesdef cpu6502
+#ruledef cpu6502
 {
     halt => 0x55
     nop => 0xaa
@@ -19,17 +19,15 @@
     test2 {x: op}$ => 0x44 @ x[7:0]
 }
 
-#use cpu6502
-
----
+; :::
 
 halt ; = 0x55
 
----
+; :::
 
 nop ; = 0xaa
 
----
+; :::
 
 unk ; error: no match
 

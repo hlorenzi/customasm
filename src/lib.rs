@@ -18,7 +18,7 @@ mod util;
 
 
 #[cfg(test)]
-mod test;
+pub mod test;
 
 
 pub use self::diagn::Report;

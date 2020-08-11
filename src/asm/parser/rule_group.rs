@@ -1,8 +1,9 @@
 use crate::*;
 
 
-pub fn parse_directive_rulesdef(
-    state: &mut asm::parser::State)
+pub fn parse_directive_ruledef(
+    state: &mut asm::parser::State,
+    enable: bool)
     -> Result<(), ()>
 {
     let tk_name = state.parser.expect(syntax::TokenKind::Identifier)?;
@@ -12,7 +13,7 @@ pub fn parse_directive_rulesdef(
 
     let mut rule_group = asm::RuleGroup
     {
-        name,
+        name: name.clone(),
         rules: Vec::new(),
     };
 
@@ -26,11 +27,19 @@ pub fn parse_directive_rulesdef(
 
     state.asm_state.rule_groups.push(rule_group);
 
+    if enable
+    {
+        state.asm_state.activate_rule_group(
+            name,
+            state.report.clone(),
+            &tk_name.span)?;
+    }
+
     Ok(())
 }
 
 
-pub fn parse_directive_use(
+pub fn parse_directive_enable(
     state: &mut asm::parser::State)
     -> Result<(), ()>
 {

@@ -53,7 +53,7 @@ impl Rule
 	{
 		for c in token.text().chars()
 		{
-			let part = PatternPart::Exact(c);
+			let part = PatternPart::Exact(c.to_ascii_lowercase());
 			self.pattern.push(part);
 		}
 	}

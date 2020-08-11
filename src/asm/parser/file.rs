@@ -64,8 +64,9 @@ pub fn parse_directive(state: &mut asm::parser::State)
 
     match directive.as_ref()
     {
-        "rulesdef" => asm::parser::parse_directive_rulesdef(state)?,
-        "use" => asm::parser::parse_directive_use(state)?,
+        "ruledef" => asm::parser::parse_directive_ruledef(state, true)?,
+        "subruledef" => asm::parser::parse_directive_ruledef(state, false)?,
+        "enable" => asm::parser::parse_directive_enable(state)?,
         _ =>
         {
             state.report.error_span("unknown directive", &tk_hash.span.join(&tk_directive.span));

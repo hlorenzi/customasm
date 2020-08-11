@@ -125,7 +125,7 @@ pub fn match_rule(
             {
                 //println!("> try match exact {}", c);
 
-                if subparser.next_partial() != *c
+                if subparser.next_partial().to_ascii_lowercase() != *c
                 {
                     return Err(());
                 }
