@@ -7,7 +7,7 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
     let mut subparser = state.parser.slice_until_linebreak();
     subparser.suppress_reports();
 
-    let candidates = match_active_rule_groups(state, &mut subparser)?;
+    let candidates = match_active_rulesets(state, &mut subparser)?;
     if candidates.len() != 0
     {
         let rule = state.asm_state.get_rule(candidates[0].rule_ref).unwrap();
@@ -17,6 +17,7 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
         {
             bit_offset,
             candidates,
+            span: subparser.get_full_span(),
         });
         state.asm_state.banks[0].cur_bit_offset += production_size;
     }
@@ -27,7 +28,7 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
 }
 
 
-pub fn match_active_rule_groups(
+pub fn match_active_rulesets(
     state: &asm::parser::State,
     subparser: &mut syntax::Parser)
     -> Result<Vec<asm::RuleInvokationCandidate>, ()>
@@ -37,7 +38,7 @@ pub fn match_active_rule_groups(
     for rule_group_ref in &state.asm_state.active_rule_groups
     {
         let mut subparser_clone = subparser.clone();
-        if let Ok(subcandidates) = match_rule_group(state, *rule_group_ref, &mut subparser_clone, true)
+        if let Ok(subcandidates) = match_ruleset(state, *rule_group_ref, &mut subparser_clone, true)
         {
             for candidate in subcandidates
             {
@@ -60,14 +61,14 @@ pub fn match_active_rule_groups(
 }
 
 
-pub fn match_rule_group<'a>(
+pub fn match_ruleset<'a>(
     state: &asm::parser::State,
-    rule_group_ref: asm::RuleGroupRef,
+    ruleset_ref: asm::RulesetRef,
     subparser: &mut syntax::Parser<'a>,
     must_consume_all_tokens: bool)
     -> Result<Vec<(asm::RuleInvokationCandidate, syntax::Parser<'a>)>, ()>
 {
-    let rule_group = &state.asm_state.rule_groups[rule_group_ref.index];
+    let rule_group = &state.asm_state.rule_groups[ruleset_ref.index];
 
     let mut candidates = Vec::new();
 
@@ -75,7 +76,7 @@ pub fn match_rule_group<'a>(
     {
         let rule_ref = asm::RuleRef
         {
-            rule_group_ref,
+            ruleset_ref,
             index,
         };
 
@@ -104,7 +105,7 @@ pub fn match_rule(
     subparser: &mut syntax::Parser)
     -> Result<asm::RuleInvokationCandidate, ()>
 {
-    let rule_group = &state.asm_state.rule_groups[rule_ref.rule_group_ref.index];
+    let rule_group = &state.asm_state.rule_groups[rule_ref.ruleset_ref.index];
     let rule = &rule_group.rules[rule_ref.index];
 
     let mut candidate = asm::RuleInvokationCandidate
@@ -162,8 +163,8 @@ pub fn match_rule(
                         //    ">> parse argument expr with parser at `{}`",
                         //    state.fileserver.get_excerpt(&expr_parser.get_next_spans(10)));
 
-                        let expr = expr::Expression::parse(&mut expr_parser)?;
-                        candidate.args.push(asm::RuleInvokationCandidateArgument::Expression(expr));
+                        let expr = expr::Expr::parse(&mut expr_parser)?;
+                        candidate.args.push(asm::RuleInvokationArgument::Expression(expr));
 
                         if !expr_using_slice
                         {
@@ -182,7 +183,7 @@ pub fn match_rule(
                     {
                         //println!("> try match subrule {:?}", rule_group_ref);
                         
-                        let subcandidates = match_rule_group(state, rule_group_ref, subparser, false)?;
+                        let subcandidates = match_ruleset(state, rule_group_ref, subparser, false)?;
                         if subcandidates.len() == 0
                         {
                             return Err(());
@@ -192,7 +193,7 @@ pub fn match_rule(
                         {
                             if subcandidate.1.get_current_token_index() != subcandidates[0].1.get_current_token_index()
                             {
-                                state.report.error_span("ambiguous sub-rule parameter", &subparser.get_full_span());
+                                state.report.error_span("ambiguous nested ruleset", &subparser.get_full_span());
                                 return Err(());
                             }
                         }
@@ -201,7 +202,7 @@ pub fn match_rule(
                         subparser.restore(subcandidates[0].1.save());
                         
                         let subcandidates = subcandidates.into_iter().map(|c| c.0).collect();
-                        candidate.args.push(asm::RuleInvokationCandidateArgument::RuleGroup(subcandidates));
+                        candidate.args.push(asm::RuleInvokationArgument::RuleGroup(subcandidates));
                     }
                 }
             }

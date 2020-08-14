@@ -2,22 +2,22 @@ use crate::*;
 
 
 #[derive(Debug)]
-pub enum Expression
+pub enum Expr
 {
-	Literal(diagn::Span, ExpressionValue),
+	Literal(diagn::Span, Value),
 	Variable(diagn::Span, String),
-	UnaryOp(diagn::Span, diagn::Span, UnaryOp, Box<Expression>),
-	BinaryOp(diagn::Span, diagn::Span, BinaryOp, Box<Expression>, Box<Expression>),
-	TernaryOp(diagn::Span, Box<Expression>, Box<Expression>, Box<Expression>),
-	BitSlice(diagn::Span, diagn::Span, usize, usize, Box<Expression>),
-	SoftSlice(diagn::Span, diagn::Span, usize, usize, Box<Expression>),
-	Block(diagn::Span, Vec<Expression>),
-	Call(diagn::Span, Box<Expression>, Vec<Expression>)
+	UnaryOp(diagn::Span, diagn::Span, UnaryOp, Box<Expr>),
+	BinaryOp(diagn::Span, diagn::Span, BinaryOp, Box<Expr>, Box<Expr>),
+	TernaryOp(diagn::Span, Box<Expr>, Box<Expr>, Box<Expr>),
+	BitSlice(diagn::Span, diagn::Span, usize, usize, Box<Expr>),
+	SoftSlice(diagn::Span, diagn::Span, usize, usize, Box<Expr>),
+	Block(diagn::Span, Vec<Expr>),
+	Call(diagn::Span, Box<Expr>, Vec<Expr>)
 }
 
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ExpressionValue
+pub enum Value
 {
 	Void,
 	Integer(util::BigInt),
@@ -54,11 +54,11 @@ pub enum BinaryOp
 }
 
 
-impl Expression
+impl Expr
 {
-	pub fn new_dummy() -> Expression
+	pub fn new_dummy() -> Expr
 	{
-		Expression::Literal(diagn::Span::new_dummy(), ExpressionValue::Bool(false))
+		Expr::Literal(diagn::Span::new_dummy(), Value::Bool(false))
 	}
 
 	
@@ -66,36 +66,30 @@ impl Expression
 	{
 		match self
 		{
-			&Expression::Literal  (ref span, ..) => span.clone(),
-			&Expression::Variable (ref span, ..) => span.clone(),
-			&Expression::UnaryOp  (ref span, ..) => span.clone(),
-			&Expression::BinaryOp (ref span, ..) => span.clone(),
-			&Expression::TernaryOp(ref span, ..) => span.clone(),
-			&Expression::BitSlice (ref span, ..) => span.clone(),
-			&Expression::SoftSlice(ref span, ..) => span.clone(),
-			&Expression::Block    (ref span, ..) => span.clone(),
-			&Expression::Call     (ref span, ..) => span.clone()
+			&Expr::Literal  (ref span, ..) => span.clone(),
+			&Expr::Variable (ref span, ..) => span.clone(),
+			&Expr::UnaryOp  (ref span, ..) => span.clone(),
+			&Expr::BinaryOp (ref span, ..) => span.clone(),
+			&Expr::TernaryOp(ref span, ..) => span.clone(),
+			&Expr::BitSlice (ref span, ..) => span.clone(),
+			&Expr::SoftSlice(ref span, ..) => span.clone(),
+			&Expr::Block    (ref span, ..) => span.clone(),
+			&Expr::Call     (ref span, ..) => span.clone()
 		}
 	}
 }
 
 
-impl ExpressionValue
+impl Value
 {
-	pub fn make_literal(&self) -> Expression
+	pub fn make_literal(&self) -> Expr
 	{
-		Expression::Literal(diagn::Span::new_dummy(), self.clone())
+		Expr::Literal(diagn::Span::new_dummy(), self.clone())
 	}
 
 
-	pub fn make_integer<T: Into<util::BigInt>>(value: T) -> ExpressionValue
+	pub fn make_integer<T: Into<util::BigInt>>(value: T) -> Value
 	{
-		ExpressionValue::Integer(value.into())
-	}
-
-
-	pub fn make_integer_from_usize(value: usize) -> ExpressionValue
-	{
-		ExpressionValue::Integer(value.into())
+		Value::Integer(value.into())
 	}
 }

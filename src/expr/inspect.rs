@@ -1,11 +1,7 @@
 use crate::*;
-use crate::diagn::Span;
-use super::Expression;
-use super::ExpressionValue;
-use super::BinaryOp;
 
 
-impl Expression
+impl expr::Expr
 {
 	pub fn width(&self) -> Option<usize>
 	{
@@ -38,12 +34,12 @@ impl Expression
 	{
 		match self
 		{
-			&Expression::Literal(_, ExpressionValue::Integer(util::BigInt { size: Some(size), .. })) =>
+			&expr::Expr::Literal(_, expr::Value::Integer(util::BigInt { size: Some(size), .. })) =>
 			{
 				Some((size - 1, 0))
 			}
 			
-			&Expression::BinaryOp(_, _, BinaryOp::Concat, ref lhs, ref rhs) =>
+			&expr::Expr::BinaryOp(_, _, expr::BinaryOp::Concat, ref lhs, ref rhs) =>
 			{
 				let lhs_width = lhs.width();
 				let rhs_width = rhs.width();
@@ -54,10 +50,10 @@ impl Expression
 				Some((lhs_width.unwrap() + rhs_width.unwrap() - 1, 0))
 			}
 			
-			&Expression::BitSlice(_, _, left, right, _) => Some((left, right)),
-			&Expression::SoftSlice(_, _, left, right, _) => Some((left, right)),
+			&expr::Expr::BitSlice(_, _, left, right, _) => Some((left, right)),
+			&expr::Expr::SoftSlice(_, _, left, right, _) => Some((left, right)),
 			
-			&Expression::TernaryOp(_, _, ref true_branch, ref false_branch) =>
+			&expr::Expr::TernaryOp(_, _, ref true_branch, ref false_branch) =>
 			{
 				let true_width = true_branch.width();
 				let false_width = false_branch.width();
@@ -71,7 +67,7 @@ impl Expression
 				Some((true_width.unwrap() - 1, 0))
 			}
 			
-			&Expression::Block(_, ref exprs) =>
+			&expr::Expr::Block(_, ref exprs) =>
 			{
 				match exprs.last()
 				{
@@ -85,11 +81,11 @@ impl Expression
 	}
 	
 	
-	pub fn returned_value_span(&self) -> Span
+	pub fn returned_value_span(&self) -> diagn::Span
 	{
 		match self
 		{
-			&Expression::Block(ref span, ref exprs) =>
+			&expr::Expr::Block(ref span, ref exprs) =>
 			{
 				match exprs.last()
 				{

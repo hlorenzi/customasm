@@ -11,7 +11,7 @@ pub fn parse_directive_ruledef(
 
     state.parser.expect(syntax::TokenKind::BraceOpen)?;
 
-    let mut rule_group = asm::RuleGroup
+    let mut ruleset = asm::Ruleset
     {
         name: name.clone(),
         rules: Vec::new(),
@@ -19,17 +19,17 @@ pub fn parse_directive_ruledef(
 
     while !state.parser.next_is(0, syntax::TokenKind::BraceClose)
     {
-        rule_group.rules.push(asm::parser::parse_rule(state)?);
+        ruleset.rules.push(asm::parser::parse_rule(state)?);
         state.parser.expect_linebreak()?;
     }
 
     state.parser.expect(syntax::TokenKind::BraceClose)?;
 
-    state.asm_state.rule_groups.push(rule_group);
+    state.asm_state.rule_groups.push(ruleset);
 
     if enable
     {
-        state.asm_state.activate_rule_group(
+        state.asm_state.activate_ruleset(
             name,
             state.report.clone(),
             &tk_name.span)?;
@@ -46,7 +46,7 @@ pub fn parse_directive_enable(
     let tk_name = state.parser.expect(syntax::TokenKind::Identifier)?;
     let name = tk_name.excerpt.as_ref().unwrap().clone();
 
-    state.asm_state.activate_rule_group(
+    state.asm_state.activate_ruleset(
         name,
         state.report.clone(),
         &tk_name.span)?;

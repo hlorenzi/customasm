@@ -5,13 +5,13 @@ use std::collections::HashSet;
 pub struct State
 {
 	pub banks: Vec<asm::Bank>,
-	pub rule_groups: Vec<asm::RuleGroup>,
-	pub active_rule_groups: HashSet<RuleGroupRef>,
+	pub rule_groups: Vec<asm::Ruleset>,
+	pub active_rule_groups: HashSet<RulesetRef>,
 }
 
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-pub struct RuleGroupRef
+pub struct RulesetRef
 {
 	pub index: usize,
 }
@@ -20,7 +20,7 @@ pub struct RuleGroupRef
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub struct RuleRef
 {
-	pub rule_group_ref: RuleGroupRef,
+	pub ruleset_ref: RulesetRef,
 	pub index: usize,
 }
 
@@ -73,14 +73,14 @@ impl State
 
 		for rule_invokation in &bank.rule_invokations
 		{
+			let _guard = report.push_parent("failed to resolve instruction", &rule_invokation.span);
+
 			let candidate = &rule_invokation.candidates[0];
-			let rule = self.get_rule(candidate.rule_ref).unwrap();
-			let resolved = rule.production.eval(
-				report.clone(), &mut expr::ExpressionEvalContext::new(),
-				&|_, _, _| Err(false),
-				&|_, _, _, _| Err(false))?;
+			let resolved = self.resolve_rule_invokation_candidate(
+				report.clone(),
+				&candidate)?;
 			
-			if let expr::ExpressionValue::Integer(bigint) = resolved
+			if let expr::Value::Integer(bigint) = resolved
 			{
 				bitvec.write_bigint(rule_invokation.bit_offset, bigint);
 			}
@@ -88,35 +88,81 @@ impl State
 
 		Ok(bitvec)
 	}
+
+
+	pub fn resolve_rule_invokation_candidate(
+		&self,
+		report: diagn::RcReport,
+		candidate: &asm::RuleInvokationCandidate)
+		-> Result<expr::Value, ()>
+	{
+		let rule = self.get_rule(candidate.rule_ref).unwrap();
+
+		let mut eval_ctx = expr::EvalContext::new();
+		for (arg_index, arg) in candidate.args.iter().enumerate()
+		{
+			match arg
+			{
+				&asm::RuleInvokationArgument::Expression(ref expr) =>
+				{
+					let arg_value = expr.eval(
+						report.clone(), &mut expr::EvalContext::new(),
+						&|_| Err(false),
+						&|_| Err(false))?;
+
+					let arg_name = &rule.parameters[arg_index].name;
+
+					eval_ctx.set_local(arg_name, arg_value);
+				}
+
+				&asm::RuleInvokationArgument::RuleGroup(ref inner_candidates) =>
+				{
+					let arg_value = self.resolve_rule_invokation_candidate(
+						report.clone(),
+						&inner_candidates[0])?;
+
+					let arg_name = &rule.parameters[arg_index].name;
+
+					eval_ctx.set_local(arg_name, arg_value);
+				}
+			}
+		}
+		
+		rule.production.eval(
+			report.clone(),
+			&mut eval_ctx,
+			&|_| Err(false),
+			&|_| Err(false))
+	}
 	
 
-	pub fn find_rule_group<TName: std::borrow::Borrow<str>>(
+	pub fn find_ruleset<TName: std::borrow::Borrow<str>>(
 		&self,
 		name: TName,
 		report: diagn::RcReport,
 		span: &diagn::Span)
-		-> Result<RuleGroupRef, ()>
+		-> Result<RulesetRef, ()>
 	{
 		match self.rule_groups.iter().position(|rg| rg.name == name.borrow())
 		{
-			Some(index) => Ok(RuleGroupRef{ index }),
+			Some(index) => Ok(RulesetRef{ index }),
 			None =>
 			{
-				report.error_span("unknown rule group", span);
+				report.error_span("unknown ruleset", span);
 				Err(())
 			}
 		}
 	}
 	
 
-	pub fn activate_rule_group<TName: std::borrow::Borrow<str>>(
+	pub fn activate_ruleset<TName: std::borrow::Borrow<str>>(
 		&mut self,
 		name: TName,
 		report: diagn::RcReport,
 		span: &diagn::Span)
 		-> Result<(), ()>
 	{
-		let rg_ref = self.find_rule_group(name.borrow(), report, span)?;
+		let rg_ref = self.find_ruleset(name.borrow(), report, span)?;
 
 		self.active_rule_groups.insert(rg_ref);
 		Ok(())
@@ -128,6 +174,6 @@ impl State
 		rule_ref: asm::RuleRef)
 		-> Option<&asm::Rule>
 	{
-		Some(&self.rule_groups[rule_ref.rule_group_ref.index].rules[rule_ref.index])
+		Some(&self.rule_groups[rule_ref.ruleset_ref.index].rules[rule_ref.index])
 	}
 }

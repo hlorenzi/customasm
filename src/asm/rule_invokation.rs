@@ -6,6 +6,7 @@ pub struct RuleInvokation
 {
     pub bit_offset: usize,
     pub candidates: Vec<RuleInvokationCandidate>,
+    pub span: diagn::Span,
 }
 
 
@@ -13,13 +14,13 @@ pub struct RuleInvokation
 pub struct RuleInvokationCandidate
 {
     pub rule_ref: asm::RuleRef,
-    pub args: Vec<RuleInvokationCandidateArgument>,
+    pub args: Vec<RuleInvokationArgument>,
 }
 
 
 #[derive(Debug)]
-pub enum RuleInvokationCandidateArgument
+pub enum RuleInvokationArgument
 {
-    Expression(expr::Expression),
+    Expression(expr::Expr),
     RuleGroup(Vec<RuleInvokationCandidate>),
 }

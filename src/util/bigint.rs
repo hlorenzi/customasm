@@ -124,9 +124,14 @@ impl BigInt
     
     pub fn concat(&self, lhs_slice: (usize, usize), rhs: &BigInt, rhs_slice: (usize, usize)) -> BigInt
     {
-        let lhs = self.slice(lhs_slice.0, lhs_slice.1).shr(rhs_slice.0 + 1 - rhs_slice.1);
+        let lhs_size = lhs_slice.0 + 1 - lhs_slice.1;
+        let rhs_size = rhs_slice.0 + 1 - rhs_slice.1;
+        let lhs = self.slice(lhs_slice.0, lhs_slice.1).shr(rhs_size);
         let rhs = rhs.slice(rhs_slice.0, rhs_slice.1);
-        (&lhs | &rhs).into()
+
+        let mut result: BigInt = (&lhs | &rhs).into();
+        result.size = Some(lhs_size + rhs_size);
+        result
     }
     
     
@@ -139,7 +144,9 @@ impl BigInt
         for _ in 0..(left - right + 1)
             { mask = (mask << 1) + num_bigint::BigInt::one(); }
         
-        &self.shl(right) & &mask.into()
+        let mut result = &self.shl(right) & &mask.into();
+        result.size = Some(left + 1 - right);
+        result
     }
 
 

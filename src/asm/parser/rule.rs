@@ -21,7 +21,7 @@ pub fn parse_rule(
                 let tk_param_type_name = state.parser.expect(syntax::TokenKind::Identifier)?;
                 let param_type_name = tk_param_type_name.excerpt.as_ref().unwrap().clone();
 
-                let rule_group_ref = state.asm_state.find_rule_group(param_type_name, state.report.clone(), &tk_param_type_name.span)?;
+                let rule_group_ref = state.asm_state.find_ruleset(param_type_name, state.report.clone(), &tk_param_type_name.span)?;
                 asm::PatternParameterType::RuleGroup(rule_group_ref)
             }
             else
@@ -59,7 +59,7 @@ pub fn parse_rule(
     }
 
 
-    rule.production = expr::Expression::parse(&mut state.parser)?;
+    rule.production = expr::Expr::parse(&mut state.parser)?;
 
     if !rule.production.has_size()
     {

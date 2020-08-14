@@ -1,24 +1,22 @@
-use crate::syntax::{TokenKind, Parser, excerpt_as_usize, excerpt_as_bigint};
-//use crate::asm::cpudef::{RuleParameter, RuleParameterType};
-use super::{Expression, ExpressionValue, UnaryOp, BinaryOp};
+use crate::*;
 
 
 pub struct ExpressionParser<'a, 'parser: 'a>
 {
-	parser: &'a mut Parser<'parser>,
+	parser: &'a mut syntax::Parser<'parser>,
 	//rule_params: Option<&'a [RuleParameter]>,
 }
 
 
-impl Expression
+impl expr::Expr
 {
-	pub fn parse(parser: &mut Parser) -> Result<Expression, ()>
+	pub fn parse(parser: &mut syntax::Parser) -> Result<expr::Expr, ()>
 	{
 		ExpressionParser::new(parser).parse_expr()
 	}
 
 
-	/*pub fn parse_for_rule(parser: &mut Parser, rule_params: &[RuleParameter]) -> Result<Expression, ()>
+	/*pub fn parse_for_rule(parser: &mut Parser, rule_params: &[RuleParameter]) -> Result<expr::Expr, ()>
 	{
 		ExpressionParser::new(parser, Some(rule_params)).parse_expr()
 	}*/
@@ -27,7 +25,7 @@ impl Expression
 
 impl<'a, 'parser> ExpressionParser<'a, 'parser>
 {
-	pub fn new(parser: &'a mut Parser<'parser>/*, rule_params: Option<&'a [RuleParameter]>*/) -> ExpressionParser<'a, 'parser>
+	pub fn new(parser: &'a mut syntax::Parser<'parser>/*, rule_params: Option<&'a [RuleParameter]>*/) -> ExpressionParser<'a, 'parser>
 	{
 		ExpressionParser
 		{
@@ -37,14 +35,14 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	}
 	
 	
-	pub fn parse_expr(&mut self) -> Result<Expression, ()>
+	pub fn parse_expr(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_ternary_conditional()
 	}
 	
 	
-	fn parse_unary_ops<F>(&mut self, ops: &[(TokenKind, UnaryOp)], parse_inner: F) -> Result<Expression, ()>
-	where F: Fn(&mut ExpressionParser<'a, 'parser>) -> Result<Expression, ()>
+	fn parse_unary_ops<F>(&mut self, ops: &[(syntax::TokenKind, expr::UnaryOp)], parse_inner: F) -> Result<expr::Expr, ()>
+	where F: Fn(&mut ExpressionParser<'a, 'parser>) -> Result<expr::Expr, ()>
 	{
 		for op in ops
 		{
@@ -57,15 +55,15 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 			let inner = self.parse_unary_ops(ops, parse_inner)?;
 			let span = tk.span.join(&inner.span());
 			
-			return Ok(Expression::UnaryOp(span, tk.span.clone(), op.1, Box::new(inner)));
+			return Ok(expr::Expr::UnaryOp(span, tk.span.clone(), op.1, Box::new(inner)));
 		}
 		
 		parse_inner(self)
 	}
 	
 
-	fn parse_binary_ops<F>(&mut self, ops: &[(TokenKind, BinaryOp)], parse_inner: F) -> Result<Expression, ()>
-	where F: Fn(&mut ExpressionParser<'a, 'parser>) -> Result<Expression, ()>
+	fn parse_binary_ops<F>(&mut self, ops: &[(syntax::TokenKind, expr::BinaryOp)], parse_inner: F) -> Result<expr::Expr, ()>
+	where F: Fn(&mut ExpressionParser<'a, 'parser>) -> Result<expr::Expr, ()>
 	{
 		let mut lhs = parse_inner(self)?;
 		
@@ -90,7 +88,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 				let rhs = parse_inner(self)?;
 				let span = lhs.span().join(&rhs.span());
 				
-				lhs = Expression::BinaryOp(span, op_match.0.span.clone(), op_match.1, Box::new(lhs), Box::new(rhs));
+				lhs = expr::Expr::BinaryOp(span, op_match.0.span.clone(), op_match.1, Box::new(lhs), Box::new(rhs));
 			}
 			else
 				{ break; }
@@ -100,8 +98,8 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	}
 	
 
-	fn parse_right_associative_binary_ops<F>(&mut self, ops: &[(TokenKind, BinaryOp)], parse_inner: F) -> Result<Expression, ()>
-	where F: Fn(&mut ExpressionParser<'a, 'parser>) -> Result<Expression, ()>
+	fn parse_right_associative_binary_ops<F>(&mut self, ops: &[(syntax::TokenKind, expr::BinaryOp)], parse_inner: F) -> Result<expr::Expr, ()>
+	where F: Fn(&mut ExpressionParser<'a, 'parser>) -> Result<expr::Expr, ()>
 	{
 		let mut lhs = parse_inner(self)?;
 		
@@ -121,172 +119,172 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 			let rhs = self.parse_expr()?;
 			let span = lhs.span().join(&rhs.span());
 			
-			lhs = Expression::BinaryOp(span, op_match.0.span.clone(), op_match.1, Box::new(lhs), Box::new(rhs));
+			lhs = expr::Expr::BinaryOp(span, op_match.0.span.clone(), op_match.1, Box::new(lhs), Box::new(rhs));
 		}
 		
 		Ok(lhs)
 	}
 	
 	
-	fn parse_ternary_conditional(&mut self) -> Result<Expression, ()>
+	fn parse_ternary_conditional(&mut self) -> Result<expr::Expr, ()>
 	{
 		let cond = self.parse_assignment()?;
 		
-		if self.parser.maybe_expect(TokenKind::Question).is_some()
+		if self.parser.maybe_expect(syntax::TokenKind::Question).is_some()
 		{
 			let true_branch = self.parse_expr()?;
 			
 			let false_branch =
 			{
-				if self.parser.maybe_expect(TokenKind::Colon).is_some()
+				if self.parser.maybe_expect(syntax::TokenKind::Colon).is_some()
 					{ self.parse_assignment()? }
 				else
-					{ Expression::Block(true_branch.span(), Vec::new()) }
+					{ expr::Expr::Block(true_branch.span(), Vec::new()) }
 			};
 			
-			Ok(Expression::TernaryOp(cond.span().join(&false_branch.span()), Box::new(cond), Box::new(true_branch), Box::new(false_branch)))
+			Ok(expr::Expr::TernaryOp(cond.span().join(&false_branch.span()), Box::new(cond), Box::new(true_branch), Box::new(false_branch)))
 		}
 		else
 			{ Ok(cond) }
 	}
 	
 	
-	fn parse_assignment(&mut self) -> Result<Expression, ()>
+	fn parse_assignment(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_right_associative_binary_ops(
 			&[
-				(TokenKind::Equal, BinaryOp::Assign)
+				(syntax::TokenKind::Equal, expr::BinaryOp::Assign)
 			],
 			|s| s.parse_concat())
 	}
 	
 	
-	fn parse_concat(&mut self) -> Result<Expression, ()>
+	fn parse_concat(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_binary_ops(
 			&[
-				(TokenKind::At, BinaryOp::Concat)
+				(syntax::TokenKind::At, expr::BinaryOp::Concat)
 			],
 			|s| s.parse_lazy_or())
 	}
 	
 	
-	fn parse_lazy_or(&mut self) -> Result<Expression, ()>
+	fn parse_lazy_or(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_binary_ops(
 			&[
-				(TokenKind::VerticalBarVerticalBar, BinaryOp::LazyOr)
+				(syntax::TokenKind::VerticalBarVerticalBar, expr::BinaryOp::LazyOr)
 			],
 			|s| s.parse_lazy_and())
 	}
 	
 	
-	fn parse_lazy_and(&mut self) -> Result<Expression, ()>
+	fn parse_lazy_and(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_binary_ops(
 			&[
-				(TokenKind::AmpersandAmpersand, BinaryOp::LazyAnd)
+				(syntax::TokenKind::AmpersandAmpersand, expr::BinaryOp::LazyAnd)
 			],
 			|s| s.parse_relational())
 	}
 	
 	
-	fn parse_relational(&mut self) -> Result<Expression, ()>
+	fn parse_relational(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_binary_ops(
 			&[
-				(TokenKind::EqualEqual,       BinaryOp::Eq),
-				(TokenKind::ExclamationEqual, BinaryOp::Ne),
-				(TokenKind::LessThan,         BinaryOp::Lt),
-				(TokenKind::LessThanEqual,    BinaryOp::Le),
-				(TokenKind::GreaterThan,      BinaryOp::Gt),
-				(TokenKind::GreaterThanEqual, BinaryOp::Ge)
+				(syntax::TokenKind::EqualEqual,       expr::BinaryOp::Eq),
+				(syntax::TokenKind::ExclamationEqual, expr::BinaryOp::Ne),
+				(syntax::TokenKind::LessThan,         expr::BinaryOp::Lt),
+				(syntax::TokenKind::LessThanEqual,    expr::BinaryOp::Le),
+				(syntax::TokenKind::GreaterThan,      expr::BinaryOp::Gt),
+				(syntax::TokenKind::GreaterThanEqual, expr::BinaryOp::Ge)
 			],
 			|s| s.parse_binary_or())
 	}
 	
 	
-	fn parse_binary_or(&mut self) -> Result<Expression, ()>
+	fn parse_binary_or(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_binary_ops(
 			&[
-				(TokenKind::VerticalBar, BinaryOp::Or),
+				(syntax::TokenKind::VerticalBar, expr::BinaryOp::Or),
 			],
 			|s| s.parse_binary_xor())
 	}
 	
 	
-	fn parse_binary_xor(&mut self) -> Result<Expression, ()>
+	fn parse_binary_xor(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_binary_ops(
 			&[
-				(TokenKind::Circumflex, BinaryOp::Xor),
+				(syntax::TokenKind::Circumflex, expr::BinaryOp::Xor),
 			],
 			|s| s.parse_binary_and())
 	}
 	
 	
-	fn parse_binary_and(&mut self) -> Result<Expression, ()>
+	fn parse_binary_and(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_binary_ops(
 			&[
-				(TokenKind::Ampersand, BinaryOp::And),
+				(syntax::TokenKind::Ampersand, expr::BinaryOp::And),
 			],
 			|s| s.parse_shifts())
 	}
 	
 	
-	fn parse_shifts(&mut self) -> Result<Expression, ()>
+	fn parse_shifts(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_binary_ops(
 			&[
-				(TokenKind::LessThanLessThan,       BinaryOp::Shl),
-				(TokenKind::GreaterThanGreaterThan, BinaryOp::Shr)
+				(syntax::TokenKind::LessThanLessThan,       expr::BinaryOp::Shl),
+				(syntax::TokenKind::GreaterThanGreaterThan, expr::BinaryOp::Shr)
 			],
 			|s| s.parse_addition())
 	}
 	
 	
-	fn parse_addition(&mut self) -> Result<Expression, ()>
+	fn parse_addition(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_binary_ops(
 			&[
-				(TokenKind::Plus,  BinaryOp::Add),
-				(TokenKind::Minus, BinaryOp::Sub)
+				(syntax::TokenKind::Plus,  expr::BinaryOp::Add),
+				(syntax::TokenKind::Minus, expr::BinaryOp::Sub)
 			],
 			|s| s.parse_multiplication())
 	}
 	
 	
-	fn parse_multiplication(&mut self) -> Result<Expression, ()>
+	fn parse_multiplication(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_binary_ops(
 			&[
-				(TokenKind::Asterisk, BinaryOp::Mul),
-				(TokenKind::Slash,    BinaryOp::Div),
-				(TokenKind::Percent,  BinaryOp::Mod)
+				(syntax::TokenKind::Asterisk, expr::BinaryOp::Mul),
+				(syntax::TokenKind::Slash,    expr::BinaryOp::Div),
+				(syntax::TokenKind::Percent,  expr::BinaryOp::Mod)
 			],
 			|s| s.parse_bitslice())
 	}
 	
 	
-	fn parse_bitslice(&mut self) -> Result<Expression, ()>
+	fn parse_bitslice(&mut self) -> Result<expr::Expr, ()>
 	{
-		let inner = self.parse_unary()?;
+		let inner = self.parse_size()?;
 		
-		let tk_open = match self.parser.maybe_expect(TokenKind::BracketOpen)
+		let tk_open = match self.parser.maybe_expect(syntax::TokenKind::BracketOpen)
 		{
 			Some(tk) => tk,
 			None => return Ok(inner)
 		};
 			
-		let tk_leftmost = self.parser.expect(TokenKind::Number)?;
-		self.parser.expect(TokenKind::Colon)?;
-		let tk_rightmost = self.parser.expect(TokenKind::Number)?;
-		let tk_close = self.parser.expect(TokenKind::BracketClose)?;
+		let tk_leftmost = self.parser.expect(syntax::TokenKind::Number)?;
+		self.parser.expect(syntax::TokenKind::Colon)?;
+		let tk_rightmost = self.parser.expect(syntax::TokenKind::Number)?;
+		let tk_close = self.parser.expect(syntax::TokenKind::BracketClose)?;
 		
-		let leftmost  = excerpt_as_usize(self.parser.report.clone(), tk_leftmost. excerpt.as_ref().unwrap(), &tk_leftmost .span)?;
-		let rightmost = excerpt_as_usize(self.parser.report.clone(), tk_rightmost.excerpt.as_ref().unwrap(), &tk_rightmost.span)?;
+		let leftmost  = syntax::excerpt_as_usize(self.parser.report.clone(), tk_leftmost. excerpt.as_ref().unwrap(), &tk_leftmost .span)?;
+		let rightmost = syntax::excerpt_as_usize(self.parser.report.clone(), tk_rightmost.excerpt.as_ref().unwrap(), &tk_rightmost.span)?;
 		
 		let slice_span = tk_open.span.join(&tk_close.span);
 		let span = inner.span().join(&tk_close.span);
@@ -300,63 +298,95 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 			return Err(());
 		}
 			
-		Ok(Expression::BitSlice(span, slice_span, leftmost, rightmost, Box::new(inner)))
+		Ok(expr::Expr::BitSlice(span, slice_span, leftmost, rightmost, Box::new(inner)))
 	}
 	
 	
-	fn parse_unary(&mut self) -> Result<Expression, ()>
+	fn parse_size(&mut self) -> Result<expr::Expr, ()>
+	{
+		let inner = self.parse_unary()?;
+		
+		let tk_grave = match self.parser.maybe_expect(syntax::TokenKind::Grave)
+		{
+			Some(tk) => tk,
+			None => return Ok(inner)
+		};
+
+		let tk_size = self.parser.expect(syntax::TokenKind::Number)?;
+		let size = syntax::excerpt_as_usize(
+			self.parser.report.clone(),
+			tk_size.excerpt.as_ref().unwrap(),
+			&tk_size.span)?;
+
+		let span = inner.span().join(&tk_size.span);
+		let size_span = tk_grave.span.join(&tk_size.span);
+
+		if size < 1
+		{
+			if let Some(ref report) = self.parser.report
+			{
+				report.error_span("invalid size specifier", &size_span);
+				return Err(());
+			}
+		}
+
+		Ok(expr::Expr::BitSlice(span, size_span, size - 1, 0, Box::new(inner)))
+	}
+	
+	
+	fn parse_unary(&mut self) -> Result<expr::Expr, ()>
 	{
 		self.parse_unary_ops(
 			&[
-				(TokenKind::Exclamation, UnaryOp::Not),
-				(TokenKind::Minus,       UnaryOp::Neg)
+				(syntax::TokenKind::Exclamation, expr::UnaryOp::Not),
+				(syntax::TokenKind::Minus,       expr::UnaryOp::Neg)
 			],
 			|s| s.parse_call())
 	}
 	
 	
-	fn parse_call(&mut self) -> Result<Expression, ()>
+	fn parse_call(&mut self) -> Result<expr::Expr, ()>
 	{
 		let leaf = self.parse_leaf()?;
 		
 		if self.parser.next_is_linebreak()
 			{ return Ok(leaf); }
 			
-		if self.parser.maybe_expect(TokenKind::ParenOpen).is_none()
+		if self.parser.maybe_expect(syntax::TokenKind::ParenOpen).is_none()
 			{ return Ok(leaf); }
 			
 		let mut args = Vec::new();
-		while !self.parser.next_is(0, TokenKind::ParenClose)
+		while !self.parser.next_is(0, syntax::TokenKind::ParenClose)
 		{
 			args.push(self.parse_expr()?);
 			
-			if self.parser.next_is(0, TokenKind::ParenClose)
+			if self.parser.next_is(0, syntax::TokenKind::ParenClose)
 				{ break; }
 				
-			self.parser.expect(TokenKind::Comma)?;
+			self.parser.expect(syntax::TokenKind::Comma)?;
 		}
 		
-		let tk_close = self.parser.expect(TokenKind::ParenClose)?;
+		let tk_close = self.parser.expect(syntax::TokenKind::ParenClose)?;
 		
-		Ok(Expression::Call(leaf.span().join(&tk_close.span), Box::new(leaf), args))
+		Ok(expr::Expr::Call(leaf.span().join(&tk_close.span), Box::new(leaf), args))
 	}
 	
 	
-	fn parse_leaf(&mut self) -> Result<Expression, ()>
+	fn parse_leaf(&mut self) -> Result<expr::Expr, ()>
 	{
-		if self.parser.next_is(0, TokenKind::BraceOpen)
+		if self.parser.next_is(0, syntax::TokenKind::BraceOpen)
 			{ self.parse_block() }
 	
-		else if self.parser.next_is(0, TokenKind::ParenOpen)
+		else if self.parser.next_is(0, syntax::TokenKind::ParenOpen)
 			{ self.parse_parenthesized() }
 	
-		else if self.parser.next_is(0, TokenKind::Identifier)
+		else if self.parser.next_is(0, syntax::TokenKind::Identifier)
 			{ self.parse_variable() }
 			
-		else if self.parser.next_is(0, TokenKind::Dot)
+		else if self.parser.next_is(0, syntax::TokenKind::Dot)
 			{ self.parse_variable() }
 			
-		else if self.parser.next_is(0, TokenKind::Number)
+		else if self.parser.next_is(0, syntax::TokenKind::Number)
 			{ self.parse_number() }
 			
 		else
@@ -371,45 +401,45 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	}
 	
 	
-	fn parse_block(&mut self) -> Result<Expression, ()>
+	fn parse_block(&mut self) -> Result<expr::Expr, ()>
 	{
-		let tk_open = self.parser.expect(TokenKind::BraceOpen)?;
+		let tk_open = self.parser.expect(syntax::TokenKind::BraceOpen)?;
 		
 		let mut exprs = Vec::new();
-		while !self.parser.next_is(0, TokenKind::BraceClose)
+		while !self.parser.next_is(0, syntax::TokenKind::BraceClose)
 		{
 			exprs.push(self.parse_expr()?);
 			
 			if self.parser.maybe_expect_linebreak().is_some()
 				{ continue; }
 				
-			if self.parser.next_is(0, TokenKind::BraceClose)
+			if self.parser.next_is(0, syntax::TokenKind::BraceClose)
 				{ break; }
 				
-			self.parser.expect(TokenKind::Comma)?;
+			self.parser.expect(syntax::TokenKind::Comma)?;
 		}
 		
-		let tk_close = self.parser.expect(TokenKind::BraceClose)?;
+		let tk_close = self.parser.expect(syntax::TokenKind::BraceClose)?;
 		
-		Ok(Expression::Block(tk_open.span.join(&tk_close.span), exprs))
+		Ok(expr::Expr::Block(tk_open.span.join(&tk_close.span), exprs))
 	}
 	
 	
-	fn parse_parenthesized(&mut self) -> Result<Expression, ()>
+	fn parse_parenthesized(&mut self) -> Result<expr::Expr, ()>
 	{
-		self.parser.expect(TokenKind::ParenOpen)?;
+		self.parser.expect(syntax::TokenKind::ParenOpen)?;
 		let expr = self.parse_expr()?;
-		self.parser.expect(TokenKind::ParenClose)?;
+		self.parser.expect(syntax::TokenKind::ParenClose)?;
 		Ok(expr)
 	}
 	
 	
-	fn parse_variable(&mut self) -> Result<Expression, ()>
+	fn parse_variable(&mut self) -> Result<expr::Expr, ()>
 	{
-		let tk_dot = self.parser.maybe_expect(TokenKind::Dot);
+		let tk_dot = self.parser.maybe_expect(syntax::TokenKind::Dot);
 		let mut name = if tk_dot.is_some() { "." } else { "" }.to_string();
 		
-		let tk_name = self.parser.expect(TokenKind::Identifier)?;
+		let tk_name = self.parser.expect(syntax::TokenKind::Identifier)?;
 		name.push_str(&tk_name.excerpt.clone().unwrap());
 		
 		let expr_span = if let Some(tk_dot) = tk_dot
@@ -417,7 +447,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 		else
 			{ tk_name.span.clone() };
 		
-		let expr_var = Expression::Variable(expr_span.clone(), name.clone());
+		let expr_var = expr::Expr::Variable(expr_span.clone(), name.clone());
 
 		/*if let Some(rule_params) = self.rule_params
 		{
@@ -434,7 +464,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 				if let Some(width) = width
 				{
 					if width > 0
-						{ return Ok(Expression::SoftSlice(expr_span.clone(), expr_span.clone(), width - 1, 0, Box::new(expr_var))); }
+						{ return Ok(expr::Expr::SoftSlice(expr_span.clone(), expr_span.clone(), width - 1, 0, Box::new(expr_var))); }
 				}
 			}
 		}*/
@@ -443,17 +473,17 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	}
 	
 	
-	fn parse_number(&mut self) -> Result<Expression, ()>
+	fn parse_number(&mut self) -> Result<expr::Expr, ()>
 	{
-		let tk_number = self.parser.expect(TokenKind::Number)?;
+		let tk_number = self.parser.expect(syntax::TokenKind::Number)?;
 		let number = tk_number.excerpt.clone().unwrap();
 		
-		let bigint = excerpt_as_bigint(self.parser.report.clone(), &number, &tk_number.span)?;
+		let bigint = syntax::excerpt_as_bigint(self.parser.report.clone(), &number, &tk_number.span)?;
 		
 		let span = tk_number.span;
-		let expr = Expression::Literal(
+		let expr = expr::Expr::Literal(
 			span.clone(),
-			ExpressionValue::Integer(bigint));
+			expr::Value::Integer(bigint));
 
 		Ok(expr)
 	}

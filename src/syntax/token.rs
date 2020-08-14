@@ -47,6 +47,7 @@ pub enum TokenKind
 	VerticalBar,
 	Circumflex,
 	Tilde,
+	Grave,
 	At,
 	AmpersandAmpersand,
 	VerticalBarVerticalBar,
@@ -155,6 +156,7 @@ impl TokenKind
 			TokenKind::Circumflex => "`^`",
 			TokenKind::Tilde => "`~`",
 			TokenKind::At => "`@`",
+			TokenKind::Grave => "```",
 			TokenKind::AmpersandAmpersand => "`&&`",
 			TokenKind::VerticalBarVerticalBar => "`||`",
 			TokenKind::EqualEqual => "`==`",
@@ -213,6 +215,7 @@ impl Token
 			TokenKind::Circumflex => "^",
 			TokenKind::Tilde => "~",
 			TokenKind::At => "@",
+			TokenKind::Grave => "`",
 			TokenKind::AmpersandAmpersand => "&&",
 			TokenKind::VerticalBarVerticalBar => "||",
 			TokenKind::EqualEqual => "==",
@@ -368,7 +371,7 @@ fn check_for_string(src: &[char]) -> Option<(TokenKind, usize)>
 
 fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 {
-	static POSSIBLE_TOKENS: [(&str, TokenKind); 39] =
+	static POSSIBLE_TOKENS: [(&str, TokenKind); 40] =
 	[
 		("\n",  TokenKind::LineBreak),
 		("(",   TokenKind::ParenOpen),
@@ -393,6 +396,7 @@ fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 		("^",   TokenKind::Circumflex),
 		("~",   TokenKind::Tilde),
 		("@",   TokenKind::At),
+		("`",   TokenKind::Grave),
 		("&&",  TokenKind::AmpersandAmpersand),
 		("&",   TokenKind::Ampersand),
 		("||",  TokenKind::VerticalBarVerticalBar),

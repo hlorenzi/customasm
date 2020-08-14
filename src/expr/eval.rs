@@ -1,36 +1,32 @@
-use crate::diagn::{RcReport, Span};
-use super::Expression;
-use super::ExpressionValue;
-use super::UnaryOp;
-use super::BinaryOp;
+use crate::*;
 use std::collections::HashMap;
 
 
-pub struct ExpressionEvalContext
+pub struct EvalContext
 {
-	locals: HashMap<String, ExpressionValue>
+	locals: HashMap<String, expr::Value>
 }
 
 
-impl ExpressionEvalContext
+impl EvalContext
 {
-	pub fn new() -> ExpressionEvalContext
+	pub fn new() -> EvalContext
 	{
-		ExpressionEvalContext
+		EvalContext
 		{
 			locals: HashMap::new()
 		}
 	}
 	
 	
-	pub fn set_local<S>(&mut self, name: S, value: ExpressionValue)
+	pub fn set_local<S>(&mut self, name: S, value: expr::Value)
 	where S: Into<String>
 	{
 		self.locals.insert(name.into(), value);
 	}
 	
 	
-	pub fn get_local(&self, name: &str) -> Result<ExpressionValue, ()>
+	pub fn get_local(&self, name: &str) -> Result<expr::Value, ()>
 	{
 		match self.locals.get(name)
 		{
@@ -41,46 +37,79 @@ impl ExpressionEvalContext
 }
 
 
-impl Expression
+pub struct EvalVariableInfo<'a>
 {
-	pub fn eval<FVar, FFn>(&self, report: RcReport, ctx: &mut ExpressionEvalContext, eval_var: &FVar, eval_fn: &FFn) -> Result<ExpressionValue, ()>
-		where
-		FVar: Fn(RcReport, &str, &Span) -> Result<ExpressionValue, bool>,
-		FFn: Fn(RcReport, usize, Vec<ExpressionValue>, &Span) -> Result<ExpressionValue, bool>
+	report: diagn::RcReport,
+	name: &'a str,
+	span: &'a diagn::Span,
+}
+
+
+pub struct EvalFunctionInfo<'a>
+{
+	report: diagn::RcReport,
+	fn_index: usize,
+	args: Vec<expr::Value>,
+	span: &'a diagn::Span,
+}
+
+
+impl expr::Expr
+{
+	pub fn eval<FVar, FFn>(
+		&self,
+		report: RcReport,
+		ctx: &mut EvalContext,
+		eval_var: &FVar,
+		eval_fn: &FFn)
+		-> Result<expr::Value, ()>
+	where
+		FVar: Fn(&EvalVariableInfo) -> Result<expr::Value, bool>,
+		FFn: Fn(&EvalFunctionInfo) -> Result<expr::Value, bool>
 	{
 		match self
 		{
-			&Expression::Literal(_, ref value) => Ok(value.clone()),
+			&expr::Expr::Literal(_, ref value) => Ok(value.clone()),
 			
-			&Expression::Variable(ref span, ref name) => match ctx.get_local(&name)
+			&expr::Expr::Variable(ref span, ref name) => match ctx.get_local(&name)
 			{
 				Ok(value) => Ok(value),
-				Err(_) => match eval_var(report.clone(), &name, &span)
+				Err(_) =>
 				{
-					Ok(value) => Ok(value),
-					Err(handled) =>
+					let info = EvalVariableInfo
 					{
-						if !handled
-							{ report.error_span("unknown variable", &span); }
-							
-						Err(())
+						report: report.clone(),
+						name,
+						span,
+					};
+
+					match eval_var(&info)
+					{
+						Ok(value) => Ok(value),
+						Err(handled) =>
+						{
+							if !handled
+								{ report.error_span("unknown variable", &span); }
+								
+							Err(())
+						}
 					}
 				}
 			}
 			
-			&Expression::UnaryOp(ref span, _, op, ref inner_expr) =>
+			&expr::Expr::UnaryOp(ref span, _, op, ref inner_expr) =>
 			{
 				match inner_expr.eval(report.clone(), ctx, eval_var, eval_fn)?
 				{
-					ExpressionValue::Integer(ref x) => match op
+					expr::Value::Integer(ref x) => match op
 					{
-						UnaryOp::Neg => Ok(ExpressionValue::make_integer(-x)),
-						UnaryOp::Not => Ok(ExpressionValue::make_integer(!x))
+						expr::UnaryOp::Neg => Ok(expr::Value::make_integer(-x)),
+						expr::UnaryOp::Not => Ok(expr::Value::make_integer(!x))
 					},
 					
-					ExpressionValue::Bool(b) => match op
+					expr::Value::Bool(b) => match op
 					{
-						UnaryOp::Not => Ok(ExpressionValue::Bool(!b)),
+						expr::UnaryOp::Not => Ok(expr::Value::Bool(!b)),
 						_ => Err(report.error_span("invalid argument type to operator", &span))
 					},
 					
@@ -88,35 +117,35 @@ impl Expression
 				}
 			}
 			
-			&Expression::BinaryOp(ref span, ref op_span, op, ref lhs_expr, ref rhs_expr) =>
+			&expr::Expr::BinaryOp(ref span, ref op_span, op, ref lhs_expr, ref rhs_expr) =>
 			{
-				if op == BinaryOp::Assign
+				if op == expr::BinaryOp::Assign
 				{
 					use std::ops::Deref;
 					
 					match lhs_expr.deref()
 					{
-						&Expression::Variable(_, ref name) =>
+						&expr::Expr::Variable(_, ref name) =>
 						{
 							let value = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?;
 							ctx.set_local(name.clone(), value);
-							Ok(ExpressionValue::Void)
+							Ok(expr::Value::Void)
 						}
 						
 						_ => Err(report.error_span("invalid assignment destination", &lhs_expr.span()))
 					}
 				}
 				
-				else if op == BinaryOp::LazyOr || op == BinaryOp::LazyAnd
+				else if op == expr::BinaryOp::LazyOr || op == expr::BinaryOp::LazyAnd
 				{
 					let lhs = lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?;
 					
 					match (op, &lhs)
 					{
-						(BinaryOp::LazyOr,  &ExpressionValue::Bool(true))  => return Ok(lhs),
-						(BinaryOp::LazyAnd, &ExpressionValue::Bool(false)) => return Ok(lhs),
-						(BinaryOp::LazyOr,  &ExpressionValue::Bool(false)) => { }
-						(BinaryOp::LazyAnd, &ExpressionValue::Bool(true))  => { }
+						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(true))  => return Ok(lhs),
+						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(false)) => return Ok(lhs),
+						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(false)) => { }
+						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(true))  => { }
 						_ => return Err(report.error_span("invalid argument type to operator", &lhs_expr.span()))
 					}
 					
@@ -124,10 +153,10 @@ impl Expression
 					
 					match (op, &rhs)
 					{
-						(BinaryOp::LazyOr,  &ExpressionValue::Bool(true))  => Ok(rhs),
-						(BinaryOp::LazyAnd, &ExpressionValue::Bool(false)) => Ok(rhs),
-						(BinaryOp::LazyOr,  &ExpressionValue::Bool(false)) => Ok(rhs),
-						(BinaryOp::LazyAnd, &ExpressionValue::Bool(true))  => Ok(rhs),
+						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(true))  => Ok(rhs),
+						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(false)) => Ok(rhs),
+						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(false)) => Ok(rhs),
+						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(true))  => Ok(rhs),
 						_ => Err(report.error_span("invalid argument type to operator", &rhs_expr.span()))
 					}
 				}
@@ -136,81 +165,75 @@ impl Expression
 				{
 					match (lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?, rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?)
 					{
-						(ExpressionValue::Integer(ref lhs), ExpressionValue::Integer(ref rhs)) =>
+						(expr::Value::Integer(ref lhs), expr::Value::Integer(ref rhs)) =>
 						{
 							match op
 							{
-								BinaryOp::Add => Ok(ExpressionValue::make_integer(lhs + rhs)),
-								BinaryOp::Sub => Ok(ExpressionValue::make_integer(lhs - rhs)),
-								BinaryOp::Mul => Ok(ExpressionValue::make_integer(lhs * rhs)),
+								expr::BinaryOp::Add => Ok(expr::Value::make_integer(lhs + rhs)),
+								expr::BinaryOp::Sub => Ok(expr::Value::make_integer(lhs - rhs)),
+								expr::BinaryOp::Mul => Ok(expr::Value::make_integer(lhs * rhs)),
 								
-								BinaryOp::Div => match lhs.checked_div(rhs)
+								expr::BinaryOp::Div => match lhs.checked_div(rhs)
 								{
-									Some(x) => Ok(ExpressionValue::make_integer(x)),
+									Some(x) => Ok(expr::Value::make_integer(x)),
 									None => Err(report.error_span("division by zero", &op_span.join(&rhs_expr.span())))
 								},
 								
-								BinaryOp::Mod => match lhs.checked_rem(rhs)
+								expr::BinaryOp::Mod => match lhs.checked_rem(rhs)
 								{
-									Some(x) => Ok(ExpressionValue::make_integer(x)),
+									Some(x) => Ok(expr::Value::make_integer(x)),
 									None => Err(report.error_span("modulo by zero", &op_span.join(&rhs_expr.span())))
 								},
 								
-								BinaryOp::Shl => match lhs.checked_shl(rhs)
+								expr::BinaryOp::Shl => match lhs.checked_shl(rhs)
 								{
-									Some(x) => Ok(ExpressionValue::make_integer(x)),
+									Some(x) => Ok(expr::Value::make_integer(x)),
 									None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
 								},
 								
-								BinaryOp::Shr => match lhs.checked_shr(rhs)
+								expr::BinaryOp::Shr => match lhs.checked_shr(rhs)
 								{
-									Some(x) => Ok(ExpressionValue::make_integer(x)),
+									Some(x) => Ok(expr::Value::make_integer(x)),
 									None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
 								},
 								
-								BinaryOp::And  => Ok(ExpressionValue::make_integer(lhs & rhs)),
-								BinaryOp::Or   => Ok(ExpressionValue::make_integer(lhs | rhs)),
-								BinaryOp::Xor  => Ok(ExpressionValue::make_integer(lhs ^ rhs)),
-								BinaryOp::Eq   => Ok(ExpressionValue::Bool(lhs == rhs)),
-								BinaryOp::Ne   => Ok(ExpressionValue::Bool(lhs != rhs)),
-								BinaryOp::Lt   => Ok(ExpressionValue::Bool(lhs <  rhs)),
-								BinaryOp::Le   => Ok(ExpressionValue::Bool(lhs <= rhs)),
-								BinaryOp::Gt   => Ok(ExpressionValue::Bool(lhs >  rhs)),
-								BinaryOp::Ge   => Ok(ExpressionValue::Bool(lhs >= rhs)),
+								expr::BinaryOp::And  => Ok(expr::Value::make_integer(lhs & rhs)),
+								expr::BinaryOp::Or   => Ok(expr::Value::make_integer(lhs | rhs)),
+								expr::BinaryOp::Xor  => Ok(expr::Value::make_integer(lhs ^ rhs)),
+								expr::BinaryOp::Eq   => Ok(expr::Value::Bool(lhs == rhs)),
+								expr::BinaryOp::Ne   => Ok(expr::Value::Bool(lhs != rhs)),
+								expr::BinaryOp::Lt   => Ok(expr::Value::Bool(lhs <  rhs)),
+								expr::BinaryOp::Le   => Ok(expr::Value::Bool(lhs <= rhs)),
+								expr::BinaryOp::Gt   => Ok(expr::Value::Bool(lhs >  rhs)),
+								expr::BinaryOp::Ge   => Ok(expr::Value::Bool(lhs >= rhs)),
 								
-								BinaryOp::Concat =>
+								expr::BinaryOp::Concat =>
 								{
 									// FIXME: wrongly evaluates lhs and rhs again, with possible duplicated side-effects
-									let lhs_sliced = lhs_expr.eval_slice(report.clone(), ctx, eval_var, eval_fn)?;
-									let rhs_sliced = rhs_expr.eval_slice(report.clone(), ctx, eval_var, eval_fn)?;
+									//let lhs_sliced = lhs_expr.eval_slice(report.clone(), ctx, eval_var, eval_fn)?;
+									//let rhs_sliced = rhs_expr.eval_slice(report.clone(), ctx, eval_var, eval_fn)?;
 
-									let (lhs_sliced, rhs_sliced) = match (lhs_sliced, rhs_sliced)
+									match (lhs.size, rhs.size)
 									{
-										(ExpressionValue::Integer(lhs), ExpressionValue::Integer(rhs)) => (lhs, rhs),
-										_ => unreachable!()
-									};
-
-									match (lhs_expr.width(), rhs_expr.width())
-									{
-										(Some(lhs_width), Some(rhs_width)) => Ok(ExpressionValue::make_integer(lhs_sliced.concat((lhs_width - 1, 0), &rhs_sliced, (rhs_width - 1, 0)))),
+										(Some(lhs_width), Some(rhs_width)) => Ok(expr::Value::make_integer(lhs.concat((lhs_width - 1, 0), &rhs, (rhs_width - 1, 0)))),
 										(None, _) => Err(report.error_span("argument to concatenation with no known width", &lhs_expr.span())),
 										(_, None) => Err(report.error_span("argument to concatenation with no known width", &rhs_expr.span()))
-									}							
+									}
 								}
 
 								_ => Err(report.error_span("invalid argument types to operator", &span))
 							}
 						}
 						
-						(ExpressionValue::Bool(lhs), ExpressionValue::Bool(rhs)) =>
+						(expr::Value::Bool(lhs), expr::Value::Bool(rhs)) =>
 						{
 							match op
 							{
-								BinaryOp::And => Ok(ExpressionValue::Bool(lhs & rhs)),
-								BinaryOp::Or  => Ok(ExpressionValue::Bool(lhs | rhs)),
-								BinaryOp::Xor => Ok(ExpressionValue::Bool(lhs ^ rhs)),
-								BinaryOp::Eq  => Ok(ExpressionValue::Bool(lhs == rhs)),
-								BinaryOp::Ne  => Ok(ExpressionValue::Bool(lhs != rhs)),
+								expr::BinaryOp::And => Ok(expr::Value::Bool(lhs & rhs)),
+								expr::BinaryOp::Or  => Ok(expr::Value::Bool(lhs | rhs)),
+								expr::BinaryOp::Xor => Ok(expr::Value::Bool(lhs ^ rhs)),
+								expr::BinaryOp::Eq  => Ok(expr::Value::Bool(lhs == rhs)),
+								expr::BinaryOp::Ne  => Ok(expr::Value::Bool(lhs != rhs)),
 								_ => Err(report.error_span("invalid argument types to operator", &span))
 							}
 						}
@@ -220,33 +243,33 @@ impl Expression
 				}
 			}
 			
-			&Expression::TernaryOp(_, ref cond, ref true_branch, ref false_branch) =>
+			&expr::Expr::TernaryOp(_, ref cond, ref true_branch, ref false_branch) =>
 			{
 				match cond.eval(report.clone(), ctx, eval_var, eval_fn)?
 				{
-					ExpressionValue::Bool(true)  => true_branch.eval(report.clone(), ctx, eval_var, eval_fn),
-					ExpressionValue::Bool(false) => false_branch.eval(report.clone(), ctx, eval_var, eval_fn),
+					expr::Value::Bool(true)  => true_branch.eval(report.clone(), ctx, eval_var, eval_fn),
+					expr::Value::Bool(false) => false_branch.eval(report.clone(), ctx, eval_var, eval_fn),
 					_ => Err(report.error_span("invalid condition type", &cond.span()))
 				}
 			}
 			
-			&Expression::BitSlice(ref span, _, left, right, ref inner) =>
+			&expr::Expr::BitSlice(ref span, _, left, right, ref inner) =>
 			{
 				match inner.eval(report.clone(), ctx, eval_var, eval_fn)?
 				{
-					ExpressionValue::Integer(ref x) => Ok(ExpressionValue::make_integer(x.slice(left, right))),
+					expr::Value::Integer(ref x) => Ok(expr::Value::make_integer(x.slice(left, right))),
 					_ => Err(report.error_span("invalid argument type to slice", &span))
 				}
 			}
 			
-			&Expression::SoftSlice(_, _, _, _, ref inner) =>
+			&expr::Expr::SoftSlice(_, _, _, _, ref inner) =>
 			{
 				inner.eval(report, ctx, eval_var, eval_fn)
 			}
 			
-			&Expression::Block(_, ref exprs) =>
+			&expr::Expr::Block(_, ref exprs) =>
 			{
-				let mut result = ExpressionValue::Void;
+				let mut result = expr::Value::Void;
 				
 				for expr in exprs
 					{ result = expr.eval(report.clone(), ctx, eval_var, eval_fn)?; }
@@ -254,17 +277,25 @@ impl Expression
 				Ok(result)
 			}
 			
-			&Expression::Call(ref span, ref target, ref arg_exprs) =>
+			&expr::Expr::Call(ref span, ref target, ref arg_exprs) =>
 			{
 				match target.eval(report.clone(), ctx, eval_var, eval_fn)?
 				{
-					ExpressionValue::Function(id) =>
+					expr::Value::Function(id) =>
 					{
 						let mut args = Vec::new();
 						for expr in arg_exprs
 							{ args.push(expr.eval(report.clone(), ctx, eval_var, eval_fn)?); }
+
+						let info = EvalFunctionInfo
+						{
+							report: report.clone(),
+							fn_index: id,
+							args,
+							span,
+						};
 							
-						match eval_fn(report, id, args, &span)
+						match eval_fn(&info)
 						{
 							Ok(value) => Ok(value),
 							Err(_handled) => Err(())
@@ -278,35 +309,35 @@ impl Expression
 	}
 
 
-	pub fn eval_slice<FVar, FFn>(&self, report: RcReport, ctx: &mut ExpressionEvalContext, eval_var: &FVar, eval_fn: &FFn) -> Result<ExpressionValue, ()>
+	/*pub fn eval_slice<FVar, FFn>(&self, report: RcReport, ctx: &mut ExpressionEvalContext, eval_var: &FVar, eval_fn: &FFn) -> Result<expr::Value, ()>
 		where
-		FVar: Fn(RcReport, &str, &Span) -> Result<ExpressionValue, bool>,
-		FFn: Fn(RcReport, usize, Vec<ExpressionValue>, &Span) -> Result<ExpressionValue, bool>
+		FVar: Fn(RcReport, &str, &Span) -> Result<expr::Value, bool>,
+		FFn: Fn(RcReport, usize, Vec<expr::Value>, &Span) -> Result<expr::Value, bool>
 	{
 		match self
 		{
-			&Expression::SoftSlice(ref span, _, left, right, ref inner) =>
+			&expr::Expr::SoftSlice(ref span, _, left, right, ref inner) =>
 			{
 				match inner.eval(report.clone(), ctx, eval_var, eval_fn)?
 				{
-					ExpressionValue::Integer(ref x) => Ok(ExpressionValue::make_integer(x.slice(left, right))),
+					expr::Value::Integer(ref x) => Ok(expr::Value::make_integer(x.slice(left, right))),
 					_ => Err(report.error_span("invalid argument type to slice", &span))
 				}
 			}
 
 			_ => self.eval(report, ctx, eval_var, eval_fn)
 		}
-	}
+	}*/
 }
 
 
-impl ExpressionValue
+impl expr::Value
 {
-	pub fn bits(&self) -> usize
+	pub fn min_size(&self) -> usize
 	{
 		match &self
 		{
-			&ExpressionValue::Integer(bigint) => bigint.min_size(),
+			&expr::Value::Integer(bigint) => bigint.min_size(),
 			_ => panic!("not an integer")
 		}
 	}
@@ -316,7 +347,7 @@ impl ExpressionValue
 	{
 		match self
 		{
-			&ExpressionValue::Integer(ref bigint) => bigint.get_bit(index),
+			&expr::Value::Integer(ref bigint) => bigint.get_bit(index),
 			_ => panic!("not an integer")
 		}
 	}

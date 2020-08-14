@@ -7,7 +7,7 @@ pub struct Rule
     pub span: diagn::Span,
     pub pattern: Vec<PatternPart>,
     pub parameters: Vec<PatternParameter>,
-    pub production: expr::Expression,
+    pub production: expr::Expr,
 }
 
 
@@ -31,7 +31,7 @@ pub struct PatternParameter
 pub enum PatternParameterType
 {
     Unspecified,
-    RuleGroup(asm::RuleGroupRef),
+    RuleGroup(asm::RulesetRef),
 }
 
 
@@ -44,7 +44,7 @@ impl Rule
             span: diagn::Span::new_dummy(),
             pattern: Vec::new(),
             parameters: Vec::new(),
-            production: expr::Expression::new_dummy(),
+            production: expr::Expr::new_dummy(),
         }
     }
 	
