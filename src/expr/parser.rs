@@ -436,18 +436,31 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	
 	fn parse_variable(&mut self) -> Result<expr::Expr, ()>
 	{
-		let tk_dot = self.parser.maybe_expect(syntax::TokenKind::Dot);
-		let mut name = if tk_dot.is_some() { "." } else { "" }.to_string();
+		let mut span = diagn::Span::new_dummy();
+		let mut hierarchy_level = 0;
 		
-		let tk_name = self.parser.expect(syntax::TokenKind::Identifier)?;
-		name.push_str(&tk_name.excerpt.clone().unwrap());
+		while let Some(tk_dot) = self.parser.maybe_expect(syntax::TokenKind::Dot)
+		{
+			hierarchy_level += 1;
+			span = span.join(&tk_dot.span);
+		}
+
+		let mut hierarchy = Vec::new();
+
+		loop
+		{
+			let tk_name = self.parser.expect(syntax::TokenKind::Identifier)?;
+			let name = tk_name.excerpt.clone().unwrap();
+			hierarchy.push(name);
+			span = span.join(&tk_name.span);
+
+			if self.parser.maybe_expect(syntax::TokenKind::Dot).is_none()
+			{
+				break;
+			}
+		}
 		
-		let expr_span = if let Some(tk_dot) = tk_dot
-			{ tk_dot.span.join(&tk_name.span) }
-		else
-			{ tk_name.span.clone() };
-		
-		let expr_var = expr::Expr::Variable(expr_span.clone(), name.clone());
+		let expr_var = expr::Expr::Variable(span, hierarchy_level, hierarchy);
 
 		/*if let Some(rule_params) = self.rule_params
 		{

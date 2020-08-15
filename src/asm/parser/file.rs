@@ -41,6 +41,20 @@ pub fn parse_line(state: &mut asm::parser::State)
     {
         parse_directive(state)?;
     }
+    else if state.parser.next_is(0, syntax::TokenKind::Identifier) &&
+        state.parser.next_is(1, syntax::TokenKind::Colon)
+    {
+        asm::parser::parse_symbol(state)?;
+    }
+    else if state.parser.next_is(0, syntax::TokenKind::Identifier) &&
+        state.parser.next_is(1, syntax::TokenKind::Equal)
+    {
+        asm::parser::parse_symbol(state)?;
+    }
+    else if state.parser.next_is(0, syntax::TokenKind::Dot)
+    {
+        asm::parser::parse_symbol(state)?;
+    }
     else if state.parser.maybe_expect_linebreak().is_some()
     {
         return Ok(());

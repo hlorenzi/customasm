@@ -323,21 +323,21 @@ impl<'a> Parser<'a>
 	
 	pub fn next_is(&self, mut nth: usize, kind: TokenKind) -> bool
 	{
-		if self.index >= self.tokens.len()
-		{
-			return false;
-		}
-
 		let mut index = self.index;
 		
 		while nth > 0 && index < self.tokens.len()
 		{
 			nth -= 1;
 			index += 1;
-			while self.tokens[index].kind.ignorable() && index < self.tokens.len()
+			while index < self.tokens.len() && self.tokens[index].kind.ignorable()
 				{ index += 1; }
 		}
 		
+		if index >= self.tokens.len()
+		{
+			return false;
+		}
+
 		self.tokens[index].kind == kind
 	}
 	

@@ -39,18 +39,19 @@ impl EvalContext
 
 pub struct EvalVariableInfo<'a>
 {
-	report: diagn::RcReport,
-	name: &'a str,
-	span: &'a diagn::Span,
+	pub report: diagn::RcReport,
+	pub hierarchy_level: usize,
+	pub hierarchy: &'a Vec<String>,
+	pub span: &'a diagn::Span,
 }
 
 
 pub struct EvalFunctionInfo<'a>
 {
-	report: diagn::RcReport,
-	fn_index: usize,
-	args: Vec<expr::Value>,
-	span: &'a diagn::Span,
+	pub report: diagn::RcReport,
+	pub fn_index: usize,
+	pub args: Vec<expr::Value>,
+	pub span: &'a diagn::Span,
 }
 
 
@@ -71,28 +72,34 @@ impl expr::Expr
 		{
 			&expr::Expr::Literal(_, ref value) => Ok(value.clone()),
 			
-			&expr::Expr::Variable(ref span, ref name) => match ctx.get_local(&name)
+			&expr::Expr::Variable(ref span, hierarchy_level, ref hierarchy) =>
 			{
-				Ok(value) => Ok(value),
-				Err(_) =>
+				if hierarchy_level == 0 && hierarchy.len() == 1
 				{
-					let info = EvalVariableInfo
+					match ctx.get_local(&hierarchy[0])
 					{
-						report: report.clone(),
-						name,
-						span,
-					};
+						Ok(value) => return Ok(value),
+						Err(()) => {}
+					}
+				}
 
-					match eval_var(&info)
+				let info = EvalVariableInfo
+				{
+					report: report.clone(),
+					hierarchy_level,
+					hierarchy,
+					span,
+				};
+
+				match eval_var(&info)
+				{
+					Ok(value) => Ok(value),
+					Err(handled) =>
 					{
-						Ok(value) => Ok(value),
-						Err(handled) =>
-						{
-							if !handled
-								{ report.error_span("unknown variable", &span); }
-								
-							Err(())
-						}
+						if !handled
+							{ report.error_span("unknown variable", &span); }
+							
+						Err(())
 					}
 				}
 			}
@@ -125,11 +132,23 @@ impl expr::Expr
 					
 					match lhs_expr.deref()
 					{
-						&expr::Expr::Variable(_, ref name) =>
+						&expr::Expr::Variable(_, hierarchy_level, ref hierarchy) =>
 						{
-							let value = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?;
-							ctx.set_local(name.clone(), value);
-							Ok(expr::Value::Void)
+							if hierarchy_level == 0 && hierarchy.len() == 1
+							{
+								match ctx.get_local(&hierarchy[0])
+								{
+									Ok(_) =>
+									{
+										let value = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?;
+										ctx.set_local(hierarchy[0].clone(), value);
+										return Ok(expr::Value::Void);
+									}
+									Err(()) => {}
+								}
+							}
+							
+							Err(report.error_span("symbol cannot be assigned to", &lhs_expr.span()))
 						}
 						
 						_ => Err(report.error_span("invalid assignment destination", &lhs_expr.span()))

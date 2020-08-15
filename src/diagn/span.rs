@@ -69,23 +69,21 @@ impl Span
 	
 	pub fn join(&self, other: &Span) -> Span
 	{
-		assert!(self.file == other.file, "joining spans from different files");
-		
-		
-		let location = if self.location.is_none()
-			{ other.location }
+		if self.location.is_none()
+			{ return other.clone(); }
 			
 		else if other.location.is_none()
-			{ self.location }
+			{ return self.clone(); }
 			
-		else
+		assert!(self.file == other.file, "joining spans from different files");
+
+		let location =
 		{
 			use std::cmp::{max, min};
 			let start = min(self.location.unwrap().0, other.location.unwrap().0);
 			let end   = max(self.location.unwrap().1, other.location.unwrap().1);
 			Some((start, end))
 		};
-		
 		
 		Span
 		{

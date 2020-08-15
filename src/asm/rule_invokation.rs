@@ -4,7 +4,7 @@ use crate::*;
 #[derive(Debug)]
 pub struct RuleInvokation
 {
-    pub bit_offset: usize,
+    pub ctx: asm::Context,
     pub candidates: Vec<RuleInvokationCandidate>,
     pub span: diagn::Span,
 }
@@ -22,5 +22,5 @@ pub struct RuleInvokationCandidate
 pub enum RuleInvokationArgument
 {
     Expression(expr::Expr),
-    RuleGroup(Vec<RuleInvokationCandidate>),
+    NestedRule(Vec<RuleInvokationCandidate>),
 }

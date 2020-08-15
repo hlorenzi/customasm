@@ -5,7 +5,7 @@ use crate::*;
 pub enum Expr
 {
 	Literal(diagn::Span, Value),
-	Variable(diagn::Span, String),
+	Variable(diagn::Span, usize, Vec<String>),
 	UnaryOp(diagn::Span, diagn::Span, UnaryOp, Box<Expr>),
 	BinaryOp(diagn::Span, diagn::Span, BinaryOp, Box<Expr>, Box<Expr>),
 	TernaryOp(diagn::Span, Box<Expr>, Box<Expr>, Box<Expr>),

@@ -12,10 +12,10 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
     {
         let rule = state.asm_state.get_rule(candidates[0].rule_ref).unwrap();
         let production_size = rule.production.size().unwrap();
-        let bit_offset = state.asm_state.banks[0].cur_bit_offset;
+        let ctx = state.asm_state.get_ctx();
         state.asm_state.banks[0].rule_invokations.push(asm::RuleInvokation
         {
-            bit_offset,
+            ctx,
             candidates,
             span: subparser.get_full_span(),
         });
@@ -202,7 +202,7 @@ pub fn match_rule(
                         subparser.restore(subcandidates[0].1.save());
                         
                         let subcandidates = subcandidates.into_iter().map(|c| c.0).collect();
-                        candidate.args.push(asm::RuleInvokationArgument::RuleGroup(subcandidates));
+                        candidate.args.push(asm::RuleInvokationArgument::NestedRule(subcandidates));
                     }
                 }
             }
