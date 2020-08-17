@@ -2,6 +2,7 @@ use crate::*;
 use std::collections::HashMap;
 
 
+#[derive(Debug)]
 pub struct SymbolManager
 {
     globals: HashMap<String, Symbol>,
@@ -9,6 +10,7 @@ pub struct SymbolManager
 }
 
 
+#[derive(Debug)]
 pub struct Symbol
 {
     pub value: expr::Value,
@@ -158,7 +160,7 @@ impl SymbolManager
     {
         if hierarchy_level > ctx.hierarchy.len()
         {
-            report.error_span("symbol declaration cannot skip a nesting level", &span);
+            report.error_span("symbol declaration skips a nesting level", &span);
             return Err(());
         }
 
@@ -170,7 +172,7 @@ impl SymbolManager
         if let Some(duplicate) = parent.get(&name)
         {
             let _guard = report.push_parent("duplicate symbol", span);
-            report.error_span("first declared here", &duplicate.decl_span);
+            report.note_span("first declared here", &duplicate.decl_span);
             return Err(());
         }
 

@@ -23,7 +23,7 @@ pub enum Value
 	Integer(util::BigInt),
 	Bool(bool),
 	String(String),
-	Function(usize)
+	Function(String)
 }
 
 

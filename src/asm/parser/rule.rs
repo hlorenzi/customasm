@@ -61,7 +61,7 @@ pub fn parse_rule(
 
     rule.production = expr::Expr::parse(&mut state.parser)?;
 
-    if !rule.production.has_size()
+    /*if !rule.production.has_size()
     {
         state.report.error_span(
             "size of rule production must be known; \
@@ -69,7 +69,7 @@ pub fn parse_rule(
             &rule.production.span());
 
         return Err(());
-    }
+    }*/
 
     Ok(rule)
 }

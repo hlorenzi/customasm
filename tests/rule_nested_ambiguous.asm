@@ -14,6 +14,6 @@
 ; :::
 ld 0xaa ; error: no match
 ; :::
-ld 0xaa$ ; error: ambiguous
+ld 0xaa$ ; error: ambiguous / error: no match
 ; :::
 ld 0xaa$$ ; error: no match

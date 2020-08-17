@@ -10,16 +10,34 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
     let candidates = match_active_rulesets(state, &mut subparser)?;
     if candidates.len() != 0
     {
-        let rule = state.asm_state.get_rule(candidates[0].rule_ref).unwrap();
-        let production_size = rule.production.size().unwrap();
-        let ctx = state.asm_state.get_ctx();
-        state.asm_state.banks[0].rule_invokations.push(asm::RuleInvokation
+        let mut invokation = asm::RuleInvokation
         {
-            ctx,
+            ctx: state.asm_state.get_ctx(),
             candidates,
+            size_guess: 0,
             span: subparser.get_full_span(),
-        });
-        state.asm_state.banks[0].cur_bit_offset += production_size;
+        };
+
+        let resolved = state.asm_state.resolve_rule_invokation(
+            state.report.clone(),
+            &invokation, 
+            false);
+
+        invokation.size_guess = match resolved
+        {
+            Ok(expr::Value::Integer(bigint)) =>
+            {
+                match bigint.size
+                {
+                    Some(size) => size,
+                    None => 0,
+                }
+            }
+            _ => 0
+        };
+
+        state.asm_state.banks[0].cur_bit_offset += invokation.size_guess;
+        state.asm_state.banks[0].rule_invokations.push(invokation);
     }
 
     state.parser.expect_linebreak()?;
@@ -35,10 +53,10 @@ pub fn match_active_rulesets(
 {
     let mut candidates = Vec::new();
 
-    for rule_group_ref in &state.asm_state.active_rule_groups
+    for ruleset_ref in &state.asm_state.active_rulesets
     {
         let mut subparser_clone = subparser.clone();
-        if let Ok(subcandidates) = match_ruleset(state, *rule_group_ref, &mut subparser_clone, true)
+        if let Ok(subcandidates) = match_ruleset(state, *ruleset_ref, &mut subparser_clone, true)
         {
             for candidate in subcandidates
             {
@@ -68,7 +86,7 @@ pub fn match_ruleset<'a>(
     must_consume_all_tokens: bool)
     -> Result<Vec<(asm::RuleInvokationCandidate, syntax::Parser<'a>)>, ()>
 {
-    let rule_group = &state.asm_state.rule_groups[ruleset_ref.index];
+    let rule_group = &state.asm_state.rulesets[ruleset_ref.index];
 
     let mut candidates = Vec::new();
 
@@ -105,7 +123,7 @@ pub fn match_rule(
     subparser: &mut syntax::Parser)
     -> Result<asm::RuleInvokationCandidate, ()>
 {
-    let rule_group = &state.asm_state.rule_groups[rule_ref.ruleset_ref.index];
+    let rule_group = &state.asm_state.rulesets[rule_ref.ruleset_ref.index];
     let rule = &rule_group.rules[rule_ref.index];
 
     let mut candidate = asm::RuleInvokationCandidate
@@ -202,7 +220,7 @@ pub fn match_rule(
                         subparser.restore(subcandidates[0].1.save());
                         
                         let subcandidates = subcandidates.into_iter().map(|c| c.0).collect();
-                        candidate.args.push(asm::RuleInvokationArgument::NestedRule(subcandidates));
+                        candidate.args.push(asm::RuleInvokationArgument::NestedRuleset(subcandidates));
                     }
                 }
             }

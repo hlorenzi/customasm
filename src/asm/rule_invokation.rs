@@ -6,6 +6,7 @@ pub struct RuleInvokation
 {
     pub ctx: asm::Context,
     pub candidates: Vec<RuleInvokationCandidate>,
+    pub size_guess: usize,
     pub span: diagn::Span,
 }
 
@@ -22,5 +23,5 @@ pub struct RuleInvokationCandidate
 pub enum RuleInvokationArgument
 {
     Expression(expr::Expr),
-    NestedRule(Vec<RuleInvokationCandidate>),
+    NestedRuleset(Vec<RuleInvokationCandidate>),
 }

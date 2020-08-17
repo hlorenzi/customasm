@@ -23,6 +23,14 @@ unk ; error: no match
 halt
 unk ; error: no match
 halt
+; :::
+halt
+unk ; error: no match
+halt
+unk ; error: no match
+halt
+unk ; error: no match
+halt
 
 
 

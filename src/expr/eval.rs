@@ -49,7 +49,7 @@ pub struct EvalVariableInfo<'a>
 pub struct EvalFunctionInfo<'a>
 {
 	pub report: diagn::RcReport,
-	pub fn_index: usize,
+	pub func: expr::Value,
 	pub args: Vec<expr::Value>,
 	pub span: &'a diagn::Span,
 }
@@ -235,8 +235,8 @@ impl expr::Expr
 									match (lhs.size, rhs.size)
 									{
 										(Some(lhs_width), Some(rhs_width)) => Ok(expr::Value::make_integer(lhs.concat((lhs_width - 1, 0), &rhs, (rhs_width - 1, 0)))),
-										(None, _) => Err(report.error_span("argument to concatenation with no known width", &lhs_expr.span())),
-										(_, None) => Err(report.error_span("argument to concatenation with no known width", &rhs_expr.span()))
+										(None, _) => Err(report.error_span("argument to concatenation with unspecified size", &lhs_expr.span())),
+										(_, None) => Err(report.error_span("argument to concatenation with unspecified size", &rhs_expr.span()))
 									}
 								}
 
@@ -298,9 +298,11 @@ impl expr::Expr
 			
 			&expr::Expr::Call(ref span, ref target, ref arg_exprs) =>
 			{
-				match target.eval(report.clone(), ctx, eval_var, eval_fn)?
+				let func = target.eval(report.clone(), ctx, eval_var, eval_fn)?;
+
+				match func
 				{
-					expr::Value::Function(id) =>
+					expr::Value::Function(_) =>
 					{
 						let mut args = Vec::new();
 						for expr in arg_exprs
@@ -309,7 +311,7 @@ impl expr::Expr
 						let info = EvalFunctionInfo
 						{
 							report: report.clone(),
-							fn_index: id,
+							func,
 							args,
 							span,
 						};

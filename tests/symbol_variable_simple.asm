@@ -24,6 +24,13 @@ ld val2 ; = 0x5508
 
 ; :::
 
+val2 = val1 + val1 ; error: unknown
+val1 = 2 * 2
+ld val1
+ld val2
+
+; :::
+
 val1 = 2 * 2
 val2 = val1 + val1
 ld val1

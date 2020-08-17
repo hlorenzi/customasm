@@ -29,4 +29,4 @@ ld ; error: no match
 ; :::
 ld 0xaa+; error: no match
 ; :::
-ld x ; error: failed to resolve
+ld x ; error: unknown

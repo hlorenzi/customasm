@@ -6,12 +6,14 @@ use std::cell::RefCell;
 use std::io::Write;
 
 
-const C_DEFAULT:  &'static str = "\u{1B}[0m";
-const C_LOCATION: &'static str = "\u{1B}[0m\u{1B}[90m";
-const C_ERROR:    &'static str = "\u{1B}[0m\u{1B}[91m";
-const C_WARNING:  &'static str = "\u{1B}[0m\u{1B}[93m";
-const C_LINENUM:  &'static str = "\u{1B}[0m\u{1B}[90m";
-const C_SRC:      &'static str = "\u{1B}[0m\u{1B}[97m"; //"
+const C_DEFAULT:  &'static str = "\u{001b}[0m";
+const C_LOCATION: &'static str = "\u{001b}[90m";
+const C_ERROR:    &'static str = "\u{001b}[91m";
+const C_WARNING:  &'static str = "\u{001b}[93m";
+const C_NOTE:     &'static str = "\u{001b}[96m";
+const C_LINENUM:  &'static str = "\u{001b}[90m";
+const C_SRC:      &'static str = "\u{001b}[97m";
+const C_BOLD:     &'static str = "\u{001b}[1m";
 
 
 pub struct Report
@@ -21,6 +23,7 @@ pub struct Report
 }
 
 
+#[derive(Clone)]
 struct Message
 {
 	pub descr: String,
@@ -30,11 +33,12 @@ struct Message
 }
 
 
-#[derive(Copy, Clone)]
-enum MessageKind
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub enum MessageKind
 {
 	Error,
-	Warning
+	Warning,
+	Note,
 }
 
 
@@ -60,6 +64,12 @@ impl Report
 			messages: Vec::new(),
 			parents: Vec::new()
 		}
+	}
+
+
+	fn transfer(&mut self, other: &mut Report)
+	{
+		other.messages.extend(self.messages.iter().cloned());
 	}
 	
 	
@@ -104,6 +114,22 @@ impl Report
 	}
 	
 	
+	pub fn note<S>(&mut self, descr: S)
+	where S: Into<String>
+	{
+		let msg = Message{ descr: descr.into(), kind: MessageKind::Note, span: None, inner: None };
+		self.message(msg);
+	}
+	
+	
+	pub fn note_span<S>(&mut self, descr: S, span: &Span)
+	where S: Into<String>
+	{
+		let msg = Message{ descr: descr.into(), kind: MessageKind::Note, span: Some(span.clone()), inner: None };
+		self.message(msg);
+	}
+	
+	
 	pub fn push_parent<S>(&mut self, descr: S, span: &Span)
 	where S: Into<String>
 	{
@@ -115,6 +141,12 @@ impl Report
 	pub fn pop_parent(&mut self)
 	{
 		self.parents.pop();
+	}
+	
+	
+	pub fn len(&self) -> usize
+	{
+		self.messages.len()
 	}
 	
 	
@@ -130,11 +162,23 @@ impl Report
 	}
 	
 	
+	pub fn has_message_at(&self, fileserver: &dyn FileServer, filename: &str, kind: MessageKind, line: usize, error_excerpt: &str) -> bool
+	{
+		for msg in &self.messages
+		{
+			if self.msg_has_error_at(msg, fileserver, filename, kind, line, error_excerpt)
+				{ return true; }
+		}
+		
+		false
+	}
+	
+	
 	pub fn has_error_at(&self, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
 	{
 		for msg in &self.messages
 		{
-			if self.msg_has_error_at(msg, fileserver, filename, line, error_excerpt)
+			if self.msg_has_error_at(msg, fileserver, filename, MessageKind::Error, line, error_excerpt)
 				{ return true; }
 		}
 		
@@ -147,15 +191,15 @@ impl Report
 		if self.messages.len() == 0
 			{ return false; }
 			
-		self.msg_has_error_at(&self.messages[0], fileserver, filename, line, error_excerpt)
+		self.msg_has_error_at(&self.messages[0], fileserver, filename, MessageKind::Error, line, error_excerpt)
 	}
 	
 	
-	fn msg_has_error_at(&self, msg: &Message, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	fn msg_has_error_at(&self, msg: &Message, fileserver: &dyn FileServer, filename: &str, kind: MessageKind, line: usize, error_excerpt: &str) -> bool
 	{
 		match msg.inner
 		{
-			Some(ref inner) => match self.msg_has_error_at(&inner, fileserver, filename, line, error_excerpt)
+			Some(ref inner) => match self.msg_has_error_at(&inner, fileserver, filename, kind, line, error_excerpt)
 			{
 				true => return true,
 				false => { }
@@ -163,6 +207,9 @@ impl Report
 			
 			None => { }
 		}
+
+		if msg.kind != kind
+			{ return false; }
 	
 		if !msg.descr.contains(error_excerpt)
 			{ return false; }
@@ -207,58 +254,22 @@ impl Report
 		let kind_label = msg.kind.get_label();
 		let highlight_color = msg.kind.get_color();
 		
-		match msg.span
+		//self.print_indent(writer, indent);
+		write!(writer, "{}", C_LOCATION).unwrap();
+		if indent > 0
 		{
-			None =>
-			{
-				// Print description without location information.
-				write!(writer, "{}", highlight_color).unwrap();
-				writeln!(writer, "{}: {}", kind_label, msg.descr).unwrap();
-				write!(writer, "{}", C_DEFAULT).unwrap();
-			}
-			
-			Some(ref span) =>
-			{
-				match span.location
-				{
-					None =>
-					{
-						// Print description with filename but without position information.
-						self.print_indent(writer, indent);
-						write!(writer, "{}", C_LOCATION).unwrap();
-						writeln!(writer, "{}:", *span.file).unwrap();
-						write!(writer, "{}", highlight_color).unwrap();
-						writeln!(writer, "{}: {}", kind_label, msg.descr).unwrap();
-						write!(writer, "{}", C_DEFAULT).unwrap();
-					}
-					
-					Some((start, end)) =>
-					{
-						// Print location information.
-						let chars = fileserver.get_chars(RcReport::new(), &*span.file, None).ok().unwrap();
-						let counter = CharCounter::new(&chars);
-						
-						let (line1, col1) = counter.get_line_column_at_index(start);
-						let (line2, col2) = counter.get_line_column_at_index(end);
-						
-						self.print_indent(writer, indent);
-						write!(writer, "{}", C_LOCATION).unwrap();
-						writeln!(writer, "{}:{}:{} {}:{}:",
-							*span.file,
-							line1 + 1, col1 + 1,
-							line2 + 1, col2 + 1).unwrap();
-							
-						self.print_indent(writer, indent);
-						write!(writer, "{}", highlight_color).unwrap();
-						writeln!(writer, "{}: {}", kind_label, msg.descr).unwrap();
-						write!(writer, "{}", C_DEFAULT).unwrap();
-						
-						// Print annotated source code.
-						self.print_msg_src(writer, &counter, msg.kind.get_color(), line1, col1, line2, col2, indent);
-					}
-				}
-			}
+			write!(writer, " === ").unwrap();
 		}
+		else
+		{
+			write!(writer, "{}", C_BOLD).unwrap();
+		}
+
+		write!(writer, "{}", highlight_color).unwrap();
+		writeln!(writer, "{}: {}", kind_label, msg.descr).unwrap();
+		write!(writer, "{}", C_DEFAULT).unwrap();
+
+		self.print_msg_src(writer, fileserver, msg, 0);
 		
 		match msg.inner
 		{
@@ -275,8 +286,49 @@ impl Report
 	}
 	
 	
-	fn print_msg_src(&self, writer: &mut dyn Write, counter: &CharCounter, highlight_color: &'static str, line1: usize, col1: usize, line2: usize, col2: usize, indent: usize)
+	fn print_msg_src(
+		&self,
+		writer: &mut dyn Write,
+		fileserver: &dyn FileServer,
+		msg: &Message,
+		indent: usize)
 	{
+		let spans = if msg.span.is_some()
+		{
+			vec![msg.span.as_ref().unwrap()]
+		}
+		else
+		{
+			return;
+		};
+
+		let highlight_color = msg.kind.get_color();
+
+		// Print filename.
+		self.print_indent(writer, indent);
+		write!(writer, "{} --> ", C_LOCATION).unwrap();
+		write!(writer, "{}:", spans[0].file).unwrap();
+		write!(writer, "{}", C_DEFAULT).unwrap();
+
+		if spans[0].location.is_none()
+		{
+			writeln!(writer).unwrap();
+			return;
+		}
+
+		let (start, end) = spans[0].location.unwrap();
+
+		// Print location information.
+		let chars = fileserver.get_chars(RcReport::new(), &spans[0].file, None).ok().unwrap();
+		let counter = CharCounter::new(&chars);
+		
+		let (line1, col1) = counter.get_line_column_at_index(start);
+		let (line2, col2) = counter.get_line_column_at_index(end);
+
+		write!(writer, "{}", C_LOCATION).unwrap();
+		writeln!(writer, "{}:{}:", line1 + 1, col1 + 1).unwrap();
+		
+
 		let first_line = if (line1 as isize - 2) < 0
 			{ 0 }
 		else
@@ -289,12 +341,14 @@ impl Report
 			{ line2 + 3 };
 		
 		
+		let line_max_width = 1 + format!("{}", std::cmp::max(first_line, last_line)).len();
+
 		// Print annotated source lines.
 		for line in first_line..last_line
 		{
 			self.print_indent(writer, indent);
 			write!(writer, "{}", C_LINENUM).unwrap();
-			write!(writer, "{:4} | ", line + 1).unwrap();
+			write!(writer, "{:>1$} | ", line + 1, line_max_width).unwrap();
 			write!(writer, "{}", C_SRC).unwrap();
 			
 			let line_pos = counter.get_index_range_of_line(line);
@@ -324,7 +378,7 @@ impl Report
 			{
 				self.print_indent(writer, indent);
 				write!(writer, "{}", C_LINENUM).unwrap();
-				write!(writer, "     | ").unwrap();
+				write!(writer, "{:>1$} | ", "", line_max_width).unwrap();
 				write!(writer, "{}", highlight_color).unwrap();
 				
 				for p in 0..(excerpt.len() + 1)
@@ -358,6 +412,12 @@ impl RcReport
 	pub fn new() -> RcReport
 	{
 		RcReport { report: Rc::new(RefCell::new(Report::new())) }
+	}
+
+
+	pub fn transfer(&self, other: RcReport)
+	{
+		self.report.borrow_mut().transfer(&mut other.report.borrow_mut());
 	}
 
 
@@ -395,6 +455,20 @@ impl RcReport
 	}
 	
 	
+	pub fn note<S>(&self, descr: S)
+	where S: Into<String>
+	{
+		self.report.borrow_mut().note(descr);
+	}
+	
+	
+	pub fn note_span<S>(&self, descr: S, span: &Span)
+	where S: Into<String>
+	{
+		self.report.borrow_mut().note_span(descr, span);
+	}
+	
+	
 	pub fn push_parent<S>(&self, descr: S, span: &Span) -> ReportParentGuard
 	where S: Into<String>
 	{
@@ -421,6 +495,18 @@ impl RcReport
 	pub fn has_errors(&self) -> bool
 	{
 		self.report.borrow_mut().has_errors()
+	}
+	
+	
+	pub fn len(&self) -> usize
+	{
+		self.report.borrow().len()
+	}
+	
+	
+	pub fn has_message_at(&self, fileserver: &dyn FileServer, filename: &str, kind: MessageKind, line: usize, error_excerpt: &str) -> bool
+	{
+		self.report.borrow_mut().has_message_at(fileserver, filename, kind, line, error_excerpt)
 	}
 	
 	
@@ -459,7 +545,8 @@ impl MessageKind
 		match self
 		{
 			&MessageKind::Error => "error",
-			&MessageKind::Warning => "warning"
+			&MessageKind::Warning => "warning",
+			&MessageKind::Note => "note",
 		}
 	}
 	
@@ -469,7 +556,8 @@ impl MessageKind
 		match self
 		{
 			&MessageKind::Error => C_ERROR,
-			&MessageKind::Warning => C_WARNING
+			&MessageKind::Warning => C_WARNING,
+			&MessageKind::Note => C_NOTE,
 		}
 	}
 }

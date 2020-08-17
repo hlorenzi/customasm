@@ -9,6 +9,7 @@ mod symbol;
 pub mod parser;
 
 
+pub use self::state::Assembler;
 pub use self::state::State;
 pub use self::state::Context;
 pub use self::state::RulesetRef;

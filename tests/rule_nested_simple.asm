@@ -29,4 +29,18 @@ ld a 0xaa; error: no match
 ; :::
 ld c, 0xaa ; error: no match
 ; :::
-ld a, x ; error: failed to resolve
+ld a, x ; error: unknown
+
+; ===========
+; ::: include
+; :::
+
+#subruledef inner
+{
+    a => 0x11
+}
+
+#ruledef test
+{
+    ld {reg: unk} => 0x55 @ reg`8 ; error: unknown
+}

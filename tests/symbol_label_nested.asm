@@ -171,6 +171,11 @@ global1:
 
 ; :::
 
+.local1: ; error: nesting level
+    ld .local1
+
+; :::
+
 global1:
 .local1:
 ..local2 ; error: expected `:`

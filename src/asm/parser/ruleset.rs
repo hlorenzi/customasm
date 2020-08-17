@@ -25,7 +25,7 @@ pub fn parse_directive_ruledef(
 
     state.parser.expect(syntax::TokenKind::BraceClose)?;
 
-    state.asm_state.rule_groups.push(ruleset);
+    state.asm_state.rulesets.push(ruleset);
 
     if enable
     {

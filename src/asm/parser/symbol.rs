@@ -27,7 +27,8 @@ pub fn parse_symbol(
             state.report.clone(),
             &expr,
             &ctx,
-            &mut expr::EvalContext::new())?;
+            &mut expr::EvalContext::new(),
+            true)?;
 
         state.parser.expect_linebreak()?;
         value
