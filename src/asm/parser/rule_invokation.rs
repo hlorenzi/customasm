@@ -162,39 +162,53 @@ pub fn match_rule(
                     asm::PatternParameterType::Unspecified =>
                     {
                         //println!("> try match expr");
-
-                        let mut expr_parser = subparser.clone();
-                        let mut expr_using_slice = false;
-
-                        let next_part = rule.pattern.get(index + 1);
-
-                        if let Some(asm::PatternPart::Exact(next_part_char)) = next_part
+                        if subparser.is_at_partial()
                         {
-                            if let Some(slice_parser) = subparser.slice_until_char_or_nesting(*next_part_char)
+                            match subparser.maybe_expect_partial_usize()
                             {
-                                expr_parser = slice_parser;
-                                expr_using_slice = true;
+                                Some(value) =>
+                                {
+                                    let expr = expr::Value::make_integer(value).make_literal();
+                                    candidate.args.push(asm::RuleInvokationArgument::Expression(expr));
+                                }
+                                None => return Err(())
                             }
                         }
-
-                        //println!(
-                        //    ">> parse argument expr with parser at `{}`",
-                        //    state.fileserver.get_excerpt(&expr_parser.get_next_spans(10)));
-
-                        let expr = expr::Expr::parse(&mut expr_parser)?;
-                        candidate.args.push(asm::RuleInvokationArgument::Expression(expr));
-
-                        if !expr_using_slice
+                        else
                         {
-                            subparser.restore(expr_parser.save());
-                        }
+                            let mut expr_parser = subparser.clone();
+                            let mut expr_using_slice = false;
 
-                        //println!(
-                        //    ">> continue with parser at {} = `{}`",
-                        //    subparser.get_current_token_index(),
-                        //    state.fileserver.get_excerpt(&subparser.get_next_spans(10)));
-                            
-                        //println!("> match!");
+                            let next_part = rule.pattern.get(index + 1);
+
+                            if let Some(asm::PatternPart::Exact(next_part_char)) = next_part
+                            {
+                                if let Some(slice_parser) = subparser.slice_until_char_or_nesting(*next_part_char)
+                                {
+                                    expr_parser = slice_parser;
+                                    expr_using_slice = true;
+                                }
+                            }
+
+                            //println!(
+                            //    ">> parse argument expr with parser at `{}`",
+                            //    state.fileserver.get_excerpt(&expr_parser.get_next_spans(10)));
+
+                            let expr = expr::Expr::parse(&mut expr_parser)?;
+                            candidate.args.push(asm::RuleInvokationArgument::Expression(expr));
+
+                            if !expr_using_slice
+                            {
+                                subparser.restore(expr_parser.save());
+                            }
+
+                            //println!(
+                            //    ">> continue with parser at {} = `{}`",
+                            //    subparser.get_current_token_index(),
+                            //    state.fileserver.get_excerpt(&subparser.get_next_spans(10)));
+                                
+                            //println!("> match!");
+                        }
                     }
 
                     asm::PatternParameterType::RuleGroup(rule_group_ref)=>
