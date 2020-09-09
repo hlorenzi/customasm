@@ -1,5 +1,5 @@
 unstable_features = true
 brace_style = "AlwaysNextLine"
 control_brace_style = "AlwaysNextLine"
-blank_lines_lower_bound = 2
+blank_lines_lower_bound = 0
 blank_lines_upper_bound = 2

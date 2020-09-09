@@ -415,7 +415,7 @@ impl RcReport
 	}
 
 
-	pub fn transfer(&self, other: RcReport)
+	pub fn transfer_to(&self, other: RcReport)
 	{
 		self.report.borrow_mut().transfer(&mut other.report.borrow_mut());
 	}

@@ -1,0 +1,85 @@
+; ::: include
+
+#ruledef test
+{
+    loop => 0x5555 @ $`16
+}
+
+; :::
+
+#bankdef test
+{
+    #addr 0x8000
+}
+
+loop
+loop
+loop
+loop
+ ; = 0x55558000
+ ; = 0x55558004
+ ; = 0x55558008
+ ; = 0x5555800c
+
+; :::
+
+#bankdef a
+{
+    #addr 0xaa00
+    #outp 0x0000
+}
+
+#bankdef b
+{
+    #addr 0xbb00
+    #outp 0x0010
+}
+
+loop
+loop
+#bank a
+loop
+loop
+#bank b
+loop
+loop
+#bank a
+loop
+loop
+; = 0x5555aa00
+; = 0x5555aa04
+; = 0x5555aa08
+; = 0x5555aa0c
+; = 0x5555bb00
+; = 0x5555bb04
+; = 0x5555bb08
+; = 0x5555bb0c
+
+; :::
+
+#bankdef a
+{
+    #unk 0x0000 ; error: unknown
+}
+; :::
+
+#bankdef a
+{
+    #outp -0x8000 ; error: valid range
+}
+
+; :::
+
+#bankdef a
+{
+    #outp 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff ; error: valid range
+}
+
+; :::
+
+#bankdef a
+{
+    #addr 0x8000
+}
+
+#bank c ; error: unknown

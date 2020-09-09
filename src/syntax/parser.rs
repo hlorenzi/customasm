@@ -421,6 +421,23 @@ impl<'a> Parser<'a>
 	}
 	
 	
+	pub fn expect_linebreak_or(&mut self, kind: TokenKind) -> Result<(), ()>
+	{
+		if self.maybe_expect(kind).is_some()
+			{ Ok(()) }
+		else if self.maybe_expect_linebreak().is_some()
+			{ Ok(()) }
+		else
+		{
+			if let Some(ref report) = self.report
+			{
+				report.error_span("expected line break", &self.tokens[self.index_prev].span.after());
+			}
+			Err(())
+		}
+	}
+	
+	
 	pub fn expect_usize(&mut self) -> Result<(Token, usize), ()>
 	{
 		let tk = self.expect(TokenKind::Number)?;

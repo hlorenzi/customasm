@@ -11,10 +11,12 @@ pub struct Assembler
 pub struct State
 {
 	pub banks: Vec<asm::Bank>,
+	pub bankdata: Vec<asm::BankData>,
 	pub symbols: asm::SymbolManager,
 	pub symbol_guesses: asm::SymbolManager,
 	pub rulesets: Vec<asm::Ruleset>,
 	pub active_rulesets: Vec<RulesetRef>,
+	pub cur_bank: BankRef,
 }
 
 
@@ -22,7 +24,15 @@ pub struct State
 pub struct Context
 {
 	pub bit_offset: usize,
+	pub bank_ref: BankRef,
 	pub symbol_ctx: asm::SymbolContext,
+}
+
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct BankRef
+{
+	pub index: usize,
 }
 
 
@@ -66,7 +76,7 @@ impl Assembler
         report: diagn::RcReport,
 		fileserver: &dyn util::FileServer,
 		max_iterations: usize)
-        -> Result<(), ()>
+        -> Result<util::BitVec, ()>
 	{
 		let mut symbol_guesses = asm::SymbolManager::new();
 
@@ -94,7 +104,7 @@ impl Assembler
 				
 				if pass_report.has_errors() || result.is_err()
 				{
-					pass_report.transfer(report);
+					pass_report.transfer_to(report);
 					return Err(());
 				}
 			}
@@ -102,19 +112,40 @@ impl Assembler
 			//dbg!(&self.state.symbols);
 			//dbg!(pass_report.has_errors());
 
-			let output = self.state.resolve_bank(
-				pass_report.clone(),
-				&self.state.banks[0]);
+			let mut full_output = util::BitVec::new();
+			let mut all_bankdata_resolved = true;
 
-			if !pass_report.has_errors() && output.is_ok()
+			for bank_index in 0..self.state.banks.len()
 			{
-				pass_report.transfer(report);
-				return Ok(());
+				let bank = &self.state.banks[bank_index];
+				let bankdata = &self.state.bankdata[bank_index];
+
+				let bank_output = self.state.resolve_bankdata(
+					pass_report.clone(),
+					bankdata);
+
+				if pass_report.has_errors() || !bank_output.is_ok()
+				{
+					all_bankdata_resolved = false;
+					break;
+				}
+
+				//println!("output {:?}, {:x}", bank.output_offset, &bank_output.as_ref().unwrap());
+
+				full_output.write_bitvec(
+					bank.output_offset.unwrap(),
+					&bank_output.unwrap());
+			}
+
+			if all_bankdata_resolved
+			{
+				pass_report.transfer_to(report);
+				return Ok(full_output);
 			}
 
 			if iteration > max_iterations
 			{
-				pass_report.transfer(report);
+				pass_report.transfer_to(report);
 				return Err(());				
 			}
 
@@ -131,30 +162,30 @@ impl State
 		let mut state = State
 		{
 			banks: Vec::new(),
+			bankdata: Vec::new(),
 			symbols: asm::SymbolManager::new(),
 			symbol_guesses: asm::SymbolManager::new(),
 			rulesets: Vec::new(),
 			active_rulesets: Vec::new(),
+			cur_bank: BankRef { index: 0 },
 		};
 
-		state.banks.push(asm::Bank
-		{
-			cur_bit_offset: 0,
-			rule_invokations: Vec::new(),
-		});
-		
+		state.create_bank(asm::Bank::new_default());
+
 		state
 	}
 
 
 	pub fn get_ctx(&self) -> Context
 	{
-        let bit_offset = self.banks[0].cur_bit_offset;
+		let bit_offset = self.get_bankdata(self.cur_bank).cur_bit_offset;
+		let bank_ref = self.cur_bank;
 		let symbol_ctx = self.symbols.get_ctx();
 
 		Context
 		{
 			bit_offset,
+			bank_ref,
 			symbol_ctx,
 		}
 	}
@@ -163,7 +194,7 @@ impl State
 	pub fn get_addr(&self, report: diagn::RcReport, ctx: &Context, span: &diagn::Span) -> Result<util::BigInt, ()>
 	{
 		let bits = 8;
-		let _bank = &self.banks[0];
+		let bank = &self.banks[ctx.bank_ref.index];
 		
 		let excess_bits = ctx.bit_offset % bits;
 		if excess_bits != 0
@@ -181,9 +212,65 @@ impl State
 			
 		let addr =
 			&util::BigInt::from(ctx.bit_offset / bits) +
-			&util::BigInt::from(0);
+			&bank.addr;
 		
 		Ok(addr)
+	}
+
+
+	pub fn create_bank(
+		&mut self,
+		bank: asm::Bank)
+	{
+		let bank_ref = BankRef { index: self.banks.len() };
+
+		self.banks.push(bank);
+
+		self.bankdata.push(asm::BankData
+		{
+			bank_ref,
+			cur_bit_offset: 0,
+			rule_invokations: Vec::new(),
+		});
+
+		self.cur_bank = bank_ref;
+	}
+
+
+	pub fn find_bank<TName: std::borrow::Borrow<str>>(
+		&self,
+		name: TName,
+		report: diagn::RcReport,
+		span: &diagn::Span)
+		-> Result<BankRef, ()>
+	{
+		match self.banks.iter().position(|rg| rg.name == name.borrow())
+		{
+			Some(index) => Ok(BankRef{ index }),
+			None =>
+			{
+				report.error_span("unknown bank", span);
+				Err(())
+			}
+		}
+	}
+
+
+	pub fn get_bankdata(
+		&self,
+		bank_ref: BankRef)
+		-> &asm::BankData
+	{
+		&self.bankdata[bank_ref.index]
+	}
+
+
+	pub fn get_bankdata_mut(
+		&mut self,
+		bank_ref: BankRef)
+		-> &mut asm::BankData
+	{
+		&mut self.bankdata[bank_ref.index]
 	}
 
 
@@ -229,10 +316,10 @@ impl State
 	}
 
 
-	pub fn resolve_bank(
+	pub fn resolve_bankdata(
 		&self,
 		report: diagn::RcReport,
-		bank: &asm::Bank)
+		bank: &asm::BankData)
 		-> Result<util::BitVec, ()>
 	{
 		let mut bitvec = util::BitVec::new();
@@ -318,7 +405,7 @@ impl State
 			{
 				Ok(resolved) =>
 				{
-					candidate_report.transfer(report);
+					candidate_report.transfer_to(report);
 					return Ok(resolved);
 				}
 				Err(()) => {}

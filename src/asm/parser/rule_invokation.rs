@@ -36,8 +36,9 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
             _ => 0
         };
 
-        state.asm_state.banks[0].cur_bit_offset += invokation.size_guess;
-        state.asm_state.banks[0].rule_invokations.push(invokation);
+        let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
+        bankdata.cur_bit_offset += invokation.size_guess;
+        bankdata.rule_invokations.push(invokation);
     }
 
     state.parser.expect_linebreak()?;

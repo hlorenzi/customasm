@@ -37,6 +37,15 @@ impl BitVec
     }
 	
 	
+	pub fn write_bitvec(&mut self, index: usize, bitvec: &util::BitVec)
+	{
+        for i in 0..bitvec.len()
+        {
+            self.write(index + i, bitvec.read(i));
+        }
+    }
+	
+	
 	pub fn read(&self, bit_index: usize) -> bool
 	{
 		if bit_index >= self.bits.len()

@@ -148,14 +148,7 @@ pub fn test_subfile(filepath: &str, subfilename: &str)
 	}
 
 	assembler.register_file(subfilename);
-	let output = if assembler.assemble(report.clone(), &mut fileserver, 10).is_ok()
-	{
-        assembler.state.resolve_bank(report.clone(), &assembler.state.banks[0])
-    }
-    else
-    {
-        Err(())
-    };
+	let output = assembler.assemble(report.clone(), &mut fileserver, 10).ok();
 	
 	let mut msgs = Vec::<u8>::new();
 	report.print_all(&mut msgs, &fileserver);
@@ -183,7 +176,7 @@ pub fn test_subfile(filepath: &str, subfilename: &str)
             
         panic!("test failed");
     }
-
+    
     let output = output.unwrap_or(util::BitVec::new());
 
     if format!("{:x}", output) != format!("{:x}", subfile.output)

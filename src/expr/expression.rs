@@ -92,4 +92,14 @@ impl Value
 	{
 		Value::Integer(value.into())
 	}
+
+
+	pub fn get_bigint(&self) -> Option<util::BigInt>
+	{
+		match self
+		{
+			&Value::Integer(ref bigint) => Some(bigint.clone()),
+			_ => None,
+		}
+	}
 }

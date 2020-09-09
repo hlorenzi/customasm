@@ -72,6 +72,13 @@ impl BigInt
     }
 
 
+    pub fn checked_to_usize(&self) -> Option<usize>
+    {
+        use num_traits::ToPrimitive;
+        self.bigint.to_usize()
+    }
+
+
     pub fn checked_div(&self, rhs: &BigInt) -> Option<BigInt>
     {
         self.bigint.checked_div(&rhs.bigint).map(|res| res.into())

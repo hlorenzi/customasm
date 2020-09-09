@@ -78,6 +78,8 @@ pub fn parse_directive(state: &mut asm::parser::State)
 
     match directive.as_ref()
     {
+        "bankdef" => asm::parser::parse_directive_bankdef(state)?,
+        "bank" => asm::parser::parse_directive_bank(state)?,
         "ruledef" => asm::parser::parse_directive_ruledef(state, true)?,
         "subruledef" => asm::parser::parse_directive_ruledef(state, false)?,
         "enable" => asm::parser::parse_directive_enable(state)?,
@@ -89,4 +91,104 @@ pub fn parse_directive(state: &mut asm::parser::State)
     }
 
     state.parser.expect_linebreak()
+}
+
+
+pub fn parse_expr_bigint(state: &mut asm::parser::State) -> Result<util::BigInt, ()>
+{
+    let expr = expr::Expr::parse(&mut state.parser)?;
+    let value = state.asm_state.eval_expr(
+        state.report.clone(),
+        &expr,
+        &state.asm_state.get_ctx(),
+        &mut expr::EvalContext::new(),
+        true)?;
+
+    match value.get_bigint()
+    {
+        Some(bigint) => Ok(bigint),
+        None =>
+        {
+            state.report.error_span("expected integer value", &expr.span());
+            Err(())
+        }
+    }
+}
+
+
+pub fn parse_expr_usize(state: &mut asm::parser::State) -> Result<usize, ()>
+{
+    let expr = expr::Expr::parse(&mut state.parser)?;
+    let value = state.asm_state.eval_expr(
+        state.report.clone(),
+        &expr,
+        &state.asm_state.get_ctx(),
+        &mut expr::EvalContext::new(),
+        true)?;
+
+    match value.get_bigint()
+    {
+        Some(bigint) =>
+        {
+            match bigint.checked_to_usize()
+            {
+                Some(value) => Ok(value),
+                None =>
+                {
+                    state.report.error_span("value is outside of valid range", &expr.span());
+                    Err(())
+                }
+            }
+        }
+        None =>
+        {
+            state.report.error_span("expected integer value", &expr.span());
+            Err(())
+        }
+    }
+}
+
+
+pub fn parse_expr_usize_fn<F>(state: &mut asm::parser::State, func: F) -> Result<usize, ()>
+where F: Fn(usize) -> Option<usize>
+{
+    let expr = expr::Expr::parse(&mut state.parser)?;
+    let value = state.asm_state.eval_expr(
+        state.report.clone(),
+        &expr,
+        &state.asm_state.get_ctx(),
+        &mut expr::EvalContext::new(),
+        true)?;
+
+    match value.get_bigint()
+    {
+        Some(bigint) =>
+        {
+            match bigint.checked_to_usize()
+            {
+                Some(value) =>
+                {
+                    match func(value)
+                    {
+                        Some(value_transf) => Ok(value_transf),
+                        None =>
+                        {
+                            state.report.error_span("value is outside of valid range", &expr.span());
+                            Err(())
+                        }
+                    }
+                }
+                None =>
+                {
+                    state.report.error_span("value is outside of valid range", &expr.span());
+                    Err(())
+                }
+            }
+        }
+        None =>
+        {
+            state.report.error_span("expected integer value", &expr.span());
+            Err(())
+        }
+    }
 }
