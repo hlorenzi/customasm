@@ -17,6 +17,7 @@ pub struct State
 	pub rulesets: Vec<asm::Ruleset>,
 	pub active_rulesets: Vec<RulesetRef>,
 	pub cur_bank: BankRef,
+	pub cur_wordsize: usize,
 }
 
 
@@ -132,8 +133,9 @@ impl Assembler
 
 				//println!("output {:?}, {:x}", bank.output_offset, &bank_output.as_ref().unwrap());
 
+				// FIXME: multiplication by wordsize can overflow
 				full_output.write_bitvec(
-					bank.output_offset.unwrap(),
+					bank.output_offset.unwrap() * bank.wordsize,
 					&bank_output.unwrap());
 			}
 
@@ -168,9 +170,10 @@ impl State
 			rulesets: Vec::new(),
 			active_rulesets: Vec::new(),
 			cur_bank: BankRef { index: 0 },
+			cur_wordsize: 8,
 		};
 
-		state.create_bank(asm::Bank::new_default());
+		state.create_bank(asm::Bank::new_default(), diagn::RcReport::new()).unwrap();
 
 		state
 	}
@@ -212,7 +215,7 @@ impl State
 			
 		let addr =
 			&util::BigInt::from(ctx.bit_offset / bits) +
-			&bank.addr;
+			&bank.addr_start;
 		
 		Ok(addr)
 	}
@@ -220,8 +223,48 @@ impl State
 
 	pub fn create_bank(
 		&mut self,
-		bank: asm::Bank)
+		bank: asm::Bank,
+		report: diagn::RcReport)
+		-> Result<(), ()>
 	{
+		if bank.output_offset.is_some()
+		{
+			for j in 1..self.banks.len()
+			{
+				let other_bank = &self.banks[j];
+
+				if other_bank.output_offset.is_none()
+					{ continue; }
+
+				// FIXME: multiplication by wordsize can overflow
+				let outp1 = bank.output_offset.unwrap() * bank.wordsize;
+				let outp2 = other_bank.output_offset.unwrap() * bank.wordsize;
+
+				// FIXME: multiplication by wordsize can overflow
+				let size1 = bank.addr_size.map(|s| s * bank.wordsize);
+				let size2 = other_bank.addr_size.map(|s| s * bank.wordsize);
+
+				let overlap = match (size1, size2)
+				{
+					(None, None) => true,
+					(Some(size1), None) => outp1 + size1 > outp2,
+					(None, Some(size2)) => outp2 + size2 > outp1,
+					(Some(size1), Some(size2)) => outp1 + size1 > outp2 && outp2 + size2 > outp1,
+				};
+
+				if overlap
+				{
+					report.error_span(
+						format!(
+							"output region overlaps with bank `{}`",
+							other_bank.name),
+						&bank.decl_span.as_ref().unwrap());
+
+					return Err(());
+				}
+			}
+		}
+
 		let bank_ref = BankRef { index: self.banks.len() };
 
 		self.banks.push(bank);
@@ -234,6 +277,7 @@ impl State
 		});
 
 		self.cur_bank = bank_ref;
+		Ok(())
 	}
 
 

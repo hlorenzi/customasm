@@ -6,6 +6,13 @@
 }
 
 ; :::
+#bankdef test { #addr 0x8000 } ; = 0x
+; :::
+#bankdef test { #addr 0x8000, #size 0x10 } ; = 0x
+; :::
+#bankdef test { #addr 0x8000 + 0x2000, #size 0x10 * 8 } ; = 0x
+
+; :::
 
 #bankdef test
 {
@@ -26,12 +33,14 @@ loop
 #bankdef a
 {
     #addr 0xaa00
+    #size 0x0010
     #outp 0x0000
 }
 
 #bankdef b
 {
     #addr 0xbb00
+    #size 0x0010
     #outp 0x0010
 }
 
@@ -56,30 +65,13 @@ loop
 ; = 0x5555bb0c
 
 ; :::
-
-#bankdef a
-{
-    #unk 0x0000 ; error: unknown
-}
+#bankdef a { #unk 0x0000 } ; error: unknown
 ; :::
-
-#bankdef a
-{
-    #outp -0x8000 ; error: valid range
-}
-
+#bankdef a { #outp -0x8000 } ; error: valid range
 ; :::
-
-#bankdef a
-{
-    #outp 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff ; error: valid range
-}
-
+#bankdef a { #size 0x10 #outp 0x10 } ; error: expected line break
 ; :::
-
-#bankdef a
-{
-    #addr 0x8000
-}
-
+#bankdef a { #outp 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff } ; error: valid range
+; :::
+#bankdef a { #addr 0x8000 }
 #bank c ; error: unknown

@@ -5,8 +5,9 @@ pub struct Bank
 {
     pub name: String,
     
-	pub addr: util::BigInt,
-	pub size: Option<usize>,
+    pub wordsize: usize,
+	pub addr_start: util::BigInt,
+	pub addr_size: Option<usize>,
 	pub output_offset: Option<usize>,
 	pub fill: bool,
     pub decl_span: Option<diagn::Span>,
@@ -27,8 +28,9 @@ impl Bank
     {
         Bank {
             name: "".to_string(),
-            addr: util::BigInt::from(0),
-            size: None,
+            wordsize: 8,
+            addr_start: util::BigInt::from(0),
+            addr_size: None,
             output_offset: Some(0),
             fill: false,
             decl_span: None,

@@ -78,6 +78,7 @@ pub fn parse_directive(state: &mut asm::parser::State)
 
     match directive.as_ref()
     {
+        "bits" => asm::parser::parse_directive_bits(state)?,
         "bankdef" => asm::parser::parse_directive_bankdef(state)?,
         "bank" => asm::parser::parse_directive_bank(state)?,
         "ruledef" => asm::parser::parse_directive_ruledef(state, true)?,
@@ -91,6 +92,20 @@ pub fn parse_directive(state: &mut asm::parser::State)
     }
 
     state.parser.expect_linebreak()
+}
+
+
+pub fn parse_directive_bits(
+    state: &mut asm::parser::State)
+    -> Result<(), ()>
+{
+    state.asm_state.cur_wordsize = asm::parser::parse_expr_usize_fn(state, |u| match u
+    {
+        0 => None,
+        _ => Some(u)
+    })?;
+
+    Ok(())
 }
 
 

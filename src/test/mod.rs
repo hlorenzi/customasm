@@ -88,10 +88,13 @@ pub fn parse_subfiles<T: Into<String>>(contents: T, up_to_subfile: &str) -> Resu
             if let Some(value_index) = line.find("; = ")
             {
                 let value_str = line.get((value_index + 4)..).unwrap().trim();
-                let value = syntax::excerpt_as_bigint(None, value_str, &diagn::Span::new_dummy()).unwrap();
-                
-                let index = cur_subfile.output.len();
-                cur_subfile.output.write_bigint(index, value);
+                if value_str != "0x"
+                {
+                    let value = syntax::excerpt_as_bigint(None, value_str, &diagn::Span::new_dummy()).unwrap();
+                    
+                    let index = cur_subfile.output.len();
+                    cur_subfile.output.write_bigint(index, value);
+                }
             }
             else if line.find("; error: ").is_some()
             {
