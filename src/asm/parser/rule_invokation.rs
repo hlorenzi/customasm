@@ -10,17 +10,20 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
     let candidates = match_active_rulesets(state, &mut subparser)?;
     if candidates.len() != 0
     {
-        let mut invokation = asm::RuleInvokation
+        let mut invokation = asm::Invokation
         {
             ctx: state.asm_state.get_ctx(),
-            candidates,
             size_guess: 0,
             span: subparser.get_full_span(),
+            kind: asm::InvokationKind::Rule(asm::RuleInvokation
+            {
+                candidates,
+            })
         };
 
         let resolved = state.asm_state.resolve_rule_invokation(
             state.report.clone(),
-            &invokation, 
+            &invokation,
             false);
 
         invokation.size_guess = match resolved
@@ -37,8 +40,7 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
         };
 
         let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
-        bankdata.cur_bit_offset += invokation.size_guess;
-        bankdata.rule_invokations.push(invokation);
+        bankdata.push_invokation(invokation);
     }
 
     state.parser.expect_linebreak()?;

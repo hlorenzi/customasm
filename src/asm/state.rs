@@ -273,7 +273,7 @@ impl State
 		{
 			bank_ref,
 			cur_bit_offset: 0,
-			rule_invokations: Vec::new(),
+			invokations: Vec::new(),
 		});
 
 		self.cur_bank = bank_ref;
@@ -368,16 +368,40 @@ impl State
 	{
 		let mut bitvec = util::BitVec::new();
 
-		for rule_invokation in &bank.rule_invokations
+		for invok in &bank.invokations
 		{
-			let guard = report.push_parent("failed to resolve instruction", &rule_invokation.span);
-	
-			let resolved = self.resolve_rule_invokation(
-				report.clone(),
-				&rule_invokation,
-				true)?;
+			let resolved = match invok.kind
+			{
+				asm::InvokationKind::Rule(_) =>
+				{
+					let _guard = report.push_parent(
+						"failed to resolve instruction",
+						&invok.span);
+			
+					self.resolve_rule_invokation(
+						report.clone(),
+						&invok,
+						true)?
+				}
+				
+				asm::InvokationKind::Data(_) =>
+				{
+					let _guard = report.push_parent(
+						"failed to resolve data element",
+						&invok.span);
+			
+					self.resolve_data_invokation(
+						report.clone(),
+						&invok,
+						true)?
+				}
+			};
 
-			drop(guard);
+			let expr_name = match invok.kind
+			{
+				asm::InvokationKind::Rule(_) => "instruction",
+				asm::InvokationKind::Data(_) => "expression",
+			};
 
 			match resolved
 			{
@@ -387,25 +411,37 @@ impl State
 					{
 						Some(size) =>
 						{
-							if size == rule_invokation.size_guess
+							if size == invok.size_guess
 							{
-								bitvec.write_bigint(rule_invokation.ctx.bit_offset, bigint);
+								bitvec.write_bigint(invok.ctx.bit_offset, bigint);
 							}
 							else
 							{
-								report.error_span("instruction size did not converge after iterations", &rule_invokation.span);
+								report.error_span(
+									format!(
+										"{} size did not converge after iterations",
+										expr_name),
+									&invok.span);
 							}
 						}
 						None =>
 						{
-							report.error_span("cannot infer size of instruction", &rule_invokation.span);
+							report.error_span(
+								format!(
+									"cannot infer size of {}",
+									expr_name),
+								&invok.span);
 						}
 					}
 				}
 
 				_ =>
 				{
-					report.error_span("wrong return type of rule production", &rule_invokation.span);
+					report.error_span(
+						format!(
+							"wrong type returned from {}",
+							expr_name),
+						&invok.span);
 				}
 			}
 		}
@@ -414,17 +450,59 @@ impl State
 	}
 
 
+	pub fn resolve_data_invokation(
+		&self,
+		report: diagn::RcReport,
+		invokation: &asm::Invokation,
+		final_pass: bool)
+		-> Result<expr::Value, ()>
+	{
+		let data_invok = &invokation.get_data_invok();
+
+		let mut resolved = self.eval_expr(
+			report.clone(),
+			&data_invok.expr,
+			&invokation.ctx,
+			&mut expr::EvalContext::new(),
+			final_pass)?;
+
+		if let Some(elem_size) = data_invok.elem_size
+		{
+			match resolved
+			{
+				expr::Value::Integer(ref mut bigint) =>
+				{
+					if bigint.min_size() > elem_size
+					{
+						report.error_span(
+							format!(
+								"value (size = {}) is larger than the directive size (= {})",
+								bigint.min_size(),
+								elem_size),
+							&data_invok.expr.span());
+					}
+
+					bigint.size = Some(elem_size);
+				}
+				_ => {}
+			}
+		}
+
+		Ok(resolved)
+	}
+
+
 	pub fn resolve_rule_invokation(
 		&self,
 		report: diagn::RcReport,
-		invokation: &asm::RuleInvokation,
+		invokation: &asm::Invokation,
 		final_pass: bool)
 		-> Result<expr::Value, ()>
 	{
 		self.resolve_rule_invokation_candidates(
 			report.clone(),
 			invokation,
-			&invokation.candidates,
+			&invokation.get_rule_invok().candidates,
 			final_pass)
 	}
 
@@ -432,7 +510,7 @@ impl State
 	pub fn resolve_rule_invokation_candidates(
 		&self,
 		report: diagn::RcReport,
-		invokation: &asm::RuleInvokation,
+		invokation: &asm::Invokation,
 		candidates: &Vec<asm::RuleInvokationCandidate>,
 		final_pass: bool)
 		-> Result<expr::Value, ()>
@@ -474,7 +552,7 @@ impl State
 	pub fn resolve_rule_invokation_candidate(
 		&self,
 		report: diagn::RcReport,
-		invokation: &asm::RuleInvokation,
+		invokation: &asm::Invokation,
 		candidate: &asm::RuleInvokationCandidate,
 		final_pass: bool)
 		-> Result<expr::Value, ()>

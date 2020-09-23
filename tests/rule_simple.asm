@@ -76,3 +76,16 @@ nop
 test*(x->$) ; = 0x55
 ; :::
 t e s t * ( x - > $ ) ; = 0x55
+
+
+
+; ===========
+; ::: include
+
+#ruledef test
+{
+    test => 1 > 2
+}
+
+; :::
+test ; error: wrong type

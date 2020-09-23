@@ -73,21 +73,44 @@ pub fn parse_directive(state: &mut asm::parser::State)
 {
     let tk_hash = state.parser.expect(syntax::TokenKind::Hash)?;
     let tk_directive = state.parser.expect(syntax::TokenKind::Identifier)?;
-
     let directive = tk_directive.excerpt.as_ref().unwrap().to_ascii_lowercase();
 
-    match directive.as_ref()
+    let mut parsed_data_directive = false;
+
+    if directive.chars().next() == Some('d')
     {
-        "bits" => asm::parser::parse_directive_bits(state)?,
-        "bankdef" => asm::parser::parse_directive_bankdef(state)?,
-        "bank" => asm::parser::parse_directive_bank(state)?,
-        "ruledef" => asm::parser::parse_directive_ruledef(state, true)?,
-        "subruledef" => asm::parser::parse_directive_ruledef(state, false)?,
-        "enable" => asm::parser::parse_directive_enable(state)?,
-        _ =>
+        if directive == "d"
         {
-            state.report.error_span("unknown directive", &tk_hash.span.join(&tk_directive.span));
-            return Err(());
+            asm::parser::parse_directive_data(state, None, &tk_hash)?;
+            parsed_data_directive = true;
+        }
+        else if let Ok(elem_size) = usize::from_str_radix(&directive[1..], 10)
+        {
+            if elem_size > 0
+            {
+                asm::parser::parse_directive_data(state, Some(elem_size), &tk_hash)?;
+                parsed_data_directive = true;
+            }
+        }
+    }
+    
+    if !parsed_data_directive
+    {
+        match directive.as_ref()
+        {
+            "bits" => asm::parser::parse_directive_bits(state)?,
+            "bankdef" => asm::parser::parse_directive_bankdef(state)?,
+            "bank" => asm::parser::parse_directive_bank(state)?,
+            "ruledef" => asm::parser::parse_directive_ruledef(state, true)?,
+            "subruledef" => asm::parser::parse_directive_ruledef(state, false)?,
+            "enable" => asm::parser::parse_directive_enable(state)?,
+            _ =>
+            {
+                state.report.error_span(
+                    "unknown directive",
+                    &tk_hash.span.join(&tk_directive.span));
+                return Err(());
+            }
         }
     }
 
