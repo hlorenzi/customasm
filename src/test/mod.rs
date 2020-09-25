@@ -21,6 +21,7 @@ pub struct TestFile
 
 pub struct TestMessageExpectation
 {
+    filename: String,
     kind: diagn::MessageKind,
     line: usize,
     excerpt: String,
@@ -103,12 +104,27 @@ pub fn parse_subfiles<T: Into<String>>(contents: T, up_to_subfile: &str) -> Resu
                 {
                     if let Some(excerpt_index) = message.find("error: ")
                     {
-                        let excerpt = message.get((excerpt_index + 7)..).unwrap().trim().to_string();
+                        let mut filename = cur_subfile.name.clone();
+                        let mut line = line_num;
+                        let mut excerpt = message.get((excerpt_index + 7)..).unwrap().trim().to_string();
+
+                        if let Some(colon_index) = excerpt.find(":")
+                        {
+                            filename = excerpt.get(0..colon_index).unwrap().trim().to_string();
+
+                            excerpt = excerpt.get((colon_index + 1)..).unwrap().trim().to_string();
+
+                            let next_colon_index = excerpt.find(":").unwrap();
+                            line = excerpt.get(0..next_colon_index).unwrap().parse::<usize>().unwrap() - 1;
+                        
+                            excerpt = excerpt.get((next_colon_index + 1)..).unwrap().trim().to_string();
+                        }
             
                         cur_subfile.messages.push(TestMessageExpectation
                         {
                             kind: diagn::MessageKind::Error,
-                            line: line_num,
+                            filename,
+                            line,
                             excerpt,
                         });
                     }
@@ -157,17 +173,23 @@ pub fn test_subfile(filepath: &str, subfilename: &str)
 	report.print_all(&mut msgs, &fileserver);
     print!("{}", String::from_utf8(msgs).unwrap());
     
+    let mut has_msg_mismatch = false;
     for msg in &subfile.messages
     {
-        if !report.has_message_at(&fileserver, &subfile.name, msg.kind, msg.line, &msg.excerpt)
+        if !report.has_message_at(&fileserver, &msg.filename, msg.kind, msg.line, &msg.excerpt)
         {
             println!("\n\
                 > test failed -- diagnostics mismatch\n\
-                > expected: `{}` at line {}\n",
-                msg.excerpt, msg.line);
-                
-            panic!("test failed");
+                > expected: `{}` at file `{}`, line {}\n",
+                msg.excerpt, msg.filename, msg.line);
+
+            has_msg_mismatch = true;
         }
+    }
+    
+    if has_msg_mismatch
+    {
+        panic!("test failed");
     }
 
     if subfile.messages.len() != report.len()

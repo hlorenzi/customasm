@@ -178,5 +178,5 @@ global1:
 
 global1:
 .local1:
-..local2 ; error: expected `:`
+..local2 ; error: expected
     ld global1.local1

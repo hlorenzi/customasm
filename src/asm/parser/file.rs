@@ -5,11 +5,12 @@ pub fn parse_file<TFilename: Into<String>>(
     report: diagn::RcReport,
     asm_state: &mut asm::State,
     fileserver: &dyn util::FileServer,
-    filename: TFilename)
+    filename: TFilename,
+    span: Option<&diagn::Span>)
     -> Result<(), ()>
 {
     let filename = filename.into();
-    let chars = fileserver.get_chars(report.clone(), &filename, None)?;
+    let chars = fileserver.get_chars(report.clone(), &filename, span)?;
     let tokens = syntax::tokenize(report.clone(), &filename, &chars)?;
     let parser = syntax::Parser::new(Some(report.clone()), &tokens);
     
@@ -101,9 +102,10 @@ pub fn parse_directive(state: &mut asm::parser::State)
             "bits" => asm::parser::parse_directive_bits(state)?,
             "bankdef" => asm::parser::parse_directive_bankdef(state)?,
             "bank" => asm::parser::parse_directive_bank(state)?,
-            "ruledef" => asm::parser::parse_directive_ruledef(state, true)?,
-            "subruledef" => asm::parser::parse_directive_ruledef(state, false)?,
-            "enable" => asm::parser::parse_directive_enable(state)?,
+            "ruledef" | "cpudef" => asm::parser::parse_directive_ruledef(state, true)?,
+            "subruledef" | "tokendef" => asm::parser::parse_directive_ruledef(state, false)?,
+            "include" => asm::parser::parse_directive_include(state)?,
+            //"enable" => asm::parser::parse_directive_enable(state)?,
             _ =>
             {
                 state.report.error_span(

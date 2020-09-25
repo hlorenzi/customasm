@@ -61,7 +61,7 @@ fn generate_tests_from_file(f: &mut dyn std::io::Write, filepath: &std::path::Pa
         if line.starts_with("; :::")
         {
             let mut name = format!("{}", &line.get(5..).unwrap().trim());
-            if name == "include"
+            if name.len() > 0
             {
                 continue;
             }

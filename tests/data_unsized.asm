@@ -8,6 +8,8 @@
 #d 0x1234 ; = 0x1234
 ; :::
 #d 10`16 ; = 0x000a
+; :::
+#d (0x12 + 0x34)`16 ; = 0x0046
 
 
 ; :::
@@ -32,6 +34,10 @@ x = 0x55
 
 ; :::
 #d 10 ; error: infer size
+; :::
+#d 0x12, 10 ; error: infer size
+; :::
+#d 0x12 + 0x34 ; error: infer size
 ; :::
 x = 10
 #d x ; error: infer size

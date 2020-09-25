@@ -101,7 +101,8 @@ impl Assembler
 					pass_report.clone(),
 					&mut self.state,
 					fileserver,
-					filename);
+					filename,
+					None);
 				
 				if pass_report.has_errors() || result.is_err()
 				{
