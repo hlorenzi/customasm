@@ -16,7 +16,7 @@ pub fn parse_directive_bankdef(
         wordsize: state.asm_state.cur_wordsize,
         addr_start: util::BigInt::from(0),
         addr_size: None,
-        output_offset: Some(0),
+        output_offset: None,
         fill: false,
         decl_span: Some(tk_name.span.clone()),
     };

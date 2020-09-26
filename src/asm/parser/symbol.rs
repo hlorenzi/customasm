@@ -44,6 +44,15 @@ pub fn parse_symbol(
             &ctx,
             &span)?;
         
+        let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
+        bankdata.push_invokation(asm::Invokation
+        {
+            ctx: ctx.clone(),
+            size_guess: 0,
+            span: span.clone(),
+            kind: asm::InvokationKind::Label(asm::LabelInvokation)
+        });
+        
         expr::Value::make_integer(addr)
     };
 

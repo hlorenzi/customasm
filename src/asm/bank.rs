@@ -41,9 +41,33 @@ impl Bank
 
 impl BankData
 {
+    pub fn check_writable(
+        &self,
+        state: &asm::State,
+        report: diagn::RcReport,
+        span: &diagn::Span)
+        -> Result<(), ()>
+    {
+        let bank = &state.banks[self.bank_ref.index];
+        if bank.output_offset.is_none()
+        {
+            report.error_span("current bank is non-writable", &span);
+            return Err(());
+        }
+
+        Ok(())
+    }
+
+
     pub fn push_invokation(&mut self, invok: asm::Invokation)
     {
         self.cur_bit_offset += invok.size_guess;
         self.invokations.push(invok);
+    }
+
+
+    pub fn reserve(&mut self, bits: usize)
+    {
+        self.cur_bit_offset += bits;
     }
 }

@@ -1,17 +1,18 @@
 #![allow(dead_code)]
 
+
 extern crate num_bigint;
 extern crate num_traits;
 extern crate num_integer;
 extern crate getopts;
 
 
-mod diagn;
-mod syntax;
-mod expr;
+pub mod diagn;
+pub mod syntax;
+pub mod expr;
 pub mod asm;
-mod util;
-//mod driver;
+pub mod util;
+pub mod driver;
 
 
 //pub mod webasm;
@@ -19,14 +20,6 @@ mod util;
 
 #[cfg(test)]
 pub mod test;
-
-
-pub use self::diagn::Report;
-pub use self::diagn::RcReport;
-pub use self::util::FileServer;
-pub use self::util::FileServerMock;
-pub use self::util::FileServerReal;
-//pub use self::driver::drive;
 
 
 /*pub fn assemble_str_to_binary(src: &str) -> (Option<Vec<u8>>, Report)

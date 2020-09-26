@@ -1,7 +1,4 @@
-use crate::diagn::RcReport;
-use crate::util::FileServer;
-use crate::util::enable_windows_ansi_support;
-use crate::asm::AssemblerState;
+use crate::*;
 use std::io::stdout;
 use getopts;
 
@@ -26,18 +23,18 @@ enum OutputFormat
 }
 
 
-pub fn drive(args: &Vec<String>, fileserver: &mut dyn FileServer) -> Result<(), ()>
+pub fn drive(args: &Vec<String>, fileserver: &mut dyn util::FileServer) -> Result<(), ()>
 {
 	let opts = make_opts();
 	
-	let report = RcReport::new();
+	let report = diagn::RcReport::new();
 	
 	let result = drive_inner(report.clone(), &opts, args, fileserver);
 	
 	if report.has_messages()
 		{ println!(""); }
 	
-	enable_windows_ansi_support();
+	util::enable_windows_ansi_support();
 	report.print_all(&mut stdout(), fileserver);
 	
 	if let Err(show_usage) = result
@@ -53,7 +50,12 @@ pub fn drive(args: &Vec<String>, fileserver: &mut dyn FileServer) -> Result<(), 
 }
 
 
-fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fileserver: &mut dyn FileServer) -> Result<(), bool>
+fn drive_inner(
+	report: diagn::RcReport,
+	opts: &getopts::Options,
+	args: &Vec<String>,
+	fileserver: &mut dyn util::FileServer)
+	-> Result<(), bool>
 {
 	let matches = parse_opts(report.clone(), opts, args).map_err(|_| true)?;
 	
@@ -107,7 +109,10 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 	};
 	
 	if matches.free.len() < 1
-		{ return Err(true); }
+	{
+		report.error("no input files");
+		return Err(true);
+	}
 	
 	let main_asm_file = matches.free[0].clone();
 	
@@ -132,33 +137,40 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 			}
 		}
 	};
-
-	let mut filenames = matches.opt_strs("i");
-	for filename in matches.free
-		{ filenames.push(filename); }
 	
-	let assembled = assemble(report.clone(), fileserver, &filenames, quiet).map_err(|_| false)?;
-	let output = assembled.get_binary_output();
-	let output_symbol_data = assembled.get_symbol_output();
-	let output_data = match out_format
+	if !quiet
+		{ print_version_short(); }
+	
+	let mut assembler = asm::Assembler::new();
+	for filename in matches.free
 	{
-		OutputFormat::Binary    => output.generate_binary(0, output.len()),
+		println!("assembling `{}`...", filename);
+		assembler.register_file(filename);
+	}
+
+	let output = assembler.assemble(report.clone(), fileserver, 10).map_err(|_| false)?;
+
+
+	//let output_symbol_data = assembled.get_symbol_output();
+	let output_data: Vec<u8> = match out_format
+	{
+		OutputFormat::Binary    => output.format_binary(),
 		
-		OutputFormat::BinStr    => output.generate_binstr  (0, output.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::BinDump   => output.generate_bindump (0, output.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexStr    => output.generate_hexstr  (0, output.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexDump   => output.generate_hexdump (0, output.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::Mif       => output.generate_mif     (0, output.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::IntelHex  => output.generate_intelhex(0, output.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::DecComma  => output.generate_comma   (0, output.len(), 10).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexComma  => output.generate_comma   (0, output.len(), 16).bytes().collect::<Vec<u8>>(),
-		OutputFormat::DecC      => output.generate_c_array (0, output.len(), 10).bytes().collect::<Vec<u8>>(),
-		OutputFormat::HexC      => output.generate_c_array (0, output.len(), 16).bytes().collect::<Vec<u8>>(),
-		OutputFormat::LogiSim8  => output.generate_logisim (0, output.len(), 8).bytes().collect::<Vec<u8>>(),
-		OutputFormat::LogiSim16 => output.generate_logisim (0, output.len(), 16).bytes().collect::<Vec<u8>>(),
+		OutputFormat::BinStr    => output.format_binstr  ().bytes().collect(),
+		OutputFormat::HexStr    => output.format_hexstr  ().bytes().collect(),
+		OutputFormat::BinDump   => output.format_bindump ().bytes().collect(),
+		OutputFormat::HexDump   => output.format_hexdump ().bytes().collect(),
+		OutputFormat::Mif       => output.format_mif     ().bytes().collect(),
+		OutputFormat::IntelHex  => output.format_intelhex().bytes().collect(),
+		OutputFormat::DecComma  => output.format_comma   (10).bytes().collect(),
+		OutputFormat::HexComma  => output.format_comma   (16).bytes().collect(),
+		OutputFormat::DecC      => output.format_c_array (10).bytes().collect(),
+		OutputFormat::HexC      => output.format_c_array (16).bytes().collect(),
+		OutputFormat::LogiSim8  => output.format_logisim (8).bytes().collect(),
+		OutputFormat::LogiSim16 => output.format_logisim (16).bytes().collect(),
 		
-		OutputFormat::AnnotatedHex => output.generate_annotated_hex(fileserver, 0, output.len()).bytes().collect::<Vec<u8>>(),
-		OutputFormat::AnnotatedBin => output.generate_annotated_bin(fileserver, 0, output.len()).bytes().collect::<Vec<u8>>(),
+		OutputFormat::AnnotatedHex => output.format_annotated_hex(fileserver).bytes().collect(),
+		OutputFormat::AnnotatedBin => output.format_annotated_bin(fileserver).bytes().collect(),
 	};
 	
 	if out_stdout
@@ -172,8 +184,8 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 		if output_requested || output_file.is_some()
 			{ println!("{}", String::from_utf8_lossy(&output_data)); }
 			
-		if output_symbol_requested || output_symbol_file.is_some()
-			{ println!("{}", &output_symbol_data); }
+		//if output_symbol_requested || output_symbol_file.is_some()
+		//	{ println!("{}", &output_symbol_data); }
 	}
 	else
 	{
@@ -186,12 +198,12 @@ fn drive_inner(report: RcReport, opts: &getopts::Options, args: &Vec<String>, fi
 			any_files_written = true;
 		}
 
-		if let Some(ref output_symbol_file) = output_symbol_file
+		/*if let Some(ref output_symbol_file) = output_symbol_file
 		{
 			println!("writing `{}`...", &output_symbol_file);
 			fileserver.write_bytes(report.clone(), &output_symbol_file, &output_symbol_data.bytes().collect::<Vec<u8>>(), None).map_err(|_| false)?;
 			any_files_written = true;
-		}
+		}*/
 
 		if !any_files_written
 			{ println!("no files written"); }
@@ -208,7 +220,6 @@ fn make_opts() -> getopts::Options
 {
     let mut opts = getopts::Options::new();
     opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16", "FORMAT");
-    opts.optmulti("i", "include", "Specifies an additional file for processing before the given <asm-files>. [deprecated]", "FILE");
     opts.opt("o", "output", "The name of the output file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
@@ -220,7 +231,7 @@ fn make_opts() -> getopts::Options
 }
 
 
-fn parse_opts(report: RcReport, opts: &getopts::Options, args: &Vec<String>) -> Result<getopts::Matches, ()>
+fn parse_opts(report: diagn::RcReport, opts: &getopts::Options, args: &Vec<String>) -> Result<getopts::Matches, ()>
 {
 	match opts.parse(&args[1..])
 	{
@@ -258,7 +269,7 @@ fn print_version_full()
 }
 
 
-fn get_default_output_filename(report: RcReport, input_filename: &str) -> Result<String, ()>
+fn get_default_output_filename(report: diagn::RcReport, input_filename: &str) -> Result<String, ()>
 {
 	use std::path::PathBuf;
 	
@@ -271,26 +282,4 @@ fn get_default_output_filename(report: RcReport, input_filename: &str) -> Result
 		{ return Err(report.error("cannot derive safe output filename")); }
 	
 	Ok(output_filename)
-}
-
-
-pub fn assemble(report: RcReport, fileserver: &dyn FileServer, filenames: &[String], quiet: bool) -> Result<AssemblerState, ()>
-{
-	if !quiet
-		{ print_version_short(); }
-	
-	let mut asm = AssemblerState::new();
-	
-	for filename in filenames
-	{
-		let filename_owned = filename.clone();
-		
-		if !quiet
-			{ println!("assembling `{}`...", &filename_owned); }
-	
-		asm.process_file(report.clone(), fileserver, filename_owned)?;
-	}
-	
-	asm.wrapup(report)?;
-	Ok(asm)
 }

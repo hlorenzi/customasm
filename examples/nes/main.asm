@@ -1,15 +1,15 @@
-#include "6502.cpu"
+#include "cpu6502.asm"
 #include "ines_nrom.asm"
 #include "nes.asm"
 
 
-#bank "zeropage"
+#bank zeropage
 
 varTimer: #res 1
 varPaletteIndex: #res 1
 
 
-#bank "prg"
+#bank prg
 
 reset:
 	; disable IRQs and decimal mode
@@ -66,7 +66,7 @@ reset:
 	lda #PPU_CTRL_NMI
 	sta PPU_CTRL
 	
-	; infinite loop
+	; wait for NMI
 	.infinite:
 		jmp .infinite
 	
@@ -114,4 +114,4 @@ palette:
 	#d8 0x0d, 0x06, 0x16, 0x26, 0x36, 0x26, 0x16, 0x06, 0x0d ; reds
 	#d8 0x0d, 0x09, 0x19, 0x29, 0x39, 0x29, 0x19, 0x09, 0x0d ; greens
 
-paletteLen = pc - palette
+paletteLen = $ - palette

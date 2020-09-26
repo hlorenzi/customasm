@@ -59,7 +59,7 @@ impl expr::Expr
 {
 	pub fn eval<FVar, FFn>(
 		&self,
-		report: RcReport,
+		report: diagn::RcReport,
 		ctx: &mut EvalContext,
 		eval_var: &FVar,
 		eval_fn: &FFn)
@@ -136,16 +136,9 @@ impl expr::Expr
 						{
 							if hierarchy_level == 0 && hierarchy.len() == 1
 							{
-								match ctx.get_local(&hierarchy[0])
-								{
-									Ok(_) =>
-									{
-										let value = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?;
-										ctx.set_local(hierarchy[0].clone(), value);
-										return Ok(expr::Value::Void);
-									}
-									Err(()) => {}
-								}
+								let value = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?;
+								ctx.set_local(hierarchy[0].clone(), value);
+								return Ok(expr::Value::Void);
 							}
 							
 							Err(report.error_span("symbol cannot be assigned to", &lhs_expr.span()))

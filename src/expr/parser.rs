@@ -389,6 +389,9 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 		else if self.parser.next_is(0, syntax::TokenKind::Number)
 			{ self.parse_number() }
 			
+		else if self.parser.next_is(0, syntax::TokenKind::String)
+			{ self.parse_string() }
+			
 		else
 		{
 			let span = self.parser.prev().span.after();
@@ -497,6 +500,23 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 		let expr = expr::Expr::Literal(
 			span.clone(),
 			expr::Value::Integer(bigint));
+
+		Ok(expr)
+	}
+	
+	
+	fn parse_string(&mut self) -> Result<expr::Expr, ()>
+	{
+		let tk_str = self.parser.expect(syntax::TokenKind::String)?;
+
+		let string = syntax::excerpt_as_string_contents(
+			self.parser.report.clone().unwrap_or(diagn::RcReport::new()),
+			tk_str.excerpt.as_ref().unwrap(),
+			&tk_str.span)?;
+		
+		let expr = expr::Expr::Literal(
+			tk_str.span.clone(),
+			expr::Value::Integer(util::BigInt::new_from_str(&string)));
 
 		Ok(expr)
 	}

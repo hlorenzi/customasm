@@ -4,7 +4,18 @@ use crate::*;
 #[derive(Debug)]
 pub struct BitVec
 {
-	pub bits: Vec<bool>,
+    pub bits: Vec<bool>,
+    pub spans: Vec<BitVecSpan>,
+}
+
+
+#[derive(Clone, Debug)]
+pub struct BitVecSpan
+{
+    pub addr: util::BigInt,
+    pub offset: Option<usize>,
+    pub size: usize,
+    pub span: diagn::Span,
 }
 
 
@@ -14,7 +25,8 @@ impl BitVec
 	{
 		BitVec
 		{
-			bits: Vec::new(),
+            bits: Vec::new(),
+            spans: Vec::new(),
 		}
 	}
 	
@@ -43,6 +55,35 @@ impl BitVec
         {
             self.write(index + i, bitvec.read(i));
         }
+
+        self.mark_spans_from(index, &bitvec);
+    }
+	
+	
+	pub fn mark_spans_from(&mut self, index: usize, bitvec: &util::BitVec)
+	{
+        for span in &bitvec.spans
+        {
+            let mut new_span = span.clone();
+            if let Some(offset) = new_span.offset
+            {
+                new_span.offset = Some(offset + index);
+            }
+            
+            self.spans.push(new_span);
+        }
+    }
+	
+	
+	pub fn mark_span(&mut self, offset: Option<usize>, size: usize, addr: util::BigInt, span: diagn::Span)
+	{
+        self.spans.push(BitVecSpan
+        {
+            offset,
+            size,
+            addr,
+            span,
+        });
     }
 	
 	

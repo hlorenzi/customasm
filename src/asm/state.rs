@@ -124,6 +124,7 @@ impl Assembler
 
 				let bank_output = self.state.resolve_bankdata(
 					pass_report.clone(),
+					bank,
 					bankdata);
 
 				if pass_report.has_errors() || !bank_output.is_ok()
@@ -132,12 +133,21 @@ impl Assembler
 					break;
 				}
 
-				//println!("output {:?}, {:x}", bank.output_offset, &bank_output.as_ref().unwrap());
+				if let Some(output_offset) = bank.output_offset
+				{
+					//println!("output {:?}, {:x}", bank.output_offset, &bank_output.as_ref().unwrap());
 
-				// FIXME: multiplication by wordsize can overflow
-				full_output.write_bitvec(
-					bank.output_offset.unwrap() * bank.wordsize,
-					&bank_output.unwrap());
+					// FIXME: multiplication by wordsize can overflow
+					full_output.write_bitvec(
+						output_offset * bank.wordsize,
+						&bank_output.unwrap());
+				}
+				else
+				{
+					full_output.mark_spans_from(
+						0,
+						&bank_output.unwrap());
+				}
 			}
 
 			if all_bankdata_resolved
@@ -219,6 +229,19 @@ impl State
 			&bank.addr_start;
 		
 		Ok(addr)
+	}
+	
+	
+	pub fn get_addr_aprox(&self, ctx: &Context) -> util::BigInt
+	{
+		let bits = 8;
+		let bank = &self.banks[ctx.bank_ref.index];
+			
+		let addr =
+			&util::BigInt::from(ctx.bit_offset / bits) +
+			&bank.addr_start;
+		
+		addr
 	}
 
 
@@ -364,12 +387,13 @@ impl State
 	pub fn resolve_bankdata(
 		&self,
 		report: diagn::RcReport,
-		bank: &asm::BankData)
+		bank: &asm::Bank,
+		bankdata: &asm::BankData)
 		-> Result<util::BitVec, ()>
 	{
 		let mut bitvec = util::BitVec::new();
 
-		for invok in &bank.invokations
+		for invok in &bankdata.invokations
 		{
 			let resolved = match invok.kind
 			{
@@ -396,12 +420,33 @@ impl State
 						&invok,
 						true)?
 				}
+				
+				asm::InvokationKind::Label(_) =>
+				{
+					let offset = if bank.output_offset.is_some()
+					{
+						Some(invok.ctx.bit_offset)
+					}
+					else
+					{
+						None
+					};
+
+					bitvec.mark_span(
+						offset,
+						0,
+						self.get_addr_aprox(&invok.ctx),
+						invok.span.clone());
+
+					continue;
+				}
 			};
 
 			let expr_name = match invok.kind
 			{
 				asm::InvokationKind::Rule(_) => "instruction",
 				asm::InvokationKind::Data(_) => "expression",
+				_ => unreachable!(),
 			};
 
 			match resolved
@@ -415,6 +460,11 @@ impl State
 							if size == invok.size_guess
 							{
 								bitvec.write_bigint(invok.ctx.bit_offset, bigint);
+								bitvec.mark_span(
+									Some(invok.ctx.bit_offset),
+									size,
+									self.get_addr_aprox(&invok.ctx),
+									invok.span.clone());
 							}
 							else
 							{

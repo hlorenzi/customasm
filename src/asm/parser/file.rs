@@ -105,6 +105,7 @@ pub fn parse_directive(state: &mut asm::parser::State)
             "ruledef" | "cpudef" => asm::parser::parse_directive_ruledef(state, true)?,
             "subruledef" | "tokendef" => asm::parser::parse_directive_ruledef(state, false)?,
             "include" => asm::parser::parse_directive_include(state)?,
+            "res" => asm::parser::parse_directive_res(state)?,
             //"enable" => asm::parser::parse_directive_enable(state)?,
             _ =>
             {

@@ -66,6 +66,17 @@ nop
 
 ; ===========
 ; ::: include
+; :::
+
+#ruledef "test" ; error: expected identifier
+{
+    halt => 0x55
+}
+
+
+
+; ===========
+; ::: include
 
 #ruledef test
 {

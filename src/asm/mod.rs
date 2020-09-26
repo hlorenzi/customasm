@@ -26,6 +26,7 @@ pub use self::invokation::RuleInvokation;
 pub use self::invokation::RuleInvokationCandidate;
 pub use self::invokation::RuleInvokationArgument;
 pub use self::invokation::DataInvokation;
+pub use self::invokation::LabelInvokation;
 pub use self::bank::Bank;
 pub use self::bank::BankData;
 pub use self::symbol::SymbolManager;

@@ -17,6 +17,7 @@
 #bankdef test
 {
     #addr 0x8000
+    #outp 0x0000
 }
 
 loop
@@ -63,6 +64,11 @@ loop
 ; = 0x5555bb04
 ; = 0x5555bb08
 ; = 0x5555bb0c
+
+; :::
+
+#bankdef test { #addr 0x8000 }
+loop ; error: non-writable
 
 ; :::
 #bankdef a { #unk 0x0000 } ; error: unknown

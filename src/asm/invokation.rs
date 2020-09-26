@@ -16,6 +16,7 @@ pub enum InvokationKind
 {
     Rule(RuleInvokation),
     Data(DataInvokation),
+    Label(LabelInvokation),
 }
 
 
@@ -48,6 +49,10 @@ pub struct DataInvokation
     pub expr: expr::Expr,
     pub elem_size: Option<usize>,
 }
+
+
+#[derive(Debug)]
+pub struct LabelInvokation;
 
 
 impl Invokation

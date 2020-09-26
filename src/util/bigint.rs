@@ -11,12 +11,25 @@ pub struct BigInt
 
 impl BigInt
 {
-    pub fn new(bigint: num_bigint::BigInt, size: Option<usize>) -> BigInt
+    pub fn new<T>(bigint: T, size: Option<usize>) -> BigInt
+    where T: Into<num_bigint::BigInt>
     {
         BigInt
         {
-            bigint,
+            bigint: bigint.into(),
             size,
+        }
+    }
+
+
+    pub fn new_from_str(s: &str) -> BigInt
+    {
+        let bytes = s.bytes().collect::<Vec<u8>>();
+        let bigint = num_bigint::BigInt::from_signed_bytes_be(&bytes);
+        BigInt
+        {
+            bigint,
+            size: Some(bytes.len() * 8),
         }
     }
 
@@ -95,13 +108,13 @@ impl BigInt
     }
 
 
-    pub fn shr(&self, rhs: usize) -> BigInt
+    pub fn shl(&self, rhs: usize) -> BigInt
     {
         (&self.bigint << rhs).into()
     }
 
 
-    pub fn shl(&self, rhs: usize) -> BigInt
+    pub fn shr(&self, rhs: usize) -> BigInt
     {
         let lhs_sign = self.bigint.sign();
         let result = &self.bigint >> rhs;
@@ -133,7 +146,7 @@ impl BigInt
     {
         let lhs_size = lhs_slice.0 + 1 - lhs_slice.1;
         let rhs_size = rhs_slice.0 + 1 - rhs_slice.1;
-        let lhs = self.slice(lhs_slice.0, lhs_slice.1).shr(rhs_size);
+        let lhs = self.slice(lhs_slice.0, lhs_slice.1).shl(rhs_size);
         let rhs = rhs.slice(rhs_slice.0, rhs_slice.1);
 
         let mut result: BigInt = (&lhs | &rhs).into();
@@ -151,7 +164,7 @@ impl BigInt
         for _ in 0..(left - right + 1)
             { mask = (mask << 1) + num_bigint::BigInt::one(); }
         
-        let mut result = &self.shl(right) & &mask.into();
+        let mut result = &self.shr(right) & &mask.into();
         result.size = Some(left + 1 - right);
         result
     }

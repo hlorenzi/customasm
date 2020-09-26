@@ -54,6 +54,9 @@ pub fn parse_directive_data(
             }
         }
 
+        let bankdata = state.asm_state.get_bankdata(state.asm_state.cur_bank);
+        bankdata.check_writable(&state.asm_state, state.report.clone(), &invokation.span)?;
+        
         let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
         bankdata.push_invokation(invokation);
         

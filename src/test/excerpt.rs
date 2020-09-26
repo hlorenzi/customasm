@@ -1,6 +1,4 @@
-use crate::diagn::{Span, RcReport};
-use crate::syntax::excerpt_as_string_contents;
-use crate::util::FileServerMock;
+use crate::*;
 use super::ExpectedResult::*;
 use super::{ExpectedResult, expect_result};
 use std::rc::Rc;
@@ -14,13 +12,13 @@ fn test(src: &str, expected: ExpectedResult<&str>)
 	src_quoted.push_str("\"");
 	let src_quoted: &str = src_quoted.as_ref();
 
-	let report = RcReport::new();
-	let mut fileserver = FileServerMock::new();
+	let report = diagn::RcReport::new();
+	let mut fileserver = util::FileServerMock::new();
 	fileserver.add("test", src_quoted);
 	
-	let span = Span::new(Rc::new("test".to_string()), 0, 0);
+	let span = diagn::Span::new(Rc::new("test".to_string()), 0, 0);
 	
-	let result = excerpt_as_string_contents(report.clone(), src_quoted, &span).ok();
+	let result = syntax::excerpt_as_string_contents(report.clone(), src_quoted, &span).ok();
 	let result = result.as_ref().map(|s| s.as_ref());
 	expect_result(report.clone(), &fileserver, result, expected);
 }

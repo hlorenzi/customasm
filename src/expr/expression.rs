@@ -22,7 +22,6 @@ pub enum Value
 	Void,
 	Integer(util::BigInt),
 	Bool(bool),
-	String(String),
 	Function(String)
 }
 
