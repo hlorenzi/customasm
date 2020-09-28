@@ -8,6 +8,13 @@ pub fn parse_directive_bankdef(
     let tk_name = state.parser.expect(syntax::TokenKind::Identifier)?;
     let name = tk_name.excerpt.as_ref().unwrap().clone();
 
+    if let Some(duplicate) = state.asm_state.banks.iter().find(|r| r.name == name)
+    {
+        let _guard = state.report.push_parent("duplicate bank", &tk_name.span);
+        state.report.note_span("first declared here", duplicate.decl_span.as_ref().unwrap());
+        return Err(());
+    }
+
     state.parser.expect(syntax::TokenKind::BraceOpen)?;
 
     let mut bank = asm::Bank
@@ -51,11 +58,11 @@ fn parse_bankdef_field(
     match field_name.as_ref()
     {
         "addr" =>
-            bank.addr_start = asm::parser::parse_expr_bigint(state)?,
+            bank.addr_start = asm::parser::parse_expr_bigint(state).map(|b| b.0)?,
             
         "addr_end" =>
         {
-            let addr_end = asm::parser::parse_expr_bigint(state)?;
+            let addr_end = asm::parser::parse_expr_bigint(state).map(|b| b.0)?;
             bank.addr_size = match (&addr_end - &bank.addr_start).checked_to_usize()
             {
                 Some(size) => Some(size),

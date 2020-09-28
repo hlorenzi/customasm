@@ -1,9 +1,11 @@
 use crate::*;
 
+
 mod excerpt;
 mod expr;
 //mod cpudef;
 mod asm;
+mod examples;
 
 
 pub enum ExpectedResult<T>

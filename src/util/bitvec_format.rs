@@ -400,10 +400,14 @@ impl util::BitVec
                     format!("{:x}", span.addr).len());
 
                 let data_digits = span.size / digit_bits + if span.size % digit_bits == 0 { 0 } else { 1 };
+				let this_content_width = data_digits + data_digits / byte_digits;
 
-                content_width = std::cmp::min((byte_digits + 1) * 5 - 1, std::cmp::max(
-                    content_width,
-                    data_digits + data_digits / byte_digits));
+				if this_content_width > 1 && this_content_width <= (byte_digits + 1) * 5
+				{
+					content_width = std::cmp::max(
+						content_width,
+						this_content_width - 1);
+				}
             }
 		}
 		
@@ -466,7 +470,7 @@ impl util::BitVec
             let char_counter = util::CharCounter::new(&prev_file_chars);
             
             result.push_str(&format!("{:1$}", contents_str, content_width));
-            result.push_str(&format!("; {}", char_counter.get_excerpt(span_location.0, span_location.1).iter().collect::<String>()));
+            result.push_str(&format!(" ; {}", char_counter.get_excerpt(span_location.0, span_location.1).iter().collect::<String>()));
             result.push_str("\n");
 		}
 		

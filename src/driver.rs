@@ -1,5 +1,4 @@
 use crate::*;
-use std::io::stdout;
 use getopts;
 
 
@@ -35,7 +34,7 @@ pub fn drive(args: &Vec<String>, fileserver: &mut dyn util::FileServer) -> Resul
 		{ println!(""); }
 	
 	util::enable_windows_ansi_support();
-	report.print_all(&mut stdout(), fileserver);
+	report.print_all(&mut std::io::stderr(), fileserver);
 	
 	if let Err(show_usage) = result
 	{
@@ -137,6 +136,23 @@ fn drive_inner(
 			}
 		}
 	};
+
+	let max_iterations = match matches.opt_str("t")
+	{
+		None => 10,
+		Some(t) =>
+		{
+			match t.parse::<usize>()
+			{
+				Ok(t) => t,
+				Err(_) =>
+				{
+					report.error("invalid number of iterations");
+					return Err(true);
+				}
+			}
+		}
+	};
 	
 	if !quiet
 		{ print_version_short(); }
@@ -148,7 +164,11 @@ fn drive_inner(
 		assembler.register_file(filename);
 	}
 
-	let output = assembler.assemble(report.clone(), fileserver, 10).map_err(|_| false)?;
+	let output = assembler.assemble(
+		report.clone(),
+		fileserver,
+		max_iterations)
+		.map_err(|_| false)?;
 
 
 	//let output_symbol_data = assembled.get_symbol_output();
@@ -222,6 +242,7 @@ fn make_opts() -> getopts::Options
     opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16", "FORMAT");
     opts.opt("o", "output", "The name of the output file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
+    opts.opt("t", "iter", "The max number of passes the assembler will attempt (default: 10).", "NUM", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
     opts.optflag("q", "quiet", "Suppress progress reports.");
     opts.optflag("v", "version", "Display version information.");

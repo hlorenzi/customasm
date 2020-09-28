@@ -25,6 +25,7 @@ pub struct State
 pub struct Context
 {
 	pub bit_offset: usize,
+	pub cur_wordsize: usize,
 	pub bank_ref: BankRef,
 	pub symbol_ctx: asm::SymbolContext,
 }
@@ -156,7 +157,7 @@ impl Assembler
 				return Ok(full_output);
 			}
 
-			if iteration > max_iterations
+			if iteration >= max_iterations
 			{
 				pass_report.transfer_to(report);
 				return Err(());				
@@ -193,12 +194,14 @@ impl State
 	pub fn get_ctx(&self) -> Context
 	{
 		let bit_offset = self.get_bankdata(self.cur_bank).cur_bit_offset;
+		let cur_wordsize = self.cur_wordsize;
 		let bank_ref = self.cur_bank;
 		let symbol_ctx = self.symbols.get_ctx();
 
 		Context
 		{
 			bit_offset,
+			cur_wordsize,
 			bank_ref,
 			symbol_ctx,
 		}
@@ -207,13 +210,13 @@ impl State
 	
 	pub fn get_addr(&self, report: diagn::RcReport, ctx: &Context, span: &diagn::Span) -> Result<util::BigInt, ()>
 	{
-		let bits = 8;
 		let bank = &self.banks[ctx.bank_ref.index];
+		let wordsize = ctx.cur_wordsize;
 		
-		let excess_bits = ctx.bit_offset % bits;
+		let excess_bits = ctx.bit_offset % wordsize;
 		if excess_bits != 0
 		{
-			let bits_short = bits - excess_bits;
+			let bits_short = wordsize - excess_bits;
 			let plural = if bits_short > 1 { "bits" } else { "bit" };
 			report.error_span(
 				format!(
@@ -225,7 +228,7 @@ impl State
 		}
 			
 		let addr =
-			&util::BigInt::from(ctx.bit_offset / bits) +
+			&util::BigInt::from(ctx.bit_offset / wordsize) +
 			&bank.addr_start;
 		
 		Ok(addr)
@@ -234,11 +237,11 @@ impl State
 	
 	pub fn get_addr_aprox(&self, ctx: &Context) -> util::BigInt
 	{
-		let bits = 8;
 		let bank = &self.banks[ctx.bank_ref.index];
+		let wordsize = ctx.cur_wordsize;
 			
 		let addr =
-			&util::BigInt::from(ctx.bit_offset / bits) +
+			&util::BigInt::from(ctx.bit_offset / wordsize) +
 			&bank.addr_start;
 		
 		addr
@@ -291,6 +294,9 @@ impl State
 
 		let bank_ref = BankRef { index: self.banks.len() };
 
+		self.cur_bank = bank_ref;
+		self.cur_wordsize = bank.wordsize;
+
 		self.banks.push(bank);
 
 		self.bankdata.push(asm::BankData
@@ -300,7 +306,6 @@ impl State
 			invokations: Vec::new(),
 		});
 
-		self.cur_bank = bank_ref;
 		Ok(())
 	}
 
@@ -445,11 +450,11 @@ impl State
 			let expr_name = match invok.kind
 			{
 				asm::InvokationKind::Rule(_) => "instruction",
-				asm::InvokationKind::Data(_) => "expression",
+				asm::InvokationKind::Data(_) => "data element",
 				_ => unreachable!(),
 			};
 
-			match resolved
+			let (bigint, size) = match resolved
 			{
 				expr::Value::Integer(bigint) =>
 				{
@@ -459,12 +464,7 @@ impl State
 						{
 							if size == invok.size_guess
 							{
-								bitvec.write_bigint(invok.ctx.bit_offset, bigint);
-								bitvec.mark_span(
-									Some(invok.ctx.bit_offset),
-									size,
-									self.get_addr_aprox(&invok.ctx),
-									invok.span.clone());
+								(bigint, size)
 							}
 							else
 							{
@@ -473,6 +473,8 @@ impl State
 										"{} size did not converge after iterations",
 										expr_name),
 									&invok.span);
+
+								continue;
 							}
 						}
 						None =>
@@ -482,6 +484,8 @@ impl State
 									"cannot infer size of {}",
 									expr_name),
 								&invok.span);
+
+							continue;
 						}
 					}
 				}
@@ -493,8 +497,31 @@ impl State
 							"wrong type returned from {}",
 							expr_name),
 						&invok.span);
+
+					continue;
+				}
+			};
+
+			if let Some(addr_size) = bank.addr_size
+			{
+				if invok.ctx.bit_offset + size > addr_size * bank.wordsize
+				{
+					report.error_span(
+						format!(
+							"{} is out of bank range",
+							expr_name),
+						&invok.span);
+
+					continue;
 				}
 			}
+			
+			bitvec.write_bigint(invok.ctx.bit_offset, bigint);
+			bitvec.mark_span(
+				Some(invok.ctx.bit_offset),
+				size,
+				self.get_addr_aprox(&invok.ctx),
+				invok.span.clone());
 		}
 
 		Ok(bitvec)
@@ -523,12 +550,18 @@ impl State
 			{
 				expr::Value::Integer(ref mut bigint) =>
 				{
-					if bigint.min_size() > elem_size
+					let mut size = bigint.min_size();
+					if let Some(intrinsic_size) = bigint.size
+					{
+						size = intrinsic_size;
+					}
+					
+					if size > elem_size
 					{
 						report.error_span(
 							format!(
-								"value (size = {}) is larger than the directive size (= {})",
-								bigint.min_size(),
+								"value size (= {}) is larger than the directive size (= {})",
+								size,
 								elem_size),
 							&data_invok.expr.span());
 					}

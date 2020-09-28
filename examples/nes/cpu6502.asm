@@ -30,7 +30,7 @@
 	
 	bne {addr} =>
 	{
-		reladdr = addr - pc - 2
+		reladdr = addr - $ - 2
 		assert(reladdr <=  0x7f)
 		assert(reladdr >= !0x7f)
 		0xd0 @ reladdr[7:0]
@@ -38,7 +38,7 @@
 	
 	bpl {addr} =>
 	{
-		reladdr = addr - pc - 2
+		reladdr = addr - $ - 2
 		assert(reladdr <=  0x7f)
 		assert(reladdr >= !0x7f)
 		0x10 @ reladdr[7:0]

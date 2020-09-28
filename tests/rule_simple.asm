@@ -64,6 +64,15 @@ nop
 
 
 
+; :::
+
+#ruledef test ; error: duplicate
+{
+    halt => 0x55
+}
+
+
+
 ; ===========
 ; ::: include
 ; :::

@@ -31,7 +31,7 @@ function setupEditor()
 		tabSize: 4, indentUnit: 4, mode: "z80"
 	})
 	
-	fetch("../examples/test.asm")
+	fetch("../examples/basic.asm")
 		.then(r => r.text())
 		.then(r => g_codeEditor.setValue(r))
 	
@@ -116,8 +116,6 @@ function assemble()
 	output = output.replace(/\x1b\[0m/g, "</span><span style='color:black;'>")
 	
 	output = "<span style='color:black;'>" + output + "</span>"
-	
-	let isError = output.includes("error")
 	
 	let divText = document.getElementById("divOutputText")
 	divText.innerHTML = output

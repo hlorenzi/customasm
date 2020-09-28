@@ -20,12 +20,17 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
                 candidates,
             })
         };
-
+        
         let resolved = state.asm_state.resolve_rule_invokation(
             state.report.clone(),
             &invokation,
             false);
 
+        //println!("{} = {:?}", state.fileserver.get_excerpt(&invokation.span), &resolved);
+
+        // TODO: can provide an exact guess even if resolution fails,
+        // if we have an exact candidate, and
+        // if the production expression returns a sized value
         invokation.size_guess = match resolved
         {
             Ok(expr::Value::Integer(bigint)) =>
@@ -38,6 +43,8 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
             }
             _ => 0
         };
+
+        //println!("{} = {}", state.fileserver.get_excerpt(&invokation.span), invokation.size_guess);
 
         let bankdata = state.asm_state.get_bankdata(state.asm_state.cur_bank);
         bankdata.check_writable(&state.asm_state, state.report.clone(), &invokation.span)?;

@@ -106,6 +106,8 @@ pub fn parse_directive(state: &mut asm::parser::State)
             "subruledef" | "tokendef" => asm::parser::parse_directive_ruledef(state, false)?,
             "include" => asm::parser::parse_directive_include(state)?,
             "res" => asm::parser::parse_directive_res(state)?,
+            "align" => asm::parser::parse_directive_align(state)?,
+            "addr" => asm::parser::parse_directive_addr(state)?,
             //"enable" => asm::parser::parse_directive_enable(state)?,
             _ =>
             {
@@ -135,7 +137,7 @@ pub fn parse_directive_bits(
 }
 
 
-pub fn parse_expr_bigint(state: &mut asm::parser::State) -> Result<util::BigInt, ()>
+pub fn parse_expr_bigint(state: &mut asm::parser::State) -> Result<(util::BigInt, diagn::Span), ()>
 {
     let expr = expr::Expr::parse(&mut state.parser)?;
     let value = state.asm_state.eval_expr(
@@ -147,7 +149,7 @@ pub fn parse_expr_bigint(state: &mut asm::parser::State) -> Result<util::BigInt,
 
     match value.get_bigint()
     {
-        Some(bigint) => Ok(bigint),
+        Some(bigint) => Ok((bigint, expr.span())),
         None =>
         {
             state.report.error_span("expected integer value", &expr.span());

@@ -28,5 +28,8 @@ num-bigint = { version = "0.1", default_features = false }
 num-traits = { version = "0.1", default_features = false }
 num-integer = { version = "0.1", default_features = false }
 
+[dev-dependencies]
+sha2 = "0.9.1"
+
 [build-dependencies]
 vergen = "3.1.0"
