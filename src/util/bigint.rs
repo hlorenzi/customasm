@@ -102,6 +102,30 @@ impl BigInt
     }
 
 
+    pub fn size_or_min_size(&self) -> usize
+    {
+        if let Some(size) = self.size
+        {
+            size
+        }
+        else
+        {
+            self.min_size()
+        }
+    }
+
+
+    pub fn sign(&self) -> isize
+    {
+        match self.bigint.sign()
+        {
+            num_bigint::Sign::Minus => -1,
+            num_bigint::Sign::NoSign => 0,
+            num_bigint::Sign::Plus => 1,
+        }
+    }
+
+
     pub fn checked_to_usize(&self) -> Option<usize>
     {
         use num_traits::ToPrimitive;

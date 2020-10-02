@@ -173,7 +173,10 @@ pub fn match_rule(
 
                 match param.typ
                 {
-                    asm::PatternParameterType::Unspecified =>
+                    asm::PatternParameterType::Unspecified |
+                    asm::PatternParameterType::Unsigned(_) |
+                    asm::PatternParameterType::Signed(_) |
+                    asm::PatternParameterType::Integer(_) =>
                     {
                         //println!("> try match expr");
                         if subparser.is_at_partial()
@@ -225,7 +228,7 @@ pub fn match_rule(
                         }
                     }
 
-                    asm::PatternParameterType::RuleGroup(rule_group_ref)=>
+                    asm::PatternParameterType::Ruleset(rule_group_ref)=>
                     {
                         //println!("> try match subrule {:?}", rule_group_ref);
                         

@@ -665,7 +665,7 @@ impl State
 			{
 				&asm::RuleInvokationArgument::Expression(ref expr) =>
 				{
-					let arg_value = self.eval_expr(
+					let mut arg_value = self.eval_expr(
 						report.clone(),
 						&expr,
 						&invokation.ctx,
@@ -673,9 +673,15 @@ impl State
 						fileserver,
 						final_pass)?;
 
-					let arg_name = &rule.parameters[arg_index].name;
+					let arg = &rule.parameters[arg_index];
 
-					eval_ctx.set_local(arg_name, arg_value);
+					State::check_and_constrain_argument(
+						&mut arg_value,
+						arg.typ,
+						report.clone(),
+						&expr.span())?;
+
+					eval_ctx.set_local(&arg.name, arg_value);
 				}
 
 				&asm::RuleInvokationArgument::NestedRuleset(ref inner_candidates) =>
@@ -701,6 +707,102 @@ impl State
 			&mut eval_ctx,
 			fileserver,
 			final_pass)
+	}
+
+
+	pub fn check_and_constrain_argument(
+		value: &mut expr::Value,
+		typ: asm::PatternParameterType,
+		report: diagn::RcReport,
+		span: &diagn::Span)
+		-> Result<(), ()>
+	{
+		match typ
+		{
+			asm::PatternParameterType::Unspecified => Ok(()),
+			asm::PatternParameterType::Ruleset(_) => unreachable!(),
+
+			asm::PatternParameterType::Unsigned(size) =>
+			{
+				if let expr::Value::Integer(value_int) = value
+				{
+					if value_int.sign() == -1 ||
+						value_int.min_size() > size
+					{
+						report.error_span(
+							&format!("argument out of range for type `u{}`", size),
+							&span);
+						Err(())
+					}
+					else
+					{
+						value_int.size = Some(size);
+						Ok(())
+					}
+				}
+				else
+				{
+					report.error_span(
+						&format!("wrong argument for type `u{}`", size),
+						&span);
+					Err(())
+				}
+			}
+
+			asm::PatternParameterType::Signed(size) =>
+			{
+				if let expr::Value::Integer(value_int) = value
+				{
+					if (value_int.sign() == 0 && size == 0) ||
+						(value_int.sign() == 1 && value_int.min_size() >= size) ||
+						(value_int.sign() == -1 && value_int.min_size() > size)
+					{
+						report.error_span(
+							&format!("argument out of range for type `s{}`", size),
+							&span);
+						Err(())
+					}
+					else
+					{
+						value_int.size = Some(size);
+						Ok(())
+					}
+				}
+				else
+				{
+					report.error_span(
+						&format!("wrong argument for type `s{}`", size),
+						&span);
+					Err(())
+				}
+			}
+
+			asm::PatternParameterType::Integer(size) =>
+			{
+				if let expr::Value::Integer(value_int) = value
+				{
+					if value_int.min_size() > size
+					{
+						report.error_span(
+							&format!("argument out of range for type `i{}`", size),
+							&span);
+						Err(())
+					}
+					else
+					{
+						value_int.size = Some(size);
+						Ok(())
+					}
+				}
+				else
+				{
+					report.error_span(
+						&format!("wrong argument for type `i{}`", size),
+						&span);
+					Err(())
+				}
+			}
+		}
 	}
 	
 

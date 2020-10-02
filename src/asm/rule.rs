@@ -27,11 +27,14 @@ pub struct PatternParameter
 }
 
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum PatternParameterType
 {
     Unspecified,
-    RuleGroup(asm::RulesetRef),
+    Ruleset(asm::RulesetRef),
+    Unsigned(usize),
+    Signed(usize),
+    Integer(usize),
 }
 
 

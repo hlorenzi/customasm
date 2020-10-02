@@ -18,11 +18,9 @@ pub fn parse_rule(
 
             let param_type = if let Some(_) = state.parser.maybe_expect(syntax::TokenKind::Colon)
             {
-                let tk_param_type_name = state.parser.expect(syntax::TokenKind::Identifier)?;
-                let param_type_name = tk_param_type_name.excerpt.as_ref().unwrap().clone();
-
-                let rule_group_ref = state.asm_state.find_ruleset(param_type_name, state.report.clone(), &tk_param_type_name.span)?;
-                asm::PatternParameterType::RuleGroup(rule_group_ref)
+                let tk_typename = state.parser.expect(syntax::TokenKind::Identifier)?;
+                let typename = tk_typename.excerpt.as_ref().unwrap().clone();
+                interpret_typename(state, &typename, &tk_typename.span)?
             }
             else
             {
@@ -72,4 +70,37 @@ pub fn parse_rule(
     }*/
 
     Ok(rule)
+}
+
+
+fn interpret_typename(
+    state: &mut asm::parser::State,
+    typename: &str,
+    span: &diagn::Span)
+    -> Result<asm::PatternParameterType, ()>
+{
+    let first_char = typename.chars().next();
+
+    if first_char == Some('u') ||
+        first_char == Some('s') ||
+        first_char == Some('i')
+    {
+        if let Ok(size) = usize::from_str_radix(&typename[1..], 10)
+        {
+            match first_char
+            {
+                Some('u') => return Ok(asm::PatternParameterType::Unsigned(size)),
+                Some('s') => return Ok(asm::PatternParameterType::Signed(size)),
+                Some('i') => return Ok(asm::PatternParameterType::Integer(size)),
+                _ => unreachable!()
+            }
+        }
+    }
+    
+    let rule_group_ref = state.asm_state.find_ruleset(
+        typename,
+        state.report.clone(),
+        &span)?;
+
+    Ok(asm::PatternParameterType::Ruleset(rule_group_ref))
 }
