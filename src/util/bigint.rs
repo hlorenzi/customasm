@@ -34,6 +34,23 @@ impl BigInt
     }
 
 
+    pub fn as_string(&self) -> String
+    {
+        String::from_utf8_lossy(&self.bigint.to_signed_bytes_be()).to_string()
+    }
+
+
+    pub fn from_bytes_be(bytes: &[u8]) -> BigInt
+    {
+        let bigint = num_bigint::BigInt::from_signed_bytes_be(&bytes);
+        BigInt
+        {
+            bigint,
+            size: Some(bytes.len() * 8),
+        }
+    }
+
+
     pub fn set_bit(&self, index: usize, value: bool) -> BigInt
     {
         if value

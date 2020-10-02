@@ -102,9 +102,10 @@ impl BitVec
 
         for i in 0..self.bits.len()
         {
-            bigint = bigint.set_bit(i, self.bits[i]);
+            bigint = bigint.set_bit(self.bits.len() - 1 - i, self.bits[i]);
         }
 
+        bigint.size = Some(self.bits.len());
         bigint
     }
 	

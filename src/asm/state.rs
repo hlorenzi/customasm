@@ -28,6 +28,7 @@ pub struct Context
 	pub cur_wordsize: usize,
 	pub bank_ref: BankRef,
 	pub symbol_ctx: asm::SymbolContext,
+	pub cur_filename: std::rc::Rc<String>,
 }
 
 
@@ -126,7 +127,8 @@ impl Assembler
 				let bank_output = self.state.resolve_bankdata(
 					pass_report.clone(),
 					bank,
-					bankdata);
+					bankdata,
+					fileserver);
 
 				if pass_report.has_errors() || !bank_output.is_ok()
 				{
@@ -191,12 +193,13 @@ impl State
 	}
 
 
-	pub fn get_ctx(&self) -> Context
+	pub fn get_ctx(&self, state: &asm::parser::State) -> Context
 	{
 		let bit_offset = self.get_bankdata(self.cur_bank).cur_bit_offset;
 		let cur_wordsize = self.cur_wordsize;
 		let bank_ref = self.cur_bank;
 		let symbol_ctx = self.symbols.get_ctx();
+		let cur_filename = state.filename.clone();
 
 		Context
 		{
@@ -204,6 +207,7 @@ impl State
 			cur_wordsize,
 			bank_ref,
 			symbol_ctx,
+			cur_filename,
 		}
 	}
 	
@@ -393,7 +397,8 @@ impl State
 		&self,
 		report: diagn::RcReport,
 		bank: &asm::Bank,
-		bankdata: &asm::BankData)
+		bankdata: &asm::BankData,
+		fileserver: &dyn util::FileServer)
 		-> Result<util::BitVec, ()>
 	{
 		let mut bitvec = util::BitVec::new();
@@ -411,6 +416,7 @@ impl State
 					self.resolve_rule_invokation(
 						report.clone(),
 						&invok,
+						fileserver,
 						true)?
 				}
 				
@@ -423,6 +429,7 @@ impl State
 					self.resolve_data_invokation(
 						report.clone(),
 						&invok,
+						fileserver,
 						true)?
 				}
 				
@@ -532,6 +539,7 @@ impl State
 		&self,
 		report: diagn::RcReport,
 		invokation: &asm::Invokation,
+		fileserver: &dyn util::FileServer,
 		final_pass: bool)
 		-> Result<expr::Value, ()>
 	{
@@ -542,6 +550,7 @@ impl State
 			&data_invok.expr,
 			&invokation.ctx,
 			&mut expr::EvalContext::new(),
+			fileserver,
 			final_pass)?;
 
 		if let Some(elem_size) = data_invok.elem_size
@@ -580,6 +589,7 @@ impl State
 		&self,
 		report: diagn::RcReport,
 		invokation: &asm::Invokation,
+		fileserver: &dyn util::FileServer,
 		final_pass: bool)
 		-> Result<expr::Value, ()>
 	{
@@ -587,6 +597,7 @@ impl State
 			report.clone(),
 			invokation,
 			&invokation.get_rule_invok().candidates,
+			fileserver,
 			final_pass)
 	}
 
@@ -596,6 +607,7 @@ impl State
 		report: diagn::RcReport,
 		invokation: &asm::Invokation,
 		candidates: &Vec<asm::RuleInvokationCandidate>,
+		fileserver: &dyn util::FileServer,
 		final_pass: bool)
 		-> Result<expr::Value, ()>
 	{
@@ -607,6 +619,7 @@ impl State
 				candidate_report.clone(),
 				invokation,
 				candidate,
+				fileserver,
 				final_pass)
 			{
 				Ok(resolved) =>
@@ -624,6 +637,7 @@ impl State
 				report,
 				invokation,
 				candidates.last().unwrap(),
+				fileserver,
 				final_pass)
 		}
 		else
@@ -638,6 +652,7 @@ impl State
 		report: diagn::RcReport,
 		invokation: &asm::Invokation,
 		candidate: &asm::RuleInvokationCandidate,
+		fileserver: &dyn util::FileServer,
 		final_pass: bool)
 		-> Result<expr::Value, ()>
 	{
@@ -655,6 +670,7 @@ impl State
 						&expr,
 						&invokation.ctx,
 						&mut expr::EvalContext::new(),
+						fileserver,
 						final_pass)?;
 
 					let arg_name = &rule.parameters[arg_index].name;
@@ -668,6 +684,7 @@ impl State
 						report.clone(),
 						invokation,
 						&inner_candidates,
+						fileserver,
 						final_pass)?;
 
 					let arg_name = &rule.parameters[arg_index].name;
@@ -682,6 +699,7 @@ impl State
 			&rule.production,
 			&invokation.ctx,
 			&mut eval_ctx,
+			fileserver,
 			final_pass)
 	}
 	
@@ -692,14 +710,15 @@ impl State
 		expr: &expr::Expr,
 		ctx: &Context,
 		eval_ctx: &mut expr::EvalContext,
+		fileserver: &dyn util::FileServer,
 		final_pass: bool)
 		-> Result<expr::Value, ()>
 	{
 		expr.eval(
 			report,
 			eval_ctx,
-			&|info| self.eval_var(ctx, info, final_pass),
-			&|info| self.eval_fn(ctx, info))
+			&|info| self.eval_var(ctx, info, fileserver, final_pass),
+			&|info| self.eval_fn(ctx, info, fileserver))
 	}
 	
 		
@@ -707,6 +726,7 @@ impl State
 		&self,
 		ctx: &Context,
 		info: &expr::EvalVariableInfo,
+		_fileserver: &dyn util::FileServer,
 		final_pass: bool)
 		-> Result<expr::Value, bool>
 	{
@@ -726,9 +746,12 @@ impl State
 					};
 				}
 
-				"assert" =>
+				"assert" |
+				"incbin" |
+				"incbinstr" |
+				"inchexstr"  =>
 				{
-					return Ok(expr::Value::Function("assert".to_string()));
+					return Ok(expr::Value::Function(info.hierarchy[0].clone()));
 				}
 
 				_ => {}
@@ -761,8 +784,9 @@ impl State
 
 	fn eval_fn(
 		&self,
-		_ctx: &Context,
-		info: &expr::EvalFunctionInfo)
+		ctx: &Context,
+		info: &expr::EvalFunctionInfo,
+		fileserver: &dyn util::FileServer)
 		-> Result<expr::Value, bool>
 	{
 		match info.func
@@ -797,6 +821,98 @@ impl State
 							_ =>
 							{
 								info.report.error_span("wrong argument type", info.span);
+								return Err(true);
+							}
+						}
+					}
+
+					"incbin" |
+					"incbinstr" |
+					"inchexstr" =>
+					{
+						match &info.args[..]
+						{
+							&[expr::Value::Integer(ref bigint)] =>
+							{
+								let filename = bigint.as_string();
+								let new_filename = util::filename_navigate(
+									info.report.clone(),
+									&ctx.cur_filename,
+									&filename,
+									&info.span)
+									.map_err(|_| true)?;
+
+								match name.as_ref()
+								{
+									"incbin" =>
+									{
+										let bytes = fileserver.get_bytes(
+											info.report.clone(),
+											&new_filename,
+											Some(&info.span))
+											.map_err(|_| true)?;
+
+										Ok(expr::Value::make_integer(util::BigInt::from_bytes_be(&bytes)))
+									}
+
+									"incbinstr" |
+									"inchexstr" =>
+									{
+										let chars = fileserver.get_chars(
+											info.report.clone(),
+											&new_filename,
+											Some(&info.span))
+											.map_err(|_| true)?;
+
+										let mut bitvec = util::BitVec::new();
+
+										let bits_per_char = match name.as_ref()
+										{
+											"incbinstr" => 1,
+											"inchexstr" => 4,
+											_ => unreachable!(),
+										};
+										
+										for c in chars
+										{
+											if syntax::is_whitespace(c) ||
+												c == '_' ||
+												c == '\r' || c == '\n'
+											{
+												continue;
+											}
+
+											let digit = match c.to_digit(1 << bits_per_char)
+											{
+												Some(digit) => digit,
+												None =>
+												{
+													info.report.error_span(
+														"invalid character in file contents",
+														&info.span);
+													return Err(true);
+												}
+											};
+											
+											for i in 0..bits_per_char
+											{
+												let bit = (digit & (1 << (bits_per_char - 1 - i))) != 0;
+												bitvec.write(bitvec.len(), bit);
+											}
+										}
+
+										// TODO: Optimize conversion to bigint
+										Ok(expr::Value::make_integer(bitvec.as_bigint()))
+									}
+
+									_ => unreachable!()
+								}
+
+							}
+							
+							_ =>
+							{
+								info.report.error_span("wrong arguments", info.span);
 								return Err(true);
 							}
 						}

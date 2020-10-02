@@ -19,7 +19,7 @@ pub fn parse_directive_data(
         
         let mut invokation = asm::Invokation
         {
-            ctx: state.asm_state.get_ctx(),
+            ctx: state.asm_state.get_ctx(&state),
             size_guess: 0,
             span,
             kind: asm::InvokationKind::Data(asm::DataInvokation
@@ -32,6 +32,7 @@ pub fn parse_directive_data(
         let resolved = state.asm_state.resolve_data_invokation(
             state.report.clone(),
             &invokation,
+            state.fileserver,
             false);
 
         match elem_size

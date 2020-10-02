@@ -1,8 +1,8 @@
 [package]
 name = "customasm"
-version = "0.10.7"
+version = "0.11.0"
 edition = "2018"
-authors = ["Henrique Lorenzi <https://hlorenzi.com>"]
+authors = ["hlorenzi <https://hlorenzi.com>"]
 description = "An assembler for custom, user-defined instruction sets!"
 homepage = "https://github.com/hlorenzi/customasm"
 repository = "https://github.com/hlorenzi/customasm"

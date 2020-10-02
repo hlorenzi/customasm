@@ -12,7 +12,7 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
     {
         let mut invokation = asm::Invokation
         {
-            ctx: state.asm_state.get_ctx(),
+            ctx: state.asm_state.get_ctx(&state),
             size_guess: 0,
             span: subparser.get_full_span(),
             kind: asm::InvokationKind::Rule(asm::RuleInvokation
@@ -24,6 +24,7 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
         let resolved = state.asm_state.resolve_rule_invokation(
             state.report.clone(),
             &invokation,
+            state.fileserver,
             false);
 
         //println!("{} = {:?}", state.fileserver.get_excerpt(&invokation.span), &resolved);

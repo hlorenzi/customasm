@@ -5,9 +5,13 @@ This can be useful if you'd like to test out a new virtual machine's bytecode,
 or even if you're eager to write programs for that new processor architecture 
 you just implemented in FPGA!
 
+[![crates.io][badge-cratesio-img]][badge-cratesio-url]
 [![Latest Release][badge-latest-img]][badge-latest-url]
 [![Releases][badge-downloads-img]][badge-downloads-url]
 [![Discord][badge-discord-img]][badge-discord-url]
+
+[badge-cratesio-img]: https://img.shields.io/crates/v/customasm
+[badge-cratesio-url]: https://crates.io/crates/customasm
 
 [badge-latest-img]: https://img.shields.io/github/v/release/hlorenzi/customasm
 [badge-latest-url]: https://github.com/hlorenzi/customasm/releases
@@ -38,20 +42,16 @@ battery of tests available at `cargo test`.
 Given the following file:
 
 ```asm
-#cpudef
+#ruledef basic
 {
-    #bits 8
-    
-    load r1, {value} -> 0x11 @ value[7:0]
-    load r2, {value} -> 0x12 @ value[7:0]
-    load r3, {value} -> 0x13 @ value[7:0]
-    add  r1, r2      -> 0x21
-    sub  r3, {value} -> 0x33 @ value[7:0]
-    jnz  {address}   -> 0x40 @ address[15:0]
-    ret              -> 0x50
+    load r1, {value} => 0x11 @ value`8
+    load r2, {value} => 0x12 @ value`8
+    load r3, {value} => 0x13 @ value`8
+    add  r1, r2      => 0x21
+    sub  r3, {value} => 0x33 @ value`8
+    jnz  {address}   => 0x40 @ address`16
+    ret              => 0x50
 }
-
-#addr 0x100
 
 multiply3x4:
     load r1, 0
@@ -66,20 +66,20 @@ multiply3x4:
     ret
 ```
 
-...the assembler would use the `#cpudef` rules to convert the instructions into binary code:
+...the assembler would use the `#ruledef` rules to convert the instructions into binary code:
 
 ```asm
-  outp | addr | data
+ outp | addr | data
 
- 100:0 |  100 |          ; multiply3x4:
- 100:0 |  100 | 11 00    ; load r1, 0
- 102:0 |  102 | 12 03    ; load r2, 3
- 104:0 |  104 | 13 04    ; load r3, 4
- 106:0 |  106 |          ; .loop:
- 106:0 |  106 | 21       ; add r1, r2
- 107:0 |  107 | 33 01    ; sub r3, 1
- 109:0 |  109 | 40 01 06 ; jnz .loop
- 10c:0 |  10c | 50       ; ret
+  0:0 |    0 |          ; multiply3x4:
+  0:0 |    0 | 11 00    ; load r1, 0
+  2:0 |    2 | 12 03    ; load r2, 3
+  4:0 |    4 | 13 04    ; load r3, 4
+  6:0 |    6 |          ; .loop:
+  6:0 |    6 | 21       ; add r1, r2
+  7:0 |    7 | 33 01    ; sub r3, 1
+  9:0 |    9 | 40 00 06 ; jnz .loop
+  c:0 |    c | 50       ; ret
 ```
 
 ## Command Line Usage
@@ -92,9 +92,10 @@ Options:
                         binary, annotated, annotatedbin, binstr, hexstr,
                         bindump, hexdump, mif, intelhex, deccomma, hexcomma,
                         decc, hexc, logisim8, logisim16
-                        
-    -o, --output FILE   The name of the output file.
-    -s, --symbol FILE   The name of the output symbol file.
+    -o, --output [FILE] The name of the output file.
+    -s, --symbol [FILE] The name of the output symbol file.
+    -t, --iter [NUM]    The max number of passes the assembler will attempt
+                        (default: 10).
     -p, --print         Print output to stdout instead of writing to a file.
     -q, --quiet         Suppress progress reports.
     -v, --version       Display version information.

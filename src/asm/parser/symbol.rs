@@ -18,7 +18,7 @@ pub fn parse_symbol(
     let name = tk_name.excerpt.clone().unwrap();
     span = span.join(&tk_name.span);
     
-    let ctx = state.asm_state.get_ctx();
+    let ctx = state.asm_state.get_ctx(state);
     
     let value = if state.parser.maybe_expect(syntax::TokenKind::Equal).is_some()
     {		
@@ -28,6 +28,7 @@ pub fn parse_symbol(
             &expr,
             &ctx,
             &mut expr::EvalContext::new(),
+            state.fileserver,
             true)?;
 
         state.parser.expect_linebreak()?;

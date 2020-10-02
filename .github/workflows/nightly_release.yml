@@ -1,117 +1,117 @@
-name: Nightly Release
-
-on:
-  push:
-    branches:
-      - master
-
-jobs:
-  build:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@master
-    - name: Checkout code
-      env:
-        COMMIT_SHA: ${{ env.GITHUB_SHA }}
-      run: |
-        git fetch --prune --unshallow
-        git fetch origin +refs/tags/*:refs/tags/*
-        git checkout $COMMIT_SHA
-
-    - name: Install latest Rust stable
-      uses: actions-rs/toolchain@v1
-      with:
-          toolchain: stable
-          override: true
-          target: x86_64-pc-windows-gnu
-
-    - name: Run tests
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: --release --verbose
-
-    - name: Get previous nightly Release info
-      uses: octokit/request-action@v2.x
-      continue-on-error: true
-      id: get_prev_release
-      with:
-        route: GET /repos/:repository/releases/tags/nightly
-        repository: ${{ github.repository }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Delete previous nightly Release
-      uses: octokit/request-action@v2.x
-      if: ${{ steps.get_prev_release.outcome == 'success' }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        route: DELETE /repos/:repository/releases/:release_id
-        repository: ${{ github.repository }}
-        release_id: ${{ fromJson(steps.get_prev_release.outputs.data).id }}
-
-    - name: Delete remote nightly tag
-      if: ${{ steps.get_prev_release.outcome == 'success' }}
-      run: |
-        git push origin :refs/tags/nightly
-
-    - name: Delete local nightly tag
-      continue-on-error: true
-      run: |
-        git tag -d nightly
-
-    - name: Get nightly version
-      run: |
-        echo "::set-env name=RELEASE_TAG::$(git describe --tags)"
-        echo "$RELEASE_TAG"
-
-    - name: Build
-      uses: actions-rs/cargo@v1
-      with:
-        use-cross: true
-        command: build
-        args: --release --verbose --target=x86_64-pc-windows-gnu
-
-    - name: Create remote nightly tag
-      env:
-        COMMIT_SHA: ${{ env.GITHUB_SHA }}
-      run: |
-        git tag nightly
-        git push --tags
-
-    - name: Create nightly Release
-      id: create_release
-      uses: actions/create-release@latest
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: nightly
-        release_name: Nightly ${{ env.RELEASE_TAG }}
-        body: |
-          The latest commits are included in this build!
-        draft: false
-        prerelease: true
-
-    - name: Prepare Release asset
-      env:
-        TARGET_EXE: ./target/x86_64-pc-windows-gnu/release/customasm.exe
-      run: |
-        mkdir ./pkg
-        mv $TARGET_EXE ./pkg/customasm.exe
-        mv ./examples ./pkg/examples
-        mv ./README_PKG.txt ./pkg/README.txt
-        cd ./pkg
-        zip -r pkg.zip .
-
-    - name: Upload Release asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./pkg/pkg.zip
-        asset_name: customasm_${{ env.RELEASE_TAG }}_win64.zip
-        asset_content_type: application/zip
+#name: Nightly Release
+#
+#on:
+#  push:
+#    branches:
+#      - master
+#
+#jobs:
+#  build:
+#
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#    - uses: actions/checkout@master
+#    - name: Checkout code
+#      env:
+#        COMMIT_SHA: ${{ env.GITHUB_SHA }}
+#      run: |
+#        git fetch --prune --unshallow
+#        git fetch origin +refs/tags/*:refs/tags/*
+#        git checkout $COMMIT_SHA
+#
+#    - name: Install latest Rust stable
+#      uses: actions-rs/toolchain@v1
+#      with:
+#          toolchain: stable
+#          override: true
+#          target: x86_64-pc-windows-gnu
+#
+#    - name: Run tests
+#      uses: actions-rs/cargo@v1
+#      with:
+#        command: test
+#        args: --release --verbose
+#
+#    - name: Get previous nightly Release info
+#      uses: octokit/request-action@v2.x
+#      continue-on-error: true
+#      id: get_prev_release
+#      with:
+#        route: GET /repos/:repository/releases/tags/nightly
+#        repository: ${{ github.repository }}
+#      env:
+#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#
+#    - name: Delete previous nightly Release
+#      uses: octokit/request-action@v2.x
+#      if: ${{ steps.get_prev_release.outcome == 'success' }}
+#      env:
+#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      with:
+#        route: DELETE /repos/:repository/releases/:release_id
+#        repository: ${{ github.repository }}
+#        release_id: ${{ fromJson(steps.get_prev_release.outputs.data).id }}
+#
+#    - name: Delete remote nightly tag
+#      if: ${{ steps.get_prev_release.outcome == 'success' }}
+#      run: |
+#        git push origin :refs/tags/nightly
+#
+#    - name: Delete local nightly tag
+#      continue-on-error: true
+#      run: |
+#        git tag -d nightly
+#
+#    - name: Get nightly version
+#      run: |
+#        echo "::set-env name=RELEASE_TAG::$(git describe --tags)"
+#        echo "$RELEASE_TAG"
+#
+#    - name: Build
+#      uses: actions-rs/cargo@v1
+#      with:
+#        use-cross: true
+#        command: build
+#        args: --release --verbose --target=x86_64-pc-windows-gnu
+#
+#    - name: Create remote nightly tag
+#      env:
+#        COMMIT_SHA: ${{ env.GITHUB_SHA }}
+#      run: |
+#        git tag nightly
+#        git push --tags
+#
+#    - name: Create nightly Release
+#      id: create_release
+#      uses: actions/create-release@latest
+#      env:
+#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      with:
+#        tag_name: nightly
+#        release_name: Nightly ${{ env.RELEASE_TAG }}
+#        body: |
+#          The latest commits are included in this build!
+#        draft: false
+#        prerelease: true
+#
+#    - name: Prepare Release asset
+#      env:
+#        TARGET_EXE: ./target/x86_64-pc-windows-gnu/release/customasm.exe
+#      run: |
+#        mkdir ./pkg
+#        mv $TARGET_EXE ./pkg/customasm.exe
+#        mv ./examples ./pkg/examples
+#        mv ./README_PKG.txt ./pkg/README.txt
+#        cd ./pkg
+#        zip -r pkg.zip .
+#
+#    - name: Upload Release asset
+#      uses: actions/upload-release-asset@v1
+#      env:
+#        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      with:
+#        upload_url: ${{ steps.create_release.outputs.upload_url }}
+#        asset_path: ./pkg/pkg.zip
+#        asset_name: customasm_${{ env.RELEASE_TAG }}_win64.zip
+#        asset_content_type: application/zip

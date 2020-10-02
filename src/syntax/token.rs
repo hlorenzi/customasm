@@ -429,7 +429,7 @@ fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 }
 
 
-fn is_whitespace(c: char) -> bool
+pub fn is_whitespace(c: char) -> bool
 {
 	c == ' '  ||
 	c == '\t' ||

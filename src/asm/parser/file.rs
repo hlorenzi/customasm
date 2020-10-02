@@ -19,7 +19,7 @@ pub fn parse_file<TFilename: Into<String>>(
         report,
         asm_state,
         fileserver,
-        filename,
+        filename: std::rc::Rc::new(filename),
         
         parser,
     };
@@ -143,8 +143,9 @@ pub fn parse_expr_bigint(state: &mut asm::parser::State) -> Result<(util::BigInt
     let value = state.asm_state.eval_expr(
         state.report.clone(),
         &expr,
-        &state.asm_state.get_ctx(),
+        &state.asm_state.get_ctx(&state),
         &mut expr::EvalContext::new(),
+        state.fileserver,
         true)?;
 
     match value.get_bigint()
@@ -165,8 +166,9 @@ pub fn parse_expr_usize(state: &mut asm::parser::State) -> Result<usize, ()>
     let value = state.asm_state.eval_expr(
         state.report.clone(),
         &expr,
-        &state.asm_state.get_ctx(),
+        &state.asm_state.get_ctx(&state),
         &mut expr::EvalContext::new(),
+        state.fileserver,
         true)?;
 
     match value.get_bigint()
@@ -199,8 +201,9 @@ where F: Fn(usize) -> Option<usize>
     let value = state.asm_state.eval_expr(
         state.report.clone(),
         &expr,
-        &state.asm_state.get_ctx(),
+        &state.asm_state.get_ctx(&state),
         &mut expr::EvalContext::new(),
+        state.fileserver,
         true)?;
 
     match value.get_bigint()
