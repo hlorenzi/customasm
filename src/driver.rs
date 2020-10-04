@@ -170,27 +170,28 @@ fn drive_inner(
 		max_iterations)
 		.map_err(|_| false)?;
 
+	let binary = output.binary;
 
-	//let output_symbol_data = assembled.get_symbol_output();
+	let output_symbol_data = output.symbols.format_output();
 	let output_data: Vec<u8> = match out_format
 	{
-		OutputFormat::Binary    => output.format_binary(),
+		OutputFormat::Binary    => binary.format_binary(),
 		
-		OutputFormat::BinStr    => output.format_binstr  ().bytes().collect(),
-		OutputFormat::HexStr    => output.format_hexstr  ().bytes().collect(),
-		OutputFormat::BinDump   => output.format_bindump ().bytes().collect(),
-		OutputFormat::HexDump   => output.format_hexdump ().bytes().collect(),
-		OutputFormat::Mif       => output.format_mif     ().bytes().collect(),
-		OutputFormat::IntelHex  => output.format_intelhex().bytes().collect(),
-		OutputFormat::DecComma  => output.format_comma   (10).bytes().collect(),
-		OutputFormat::HexComma  => output.format_comma   (16).bytes().collect(),
-		OutputFormat::DecC      => output.format_c_array (10).bytes().collect(),
-		OutputFormat::HexC      => output.format_c_array (16).bytes().collect(),
-		OutputFormat::LogiSim8  => output.format_logisim (8).bytes().collect(),
-		OutputFormat::LogiSim16 => output.format_logisim (16).bytes().collect(),
+		OutputFormat::BinStr    => binary.format_binstr  ()  .bytes().collect(),
+		OutputFormat::HexStr    => binary.format_hexstr  ()  .bytes().collect(),
+		OutputFormat::BinDump   => binary.format_bindump ()  .bytes().collect(),
+		OutputFormat::HexDump   => binary.format_hexdump ()  .bytes().collect(),
+		OutputFormat::Mif       => binary.format_mif     ()  .bytes().collect(),
+		OutputFormat::IntelHex  => binary.format_intelhex()  .bytes().collect(),
+		OutputFormat::DecComma  => binary.format_comma   (10).bytes().collect(),
+		OutputFormat::HexComma  => binary.format_comma   (16).bytes().collect(),
+		OutputFormat::DecC      => binary.format_c_array (10).bytes().collect(),
+		OutputFormat::HexC      => binary.format_c_array (16).bytes().collect(),
+		OutputFormat::LogiSim8  => binary.format_logisim (8) .bytes().collect(),
+		OutputFormat::LogiSim16 => binary.format_logisim (16).bytes().collect(),
 		
-		OutputFormat::AnnotatedHex => output.format_annotated_hex(fileserver).bytes().collect(),
-		OutputFormat::AnnotatedBin => output.format_annotated_bin(fileserver).bytes().collect(),
+		OutputFormat::AnnotatedHex => binary.format_annotated_hex(fileserver).bytes().collect(),
+		OutputFormat::AnnotatedBin => binary.format_annotated_bin(fileserver).bytes().collect(),
 	};
 	
 	if out_stdout
@@ -204,8 +205,8 @@ fn drive_inner(
 		if output_requested || output_file.is_some()
 			{ println!("{}", String::from_utf8_lossy(&output_data)); }
 			
-		//if output_symbol_requested || output_symbol_file.is_some()
-		//	{ println!("{}", &output_symbol_data); }
+		if output_symbol_requested || output_symbol_file.is_some()
+			{ println!("{}", &output_symbol_data); }
 	}
 	else
 	{
@@ -218,12 +219,12 @@ fn drive_inner(
 			any_files_written = true;
 		}
 
-		/*if let Some(ref output_symbol_file) = output_symbol_file
+		if let Some(ref output_symbol_file) = output_symbol_file
 		{
 			println!("writing `{}`...", &output_symbol_file);
 			fileserver.write_bytes(report.clone(), &output_symbol_file, &output_symbol_data.bytes().collect::<Vec<u8>>(), None).map_err(|_| false)?;
 			any_files_written = true;
-		}*/
+		}
 
 		if !any_files_written
 			{ println!("no files written"); }

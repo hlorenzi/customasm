@@ -54,6 +54,13 @@ pub struct RuleRef
 }
 
 
+pub struct AssemblyOutput
+{
+	pub binary: util::BitVec,
+	pub symbols: asm::SymbolManager,
+}
+
+
 impl Assembler
 {
 	pub fn new() -> Assembler
@@ -79,7 +86,7 @@ impl Assembler
         report: diagn::RcReport,
 		fileserver: &dyn util::FileServer,
 		max_iterations: usize)
-        -> Result<util::BitVec, ()>
+        -> Result<AssemblyOutput, ()>
 	{
 		let mut symbol_guesses = asm::SymbolManager::new();
 
@@ -142,7 +149,7 @@ impl Assembler
 
 					// FIXME: multiplication by wordsize can overflow
 					full_output.write_bitvec(
-						output_offset * bank.wordsize,
+						output_offset,
 						&bank_output.unwrap());
 				}
 				else
@@ -156,7 +163,12 @@ impl Assembler
 			if all_bankdata_resolved
 			{
 				pass_report.transfer_to(report);
-				return Ok(full_output);
+
+				return Ok(AssemblyOutput
+				{
+					binary: full_output,
+					symbols: std::mem::replace(&mut self.state.symbols, asm::SymbolManager::new()),
+				});
 			}
 
 			if iteration >= max_iterations
@@ -268,8 +280,8 @@ impl State
 					{ continue; }
 
 				// FIXME: multiplication by wordsize can overflow
-				let outp1 = bank.output_offset.unwrap() * bank.wordsize;
-				let outp2 = other_bank.output_offset.unwrap() * bank.wordsize;
+				let outp1 = bank.output_offset.unwrap();
+				let outp2 = other_bank.output_offset.unwrap();
 
 				// FIXME: multiplication by wordsize can overflow
 				let size1 = bank.addr_size.map(|s| s * bank.wordsize);

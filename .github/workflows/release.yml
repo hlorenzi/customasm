@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+    - 'v*'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@master
+
+    - name: Install latest Rust stable
+      uses: actions-rs/toolchain@v1
+      with:
+          toolchain: stable
+          override: true
+          target: x86_64-pc-windows-gnu
+
+    - name: Run tests
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --release --verbose
+
+    - name: Build
+      uses: actions-rs/cargo@v1
+      with:
+        use-cross: true
+        command: build
+        args: --release --verbose --target=x86_64-pc-windows-gnu
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@latest
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: ${{ github.ref }}
+        body: Here's a new release!
+        draft: false
+        prerelease: false
+
+    - name: Prepare Release asset
+      env:
+        TARGET_EXE: ./target/x86_64-pc-windows-gnu/release/customasm.exe
+      run: |
+        mkdir ./pkg
+        mv $TARGET_EXE ./pkg/customasm.exe
+        mv ./examples ./pkg/examples
+        mv ./README_PKG.txt ./pkg/README.txt
+        cd ./pkg
+        zip -r pkg.zip .
+
+    - name: Upload Release asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./pkg/pkg.zip
+        asset_name: customasm_win64.zip
+        asset_content_type: application/zip

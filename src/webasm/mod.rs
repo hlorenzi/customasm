@@ -1,6 +1,4 @@
-use crate::asm::AssemblerState;
-use crate::diagn::RcReport;
-use crate::util::FileServerMock;
+use crate::*;
 use std::mem;
 use std::ptr;
 
@@ -10,38 +8,38 @@ pub unsafe extern fn wasm_assemble(format: u32, src: *mut String) -> *mut String
 {
 	let src = mem::transmute::<_, &String>(src);
 	
-	let mut fileserver = FileServerMock::new();
+	let mut fileserver = util::FileServerMock::new();
 	fileserver.add("asm", src.clone());
 	
-	let assemble = |report: RcReport, fileserver: &FileServerMock, filename: &str| -> Result<String, ()>
+	let assemble = |report: diagn::RcReport, fileserver: &util::FileServerMock, filename: &str| -> Result<String, ()>
 	{
-		let mut asm = AssemblerState::new();
-		asm.process_file(report.clone(), fileserver, filename)?;
-		asm.wrapup(report.clone())?;
+		let mut asm = asm::Assembler::new();
+		asm.register_file(filename);
+		let output = asm.assemble(report.clone(), fileserver, 10)?;
 		
-		let output = asm.get_binary_output();
+		let binary = output.binary;
 		match format
 		{
-			 0 => Ok(output.generate_annotated_hex(fileserver, 0, output.len())),
-			 1 => Ok(output.generate_annotated_bin(fileserver, 0, output.len())),
+			 0 => Ok(binary.format_annotated_hex(fileserver)),
+			 1 => Ok(binary.format_annotated_bin(fileserver)),
 			 
-			 2 => Ok(output.generate_hexdump (0, output.len())),
-			 3 => Ok(output.generate_bindump (0, output.len())),
-			 4 => Ok(output.generate_hexstr  (0, output.len())),
-			 5 => Ok(output.generate_binstr  (0, output.len())),
-			 6 => Ok(output.generate_mif     (0, output.len())),
-			 7 => Ok(output.generate_intelhex(0, output.len())),
-			 8 => Ok(output.generate_comma   (0, output.len(), 10)),
-			 9 => Ok(output.generate_comma   (0, output.len(), 16)),
-			10 => Ok(output.generate_c_array (0, output.len(), 10)),
-			11 => Ok(output.generate_c_array (0, output.len(), 16)),
-			12 => Ok(output.generate_logisim (0, output.len(), 8)),
-			13 => Ok(output.generate_logisim (0, output.len(), 16)),
+			 2 => Ok(binary.format_hexdump ()),
+			 3 => Ok(binary.format_bindump ()),
+			 4 => Ok(binary.format_hexstr  ()),
+			 5 => Ok(binary.format_binstr  ()),
+			 6 => Ok(binary.format_mif     ()),
+			 7 => Ok(binary.format_intelhex()),
+			 8 => Ok(binary.format_comma   (10)),
+			 9 => Ok(binary.format_comma   (16)),
+			10 => Ok(binary.format_c_array (10)),
+			11 => Ok(binary.format_c_array (16)),
+			12 => Ok(binary.format_logisim (8)),
+			13 => Ok(binary.format_logisim (16)),
 			_ => unreachable!()
 		}
 	};
 		
-	let report = RcReport::new();
+	let report = diagn::RcReport::new();
 	
 	let output = match assemble(report.clone(), &fileserver, "asm")
 	{
@@ -61,7 +59,7 @@ pub unsafe extern fn wasm_assemble(format: u32, src: *mut String) -> *mut String
 #[no_mangle]
 pub unsafe extern fn wasm_get_version() -> *mut String
 {
-	wasm_string_new_with(env!("VERGEN_SEMVER_LIGHTWEIGHT"))
+	wasm_string_new_with(env!("CARGO_PKG_VERSION"))
 }
 
 

@@ -13,10 +13,10 @@ fn test_example(filename: &str, hash: &[u8])
     report.print_all(&mut std::io::stdout(), &fileserver);
 
     let mut output_hasher = sha2::Sha256::new();
-    output_hasher.update(output.as_ref().unwrap().format_binary());
+    output_hasher.update(output.as_ref().unwrap().binary.format_binary());
     let output_hash = output_hasher.finalize();
 
-    println!("{}", output.as_ref().unwrap().format_annotated_hex(&fileserver));
+    println!("{}", output.as_ref().unwrap().binary.format_annotated_hex(&fileserver));
     
     assert_eq!(output_hash[..], *hash);
 }

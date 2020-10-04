@@ -188,4 +188,59 @@ impl SymbolManager
 
         Ok(())
     }
+
+
+    pub fn format_output(&self) -> String
+	{
+		let mut result = String::new();
+
+		for (name, data) in &self.globals
+		{
+            self.format_output_recursive(
+                &mut result,
+                &mut vec![name.clone()],
+                data);
+		}
+
+		result
+    }
+
+
+    fn format_output_recursive(
+        &self,
+        result: &mut String,
+        hierarchy: &mut Vec<String>,
+        data: &Symbol)
+    {
+        match &data.value
+        {
+            expr::Value::Integer(ref bigint) =>
+            {
+                for i in 0..hierarchy.len()
+                {
+                    if i > 0
+                    {
+                        result.push_str(".");
+                    }
+
+                    result.push_str(&format!("{}", hierarchy[i]));
+                }
+
+                result.push_str(&format!(" = 0x{:x}\n", bigint));
+            }
+            _ => {}
+        }
+
+        for (child_name, child_data) in &data.children
+        {
+            hierarchy.push(child_name.clone());
+
+            self.format_output_recursive(
+                result,
+                hierarchy,
+                &child_data);
+
+            hierarchy.pop();
+        }
+    }
 }

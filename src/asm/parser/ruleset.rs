@@ -3,17 +3,24 @@ use crate::*;
 
 pub fn parse_directive_ruledef(
     state: &mut asm::parser::State,
+    tk_directive: &syntax::Token,
     enable: bool)
     -> Result<(), ()>
 {
-    let tk_name = state.parser.expect(syntax::TokenKind::Identifier)?;
-    let name = tk_name.excerpt.as_ref().unwrap().clone();
+    let mut decl_span = tk_directive.span.clone();
+    let mut name = format!("{}_anonymous", state.asm_state.rulesets.len());
 
-    if let Some(duplicate) = state.asm_state.rulesets.iter().find(|r| r.name == name)
+    if let Some(tk_name) = state.parser.maybe_expect(syntax::TokenKind::Identifier)
     {
-        let _guard = state.report.push_parent("duplicate ruleset", &tk_name.span);
-        state.report.note_span("first declared here", &duplicate.decl_span);
-        return Err(());
+        decl_span = tk_name.span.clone();
+        name = tk_name.excerpt.as_ref().unwrap().clone();
+
+        if let Some(duplicate) = state.asm_state.rulesets.iter().find(|r| r.name == name)
+        {
+            let _guard = state.report.push_parent("duplicate ruleset", &tk_name.span);
+            state.report.note_span("first declared here", &duplicate.decl_span);
+            return Err(());
+        }
     }
 
     state.parser.expect(syntax::TokenKind::BraceOpen)?;
@@ -22,7 +29,7 @@ pub fn parse_directive_ruledef(
     {
         name: name.clone(),
         rules: Vec::new(),
-        decl_span: tk_name.span.clone(),
+        decl_span: decl_span.clone(),
     };
 
     while !state.parser.next_is(0, syntax::TokenKind::BraceClose)
@@ -40,7 +47,7 @@ pub fn parse_directive_ruledef(
         state.asm_state.activate_ruleset(
             name,
             state.report.clone(),
-            &tk_name.span)?;
+            &decl_span)?;
     }
 
     Ok(())

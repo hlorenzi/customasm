@@ -1,5 +1,5 @@
 # customasm
-This is an assembler that takes custom instruction set definitions
+This is an assembler that takes custom, user-defined instruction sets
 and uses them to assemble source files.  
 This can be useful if you'd like to test out a new virtual machine's bytecode,
 or even if you're eager to write programs for that new processor architecture 
@@ -20,29 +20,38 @@ you just implemented in FPGA!
 [badge-downloads-url]: https://github.com/hlorenzi/customasm/releases
 
 [badge-discord-img]: https://img.shields.io/discord/394999035540275222?label=Discord&logo=discord
-[badge-discord-url]: https://discord.gg/pXeDXGD
+[badge-discord-url]: https://discord.com/invite/pXeDXGD
 
 [📱 Try it right now in your browser!](https://hlorenzi.github.io/customasm/web/)
  
-[🎁 Check out the Releases section](https://github.com/hlorenzi/customasm/releases) 
-for pre-built binaries.
-
 [📖 Check out the User Guide](https://github.com/hlorenzi/customasm/wiki/User-Guide)
-on how to use the main features!
-
-[📋 Check out the documentation](/doc/index.md) for more in-depth instructions.
+for instructions!
 
 [🕹 Check out an example project](/examples/nes/) which targets the NES!
 
-You can compile from source by simply doing `cargo build`. There's also a
-battery of tests available at `cargo test`.
+## New v0.11
+
+[📖 Check out instructions for migration from older versions to v0.11!](https://github.com/hlorenzi/customasm/wiki/Migrating-to-v0.11)
+
+## Installation
+
+You can install directly from crates.io by running `cargo install customasm`.
+Then the `customasm` application should automatically become available in your
+command-line environment.
+
+You can also download pre-built executables from the
+[Releases section](https://github.com/hlorenzi/customasm/releases).
+
+You can compile from source yourself by first cloning the repository and
+then simply running `cargo build`.
+There's also a battery of tests available at `cargo test`.
 
 ## Example
 
 Given the following file:
 
 ```asm
-#ruledef basic
+#ruledef
 {
     load r1, {value} => 0x11 @ value`8
     load r2, {value} => 0x12 @ value`8
@@ -66,7 +75,8 @@ multiply3x4:
     ret
 ```
 
-...the assembler would use the `#ruledef` rules to convert the instructions into binary code:
+...the assembler will use the `#ruledef` directive to convert the
+instructions into binary code:
 
 ```asm
  outp | addr | data
@@ -82,7 +92,7 @@ multiply3x4:
   c:0 |    c | 50       ; ret
 ```
 
-## Command Line Usage
+## Command-Line Usage
 
 ```
 Usage: customasm [options] <asm-file-1> ... <asm-file-N>

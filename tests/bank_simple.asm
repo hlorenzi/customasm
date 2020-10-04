@@ -17,7 +17,7 @@
 #bankdef test
 {
     #addr 0x8000
-    #outp 0x0000
+    #outp 8 * 0x0000
 }
 
 loop
@@ -35,14 +35,14 @@ loop
 {
     #addr 0xaa00
     #size 0x0010
-    #outp 0x0000
+    #outp 8 * 0x0000
 }
 
 #bankdef b
 {
     #addr 0xbb00
     #size 0x0010
-    #outp 0x0010
+    #outp 8 * 0x0010
 }
 
 loop
@@ -70,7 +70,7 @@ loop
 #bankdef test
 {
     #addr 0x8000
-    #outp 0x0000
+    #outp 8 * 0x0000
 }
 
 loop ; = 0x55558000
@@ -106,7 +106,7 @@ loop ; error: non-writable
 ; :::
 #bankdef a { #outp -0x8000 } ; error: valid range
 ; :::
-#bankdef a { #size 0x10 #outp 0x10 } ; error: expected line break
+#bankdef a { #size 0x10 #outp 8 * 0x10 } ; error: expected line break
 ; :::
 #bankdef a { #outp 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff } ; error: valid range
 ; :::

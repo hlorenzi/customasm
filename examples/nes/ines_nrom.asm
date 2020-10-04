@@ -1,6 +1,6 @@
-#bankdef header   { #addr 0x0,    #size 0x10,   #outp 0x0    }
-#bankdef prg      { #addr 0x8000, #size 0x7ffa, #outp 0x10   }
-#bankdef vectors  { #addr 0xfffa, #size 0x6,    #outp 0x800a }
+#bankdef header   { #addr 0x0,    #size 0x10,   #outp 8 * 0x0    }
+#bankdef prg      { #addr 0x8000, #size 0x7ffa, #outp 8 * 0x10   }
+#bankdef vectors  { #addr 0xfffa, #size 0x6,    #outp 8 * 0x800a }
 #bankdef zeropage { #addr 0x0,    #size 0x100 }
 #bankdef ram      { #addr 0x200,  #size 0x600 }
 

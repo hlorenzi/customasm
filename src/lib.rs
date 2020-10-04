@@ -15,26 +15,25 @@ pub mod util;
 pub mod driver;
 
 
-//pub mod webasm;
+pub mod webasm;
 
 
 #[cfg(test)]
 pub mod test;
 
 
-/*pub fn assemble_str_to_binary(src: &str) -> (Option<Vec<u8>>, Report)
+pub fn assemble_str_to_binary(src: &str) -> (Option<Vec<u8>>, diagn::Report)
 {
-	let mut fileserver = FileServerMock::new();
+	let mut fileserver = util::FileServerMock::new();
 	fileserver.add("str", src.clone());
 	
-	let assemble = |report: diagn::RcReport, fileserver: &FileServerMock, filename: &str| -> Result<Vec<u8>, ()>
+	let assemble = |report: diagn::RcReport, fileserver: &util::FileServerMock, filename: &str| -> Result<Vec<u8>, ()>
 	{
-		let mut asm = AssemblerState::new();
-		asm.process_file(report.clone(), fileserver, filename)?;
-		asm.wrapup(report)?;
+		let mut asm = asm::Assembler::new();
+		asm.register_file(filename);
+		let output = asm.assemble(report.clone(), fileserver, 10)?;
 		
-		let output = asm.get_binary_output();
-		Ok(output.generate_binary(0, output.len()))
+		Ok(output.binary.format_binary())
 	};
 		
 	let report = diagn::RcReport::new();
@@ -44,4 +43,4 @@ pub mod test;
 		Ok(output) => (Some(output), report.into_inner()),
 		Err(_) => (None, report.into_inner())
 	}
-}*/
+}

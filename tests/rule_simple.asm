@@ -75,9 +75,30 @@ nop
 
 ; ===========
 ; ::: include
+
+#ruledef
+{
+    halt => 0x55
+}
+
+#ruledef
+{
+    nop => 0xaa
+}
+
+; :::
+halt ; = 0x55
+nop  ; = 0xaa
+halt ; = 0x55
+nop  ; = 0xaa
+
+
+
+; ===========
+; ::: include
 ; :::
 
-#ruledef "test" ; error: expected identifier
+#ruledef "test" ; error: expected
 {
     halt => 0x55
 }

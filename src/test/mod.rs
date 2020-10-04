@@ -3,9 +3,9 @@ use crate::*;
 
 mod excerpt;
 mod expr;
-//mod cpudef;
 mod asm;
 mod examples;
+mod lib;
 
 
 pub enum ExpectedResult<T>
