@@ -270,6 +270,15 @@ impl State
 		report: diagn::RcReport)
 		-> Result<(), ()>
 	{
+		if self.banks.len() > 0 && self.bankdata[0].cur_bit_offset != 0
+		{
+			report.error_span(
+				"cannot create new bank if the default bank has already been used",
+				&bank.decl_span.as_ref().unwrap());
+
+			return Err(());
+		}
+
 		if bank.output_offset.is_some()
 		{
 			for j in 1..self.banks.len()
