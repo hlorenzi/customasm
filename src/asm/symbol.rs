@@ -130,6 +130,11 @@ impl SymbolManager
 
     pub fn get(&self, ctx: &SymbolContext, hierarchy_level: usize, hierarchy: &[String]) -> Option<&Symbol>
     {
+        if hierarchy_level > ctx.hierarchy.len()
+        {
+            return None;
+        }
+
         let parent = SymbolManager::get_parent(&self.globals, &ctx.hierarchy[0..hierarchy_level])?;
         SymbolManager::traverse(parent, hierarchy)
     }
@@ -137,6 +142,11 @@ impl SymbolManager
 
     pub fn get_mut(&mut self, ctx: &SymbolContext, hierarchy_level: usize, hierarchy: &[String]) -> Option<&mut Symbol>
     {
+        if hierarchy_level > ctx.hierarchy.len()
+        {
+            return None;
+        }
+        
         let parent = SymbolManager::get_mut_parent(&mut self.globals, &ctx.hierarchy[0..hierarchy_level])?;
         SymbolManager::traverse_mut(parent, hierarchy)
     }

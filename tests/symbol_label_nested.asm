@@ -180,3 +180,16 @@ global1:
 .local1:
 ..local2 ; error: expected
     ld global1.local1
+
+; :::
+
+global1:
+    ld ..local2
+..local2: ; error: nesting level
+
+; :::
+
+global1:
+.local1:
+    ld ..local2 ; = 0x5502
+..local2:
