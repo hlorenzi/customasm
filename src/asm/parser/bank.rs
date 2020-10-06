@@ -113,5 +113,8 @@ pub fn parse_directive_bank(
         state.report.clone(),
         &tk_name.span)?;
 
+    let bank = &state.asm_state.banks[state.asm_state.cur_bank.index];
+    state.asm_state.cur_wordsize = bank.wordsize;
+
     Ok(())
 }

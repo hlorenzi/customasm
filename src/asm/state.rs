@@ -285,7 +285,7 @@ impl State
 
 				// FIXME: multiplication by wordsize can overflow
 				let size1 = bank.addr_size.map(|s| s * bank.wordsize);
-				let size2 = other_bank.addr_size.map(|s| s * bank.wordsize);
+				let size2 = other_bank.addr_size.map(|s| s * other_bank.wordsize);
 
 				let overlap = match (size1, size2)
 				{
