@@ -543,6 +543,14 @@ impl State
 				invok.span.clone());
 		}
 
+		if bank.fill && bank.addr_size.is_some()
+		{
+			while bitvec.len() < bank.addr_size.unwrap() * bank.wordsize
+			{
+				bitvec.write(bitvec.len(), false);
+			}
+		}
+
 		Ok(bitvec)
 	}
 
