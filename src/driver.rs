@@ -272,21 +272,31 @@ fn print_usage(opts: &getopts::Options)
 
 fn print_version_short()
 {
-	println!("{} {} ({}, {})",
+	let mut version = env!("VERGEN_SEMVER_LIGHTWEIGHT").to_string();
+	if version == "UNKNOWN"
+	{
+		version = format!("v{}", env!("CARGO_PKG_VERSION"));
+	}
+
+
+	let mut date = format!("{}, ", env!("VERGEN_COMMIT_DATE"));
+	if date == "UNKNOWN, "
+	{
+		date = "".to_string();
+	}
+
+
+	println!("{} {} ({}{})",
 		env!("CARGO_PKG_NAME"),
-		env!("VERGEN_SEMVER_LIGHTWEIGHT"),
-		env!("VERGEN_COMMIT_DATE"),
+		version,
+		date,
 		env!("VERGEN_TARGET_TRIPLE"));
 }
 
 
 fn print_version_full()
 {
-	println!("{} {} ({}, {})",
-		env!("CARGO_PKG_NAME"),
-		env!("VERGEN_SEMVER_LIGHTWEIGHT"),
-		env!("VERGEN_COMMIT_DATE"),
-		env!("VERGEN_TARGET_TRIPLE"));
+	print_version_short();
 	println!("https://github.com/hlorenzi/customasm");
 }
 

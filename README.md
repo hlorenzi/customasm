@@ -22,7 +22,7 @@ you just implemented in FPGA!
 [badge-discord-img]: https://img.shields.io/discord/394999035540275222?label=Discord&logo=discord
 [badge-discord-url]: https://discord.com/invite/pXeDXGD
 
-[📱 Try it right now in your browser!](https://hlorenzi.github.io/customasm/web/)
+[📱 Try it right now on your browser!](https://hlorenzi.github.io/customasm/web/)
  
 [📖 Check out the User Guide](https://github.com/hlorenzi/customasm/wiki/User-Guide)
 for instructions!
