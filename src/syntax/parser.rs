@@ -230,6 +230,10 @@ impl<'a> Parser<'a>
 			if self.tokens[self.index].kind == TokenKind::LineBreak
 				{ self.read_linebreak = true; }
 			
+			/*if self.tokens[self.index].kind == TokenKind::Comment &&
+				self.tokens[self.index].excerpt.as_ref().unwrap().chars().any(|c| c == '\n')
+				{ self.read_linebreak = true; }*/
+
 			self.index += 1;
 		}
 	}
