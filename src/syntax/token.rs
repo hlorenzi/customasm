@@ -309,11 +309,18 @@ fn check_for_comment(src: &[char]) -> Option<(TokenKind, usize)>
 	
 	if src[length] != ';'
 		{ return None; }
-	
-	while length < src.len() && src[length] != '\n'
-		{ length += 1; }
-		
-	Some((TokenKind::Comment, length))
+	if src[length+1] == '*'
+    {
+        while length < src.len() && !(src[length] == '*' && src[length+1] == ';')
+            { length += 1; }
+    	return Some((TokenKind::Comment, length + 1));
+    }
+    else
+    {
+    	while length < src.len() && src[length] != '\n'
+    		{ length += 1; }
+    	return Some((TokenKind::Comment, length));
+    }
 }
 
 
