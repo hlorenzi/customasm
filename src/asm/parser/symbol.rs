@@ -17,11 +17,12 @@ pub fn parse_symbol(
     let tk_name = state.parser.expect(syntax::TokenKind::Identifier)?;
     let name = tk_name.excerpt.clone().unwrap();
     span = span.join(&tk_name.span);
-    
-    let ctx = state.asm_state.get_ctx(state);
+
+    let ctx;
     
     let value = if state.parser.maybe_expect(syntax::TokenKind::Equal).is_some()
     {		
+        ctx = state.asm_state.get_ctx(state);
         let expr = expr::Expr::parse(&mut state.parser)?;
         let value = state.asm_state.eval_expr(
             state.report.clone(),
@@ -36,10 +37,23 @@ pub fn parse_symbol(
     }
     else
     {
+        if state.asm_state.cur_labelalign != 0
+        {
+            println!("{:?}", state.asm_state.cur_labelalign);
+            let bankdata = state.asm_state.get_bankdata(state.asm_state.cur_bank);
+            let skip_bits = bankdata.bits_until_aligned(
+                state.asm_state,
+                state.asm_state.cur_labelalign);
+        
+            let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
+            bankdata.reserve(skip_bits);
+        }
+
         let tk_colon = state.parser.expect(syntax::TokenKind::Colon)?;
         
         span = span.join(&tk_colon.span);
         
+        ctx = state.asm_state.get_ctx(state);
         let addr = state.asm_state.get_addr(
             state.report.clone(),
             &ctx,

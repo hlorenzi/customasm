@@ -1,6 +1,20 @@
 use crate::*;
 
 
+pub fn parse_directive_bits(
+    state: &mut asm::parser::State)
+    -> Result<(), ()>
+{
+    state.asm_state.cur_wordsize = asm::parser::parse_expr_usize_fn(state, |u| match u
+    {
+        0 => None,
+        _ => Some(u)
+    })?;
+
+    Ok(())
+}
+
+
 pub fn parse_directive_res(
     state: &mut asm::parser::State)
     -> Result<(), ()>
@@ -33,6 +47,20 @@ pub fn parse_directive_align(
     let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
     bankdata.reserve(skip_bits);
     
+    Ok(())
+}
+
+
+pub fn parse_directive_labelalign(
+    state: &mut asm::parser::State)
+    -> Result<(), ()>
+{
+    state.asm_state.cur_labelalign = asm::parser::parse_expr_usize_fn(state, |u| match u
+    {
+        0 => None,
+        _ => Some(u),
+    })?;
+
     Ok(())
 }
 

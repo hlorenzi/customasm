@@ -107,6 +107,7 @@ pub fn parse_directive(state: &mut asm::parser::State)
             "include" => asm::parser::parse_directive_include(state)?,
             "res" => asm::parser::parse_directive_res(state)?,
             "align" => asm::parser::parse_directive_align(state)?,
+            "labelalign" => asm::parser::parse_directive_labelalign(state)?,
             "addr" => asm::parser::parse_directive_addr(state)?,
             //"enable" => asm::parser::parse_directive_enable(state)?,
             _ =>
@@ -120,20 +121,6 @@ pub fn parse_directive(state: &mut asm::parser::State)
     }
 
     state.parser.expect_linebreak()
-}
-
-
-pub fn parse_directive_bits(
-    state: &mut asm::parser::State)
-    -> Result<(), ()>
-{
-    state.asm_state.cur_wordsize = asm::parser::parse_expr_usize_fn(state, |u| match u
-    {
-        0 => None,
-        _ => Some(u)
-    })?;
-
-    Ok(())
 }
 
 

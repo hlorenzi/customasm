@@ -6,6 +6,7 @@ pub struct Bank
     pub name: String,
     
     pub wordsize: usize,
+    pub labelalign: usize,
 	pub addr_start: util::BigInt,
 	pub addr_size: Option<usize>,
 	pub output_offset: Option<usize>,
@@ -29,6 +30,7 @@ impl Bank
         Bank {
             name: "".to_string(),
             wordsize: 8,
+            labelalign: 0,
             addr_start: util::BigInt::from(0),
             addr_size: None,
             output_offset: Some(0),

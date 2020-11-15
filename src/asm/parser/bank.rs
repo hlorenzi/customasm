@@ -21,6 +21,7 @@ pub fn parse_directive_bankdef(
     {
         name: name.clone(),
         wordsize: state.asm_state.cur_wordsize,
+        labelalign: state.asm_state.cur_labelalign,
         addr_start: util::BigInt::from(0),
         addr_size: None,
         output_offset: None,
@@ -88,6 +89,12 @@ fn parse_bankdef_field(
                 _ => Some(u)
             })?,
 
+        "labelalign" => bank.labelalign = asm::parser::parse_expr_usize_fn(state, |u| match u
+            {
+                0 => None,
+                _ => Some(u)
+            })?,
+            
         "fill" => bank.fill = true,
 
         _ =>
@@ -115,6 +122,7 @@ pub fn parse_directive_bank(
 
     let bank = &state.asm_state.banks[state.asm_state.cur_bank.index];
     state.asm_state.cur_wordsize = bank.wordsize;
+    state.asm_state.cur_labelalign = bank.labelalign;
 
     Ok(())
 }

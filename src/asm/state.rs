@@ -18,6 +18,7 @@ pub struct State
 	pub active_rulesets: Vec<RulesetRef>,
 	pub cur_bank: BankRef,
 	pub cur_wordsize: usize,
+	pub cur_labelalign: usize,
 }
 
 
@@ -147,7 +148,6 @@ impl Assembler
 				{
 					//println!("output {:?}, {:x}", bank.output_offset, &bank_output.as_ref().unwrap());
 
-					// FIXME: multiplication by wordsize can overflow
 					full_output.write_bitvec(
 						output_offset,
 						&bank_output.unwrap());
@@ -197,6 +197,7 @@ impl State
 			active_rulesets: Vec::new(),
 			cur_bank: BankRef { index: 0 },
 			cur_wordsize: 8,
+			cur_labelalign: 0,
 		};
 
 		state.create_bank(asm::Bank::new_default(), diagn::RcReport::new()).unwrap();
@@ -321,6 +322,7 @@ impl State
 
 		self.cur_bank = bank_ref;
 		self.cur_wordsize = bank.wordsize;
+		self.cur_labelalign = bank.labelalign;
 
 		self.banks.push(bank);
 
