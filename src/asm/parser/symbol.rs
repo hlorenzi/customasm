@@ -37,9 +37,8 @@ pub fn parse_symbol(
     }
     else
     {
-        if state.asm_state.cur_labelalign != 0
+        if hierarchy_level == 0 && state.asm_state.cur_labelalign != 0
         {
-            println!("{:?}", state.asm_state.cur_labelalign);
             let bankdata = state.asm_state.get_bankdata(state.asm_state.cur_bank);
             let skip_bits = bankdata.bits_until_aligned(
                 state.asm_state,
