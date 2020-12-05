@@ -336,7 +336,7 @@ impl State
 		{
 			bank_ref,
 			cur_bit_offset: 0,
-			invokations: Vec::new(),
+			invocations: Vec::new(),
 		});
 
 		Ok(())
@@ -432,41 +432,41 @@ impl State
 	{
 		let mut bitvec = util::BitVec::new();
 
-		for invok in &bankdata.invokations
+		for invoc in &bankdata.invocations
 		{
-			let resolved = match invok.kind
+			let resolved = match invoc.kind
 			{
-				asm::InvokationKind::Rule(_) =>
+				asm::InvocationKind::Rule(_) =>
 				{
 					let _guard = report.push_parent(
 						"failed to resolve instruction",
-						&invok.span);
+						&invoc.span);
 			
-					self.resolve_rule_invokation(
+					self.resolve_rule_invocation(
 						report.clone(),
-						&invok,
+						&invoc,
 						fileserver,
 						true)?
 				}
 				
-				asm::InvokationKind::Data(_) =>
+				asm::InvocationKind::Data(_) =>
 				{
 					let _guard = report.push_parent(
 						"failed to resolve data element",
-						&invok.span);
+						&invoc.span);
 			
-					self.resolve_data_invokation(
+					self.resolve_data_invocation(
 						report.clone(),
-						&invok,
+						&invoc,
 						fileserver,
 						true)?
 				}
 				
-				asm::InvokationKind::Label(_) =>
+				asm::InvocationKind::Label(_) =>
 				{
 					let offset = if bank.output_offset.is_some()
 					{
-						Some(invok.ctx.bit_offset)
+						Some(invoc.ctx.bit_offset)
 					}
 					else
 					{
@@ -476,17 +476,17 @@ impl State
 					bitvec.mark_span(
 						offset,
 						0,
-						self.get_addr_aprox(&invok.ctx),
-						invok.span.clone());
+						self.get_addr_aprox(&invoc.ctx),
+						invoc.span.clone());
 
 					continue;
 				}
 			};
 
-			let expr_name = match invok.kind
+			let expr_name = match invoc.kind
 			{
-				asm::InvokationKind::Rule(_) => "instruction",
-				asm::InvokationKind::Data(_) => "data element",
+				asm::InvocationKind::Rule(_) => "instruction",
+				asm::InvocationKind::Data(_) => "data element",
 				_ => unreachable!(),
 			};
 
@@ -498,7 +498,7 @@ impl State
 					{
 						Some(size) =>
 						{
-							if size == invok.size_guess
+							if size == invoc.size_guess
 							{
 								(bigint, size)
 							}
@@ -508,7 +508,7 @@ impl State
 									format!(
 										"{} size did not converge after iterations",
 										expr_name),
-									&invok.span);
+									&invoc.span);
 
 								continue;
 							}
@@ -519,7 +519,7 @@ impl State
 								format!(
 									"cannot infer size of {}",
 									expr_name),
-								&invok.span);
+								&invoc.span);
 
 							continue;
 						}
@@ -532,7 +532,7 @@ impl State
 						format!(
 							"wrong type returned from {}",
 							expr_name),
-						&invok.span);
+						&invoc.span);
 
 					continue;
 				}
@@ -540,24 +540,24 @@ impl State
 
 			if let Some(addr_size) = bank.addr_size
 			{
-				if invok.ctx.bit_offset + size > addr_size * bank.wordsize
+				if invoc.ctx.bit_offset + size > addr_size * bank.wordsize
 				{
 					report.error_span(
 						format!(
 							"{} is out of bank range",
 							expr_name),
-						&invok.span);
+						&invoc.span);
 
 					continue;
 				}
 			}
 			
-			bitvec.write_bigint(invok.ctx.bit_offset, bigint);
+			bitvec.write_bigint(invoc.ctx.bit_offset, bigint);
 			bitvec.mark_span(
-				Some(invok.ctx.bit_offset),
+				Some(invoc.ctx.bit_offset),
 				size,
-				self.get_addr_aprox(&invok.ctx),
-				invok.span.clone());
+				self.get_addr_aprox(&invoc.ctx),
+				invoc.span.clone());
 		}
 
 		if bank.fill && bank.addr_size.is_some()
@@ -572,25 +572,25 @@ impl State
 	}
 
 
-	pub fn resolve_data_invokation(
+	pub fn resolve_data_invocation(
 		&self,
 		report: diagn::RcReport,
-		invokation: &asm::Invokation,
+		invocation: &asm::Invocation,
 		fileserver: &dyn util::FileServer,
 		final_pass: bool)
 		-> Result<expr::Value, ()>
 	{
-		let data_invok = &invokation.get_data_invok();
+		let data_invoc = &invocation.get_data_invoc();
 
 		let mut resolved = self.eval_expr(
 			report.clone(),
-			&data_invok.expr,
-			&invokation.ctx,
+			&data_invoc.expr,
+			&invocation.ctx,
 			&mut expr::EvalContext::new(),
 			fileserver,
 			final_pass)?;
 
-		if let Some(elem_size) = data_invok.elem_size
+		if let Some(elem_size) = data_invoc.elem_size
 		{
 			match resolved
 			{
@@ -609,7 +609,7 @@ impl State
 								"value size (= {}) is larger than the directive size (= {})",
 								size,
 								elem_size),
-							&data_invok.expr.span());
+							&data_invoc.expr.span());
 					}
 
 					bigint.size = Some(elem_size);
@@ -622,28 +622,28 @@ impl State
 	}
 
 
-	pub fn resolve_rule_invokation(
+	pub fn resolve_rule_invocation(
 		&self,
 		report: diagn::RcReport,
-		invokation: &asm::Invokation,
+		invocation: &asm::Invocation,
 		fileserver: &dyn util::FileServer,
 		final_pass: bool)
 		-> Result<expr::Value, ()>
 	{
-		self.resolve_rule_invokation_candidates(
+		self.resolve_rule_invocation_candidates(
 			report.clone(),
-			invokation,
-			&invokation.get_rule_invok().candidates,
+			invocation,
+			&invocation.get_rule_invoc().candidates,
 			fileserver,
 			final_pass)
 	}
 
 
-	pub fn resolve_rule_invokation_candidates(
+	pub fn resolve_rule_invocation_candidates(
 		&self,
 		report: diagn::RcReport,
-		invokation: &asm::Invokation,
-		candidates: &Vec<asm::RuleInvokationCandidate>,
+		invocation: &asm::Invocation,
+		candidates: &Vec<asm::RuleInvocationCandidate>,
 		fileserver: &dyn util::FileServer,
 		final_pass: bool)
 		-> Result<expr::Value, ()>
@@ -652,14 +652,14 @@ impl State
 		{
 			println!(
 				"=== resolve candidates for invocation `{}` ===",
-				fileserver.get_excerpt(&invokation.span));
+				fileserver.get_excerpt(&invocation.span));
 		}
 
 		if final_pass && candidates.len() == 1
 		{
-			return self.resolve_rule_invokation_candidate(
+			return self.resolve_rule_invocation_candidate(
 				report,
-				invokation,
+				invocation,
 				&candidates[0],
 				fileserver,
 				final_pass)
@@ -681,9 +681,9 @@ impl State
 					fileserver.get_excerpt(&rule.span));
 			}
 
-			match self.resolve_rule_invokation_candidate(
+			match self.resolve_rule_invocation_candidate(
 				candidate_report.clone(),
-				invokation,
+				invocation,
 				candidate,
 				fileserver,
 				final_pass)
@@ -709,13 +709,13 @@ impl State
 				{
 					report.error_span(
 						"multiple matches for instruction",
-						&invokation.span);
+						&invocation.span);
 					return Err(())
 				}
 
-				self.resolve_rule_invokation_candidate(
+				self.resolve_rule_invocation_candidate(
 					report,
-					invokation,
+					invocation,
 					successful_candidates[0].0,
 					fileserver,
 					final_pass)
@@ -733,11 +733,11 @@ impl State
 	}
 
 
-	pub fn resolve_rule_invokation_candidate(
+	pub fn resolve_rule_invocation_candidate(
 		&self,
 		report: diagn::RcReport,
-		invokation: &asm::Invokation,
-		candidate: &asm::RuleInvokationCandidate,
+		invocation: &asm::Invocation,
+		candidate: &asm::RuleInvocationCandidate,
 		fileserver: &dyn util::FileServer,
 		final_pass: bool)
 		-> Result<expr::Value, ()>
@@ -749,12 +749,12 @@ impl State
 		{
 			match arg
 			{
-				&asm::RuleInvokationArgument::Expression(ref expr) =>
+				&asm::RuleInvocationArgument::Expression(ref expr) =>
 				{
 					let mut arg_value = self.eval_expr(
 						report.clone(),
 						&expr,
-						&invokation.ctx,
+						&invocation.ctx,
 						&mut expr::EvalContext::new(),
 						fileserver,
 						final_pass)?;
@@ -770,11 +770,11 @@ impl State
 					eval_ctx.set_local(&arg.name, arg_value);
 				}
 
-				&asm::RuleInvokationArgument::NestedRuleset(ref inner_candidates) =>
+				&asm::RuleInvocationArgument::NestedRuleset(ref inner_candidates) =>
 				{
-					let arg_value = self.resolve_rule_invokation_candidates(
+					let arg_value = self.resolve_rule_invocation_candidates(
 						report.clone(),
-						invokation,
+						invocation,
 						&inner_candidates,
 						fileserver,
 						final_pass)?;
@@ -789,7 +789,7 @@ impl State
 		self.eval_expr(
 			report,
 			&rule.production,
-			&invokation.ctx,
+			&invocation.ctx,
 			&mut eval_ctx,
 			fileserver,
 			final_pass)

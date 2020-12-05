@@ -19,7 +19,7 @@ pub struct BankData
 {
     pub bank_ref: asm::BankRef,
     pub cur_bit_offset: usize,
-    pub invokations: Vec<asm::Invokation>,
+    pub invocations: Vec<asm::Invocation>,
 }
 
 
@@ -61,10 +61,10 @@ impl BankData
     }
 
 
-    pub fn push_invokation(&mut self, invok: asm::Invokation)
+    pub fn push_invocation(&mut self, invoc: asm::Invocation)
     {
-        self.cur_bit_offset += invok.size_guess;
-        self.invokations.push(invok);
+        self.cur_bit_offset += invoc.size_guess;
+        self.invocations.push(invoc);
     }
 
 

@@ -62,7 +62,7 @@ pub fn parse_line(state: &mut asm::parser::State)
     }
     else
     {
-        asm::parser::parse_rule_invokation(state)?;
+        asm::parser::parse_rule_invocation(state)?;
     }
 
     Ok(())

@@ -59,12 +59,12 @@ pub fn parse_symbol(
             &span)?;
         
         let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
-        bankdata.push_invokation(asm::Invokation
+        bankdata.push_invocation(asm::Invocation
         {
             ctx: ctx.clone(),
             size_guess: 0,
             span: span.clone(),
-            kind: asm::InvokationKind::Label(asm::LabelInvokation)
+            kind: asm::InvocationKind::Label(asm::LabelInvocation)
         });
         
         expr::Value::make_integer(addr)

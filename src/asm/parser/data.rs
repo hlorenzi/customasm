@@ -17,30 +17,30 @@ pub fn parse_directive_data(
         else
             { expr.span() };
         
-        let mut invokation = asm::Invokation
+        let mut invocation = asm::Invocation
         {
             ctx: state.asm_state.get_ctx(&state),
             size_guess: 0,
             span,
-            kind: asm::InvokationKind::Data(asm::DataInvokation
+            kind: asm::InvocationKind::Data(asm::DataInvocation
             {
                 expr,
                 elem_size,
             })
         };
 
-        let resolved = state.asm_state.resolve_data_invokation(
+        let resolved = state.asm_state.resolve_data_invocation(
             state.report.clone(),
-            &invokation,
+            &invocation,
             state.fileserver,
             false);
 
         match elem_size
         {
-            Some(elem_size) => invokation.size_guess = elem_size,
+            Some(elem_size) => invocation.size_guess = elem_size,
             None =>
             {
-                invokation.size_guess = match resolved
+                invocation.size_guess = match resolved
                 {
                     Ok(expr::Value::Integer(bigint)) =>
                     {
@@ -56,10 +56,10 @@ pub fn parse_directive_data(
         }
 
         let bankdata = state.asm_state.get_bankdata(state.asm_state.cur_bank);
-        bankdata.check_writable(&state.asm_state, state.report.clone(), &invokation.span)?;
+        bankdata.check_writable(&state.asm_state, state.report.clone(), &invocation.span)?;
         
         let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
-        bankdata.push_invokation(invokation);
+        bankdata.push_invocation(invocation);
         
         if state.parser.maybe_expect(syntax::TokenKind::Comma).is_none()
         {

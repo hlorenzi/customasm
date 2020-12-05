@@ -4,7 +4,7 @@ use crate::*;
 static DEBUG: bool = false;
 
 
-pub fn parse_rule_invokation(state: &mut asm::parser::State)
+pub fn parse_rule_invocation(state: &mut asm::parser::State)
     -> Result<(), ()>
 {
     let mut subparser = state.parser.slice_until_linebreak();
@@ -38,29 +38,29 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
             }
         }
 
-        let mut invokation = asm::Invokation
+        let mut invocation = asm::Invocation
         {
             ctx: state.asm_state.get_ctx(&state),
             size_guess: 0,
             span: subparser.get_full_span(),
-            kind: asm::InvokationKind::Rule(asm::RuleInvokation
+            kind: asm::InvocationKind::Rule(asm::RuleInvocation
             {
                 candidates,
             })
         };
         
-        let resolved = state.asm_state.resolve_rule_invokation(
+        let resolved = state.asm_state.resolve_rule_invocation(
             state.report.clone(),
-            &invokation,
+            &invocation,
             state.fileserver,
             false);
 
-        //println!("{} = {:?}", state.fileserver.get_excerpt(&invokation.span), &resolved);
+        //println!("{} = {:?}", state.fileserver.get_excerpt(&invocation.span), &resolved);
 
         // TODO: can provide an exact guess even if resolution fails,
         // if we have an exact candidate, and
         // if the production expression returns a sized value
-        invokation.size_guess = match resolved
+        invocation.size_guess = match resolved
         {
             Ok(expr::Value::Integer(bigint)) =>
             {
@@ -73,13 +73,13 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
             _ => 0
         };
 
-        //println!("{} = {}", state.fileserver.get_excerpt(&invokation.span), invokation.size_guess);
+        //println!("{} = {}", state.fileserver.get_excerpt(&invocation.span), invocation.size_guess);
 
         let bankdata = state.asm_state.get_bankdata(state.asm_state.cur_bank);
-        bankdata.check_writable(&state.asm_state, state.report.clone(), &invokation.span)?;
+        bankdata.check_writable(&state.asm_state, state.report.clone(), &invocation.span)?;
         
         let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
-        bankdata.push_invokation(invokation);
+        bankdata.push_invocation(invocation);
     }
 
     state.parser.expect_linebreak()?;
@@ -91,7 +91,7 @@ pub fn parse_rule_invokation(state: &mut asm::parser::State)
 pub fn match_active_rulesets(
     state: &asm::parser::State,
     subparser: &mut syntax::Parser)
-    -> Result<Vec<asm::RuleInvokationCandidate>, ()>
+    -> Result<Vec<asm::RuleInvocationCandidate>, ()>
 {
     let mut candidates = Vec::new();
 
@@ -126,7 +126,7 @@ pub fn match_ruleset<'a>(
     ruleset_ref: asm::RulesetRef,
     subparser: &mut syntax::Parser<'a>,
     must_consume_all_tokens: bool)
-    -> Result<Vec<(asm::RuleInvokationCandidate, syntax::Parser<'a>)>, ()>
+    -> Result<Vec<(asm::RuleInvocationCandidate, syntax::Parser<'a>)>, ()>
 {
     let rule_group = &state.asm_state.rulesets[ruleset_ref.index];
 
@@ -163,12 +163,12 @@ pub fn match_rule(
     state: &asm::parser::State,
     rule_ref: asm::RuleRef,
     subparser: &mut syntax::Parser)
-    -> Result<asm::RuleInvokationCandidate, ()>
+    -> Result<asm::RuleInvocationCandidate, ()>
 {
     let rule_group = &state.asm_state.rulesets[rule_ref.ruleset_ref.index];
     let rule = &rule_group.rules[rule_ref.index];
 
-    let mut candidate = asm::RuleInvokationCandidate
+    let mut candidate = asm::RuleInvocationCandidate
     {
         rule_ref,
         args: Vec::new(),
@@ -232,7 +232,7 @@ pub fn match_rule(
                                 Some(value) =>
                                 {
                                     let expr = expr::Value::make_integer(value).make_literal();
-                                    candidate.args.push(asm::RuleInvokationArgument::Expression(expr));
+                                    candidate.args.push(asm::RuleInvocationArgument::Expression(expr));
                                 }
                                 None => return Err(())
                             }
@@ -268,7 +268,7 @@ pub fn match_rule(
                                 return Err(());
                             }
 
-                            candidate.args.push(asm::RuleInvokationArgument::Expression(expr));
+                            candidate.args.push(asm::RuleInvocationArgument::Expression(expr));
 
                             if !expr_using_slice
                             {
@@ -316,7 +316,7 @@ pub fn match_rule(
                         subparser.restore(subcandidates[0].1.save());
                         
                         let subcandidates = subcandidates.into_iter().map(|c| c.0).collect();
-                        candidate.args.push(asm::RuleInvokationArgument::NestedRuleset(subcandidates));
+                        candidate.args.push(asm::RuleInvocationArgument::NestedRuleset(subcandidates));
                     }
                 }
             }
