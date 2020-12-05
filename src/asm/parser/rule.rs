@@ -10,6 +10,7 @@ pub fn parse_rule(
     while !state.parser.next_is(0, syntax::TokenKind::HeavyArrowRight)
     {
         let tk = state.parser.advance();
+        rule.span = rule.span.join(&tk.span);
         
         if tk.kind == syntax::TokenKind::BraceOpen
         {
@@ -27,7 +28,8 @@ pub fn parse_rule(
                 asm::PatternParameterType::Unspecified
             };
 
-            state.parser.expect(syntax::TokenKind::BraceClose)?;
+            let brace_close_tk = state.parser.expect(syntax::TokenKind::BraceClose)?;
+            rule.span = rule.span.join(&brace_close_tk.span);
 
             rule.pattern_add_parameter(asm::PatternParameter
             {

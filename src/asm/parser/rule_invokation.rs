@@ -1,15 +1,43 @@
 use crate::*;
 
 
+static DEBUG: bool = false;
+
+
 pub fn parse_rule_invokation(state: &mut asm::parser::State)
     -> Result<(), ()>
 {
     let mut subparser = state.parser.slice_until_linebreak();
     subparser.suppress_reports();
 
+    if DEBUG
+    {
+        println!("");
+        println!(
+            "=== parse rule invocation `{}` ===",
+            state.fileserver.get_excerpt(&subparser.get_full_span()));
+    }
+
     let candidates = match_active_rulesets(state, &mut subparser)?;
     if candidates.len() != 0
     {
+        //candidates.sort_by(|a, b| a.args.len().cmp(&b.args.len()));
+
+        if DEBUG
+        {
+            println!("");
+            println!("final candidates:");
+            for candidate in &candidates
+            {
+                let rule_group = &state.asm_state.rulesets[candidate.rule_ref.ruleset_ref.index];
+                let rule = &rule_group.rules[candidate.rule_ref.index];
+
+                println!(
+                    "  `{}`",
+                    state.fileserver.get_excerpt(&rule.span));
+            }
+        }
+
         let mut invokation = asm::Invokation
         {
             ctx: state.asm_state.get_ctx(&state),
@@ -146,9 +174,16 @@ pub fn match_rule(
         args: Vec::new(),
     };
     
-    //println!(
-    //    "parse pattern with parser at `{}`",
-    //    state.fileserver.get_excerpt(&subparser.get_next_spans(10)));
+    if DEBUG
+    {
+        println!("");
+        println!(
+            "> try match rule `{}`",
+            state.fileserver.get_excerpt(&rule.span));
+        println!(
+            "  parser at `{}`",
+            state.fileserver.get_excerpt(&subparser.get_next_spans(100)));
+    }
 
     for (index, part) in rule.pattern.iter().enumerate()
     {
@@ -156,14 +191,21 @@ pub fn match_rule(
         {
             asm::PatternPart::Exact(c) =>
             {
-                //println!("> try match exact {}", c);
-
+                if DEBUG
+                {
+                    println!("- try match exact {}", c);
+                }
+                
                 if subparser.next_partial().to_ascii_lowercase() != *c
                 {
                     return Err(());
                 }
 
-                //println!("> match!");
+                if DEBUG
+                {
+                    println!("  matched!");
+                }
+
                 subparser.advance_partial();
             }
 
@@ -178,7 +220,11 @@ pub fn match_rule(
                     asm::PatternParameterType::Signed(_) |
                     asm::PatternParameterType::Integer(_) =>
                     {
-                        //println!("> try match expr");
+                        if DEBUG
+                        {
+                            println!("- try match expr");
+                        }
+                        
                         if subparser.is_at_partial()
                         {
                             match subparser.maybe_expect_partial_usize()
@@ -207,11 +253,21 @@ pub fn match_rule(
                                 }
                             }
 
-                            //println!(
-                            //    ">> parse argument expr with parser at `{}`",
-                            //    state.fileserver.get_excerpt(&expr_parser.get_next_spans(10)));
+                            if DEBUG
+                            {
+                                println!(
+                                    "  parser {}at `{}`",
+                                    if expr_using_slice { "using slice " } else { "" },
+                                    state.fileserver.get_excerpt(&expr_parser.get_next_spans(100)));
+                            }
 
                             let expr = expr::Expr::parse(&mut expr_parser)?;
+
+                            if expr_using_slice && !expr_parser.is_over()
+                            {
+                                return Err(());
+                            }
+
                             candidate.args.push(asm::RuleInvokationArgument::Expression(expr));
 
                             if !expr_using_slice
@@ -219,19 +275,24 @@ pub fn match_rule(
                                 subparser.restore(expr_parser.save());
                             }
 
-                            //println!(
-                            //    ">> continue with parser at {} = `{}`",
-                            //    subparser.get_current_token_index(),
-                            //    state.fileserver.get_excerpt(&subparser.get_next_spans(10)));
-                                
-                            //println!("> match!");
+                            if DEBUG
+                            {
+                                println!(
+                                    "  continue with parser at `{}`",
+                                    state.fileserver.get_excerpt(&subparser.get_next_spans(100)));
+                                    
+                                println!("  matched!");
+                            }
                         }
                     }
 
                     asm::PatternParameterType::Ruleset(rule_group_ref)=>
                     {
-                        //println!("> try match subrule {:?}", rule_group_ref);
-                        
+                        if DEBUG
+                        {
+                            println!("- try match subrule {:?}", rule_group_ref);
+                        }
+
                         let subcandidates = match_ruleset(state, rule_group_ref, subparser, false)?;
                         if subcandidates.len() == 0
                         {
@@ -247,7 +308,11 @@ pub fn match_rule(
                             }
                         }
 
-                        //println!("> match!");
+                        if DEBUG
+                        {
+                            println!("  matched!");
+                        }
+
                         subparser.restore(subcandidates[0].1.save());
                         
                         let subcandidates = subcandidates.into_iter().map(|c| c.0).collect();

@@ -1,6 +1,9 @@
 use crate::*;
 
 
+static DEBUG_CANDIDATE_RESOLUTION: bool = false;
+
+
 pub struct Assembler
 {
 	pub root_files: Vec<String>,
@@ -10,6 +13,7 @@ pub struct Assembler
 
 pub struct State
 {
+	pub is_first_pass: bool,
 	pub banks: Vec<asm::Bank>,
 	pub bankdata: Vec<asm::BankData>,
 	pub symbols: asm::SymbolManager,
@@ -94,11 +98,12 @@ impl Assembler
 		let mut iteration = 0;
 		loop
 		{
+			self.state = State::new();
+			self.state.is_first_pass = iteration == 0;
+			std::mem::swap(&mut self.state.symbol_guesses, &mut symbol_guesses);
+
 			iteration += 1;
 			//dbg!(iteration);
-
-			self.state = State::new();
-			std::mem::swap(&mut self.state.symbol_guesses, &mut symbol_guesses);
 
 			//dbg!(&symbol_guesses);
 			//dbg!(&self.state.symbols);
@@ -189,6 +194,7 @@ impl State
 	{
 		let mut state = State
 		{
+			is_first_pass: false,
 			banks: Vec::new(),
 			bankdata: Vec::new(),
 			symbols: asm::SymbolManager::new(),
@@ -642,9 +648,38 @@ impl State
 		final_pass: bool)
 		-> Result<expr::Value, ()>
 	{
+		if DEBUG_CANDIDATE_RESOLUTION
+		{
+			println!(
+				"=== resolve candidates for invocation `{}` ===",
+				fileserver.get_excerpt(&invokation.span));
+		}
+
+		if final_pass && candidates.len() == 1
+		{
+			return self.resolve_rule_invokation_candidate(
+				report,
+				invokation,
+				&candidates[0],
+				fileserver,
+				final_pass)
+		}
+
+		let mut successful_candidates = Vec::new();
+
 		for candidate in candidates
 		{
 			let candidate_report = diagn::RcReport::new();
+
+			if DEBUG_CANDIDATE_RESOLUTION
+			{
+                let rule_group = &self.rulesets[candidate.rule_ref.ruleset_ref.index];
+                let rule = &rule_group.rules[candidate.rule_ref.index];
+
+				println!(
+					"> try candidate `{}`",
+					fileserver.get_excerpt(&rule.span));
+			}
 
 			match self.resolve_rule_invokation_candidate(
 				candidate_report.clone(),
@@ -655,21 +690,41 @@ impl State
 			{
 				Ok(resolved) =>
 				{
-					candidate_report.transfer_to(report);
-					return Ok(resolved);
+					if DEBUG_CANDIDATE_RESOLUTION
+					{
+						println!("  ok");
+					}
+
+					successful_candidates.push((candidate, resolved, candidate_report));
 				}
 				Err(()) => {}
 			}
 		}
 
-		if final_pass
+		if successful_candidates.len() > 0
 		{
-			self.resolve_rule_invokation_candidate(
-				report,
-				invokation,
-				candidates.last().unwrap(),
-				fileserver,
-				final_pass)
+			if final_pass
+			{
+				if successful_candidates.len() > 1
+				{
+					report.error_span(
+						"multiple matches for instruction",
+						&invokation.span);
+					return Err(())
+				}
+
+				self.resolve_rule_invokation_candidate(
+					report,
+					invokation,
+					successful_candidates[0].0,
+					fileserver,
+					final_pass)
+			}
+			else
+			{
+				successful_candidates.last().unwrap().2.transfer_to(report);
+				Ok(successful_candidates.last().unwrap().1.clone())
+			}
 		}
 		else
 		{
@@ -903,9 +958,13 @@ impl State
 			{
 				Ok(symbol.value.clone())
 			}
-			else
+			else if self.is_first_pass
 			{
 				Ok(expr::Value::make_integer(0))
+			}
+			else
+			{
+				Err(false)
 			}
 		}
 		else

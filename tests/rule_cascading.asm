@@ -10,12 +10,13 @@
 
     ld {x} =>
     {
-        assert(x < 0x100)
+        assert(x >= 0x10 && x < 0x100)
         0x22 @ x`8
     }
 
     ld {x} =>
     {
+        assert(x >= 0x100)
         0x33 @ x`16
     }
 }
