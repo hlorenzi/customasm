@@ -29,6 +29,8 @@ for instructions!
 
 [🕹 Check out an example project](/examples/nes/) which targets the NES!
 
+[❤️ A big thank you to my supporters!](https://accounts.hlorenzi.com/supporters)
+
 ## New v0.11
 
 [📖 Check out instructions for migration from older versions to v0.11!](https://github.com/hlorenzi/customasm/wiki/Migrating-to-v0.11)
