@@ -29,6 +29,8 @@ for instructions!
 
 [🕹 Check out an example project](/examples/nes/) which targets the NES!
 
+[💻 Install the VSCode syntax highlight extension!](https://marketplace.visualstudio.com/items?itemName=hlorenzi.customasm-vscode)
+
 [❤️ A big thank you to my supporters!](https://accounts.hlorenzi.com/supporters)
 
 ## New v0.11
