@@ -160,7 +160,11 @@ fn drive_inner(
 	let mut assembler = asm::Assembler::new();
 	for filename in matches.free
 	{
-		println!("assembling `{}`...", filename);
+		if !quiet
+		{
+			println!("assembling `{}`...", filename);
+		}
+		
 		assembler.register_file(filename);
 	}
 
