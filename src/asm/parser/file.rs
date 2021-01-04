@@ -7,32 +7,23 @@ pub fn parse_file<TFilename: Into<String>>(
     fileserver: &dyn util::FileServer,
     filename: TFilename,
     span: Option<&diagn::Span>,
+    depth: usize
 ) -> Result<(), ()>
 {
     let filename = filename.into();
-    for f in &asm_state.parsed_files
-    {
-        if f == &filename
-        {
-            // eprintln!("Recursive include - skipping");
-            return Ok(());
-        };
-    }
     let chars = fileserver.get_chars(report.clone(), &filename, span)?;
     let tokens = syntax::tokenize(report.clone(), &filename, &chars)?;
     let parser = syntax::Parser::new(Some(report.clone()), &tokens);
-
     let mut state = asm::parser::State {
         report,
         asm_state,
         fileserver,
         filename: std::rc::Rc::new(filename.clone()),
-
         parser,
+        include_depth: depth
     };
 
     //println!("{:#?}", state.parser.tokens.iter().map(|t| t.kind).collect::<Vec<_>>());
-    state.asm_state.parsed_files.push(filename);
     while !state.parser.is_over()
     {
         parse_line(&mut state)?;

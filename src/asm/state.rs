@@ -23,7 +23,6 @@ pub struct State
     pub cur_bank: BankRef,
     pub cur_wordsize: usize,
     pub cur_labelalign: usize,
-    pub parsed_files: Vec<String>,
 }
 
 
@@ -82,7 +81,6 @@ impl Assembler
     {
         let filename = filename.into();
         self.root_files.push(filename.clone());
-        self.state.parsed_files.push(filename);
     }
 
 
@@ -118,6 +116,7 @@ impl Assembler
                     fileserver,
                     filename,
                     None,
+                    0
                 );
 
                 if pass_report.has_errors() || result.is_err()
@@ -126,7 +125,6 @@ impl Assembler
                     return Err(());
                 }
             }
-            self.state.parsed_files = vec![];
             //dbg!(&self.state.symbols);
             //dbg!(pass_report.has_errors());
 
@@ -196,7 +194,6 @@ impl State
             cur_bank: BankRef { index: 0 },
             cur_wordsize: 8,
             cur_labelalign: 0,
-            parsed_files: Vec::<String>::new(),
         };
 
         state

@@ -5,6 +5,9 @@ pub fn parse_directive_include(
     state: &mut asm::parser::State)
     -> Result<(), ()>
 {
+    if state.include_depth >= 10 {
+        panic!("Include depth limit exceeded");
+    }
     let tk_filename = state.parser.expect(syntax::TokenKind::String)?;
     let filename = syntax::excerpt_as_string_contents(
         state.report.clone(),
@@ -17,10 +20,12 @@ pub fn parse_directive_include(
         &filename,
         &tk_filename.span)?;
 
-    asm::parser::parse_file(
+    let res = asm::parser::parse_file(
         state.report.clone(),
         state.asm_state,
         state.fileserver,
         new_filename,
-        Some(&tk_filename.span))
+        Some(&tk_filename.span),
+        state.include_depth + 1);
+    res
 }
