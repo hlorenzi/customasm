@@ -20,12 +20,11 @@ pub fn parse_directive_include(
         &filename,
         &tk_filename.span)?;
 
-    let res = asm::parser::parse_file(
+    asm::parser::parse_file(
         state.report.clone(),
         state.asm_state,
         state.fileserver,
         new_filename,
         Some(&tk_filename.span),
-        state.include_depth + 1);
-    res
+        state.include_depth + 1)
 }
