@@ -49,9 +49,6 @@ halt ; = 0x55
 ; error: code.asm:2: no match
 ; error: code.asm:3: no match
 ; error: code.asm:4: no match
-; error: code.asm:2: no match
-; error: code.asm:3: no match
-; error: code.asm:4: no match
 
 ; :::
 

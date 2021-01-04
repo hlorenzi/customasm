@@ -126,7 +126,7 @@ impl Assembler
                     return Err(());
                 }
             }
-
+            self.state.parsed_files = vec![];
             //dbg!(&self.state.symbols);
             //dbg!(pass_report.has_errors());
 
@@ -163,7 +163,6 @@ impl Assembler
             if all_bankdata_resolved
             {
                 pass_report.transfer_to(report);
-
                 return Ok(AssemblyOutput {
                     binary: full_output,
                     symbols: std::mem::replace(&mut self.state.symbols, asm::SymbolManager::new()),

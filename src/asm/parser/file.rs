@@ -14,7 +14,7 @@ pub fn parse_file<TFilename: Into<String>>(
     {
         if f == &filename
         {
-            eprintln!("Recursive include - skipping");
+            // eprintln!("Recursive include - skipping");
             return Ok(());
         };
     }
