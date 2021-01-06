@@ -6,22 +6,25 @@ pub fn parse_file<TFilename: Into<String>>(
     asm_state: &mut asm::State,
     fileserver: &dyn util::FileServer,
     filename: TFilename,
-    span: Option<&diagn::Span>)
+    span: Option<&diagn::Span>,
+    parsed_filenames: &mut std::collections::HashSet<String>)
     -> Result<(), ()>
 {
     let filename = filename.into();
     let chars = fileserver.get_chars(report.clone(), &filename, span)?;
     let tokens = syntax::tokenize(report.clone(), &filename, &chars)?;
     let parser = syntax::Parser::new(Some(report.clone()), &tokens);
+
+    parsed_filenames.insert(filename.clone());
     
     let mut state = asm::parser::State
     {
         report,
         asm_state,
         fileserver,
-        filename: std::rc::Rc::new(filename),
-        
+        filename: std::rc::Rc::new(filename.clone()),
         parser,
+        parsed_filenames,
     };
 
     //println!("{:#?}", state.parser.tokens.iter().map(|t| t.kind).collect::<Vec<_>>());
@@ -30,7 +33,8 @@ pub fn parse_file<TFilename: Into<String>>(
     {
         parse_line(&mut state)?;
     }
-		
+	
+    parsed_filenames.remove(&filename);
 	Ok(())
 }
 

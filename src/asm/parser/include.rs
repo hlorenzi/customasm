@@ -17,10 +17,17 @@ pub fn parse_directive_include(
         &filename,
         &tk_filename.span)?;
 
+    if state.parsed_filenames.contains(&new_filename)
+    {
+        state.report.error_span("recursive include", &tk_filename.span);
+        return Err(());
+    }
+
     asm::parser::parse_file(
         state.report.clone(),
         state.asm_state,
         state.fileserver,
         new_filename,
-        Some(&tk_filename.span))
+        Some(&tk_filename.span),
+        state.parsed_filenames)
 }
