@@ -142,7 +142,7 @@ impl Assembler
 					bank,
 					bankdata,
 					fileserver);
-
+					
 				if pass_report.has_errors() || !bank_output.is_ok()
 				{
 					all_bankdata_resolved = false;
@@ -631,7 +631,7 @@ impl State
 		-> Result<expr::Value, ()>
 	{
 		self.resolve_rule_invocation_candidates(
-			report.clone(),
+			report,
 			invocation,
 			&invocation.get_rule_invoc().candidates,
 			fileserver,
@@ -657,15 +657,21 @@ impl State
 
 		if final_pass && candidates.len() == 1
 		{
+			if DEBUG_CANDIDATE_RESOLUTION
+			{
+				println!("> final pass resolve (single candidate)");
+			}
+
 			return self.resolve_rule_invocation_candidate(
 				report,
 				invocation,
 				&candidates[0],
 				fileserver,
-				final_pass)
+				final_pass);
 		}
 
 		let mut successful_candidates = Vec::new();
+		let mut failed_candidates = Vec::new();
 
 		for candidate in candidates
 		{
@@ -697,7 +703,10 @@ impl State
 
 					successful_candidates.push((candidate, resolved, candidate_report));
 				}
-				Err(()) => {}
+				Err(()) =>
+				{
+					failed_candidates.push((candidate, candidate_report));
+				}
 			}
 		}
 
@@ -711,6 +720,11 @@ impl State
 						"multiple matches for instruction",
 						&invocation.span);
 					return Err(())
+				}
+
+				if DEBUG_CANDIDATE_RESOLUTION
+				{
+					println!("> final pass resolve (multiple candidates)");
 				}
 
 				self.resolve_rule_invocation_candidate(
@@ -728,6 +742,21 @@ impl State
 		}
 		else
 		{
+			if final_pass
+			{
+				for e in failed_candidates
+				{
+					let rule_group = &self.rulesets[e.0.rule_ref.ruleset_ref.index];
+					let rule = &rule_group.rules[e.0.rule_ref.index];
+	
+					let _guard = report.push_parent_note(
+						"while attempting the following rule candidate:",
+						&rule.span);
+	
+					e.1.transfer_to(report.clone());
+				}
+			}
+
 			Err(())
 		}
 	}

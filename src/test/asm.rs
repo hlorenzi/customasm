@@ -97,7 +97,7 @@ pub fn parse_subfiles<T: Into<String>>(contents: T, up_to_subfile: &str) -> Resu
                     cur_subfile.output.write_bigint(index, value);
                 }
             }
-            else if line.find("; error: ").is_some()
+            else if line.find("; error: ").is_some() || line.find("; note: ").is_some()
             {
                 let messages = line.get(2..).unwrap().split("/").map(|s| s.trim());
                 for message in messages
@@ -111,6 +111,10 @@ pub fn parse_subfiles<T: Into<String>>(contents: T, up_to_subfile: &str) -> Resu
                         if let Some(colon_index) = excerpt.find(":")
                         {
                             filename = excerpt.get(0..colon_index).unwrap().trim().to_string();
+                            if filename == ""
+                            {
+                                filename = cur_subfile.name.clone();
+                            }
 
                             excerpt = excerpt.get((colon_index + 1)..).unwrap().trim().to_string();
 
@@ -123,6 +127,36 @@ pub fn parse_subfiles<T: Into<String>>(contents: T, up_to_subfile: &str) -> Resu
                         cur_subfile.messages.push(TestMessageExpectation
                         {
                             kind: diagn::MessageKind::Error,
+                            filename,
+                            line,
+                            excerpt,
+                        });
+                    }
+                    else if let Some(excerpt_index) = message.find("note: ")
+                    {
+                        let mut filename = cur_subfile.name.clone();
+                        let mut line = line_num;
+                        let mut excerpt = message.get((excerpt_index + 6)..).unwrap().trim().to_string();
+
+                        if let Some(colon_index) = excerpt.find(":")
+                        {
+                            filename = excerpt.get(0..colon_index).unwrap().trim().to_string();
+                            if filename == ""
+                            {
+                                filename = cur_subfile.name.clone();
+                            }
+
+                            excerpt = excerpt.get((colon_index + 1)..).unwrap().trim().to_string();
+
+                            let next_colon_index = excerpt.find(":").unwrap();
+                            line = excerpt.get(0..next_colon_index).unwrap().parse::<usize>().unwrap() - 1;
+                        
+                            excerpt = excerpt.get((next_colon_index + 1)..).unwrap().trim().to_string();
+                        }
+            
+                        cur_subfile.messages.push(TestMessageExpectation
+                        {
+                            kind: diagn::MessageKind::Note,
                             filename,
                             line,
                             excerpt,
@@ -193,7 +227,9 @@ pub fn test_subfile(filepath: &str, subfilename: &str)
         panic!("test failed");
     }
 
-    if subfile.messages.len() != report.len()
+    // FIXME: Add appropriate submessage expectations for all tests
+    if subfile.messages.len() != report.len_with_submessages() &&
+        subfile.messages.len() != report.len()
     {
         println!("\n\
             > test failed -- diagnostics mismatch\n\

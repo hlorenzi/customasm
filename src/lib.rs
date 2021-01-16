@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![feature(backtrace)]
 
 
 extern crate num_bigint;

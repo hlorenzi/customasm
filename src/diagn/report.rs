@@ -69,7 +69,10 @@ impl Report
 
 	fn transfer(&mut self, other: &mut Report)
 	{
-		other.messages.extend(self.messages.iter().cloned());
+		for msg in &self.messages
+		{
+			other.message(msg.clone());
+		}
 	}
 	
 	
@@ -138,6 +141,14 @@ impl Report
 	}
 	
 	
+	pub fn push_parent_note<S>(&mut self, descr: S, span: &Span)
+	where S: Into<String>
+	{
+		let msg = Message{ descr: descr.into(), kind: MessageKind::Note, span: Some(span.clone()), inner: None };
+		self.parents.push(msg);
+	}
+	
+	
 	pub fn pop_parent(&mut self)
 	{
 		self.parents.pop();
@@ -147,6 +158,25 @@ impl Report
 	pub fn len(&self) -> usize
 	{
 		self.messages.len()
+	}
+	
+	
+	pub fn len_with_submessages(&self) -> usize
+	{
+		let mut count = 0;
+		for msg in &self.messages
+		{
+			count += 1;
+
+			let mut cur_msg = msg;
+			while let Some(inner_msg) = cur_msg.inner.as_ref()
+			{
+				count += 1;
+				cur_msg = &*inner_msg;
+			}
+		}
+
+		count
 	}
 	
 	
@@ -479,6 +509,16 @@ impl RcReport
 		guard
 	}
 	
+	pub fn push_parent_note<S>(&self, descr: S, span: &Span) -> ReportParentGuard
+	where S: Into<String>
+	{
+		let guard = ReportParentGuard{ report: self.clone() };
+		
+		self.report.borrow_mut().push_parent_note(descr, span);
+		
+		guard
+	}
+
 	
 	fn pop_parent(&self)
 	{
@@ -501,6 +541,12 @@ impl RcReport
 	pub fn len(&self) -> usize
 	{
 		self.report.borrow().len()
+	}
+	
+	
+	pub fn len_with_submessages(&self) -> usize
+	{
+		self.report.borrow().len_with_submessages()
 	}
 	
 	

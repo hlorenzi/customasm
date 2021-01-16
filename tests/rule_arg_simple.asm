@@ -91,3 +91,21 @@ ld 0x1122 ; = 0x1122
 ld 0x112233 ; = 0x112233
 ; :::
 ld 123 ; error: size of instruction
+
+
+; ===========
+; ::: include
+
+#ruledef test
+{
+    ld {x} => y
+}
+
+; :::
+ld 0x11 ; error: failed to resolve
+; :::
+ld 0x1122 ; error: failed to resolve
+; :::
+ld 0x112233 ; error: failed to resolve
+; :::
+ld 123 ; error: failed to resolve
