@@ -79,7 +79,7 @@ pub fn parse_directive_addr(
         &addr_span)?;
 
     let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
-    bankdata.reserve(skip_bits);
+    bankdata.reserve_or_backtrack(skip_bits);
     
     Ok(())
 }

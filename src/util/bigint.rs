@@ -133,6 +133,13 @@ impl BigInt
     }
 
 
+    pub fn checked_to_isize(&self) -> Option<isize>
+    {
+        use num_traits::ToPrimitive;
+        self.bigint.to_isize()
+    }
+
+
     pub fn checked_div(&self, rhs: &BigInt) -> Option<BigInt>
     {
         self.bigint.checked_div(&rhs.bigint).map(|res| res.into())

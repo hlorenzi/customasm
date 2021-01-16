@@ -74,6 +74,19 @@ impl BankData
     }
 
 
+    pub fn reserve_or_backtrack(&mut self, bits: isize)
+    {
+        if bits < 0
+        {
+            self.cur_bit_offset -= (-bits) as usize;
+        }
+        else
+        {
+            self.cur_bit_offset += bits as usize;
+        }
+    }
+
+
     pub fn bits_until_aligned(&self, state: &asm::State, wordsize: usize) -> usize
     {
 		let _bank = &state.banks[self.bank_ref.index];
@@ -96,10 +109,15 @@ impl BankData
         addr: util::BigInt,
         report: diagn::RcReport,
         span: &diagn::Span)
-        -> Result<usize, ()>
+        -> Result<isize, ()>
     {
-		let bank = &state.banks[self.bank_ref.index];
-        let wordsize = bank.wordsize;
+        if addr.sign() < 0
+        {
+            report.error_span("address is out of valid range", span);
+            return Err(());
+        }
+
+        let wordsize = state.cur_wordsize;
         
         let excess_bits = wordsize - (self.cur_bit_offset % wordsize);
         let excess_bits = if excess_bits != 0
@@ -117,7 +135,13 @@ impl BankData
 			&util::BigInt::from(self.cur_bit_offset / wordsize) +
             &bank.addr_start;
 
-        match (&addr - &addr_approx).checked_to_usize()
+        if bank.output_offset.is_some() && &addr_approx > &addr
+        {
+            report.error_span("address is behind current position", span);
+            return Err(());
+        }
+
+        match (&addr - &addr_approx).checked_to_isize()
         {
             None =>
             {
@@ -128,7 +152,7 @@ impl BankData
             Some(addr_diff) =>
             {
                 // FIXME: operations can overflow
-                Ok(addr_diff * wordsize + excess_bits)
+                Ok(addr_diff * (wordsize as isize) + (excess_bits as isize))
             }
         }
     }

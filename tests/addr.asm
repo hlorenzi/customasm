@@ -57,13 +57,4 @@ label:
 
 ; :::
 
-ld $
-#addr 0 ; error: valid range
-
-; :::
-
-#addr -1 ; error: valid range
-
-; :::
-
 #addr 0x1_0000_0000_0000_0000 ; error: valid range
