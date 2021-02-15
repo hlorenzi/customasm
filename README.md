@@ -8,6 +8,7 @@ you just implemented in FPGA!
 [![crates.io][badge-cratesio-img]][badge-cratesio-url]
 [![Latest Release][badge-latest-img]][badge-latest-url]
 [![Releases][badge-downloads-img]][badge-downloads-url]
+
 [![Discord][badge-discord-img]][badge-discord-url]
 
 [badge-cratesio-img]: https://img.shields.io/crates/v/customasm
@@ -19,7 +20,7 @@ you just implemented in FPGA!
 [badge-downloads-img]: https://img.shields.io/github/downloads/hlorenzi/customasm/total
 [badge-downloads-url]: https://github.com/hlorenzi/customasm/releases
 
-[badge-discord-img]: https://img.shields.io/discord/394999035540275222?label=Discord&logo=discord
+[badge-discord-img]: https://img.shields.io/discord/394999035540275222?label=Join%20the%20Discord%20server!&logo=discord
 [badge-discord-url]: https://discord.com/invite/pXeDXGD
 
 [📱 Try it right now on your browser!](https://hlorenzi.github.io/customasm/web/)
@@ -31,7 +32,7 @@ for instructions!
 
 [💻 Install the VSCode syntax highlight extension!](https://marketplace.visualstudio.com/items?itemName=hlorenzi.customasm-vscode)
 
-[❤️ A big thank you to my supporters!](https://accounts.hlorenzi.com/supporters)
+[❤️ Support me!](https://accounts.hlorenzi.com/supporters)
 
 ## New v0.11
 
