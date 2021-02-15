@@ -1,7 +1,7 @@
 use num_bigint;
 
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq)]
 pub struct BigInt
 {
     bigint: num_bigint::BigInt,
@@ -368,6 +368,15 @@ impl std::ops::BitXor for &BigInt
     fn bitxor(self, rhs: &BigInt) -> Self::Output
     {
         self.combine_bits(rhs, |a, b| a ^ b).into()
+    }
+}
+
+
+impl std::cmp::PartialEq for BigInt
+{
+    fn eq(&self, rhs: &BigInt) -> bool
+    {
+        self.bigint.partial_cmp(&rhs.bigint) == Some(std::cmp::Ordering::Equal)
     }
 }
 

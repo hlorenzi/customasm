@@ -281,6 +281,11 @@ fn test_ops_relational_int()
 	test("0 == 1", Pass(expr::Value::Bool(false)));
 	test("0 != 1", Pass(expr::Value::Bool(true)));
 	
+	test("(0xff & 0xff) == 0xff", Pass(expr::Value::Bool(true)));
+	test("(0xff & 0xff) != 0xff", Pass(expr::Value::Bool(false)));
+	test("(0xff & 0xff) == 0xee", Pass(expr::Value::Bool(false)));
+	test("(0xff & 0xff) != 0xee", Pass(expr::Value::Bool(true)));
+
 	test("1 <  2", Pass(expr::Value::Bool(true)));
 	test("1 <= 2", Pass(expr::Value::Bool(true)));
 	test("2 <  1", Pass(expr::Value::Bool(false)));
