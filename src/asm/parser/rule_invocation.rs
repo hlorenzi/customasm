@@ -18,11 +18,18 @@ pub fn parse_rule_invocation(state: &mut asm::parser::State)
             state.fileserver.get_excerpt(&subparser.get_full_span()));
     }
 
-    let candidates = match_active_rulesets(state, &mut subparser)?;
+    let mut candidates = match_active_rulesets(state, &mut subparser)?;
     if candidates.len() != 0
     {
-        //candidates.sort_by(|a, b| a.args.len().cmp(&b.args.len()));
+        // Calculate specificity scores
+        for candidate in &mut candidates
+        {
+            candidate.specificity = candidate.calculate_specificity_score(&state.asm_state);
+        }
 
+        // Sort candidates by specificity score
+        candidates.sort_by(|a, b| b.specificity.cmp(&a.specificity));
+        
         if DEBUG
         {
             println!("");
@@ -37,6 +44,15 @@ pub fn parse_rule_invocation(state: &mut asm::parser::State)
                     state.fileserver.get_excerpt(&rule.span));
             }
         }
+
+        // Only keep candidates with the maximum specificity score
+        let mut max_specificity = candidates[0].specificity;
+        for candidate in &candidates[1..]
+        {
+            max_specificity = std::cmp::max(max_specificity, candidate.specificity);
+        }
+
+        candidates.retain(|c| c.specificity == max_specificity);
 
         let mut invocation = asm::Invocation
         {
@@ -142,7 +158,7 @@ pub fn match_ruleset<'a>(
 
         let mut subparser_clone = subparser.clone();
 
-        if let Ok(candidate) = match_rule(state, rule_ref, &mut subparser_clone)
+        if let Ok(subcandidates) = match_rule(state, rule_ref, &mut subparser_clone)
         {
             //println!(
             //    "finish pattern with parser at `{}`",
@@ -150,7 +166,10 @@ pub fn match_ruleset<'a>(
         
             if !must_consume_all_tokens || subparser_clone.is_over()
             {
-                candidates.push((candidate, subparser_clone));
+                for subcandidate in subcandidates
+                {
+                    candidates.push((subcandidate, subparser_clone.clone()));
+                }
             }
         }
     }
@@ -163,16 +182,12 @@ pub fn match_rule(
     state: &asm::parser::State,
     rule_ref: asm::RuleRef,
     subparser: &mut syntax::Parser)
-    -> Result<asm::RuleInvocationCandidate, ()>
+    -> Result<Vec<asm::RuleInvocationCandidate>, ()>
 {
     let rule_group = &state.asm_state.rulesets[rule_ref.ruleset_ref.index];
     let rule = &rule_group.rules[rule_ref.index];
 
-    let mut candidate = asm::RuleInvocationCandidate
-    {
-        rule_ref,
-        args: Vec::new(),
-    };
+    let mut args = Vec::new();
     
     if DEBUG
     {
@@ -232,7 +247,7 @@ pub fn match_rule(
                                 Some(value) =>
                                 {
                                     let expr = expr::Value::make_integer(value).make_literal();
-                                    candidate.args.push(asm::RuleInvocationArgument::Expression(expr));
+                                    args.push(vec![asm::RuleInvocationArgument::Expression(expr)]);
                                 }
                                 None => return Err(())
                             }
@@ -268,7 +283,7 @@ pub fn match_rule(
                                 return Err(());
                             }
 
-                            candidate.args.push(asm::RuleInvocationArgument::Expression(expr));
+                            args.push(vec![asm::RuleInvocationArgument::Expression(expr)]);
 
                             if !expr_using_slice
                             {
@@ -314,9 +329,10 @@ pub fn match_rule(
                         }
 
                         subparser.restore(subcandidates[0].1.save());
-                        
-                        let subcandidates = subcandidates.into_iter().map(|c| c.0).collect();
-                        candidate.args.push(asm::RuleInvocationArgument::NestedRuleset(subcandidates));
+                        args.push(subcandidates
+                            .into_iter()
+                            .map(|s| asm::RuleInvocationArgument::NestedRuleset(s.0))
+                            .collect());
                     }
                 }
             }
@@ -328,5 +344,36 @@ pub fn match_rule(
         return Err(());
     }
 
-    Ok(candidate)
+    // Create a candidate for each combination of arguments,
+    // flattening all the alternatives
+    let mut num_combinations = 1;
+    for arg in &args
+    {
+        num_combinations *= arg.len();
+    }
+
+    let mut candidates = Vec::new();
+
+    for combination_index in 0..num_combinations
+    {
+        let mut candidate = asm::RuleInvocationCandidate
+        {
+            rule_ref,
+            specificity: 0,
+            args: Vec::new(),
+        };
+
+        let mut permutation = combination_index;
+        for arg in &args
+        {
+            let choice = permutation % arg.len();
+            candidate.args.push(arg[choice].clone());
+
+            permutation /= arg.len();
+        }
+
+        candidates.push(candidate);
+    }
+
+    Ok(candidates)
 }

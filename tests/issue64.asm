@@ -22,9 +22,4 @@ test my_reg + 1 ; = 0xa0001
 
 test my_reg + 1
 ; error: :9: failed to resolve
-; note:  :5: rule candidate
-; error: :9: unknown
-
-; error: :9: failed to resolve
-; note:  :6: rule candidate
 ; error: :6: unknown

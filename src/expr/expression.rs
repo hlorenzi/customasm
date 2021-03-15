@@ -1,7 +1,7 @@
 use crate::*;
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Expr
 {
 	Literal(diagn::Span, Value),

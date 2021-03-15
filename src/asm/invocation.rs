@@ -27,19 +27,20 @@ pub struct RuleInvocation
 }
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RuleInvocationCandidate
 {
     pub rule_ref: asm::RuleRef,
+    pub specificity: usize,
     pub args: Vec<RuleInvocationArgument>,
 }
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum RuleInvocationArgument
 {
     Expression(expr::Expr),
-    NestedRuleset(Vec<RuleInvocationCandidate>),
+    NestedRuleset(RuleInvocationCandidate),
 }
 
 
@@ -76,5 +77,26 @@ impl Invocation
         }
 
         panic!();
+    }
+}
+
+
+impl RuleInvocationCandidate
+{
+    pub fn calculate_specificity_score(&self, asm_state: &asm::State) -> usize
+    {
+        let rule_group = &asm_state.rulesets[self.rule_ref.ruleset_ref.index];
+        let rule = &rule_group.rules[self.rule_ref.index];
+        let mut score = rule.get_specificity_score();
+
+        for arg in &self.args
+        {
+            if let RuleInvocationArgument::NestedRuleset(nested) = arg
+            {
+                score += nested.calculate_specificity_score(asm_state);
+            }
+        }
+
+        score
     }
 }

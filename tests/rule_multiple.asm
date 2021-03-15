@@ -20,7 +20,7 @@ ld 0x55 ; = 0x0055
 ld x ; = 0xff00
 ; :::
 x = 0x55
-ld x ; error: multiple matches
+ld x ; = 0xff00
 ; :::
-ld x ; error: multiple matches
+ld x ; = 0xff00
 x = 0x55

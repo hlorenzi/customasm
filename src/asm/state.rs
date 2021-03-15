@@ -800,12 +800,12 @@ impl State
 					eval_ctx.set_local(&arg.name, arg_value);
 				}
 
-				&asm::RuleInvocationArgument::NestedRuleset(ref inner_candidates) =>
+				&asm::RuleInvocationArgument::NestedRuleset(ref inner_candidate) =>
 				{
-					let arg_value = self.resolve_rule_invocation_candidates(
+					let arg_value = self.resolve_rule_invocation_candidate(
 						report.clone(),
 						invocation,
-						&inner_candidates,
+						&inner_candidate,
 						fileserver,
 						final_pass)?;
 

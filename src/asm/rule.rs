@@ -68,4 +68,20 @@ impl Rule
         self.parameters.push(param);
 		self.pattern.push(PatternPart::Parameter(param_index));
 	}
+
+
+    pub fn get_specificity_score(&self) -> usize
+    {
+        let mut count = 0;
+
+        for part in &self.pattern
+        {
+            if let PatternPart::Exact(_) = part
+            {
+                count += 1;
+            }
+        }
+
+        count
+    }
 }
