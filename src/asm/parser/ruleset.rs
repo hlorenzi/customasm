@@ -4,7 +4,7 @@ use crate::*;
 pub fn parse_directive_ruledef(
     state: &mut asm::parser::State,
     tk_directive: &syntax::Token,
-    enable: bool)
+    is_not_subruledef: bool)
     -> Result<(), ()>
 {
     let mut decl_span = tk_directive.span.clone();
@@ -34,7 +34,7 @@ pub fn parse_directive_ruledef(
 
     while !state.parser.next_is(0, syntax::TokenKind::BraceClose)
     {
-        ruleset.rules.push(asm::parser::parse_rule(state)?);
+        ruleset.rules.push(asm::parser::parse_rule(state, is_not_subruledef)?);
         state.parser.expect_linebreak()?;
     }
 
@@ -42,7 +42,7 @@ pub fn parse_directive_ruledef(
 
     state.asm_state.rulesets.push(ruleset);
 
-    if enable
+    if is_not_subruledef
     {
         state.asm_state.activate_ruleset(
             name,

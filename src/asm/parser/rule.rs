@@ -2,40 +2,59 @@ use crate::*;
 
 
 pub fn parse_rule(
-    state: &mut asm::parser::State)
+    state: &mut asm::parser::State,
+    is_not_subruledef: bool)
     -> Result<asm::Rule, ()>
 {
     let mut rule = asm::Rule::new();
+    let mut empty_pattern = false;
 
     while !state.parser.next_is(0, syntax::TokenKind::HeavyArrowRight)
     {
         let tk = state.parser.advance();
         rule.span = rule.span.join(&tk.span);
+
+        if empty_pattern
+        {
+            state.report.error_span("invalid pattern after empty specifier", &tk.span);
+            return Err(());
+        }
         
         if tk.kind == syntax::TokenKind::BraceOpen
         {
-            let tk_param_name = state.parser.expect(syntax::TokenKind::Identifier)?;
-            let param_name = tk_param_name.excerpt.as_ref().unwrap().clone();
-
-            let param_type = if let Some(_) = state.parser.maybe_expect(syntax::TokenKind::Colon)
+            if rule.pattern.len() == 0 &&
+                !empty_pattern &&
+                !is_not_subruledef &&
+                state.parser.next_is(0, syntax::TokenKind::BraceClose)
             {
-                let tk_typename = state.parser.expect(syntax::TokenKind::Identifier)?;
-                let typename = tk_typename.excerpt.as_ref().unwrap().clone();
-                interpret_typename(state, &typename, &tk_typename.span)?
+                state.parser.advance();
+                empty_pattern = true;
             }
             else
             {
-                asm::PatternParameterType::Unspecified
-            };
+                let tk_param_name = state.parser.expect(syntax::TokenKind::Identifier)?;
+                let param_name = tk_param_name.excerpt.as_ref().unwrap().clone();
 
-            let brace_close_tk = state.parser.expect(syntax::TokenKind::BraceClose)?;
-            rule.span = rule.span.join(&brace_close_tk.span);
+                let param_type = if let Some(_) = state.parser.maybe_expect(syntax::TokenKind::Colon)
+                {
+                    let tk_typename = state.parser.expect(syntax::TokenKind::Identifier)?;
+                    let typename = tk_typename.excerpt.as_ref().unwrap().clone();
+                    interpret_typename(state, &typename, &tk_typename.span)?
+                }
+                else
+                {
+                    asm::PatternParameterType::Unspecified
+                };
 
-            rule.pattern_add_parameter(asm::PatternParameter
-            {
-                name: param_name,
-                typ: param_type,
-            });
+                let brace_close_tk = state.parser.expect(syntax::TokenKind::BraceClose)?;
+                rule.span = rule.span.join(&brace_close_tk.span);
+
+                rule.pattern_add_parameter(asm::PatternParameter
+                {
+                    name: param_name,
+                    typ: param_type,
+                });
+            }
         }
         
         else if tk.kind.is_allowed_pattern_token()
@@ -52,24 +71,13 @@ pub fn parse_rule(
 
     let tk_heavy_arrow = state.parser.expect(syntax::TokenKind::HeavyArrowRight)?;
 
-    if rule.pattern.len() == 0
+    if rule.pattern.len() == 0 && !empty_pattern
     {
         state.report.error_span("expected pattern", &tk_heavy_arrow.span.before());
         return Err(());
     }
 
-
     rule.production = expr::Expr::parse(&mut state.parser)?;
-
-    /*if !rule.production.has_size()
-    {
-        state.report.error_span(
-            "size of rule production must be known; \
-            try using a bit slice like `x[hi:lo]`",
-            &rule.production.span());
-
-        return Err(());
-    }*/
 
     Ok(rule)
 }

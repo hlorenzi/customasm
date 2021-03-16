@@ -14,6 +14,10 @@
 ; :::
 ld 0xaa ; error: no match
 ; :::
-ld 0xaa$ ; error: ambiguous / error: no match
+ld 0xaa$ ; = 0x5511aa
 ; :::
-ld 0xaa$$ ; error: no match
+ld 0x99 + 0x11$ ; = 0x5511aa
+; :::
+ld (0x99 + 0x11)$ ; = 0x5511aa
+; :::
+ld 0xaa$$ ; = 0x5522aa
