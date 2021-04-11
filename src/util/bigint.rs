@@ -212,7 +212,8 @@ impl BigInt
         for _ in 0..(left - right + 1)
             { mask = (mask << 1) + num_bigint::BigInt::one(); }
         
-        let mut result = &self.shr(right) & &mask.into();
+        let shifted_mask = BigInt::new(mask, None).shl(right);
+        let mut result = (self & &shifted_mask).shr(right);
         result.size = Some(left + 1 - right);
         result
     }
