@@ -10,21 +10,50 @@ pub fn parse_rule_invocation(state: &mut asm::parser::State)
     let mut subparser = state.parser.slice_until_linebreak();
     subparser.suppress_reports();
 
+    let ctx = state.asm_state.get_ctx(&state);
+
+    if let Ok(invocation) = match_rule_invocation(
+        &mut state.asm_state,
+        subparser,
+        ctx,
+        state.fileserver,
+        state.report.clone())
+    {
+        let bankdata = state.asm_state.get_bankdata(state.asm_state.cur_bank);
+        bankdata.check_writable(&state.asm_state, state.report.clone(), &invocation.span)?;
+        
+        let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
+        bankdata.push_invocation(invocation);
+    }
+
+    state.parser.expect_linebreak()?;
+    Ok(())
+}
+
+
+pub fn match_rule_invocation(
+    asm_state: &asm::State,
+    subparser: syntax::Parser,
+    ctx: asm::Context,
+    fileserver: &dyn util::FileServer,
+    report: diagn::RcReport)
+    -> Result<asm::Invocation, ()>
+{
     if DEBUG
     {
         println!("");
         println!(
             "=== parse rule invocation `{}` ===",
-            state.fileserver.get_excerpt(&subparser.get_full_span()));
+            fileserver.get_excerpt(&subparser.get_full_span()));
     }
 
-    let mut candidates = match_active_rulesets(state, &subparser)?;
+    let mut candidates = match_active_rulesets(asm_state, &subparser, fileserver, report.clone())?;
     if candidates.len() != 0
     {
         // Calculate specificity scores
         for candidate in &mut candidates
         {
-            candidate.specificity = candidate.calculate_specificity_score(&state.asm_state);
+            candidate.specificity = candidate.calculate_specificity_score(&asm_state);
         }
 
         // Sort candidates by specificity score
@@ -36,12 +65,12 @@ pub fn parse_rule_invocation(state: &mut asm::parser::State)
             println!("final candidates:");
             for candidate in &candidates
             {
-                let rule_group = &state.asm_state.rulesets[candidate.rule_ref.ruleset_ref.index];
+                let rule_group = &asm_state.rulesets[candidate.rule_ref.ruleset_ref.index];
                 let rule = &rule_group.rules[candidate.rule_ref.index];
 
                 println!(
                     "  `{}`",
-                    state.fileserver.get_excerpt(&rule.span));
+                    fileserver.get_excerpt(&rule.span));
             }
         }
 
@@ -56,7 +85,7 @@ pub fn parse_rule_invocation(state: &mut asm::parser::State)
 
         let mut invocation = asm::Invocation
         {
-            ctx: state.asm_state.get_ctx(&state),
+            ctx,
             size_guess: 0,
             span: subparser.get_full_span(),
             kind: asm::InvocationKind::Rule(asm::RuleInvocation
@@ -65,13 +94,14 @@ pub fn parse_rule_invocation(state: &mut asm::parser::State)
             })
         };
         
-        let resolved = state.asm_state.resolve_rule_invocation(
-            state.report.clone(),
+        let resolved = asm_state.resolve_rule_invocation(
+            report.clone(),
             &invocation,
-            state.fileserver,
-            false);
+            fileserver,
+            false,
+            &mut expr::EvalContext::new());
 
-        //println!("{} = {:?}", state.fileserver.get_excerpt(&invocation.span), &resolved);
+        //println!("{} = {:?}", fileserver.get_excerpt(&invocation.span), &resolved);
 
         // TODO: can provide an exact guess even if resolution fails,
         // if we have an exact candidate, and
@@ -89,31 +119,27 @@ pub fn parse_rule_invocation(state: &mut asm::parser::State)
             _ => 0
         };
 
-        //println!("{} = {}", state.fileserver.get_excerpt(&invocation.span), invocation.size_guess);
+        //println!("{} = {}", fileserver.get_excerpt(&invocation.span), invocation.size_guess);
 
-        let bankdata = state.asm_state.get_bankdata(state.asm_state.cur_bank);
-        bankdata.check_writable(&state.asm_state, state.report.clone(), &invocation.span)?;
-        
-        let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
-        bankdata.push_invocation(invocation);
+        return Ok(invocation);
     }
 
-    state.parser.expect_linebreak()?;
-
-    Ok(())
+    Err(())
 }
 
 
 pub fn match_active_rulesets(
-    state: &asm::parser::State,
-    subparser: &syntax::Parser)
+    asm_state: &asm::State,
+    subparser: &syntax::Parser,
+    fileserver: &dyn util::FileServer,
+    report: diagn::RcReport)
     -> Result<Vec<asm::RuleInvocationCandidate>, ()>
 {
     let mut candidates = Vec::new();
 
-    for ruleset_ref in &state.asm_state.active_rulesets
+    for ruleset_ref in &asm_state.active_rulesets
     {
-        if let Ok(subcandidates) = match_ruleset(state, *ruleset_ref, &subparser, true)
+        if let Ok(subcandidates) = match_ruleset(asm_state, *ruleset_ref, &subparser, true, fileserver, report.clone())
         {
             for candidate in subcandidates
             {
@@ -124,12 +150,12 @@ pub fn match_active_rulesets(
 
     if candidates.len() == 0
     {
-        state.report.error_span("no match for instruction found", &subparser.get_full_span());
+        report.error_span("no match for instruction found", &subparser.get_full_span());
     }
 
     //println!(
     //    "rule candidates for `{}`:\n{:#?}",
-    //    state.fileserver.get_excerpt(&subparser.get_full_span()),
+    //    fileserver.get_excerpt(&subparser.get_full_span()),
     //    candidates);
 
     Ok(candidates)
@@ -137,13 +163,15 @@ pub fn match_active_rulesets(
 
 
 pub fn match_ruleset<'a>(
-    state: &asm::parser::State,
+    asm_state: &asm::State,
     ruleset_ref: asm::RulesetRef,
     subparser: &syntax::Parser<'a>,
-    must_consume_all_tokens: bool)
+    must_consume_all_tokens: bool,
+    fileserver: &dyn util::FileServer,
+    report: diagn::RcReport)
     -> Result<Vec<(asm::RuleInvocationCandidate, syntax::Parser<'a>)>, ()>
 {
-    let rule_group = &state.asm_state.rulesets[ruleset_ref.index];
+    let rule_group = &asm_state.rulesets[ruleset_ref.index];
 
     let mut candidates = Vec::new();
 
@@ -155,11 +183,11 @@ pub fn match_ruleset<'a>(
             index,
         };
 
-        if let Ok(subcandidates) = match_rule(state, rule_ref, subparser)
+        if let Ok(subcandidates) = match_rule(asm_state, rule_ref, subparser, fileserver, report.clone())
         {
             //println!(
             //    "finish pattern with parser at `{}`",
-            //    state.fileserver.get_excerpt(&subparser_clone.get_next_spans(10)));
+            //    fileserver.get_excerpt(&subparser_clone.get_next_spans(10)));
         
             for subcandidate in subcandidates
             {
@@ -185,12 +213,14 @@ struct ParsingBranch<'a>
 
 
 pub fn match_rule<'a>(
-    state: &asm::parser::State,
+    asm_state: &asm::State,
     rule_ref: asm::RuleRef,
-    subparser: &syntax::Parser<'a>)
+    subparser: &syntax::Parser<'a>,
+    fileserver: &dyn util::FileServer,
+    report: diagn::RcReport)
     -> Result<Vec<(asm::RuleInvocationCandidate, syntax::Parser<'a>)>, ()>
 {
-    let rule_group = &state.asm_state.rulesets[rule_ref.ruleset_ref.index];
+    let rule_group = &asm_state.rulesets[rule_ref.ruleset_ref.index];
     let rule = &rule_group.rules[rule_ref.index];
 
     let mut parsing_branches = Vec::new();
@@ -206,10 +236,10 @@ pub fn match_rule<'a>(
         println!("");
         println!(
             "> try match rule `{}`",
-            state.fileserver.get_excerpt(&rule.span));
+            fileserver.get_excerpt(&rule.span));
         println!(
             "  parser at `{}`",
-            state.fileserver.get_excerpt(&subparser.get_next_spans(100)));
+            fileserver.get_excerpt(&subparser.get_next_spans(100)));
     }
 
     for (index, part) in rule.pattern.iter().enumerate()
@@ -245,7 +275,7 @@ pub fn match_rule<'a>(
                         {
                             println!("  branch {}, exact matched! parser at `{}`",
                                 branch_index,
-                                state.fileserver.get_excerpt(&branch.parser.get_next_spans(100)));
+                                fileserver.get_excerpt(&branch.parser.get_next_spans(100)));
                         }
                     }
                 }
@@ -303,7 +333,7 @@ pub fn match_rule<'a>(
                                         "  branch {}, parser {}at `{}`",
                                         branch_index,
                                         if expr_using_slice { "using slice " } else { "" },
-                                        state.fileserver.get_excerpt(&expr_parser.get_next_spans(100)));
+                                        fileserver.get_excerpt(&expr_parser.get_next_spans(100)));
                                 }
 
                                 let expr = expr::Expr::parse(&mut expr_parser)?;
@@ -325,7 +355,7 @@ pub fn match_rule<'a>(
                                     {
                                         println!("  branch {}, expr matched! parser at `{}`",
                                             branch_index,
-                                            state.fileserver.get_excerpt(&branch.parser.get_next_spans(100)));
+                                            fileserver.get_excerpt(&branch.parser.get_next_spans(100)));
                                     }
                                 }
                             }
@@ -339,10 +369,12 @@ pub fn match_rule<'a>(
                             }
 
                             let subcandidates = match_ruleset(
-                                state,
+                                asm_state,
                                 rule_group_ref,
                                 &mut branch.parser,
-                                false)?;
+                                false,
+                                fileserver,
+                                report.clone())?;
 
                             if subcandidates.len() != 0
                             {
@@ -392,7 +424,7 @@ pub fn match_rule<'a>(
             println!("= branch {}{}, candidate parser at `{}`",
                 branch_index,
                 if branch.dead { " (dead)" } else { "" },
-                state.fileserver.get_excerpt(&branch.parser.get_next_spans(100)));
+                fileserver.get_excerpt(&branch.parser.get_next_spans(100)));
         }
 
         if branch.dead

@@ -55,18 +55,29 @@ pub struct EvalFunctionInfo<'a>
 }
 
 
+pub struct EvalAsmInfo<'a>
+{
+	pub report: diagn::RcReport,
+	pub tokens: &'a [syntax::Token],
+	pub span: &'a diagn::Span,
+	pub args: &'a mut EvalContext,
+}
+
+
 impl expr::Expr
 {
-	pub fn eval<FVar, FFn>(
+	pub fn eval<FVar, FFn, FAsm>(
 		&self,
 		report: diagn::RcReport,
 		ctx: &mut EvalContext,
 		eval_var: &FVar,
-		eval_fn: &FFn)
+		eval_fn: &FFn,
+		eval_asm: &FAsm)
 		-> Result<expr::Value, ()>
 	where
 		FVar: Fn(&EvalVariableInfo) -> Result<expr::Value, bool>,
-		FFn: Fn(&EvalFunctionInfo) -> Result<expr::Value, bool>
+		FFn: Fn(&EvalFunctionInfo) -> Result<expr::Value, bool>,
+		FAsm: Fn(&mut EvalAsmInfo) -> Result<expr::Value, ()>
 	{
 		match self
 		{
@@ -106,7 +117,7 @@ impl expr::Expr
 			
 			&expr::Expr::UnaryOp(ref span, _, op, ref inner_expr) =>
 			{
-				match inner_expr.eval(report.clone(), ctx, eval_var, eval_fn)?
+				match inner_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?
 				{
 					expr::Value::Integer(ref x) => match op
 					{
@@ -136,7 +147,7 @@ impl expr::Expr
 						{
 							if hierarchy_level == 0 && hierarchy.len() == 1
 							{
-								let value = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?;
+								let value = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
 								ctx.set_local(hierarchy[0].clone(), value);
 								return Ok(expr::Value::Void);
 							}
@@ -150,7 +161,7 @@ impl expr::Expr
 				
 				else if op == expr::BinaryOp::LazyOr || op == expr::BinaryOp::LazyAnd
 				{
-					let lhs = lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?;
+					let lhs = lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
 					
 					match (op, &lhs)
 					{
@@ -161,7 +172,7 @@ impl expr::Expr
 						_ => return Err(report.error_span("invalid argument type to operator", &lhs_expr.span()))
 					}
 					
-					let rhs = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?;
+					let rhs = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
 					
 					match (op, &rhs)
 					{
@@ -175,7 +186,7 @@ impl expr::Expr
 				
 				else
 				{
-					match (lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?, rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn)?)
+					match (lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?, rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?)
 					{
 						(expr::Value::Integer(ref lhs), expr::Value::Integer(ref rhs)) =>
 						{
@@ -257,17 +268,17 @@ impl expr::Expr
 			
 			&expr::Expr::TernaryOp(_, ref cond, ref true_branch, ref false_branch) =>
 			{
-				match cond.eval(report.clone(), ctx, eval_var, eval_fn)?
+				match cond.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?
 				{
-					expr::Value::Bool(true)  => true_branch.eval(report.clone(), ctx, eval_var, eval_fn),
-					expr::Value::Bool(false) => false_branch.eval(report.clone(), ctx, eval_var, eval_fn),
+					expr::Value::Bool(true)  => true_branch.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm),
+					expr::Value::Bool(false) => false_branch.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm),
 					_ => Err(report.error_span("invalid condition type", &cond.span()))
 				}
 			}
 			
 			&expr::Expr::BitSlice(ref span, _, left, right, ref inner) =>
 			{
-				match inner.eval(report.clone(), ctx, eval_var, eval_fn)?
+				match inner.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?
 				{
 					expr::Value::Integer(ref x) => Ok(expr::Value::make_integer(x.slice(left, right))),
 					_ => Err(report.error_span("invalid argument type to slice", &span))
@@ -276,7 +287,7 @@ impl expr::Expr
 			
 			&expr::Expr::SoftSlice(_, _, _, _, ref inner) =>
 			{
-				inner.eval(report, ctx, eval_var, eval_fn)
+				inner.eval(report, ctx, eval_var, eval_fn, eval_asm)
 			}
 			
 			&expr::Expr::Block(_, ref exprs) =>
@@ -284,14 +295,14 @@ impl expr::Expr
 				let mut result = expr::Value::Void;
 				
 				for expr in exprs
-					{ result = expr.eval(report.clone(), ctx, eval_var, eval_fn)?; }
+					{ result = expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?; }
 					
 				Ok(result)
 			}
 			
 			&expr::Expr::Call(ref span, ref target, ref arg_exprs) =>
 			{
-				let func = target.eval(report.clone(), ctx, eval_var, eval_fn)?;
+				let func = target.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
 
 				match func
 				{
@@ -299,7 +310,7 @@ impl expr::Expr
 					{
 						let mut args = Vec::new();
 						for expr in arg_exprs
-							{ args.push(expr.eval(report.clone(), ctx, eval_var, eval_fn)?); }
+							{ args.push(expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?); }
 
 						let info = EvalFunctionInfo
 						{
@@ -308,7 +319,7 @@ impl expr::Expr
 							args,
 							span,
 						};
-							
+						
 						match eval_fn(&info)
 						{
 							Ok(value) => Ok(value),
@@ -319,29 +330,25 @@ impl expr::Expr
 					_ => Err(report.error_span("expression is not callable", &target.span()))
 				}
 			}
-		}
-	}
-
-
-	/*pub fn eval_slice<FVar, FFn>(&self, report: RcReport, ctx: &mut ExpressionEvalContext, eval_var: &FVar, eval_fn: &FFn) -> Result<expr::Value, ()>
-		where
-		FVar: Fn(RcReport, &str, &Span) -> Result<expr::Value, bool>,
-		FFn: Fn(RcReport, usize, Vec<expr::Value>, &Span) -> Result<expr::Value, bool>
-	{
-		match self
-		{
-			&expr::Expr::SoftSlice(ref span, _, left, right, ref inner) =>
+			
+			&expr::Expr::Asm(ref span, ref tokens) =>
 			{
-				match inner.eval(report.clone(), ctx, eval_var, eval_fn)?
+				let mut info = EvalAsmInfo
 				{
-					expr::Value::Integer(ref x) => Ok(expr::Value::make_integer(x.slice(left, right))),
-					_ => Err(report.error_span("invalid argument type to slice", &span))
+					report: report.clone(),
+					tokens,
+					span,
+					args: ctx,
+				};
+
+				match eval_asm(&mut info)
+				{
+					Ok(value) => Ok(value),
+					Err(_) => Err(())
 				}
 			}
-
-			_ => self.eval(report, ctx, eval_var, eval_fn)
 		}
-	}*/
+	}
 }
 
 

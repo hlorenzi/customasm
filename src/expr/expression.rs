@@ -12,7 +12,8 @@ pub enum Expr
 	BitSlice(diagn::Span, diagn::Span, usize, usize, Box<Expr>),
 	SoftSlice(diagn::Span, diagn::Span, usize, usize, Box<Expr>),
 	Block(diagn::Span, Vec<Expr>),
-	Call(diagn::Span, Box<Expr>, Vec<Expr>)
+	Call(diagn::Span, Box<Expr>, Vec<Expr>),
+	Asm(diagn::Span, Vec<syntax::Token>),
 }
 
 
@@ -73,7 +74,8 @@ impl Expr
 			&Expr::BitSlice (ref span, ..) => span.clone(),
 			&Expr::SoftSlice(ref span, ..) => span.clone(),
 			&Expr::Block    (ref span, ..) => span.clone(),
-			&Expr::Call     (ref span, ..) => span.clone()
+			&Expr::Call     (ref span, ..) => span.clone(),
+			&Expr::Asm      (ref span, ..) => span.clone(),
 		}
 	}
 }

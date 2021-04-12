@@ -447,7 +447,8 @@ impl State
 						report.clone(),
 						&invoc,
 						fileserver,
-						true)?
+						true,
+						&mut expr::EvalContext::new())?
 				}
 				
 				asm::InvocationKind::Data(_) =>
@@ -628,7 +629,8 @@ impl State
 		report: diagn::RcReport,
 		invocation: &asm::Invocation,
 		fileserver: &dyn util::FileServer,
-		final_pass: bool)
+		final_pass: bool,
+		asm_block_args: &mut expr::EvalContext)
 		-> Result<expr::Value, ()>
 	{
 		self.resolve_rule_invocation_candidates(
@@ -636,7 +638,8 @@ impl State
 			invocation,
 			&invocation.get_rule_invoc().candidates,
 			fileserver,
-			final_pass)
+			final_pass,
+			asm_block_args)
 	}
 
 
@@ -646,7 +649,8 @@ impl State
 		invocation: &asm::Invocation,
 		candidates: &Vec<asm::RuleInvocationCandidate>,
 		fileserver: &dyn util::FileServer,
-		final_pass: bool)
+		final_pass: bool,
+		asm_block_args: &mut expr::EvalContext)
 		-> Result<expr::Value, ()>
 	{
 		if DEBUG_CANDIDATE_RESOLUTION
@@ -668,7 +672,8 @@ impl State
 				invocation,
 				&candidates[0],
 				fileserver,
-				final_pass);
+				final_pass,
+				asm_block_args);
 		}
 
 		let mut successful_candidates = Vec::new();
@@ -693,7 +698,8 @@ impl State
 				invocation,
 				candidate,
 				fileserver,
-				final_pass)
+				final_pass,
+				asm_block_args)
 			{
 				Ok(resolved) =>
 				{
@@ -733,7 +739,8 @@ impl State
 					invocation,
 					successful_candidates[0].0,
 					fileserver,
-					final_pass)
+					final_pass,
+					asm_block_args)
 			}
 			else
 			{
@@ -769,7 +776,8 @@ impl State
 		invocation: &asm::Invocation,
 		candidate: &asm::RuleInvocationCandidate,
 		fileserver: &dyn util::FileServer,
-		final_pass: bool)
+		final_pass: bool,
+		asm_block_args: &mut expr::EvalContext)
 		-> Result<expr::Value, ()>
 	{
 		let rule = self.get_rule(candidate.rule_ref).unwrap();
@@ -785,7 +793,7 @@ impl State
 						report.clone(),
 						&expr,
 						&invocation.ctx,
-						&mut expr::EvalContext::new(),
+						asm_block_args,
 						fileserver,
 						final_pass)?;
 
@@ -807,7 +815,8 @@ impl State
 						invocation,
 						&inner_candidate,
 						fileserver,
-						final_pass)?;
+						final_pass,
+						asm_block_args)?;
 
 					let arg_name = &rule.parameters[arg_index].name;
 
@@ -936,7 +945,8 @@ impl State
 			report,
 			eval_ctx,
 			&|info| self.eval_var(ctx, info, fileserver, final_pass),
-			&|info| self.eval_fn(ctx, info, fileserver))
+			&|info| self.eval_fn(ctx, info, fileserver),
+			&|info| self.eval_asm(ctx, info, fileserver))
 	}
 	
 		
@@ -1146,5 +1156,91 @@ impl State
 			
 			_ => unreachable!()
 		}
+	}
+
+
+	fn eval_asm(
+		&self,
+		ctx: &Context,
+		info: &mut expr::EvalAsmInfo,
+		fileserver: &dyn util::FileServer)
+		-> Result<expr::Value, ()>
+	{
+		let mut result = util::BigInt::new(0, Some(0));
+		
+		let mut parser = syntax::Parser::new(Some(info.report.clone()), info.tokens);
+
+		//println!("asm block `{}`", fileserver.get_excerpt(&parser.get_full_span()));
+		
+		while !parser.is_over()
+		{
+			let mut subparser = parser.slice_until_linebreak();
+			subparser.suppress_reports();
+
+			let subparser_span = subparser.get_full_span();
+
+			//println!("> instr `{}`", fileserver.get_excerpt(&subparser_span));
+		
+			let matches = asm::parser::match_rule_invocation(
+				&self,
+				subparser,
+				ctx.clone(),
+				fileserver,
+				info.report.clone())?;
+
+			let value = self.resolve_rule_invocation(
+				info.report.clone(),
+				&matches,
+				fileserver,
+				true,
+				info.args)?;
+				
+			let (bigint, size) = match value
+			{
+				expr::Value::Integer(bigint) =>
+				{
+					match bigint.size
+					{
+						Some(size) => (bigint, size),
+						None =>
+						{
+							info.report.error_span(
+								"cannot infer size of instruction",
+								&subparser_span);
+
+							return Err(());
+						}
+					}
+				}
+
+				_ =>
+				{
+					info.report.error_span(
+						"wrong type returned from instruction",
+						&subparser_span);
+
+					return Err(());
+				}
+			};
+
+			if size > 0
+			{
+				if result.size.unwrap() == 0
+				{
+					result = bigint;
+				}
+				else
+				{
+					result = result.concat(
+						(result.size.unwrap() - 1, 0),
+						&bigint,
+						(size - 1, 0));
+				}
+			}
+
+			parser.expect_linebreak()?;
+		}
+
+		Ok(expr::Value::make_integer(result))
 	}
 }

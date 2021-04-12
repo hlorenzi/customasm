@@ -11,3 +11,4 @@ pub use self::expression::BinaryOp;
 pub use self::eval::EvalContext;
 pub use self::eval::EvalVariableInfo;
 pub use self::eval::EvalFunctionInfo;
+pub use self::eval::EvalAsmInfo;

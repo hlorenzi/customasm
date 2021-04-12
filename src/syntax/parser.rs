@@ -76,6 +76,19 @@ impl<'a> Parser<'a>
 	}
 
 
+	pub fn get_cloned_tokens(&self) -> Vec<Token>
+	{
+		let mut result = Vec::new();
+
+		for token in self.tokens
+		{
+			result.push(token.clone());
+		}
+
+		result
+	}
+
+
 	pub fn get_next_spans(&self, count: usize) -> diagn::Span
 	{
 		if self.index >= self.tokens.len()

@@ -21,6 +21,7 @@ pub enum TokenKind
 	Identifier,
 	Number,
 	String,
+	KeywordAsm,
 	ParenOpen,
 	ParenClose,
 	BracketOpen,
@@ -85,6 +86,7 @@ impl TokenKind
 	{
 		self == TokenKind::Identifier ||
 		self == TokenKind::Number ||
+		self == TokenKind::KeywordAsm ||
 		self == TokenKind::ParenOpen ||
 		self == TokenKind::ParenClose ||
 		self == TokenKind::BracketOpen ||
@@ -129,6 +131,7 @@ impl TokenKind
 			TokenKind::Identifier => "identifier",
 			TokenKind::Number => "number",
 			TokenKind::String => "string",
+			TokenKind::KeywordAsm => "`asm` keyword",
 			TokenKind::ParenOpen => "`(`",
 			TokenKind::ParenClose => "`)`",
 			TokenKind::BracketOpen => "`[`",
@@ -188,6 +191,7 @@ impl Token
 	{
 		match self.kind
 		{
+			TokenKind::KeywordAsm => "asm",
 			TokenKind::ParenOpen => "(",
 			TokenKind::ParenClose => ")",
 			TokenKind::BracketOpen => "[",
@@ -247,10 +251,10 @@ where S: Into<String>
 		let (kind, length) =
 			check_for_whitespace(&src[index..]).unwrap_or_else(||
 			check_for_comment   (&src[index..]).unwrap_or_else(||
+			check_for_fixed     (&src[index..]).unwrap_or_else(||
 			check_for_identifier(&src[index..]).unwrap_or_else(||
 			check_for_number    (&src[index..]).unwrap_or_else(||
 			check_for_string    (&src[index..]).unwrap_or_else(||
-			check_for_fixed     (&src[index..]).unwrap_or_else(||
 			(TokenKind::Error, 1)))))));
 		
 		let span = Span::new(filename.clone(), index, index + length);
@@ -384,18 +388,18 @@ fn check_for_string(src: &[char]) -> Option<(TokenKind, usize)>
 {
 	let mut length = 0;
 	
-	if src[length] != '\"' // "
+	if src[length] != '\"'
 		{ return None; }
 		
 	length += 1;
 	
-	while length < src.len() && src[length] != '\"' // "
+	while length < src.len() && src[length] != '\"'
 		{ length += 1; }
 		
 	if length >= src.len()
 		{ return None; }
 		
-	if src[length] != '\"' // "
+	if src[length] != '\"'
 		{ return None; }
 		
 	length += 1;
@@ -406,9 +410,10 @@ fn check_for_string(src: &[char]) -> Option<(TokenKind, usize)>
 
 fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 {
-	static POSSIBLE_TOKENS: [(&str, TokenKind); 40] =
+	static POSSIBLE_TOKENS: [(&str, TokenKind); 41] =
 	[
 		("\n",  TokenKind::LineBreak),
+		("asm", TokenKind::KeywordAsm),
 		("(",   TokenKind::ParenOpen),
 		(")",   TokenKind::ParenClose),
 		("[",   TokenKind::BracketOpen),

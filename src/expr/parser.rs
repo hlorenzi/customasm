@@ -391,6 +391,9 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 			
 		else if self.parser.next_is(0, syntax::TokenKind::String)
 			{ self.parse_string() }
+	
+		else if self.parser.next_is(0, syntax::TokenKind::KeywordAsm)
+			{ self.parse_asm() }
 			
 		else
 		{
@@ -517,6 +520,23 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 		let expr = expr::Expr::Literal(
 			tk_str.span.clone(),
 			expr::Value::Integer(util::BigInt::new_from_str(&string)));
+
+		Ok(expr)
+	}
+	
+	
+	fn parse_asm(&mut self) -> Result<expr::Expr, ()>
+	{
+		let tk_asm = self.parser.expect(syntax::TokenKind::KeywordAsm)?;
+		self.parser.expect(syntax::TokenKind::BraceOpen)?;
+
+		let contents = self.parser.slice_until_token(syntax::TokenKind::BraceClose);
+
+		let tk_brace_close = self.parser.expect(syntax::TokenKind::BraceClose)?;
+
+		let expr = expr::Expr::Asm(
+			tk_asm.span.clone().join(&tk_brace_close.span),
+			contents.get_cloned_tokens());
 
 		Ok(expr)
 	}
