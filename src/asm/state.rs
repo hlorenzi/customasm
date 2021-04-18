@@ -633,26 +633,8 @@ impl State
 		asm_block_args: &mut expr::EvalContext)
 		-> Result<expr::Value, ()>
 	{
-		self.resolve_rule_invocation_candidates(
-			report,
-			invocation,
-			&invocation.get_rule_invoc().candidates,
-			fileserver,
-			final_pass,
-			asm_block_args)
-	}
+		let candidates = &invocation.get_rule_invoc().candidates;
 
-
-	pub fn resolve_rule_invocation_candidates(
-		&self,
-		report: diagn::RcReport,
-		invocation: &asm::Invocation,
-		candidates: &Vec<asm::RuleInvocationCandidate>,
-		fileserver: &dyn util::FileServer,
-		final_pass: bool,
-		asm_block_args: &mut expr::EvalContext)
-		-> Result<expr::Value, ()>
-	{
 		if DEBUG_CANDIDATE_RESOLUTION
 		{
 			println!(
@@ -821,6 +803,11 @@ impl State
 					let arg_name = &rule.parameters[arg_index].name;
 
 					eval_ctx.set_local(arg_name, arg_value);
+					
+					if let Some(tokens) = &candidate.token_args[arg_index]
+					{
+						eval_ctx.set_token_sub(arg_name, tokens.clone());
+					}
 				}
 			}
 		}
@@ -1174,12 +1161,50 @@ impl State
 		
 		while !parser.is_over()
 		{
-			let mut subparser = parser.slice_until_linebreak();
-			subparser.suppress_reports();
-
-			let subparser_span = subparser.get_full_span();
+			// Substitute `{x}` occurrences with tokens from the argument
+			let mut subs_parser = parser.slice_until_linebreak_over_nested_braces();
+			let subparser_span = subs_parser.get_full_span();
 
 			//println!("> instr `{}`", fileserver.get_excerpt(&subparser_span));
+
+			let mut subs_tokens: Vec<syntax::Token> = Vec::new();
+			while !subs_parser.is_over()
+			{
+				if let Some(open_token) = subs_parser.maybe_expect(syntax::TokenKind::BraceOpen)
+				{
+					let arg_name_token = subs_parser.expect(syntax::TokenKind::Identifier)?;
+					let arg_name = arg_name_token.excerpt.as_ref().unwrap();
+
+					let token_sub = match info.args.get_token_sub(&arg_name)
+					{
+						None =>
+						{
+							info.report.error_span("unknown argument", &arg_name_token.span);
+							return Err(());
+						}
+						Some(t) => t
+					};
+
+					let close_token = subs_parser.expect(syntax::TokenKind::BraceClose)?;
+					let sub_span = open_token.span.join(&close_token.span);
+
+					for token in token_sub
+					{
+						let mut sub_token = token.clone();
+						sub_token.span = sub_span.clone();
+						subs_tokens.push(sub_token);
+					}
+				}
+				else
+				{
+					subs_tokens.push(subs_parser.advance());
+				}
+			}
+
+			let mut subparser = syntax::Parser::new(Some(info.report.clone()), &subs_tokens);
+			subparser.suppress_reports();
+
+			//println!("> after subs `{:?}`", subs_tokens);
 		
 			let matches = asm::parser::match_rule_invocation(
 				&self,

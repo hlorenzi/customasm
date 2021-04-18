@@ -207,6 +207,7 @@ pub fn match_ruleset<'a>(
 struct ParsingBranch<'a>
 {
     args: Vec<asm::RuleInvocationArgument>,
+    token_args: Vec<Option<Vec<syntax::Token>>>,
     parser: syntax::Parser<'a>,
     dead: bool,
 }
@@ -227,6 +228,7 @@ pub fn match_rule<'a>(
     parsing_branches.push(ParsingBranch
     {
         args: Vec::new(),
+        token_args: Vec::new(),
         parser: subparser.clone(),
         dead: false,
     });
@@ -304,6 +306,7 @@ pub fn match_rule<'a>(
                                     {
                                         let expr = expr::Value::make_integer(value).make_literal();
                                         branch.args.push(asm::RuleInvocationArgument::Expression(expr));
+                                        branch.token_args.push(None);
                                     }
                                     None =>
                                     {
@@ -345,6 +348,7 @@ pub fn match_rule<'a>(
                                 else
                                 {
                                     branch.args.push(asm::RuleInvocationArgument::Expression(expr));
+                                    branch.token_args.push(None);
 
                                     if !expr_using_slice
                                     {
@@ -361,12 +365,14 @@ pub fn match_rule<'a>(
                             }
                         }
 
-                        asm::PatternParameterType::Ruleset(rule_group_ref)=>
+                        asm::PatternParameterType::Ruleset(rule_group_ref) =>
                         {
                             if DEBUG
                             {
                                 println!("- branch {}, try match subrule {:?}", branch_index, rule_group_ref);
                             }
+
+                            let token_start = branch.parser.get_current_token_index();
 
                             let subcandidates = match_ruleset(
                                 asm_state,
@@ -385,12 +391,18 @@ pub fn match_rule<'a>(
 
                                 for subcandidate in subcandidates.into_iter()
                                 {
+                                    let token_end = subcandidate.1.get_current_token_index();
+
                                     let mut args_clone = branch.args.clone();
                                     args_clone.push(asm::RuleInvocationArgument::NestedRuleset(subcandidate.0));
+
+                                    let mut token_args_clone = branch.token_args.clone();
+                                    token_args_clone.push(Some(branch.parser.get_cloned_tokens_by_index(token_start, token_end)));
 
                                     new_branches.push(ParsingBranch
                                     {
                                         args: args_clone,
+                                        token_args: token_args_clone,
                                         parser: subcandidate.1,
                                         dead: false,
                                     });
@@ -437,6 +449,7 @@ pub fn match_rule<'a>(
             rule_ref,
             specificity: 0,
             args: branch.args,
+            token_args: branch.token_args,
         };
 
         candidates.push((candidate, branch.parser));

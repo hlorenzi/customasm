@@ -4,7 +4,8 @@ use std::collections::HashMap;
 
 pub struct EvalContext
 {
-	locals: HashMap<String, expr::Value>
+	locals: HashMap<String, expr::Value>,
+	token_subs: HashMap<String, Vec<syntax::Token>>,
 }
 
 
@@ -14,7 +15,8 @@ impl EvalContext
 	{
 		EvalContext
 		{
-			locals: HashMap::new()
+			locals: HashMap::new(),
+			token_subs: HashMap::new(),
 		}
 	}
 	
@@ -33,6 +35,19 @@ impl EvalContext
 			Some(value) => Ok(value.clone()),
 			None => Err(())
 		}
+	}
+	
+	
+	pub fn set_token_sub<S>(&mut self, name: S, tokens: Vec<syntax::Token>)
+	where S: Into<String>
+	{
+		self.token_subs.insert(name.into(), tokens);
+	}
+	
+	
+	pub fn get_token_sub<'a>(&'a self, name: &str) -> Option<&'a Vec<syntax::Token>>
+	{
+		self.token_subs.get(name)
 	}
 }
 

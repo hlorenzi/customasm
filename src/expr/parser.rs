@@ -530,7 +530,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 		let tk_asm = self.parser.expect(syntax::TokenKind::KeywordAsm)?;
 		self.parser.expect(syntax::TokenKind::BraceOpen)?;
 
-		let contents = self.parser.slice_until_token(syntax::TokenKind::BraceClose);
+		let contents = self.parser.slice_until_token_over_nested_braces(syntax::TokenKind::BraceClose);
 
 		let tk_brace_close = self.parser.expect(syntax::TokenKind::BraceClose)?;
 

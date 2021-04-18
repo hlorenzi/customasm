@@ -33,6 +33,7 @@ pub struct RuleInvocationCandidate
     pub rule_ref: asm::RuleRef,
     pub specificity: usize,
     pub args: Vec<RuleInvocationArgument>,
+    pub token_args: Vec<Option<Vec<syntax::Token>>>,
 }
 
 

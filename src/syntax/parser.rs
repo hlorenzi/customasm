@@ -89,6 +89,19 @@ impl<'a> Parser<'a>
 	}
 
 
+	pub fn get_cloned_tokens_by_index(&self, start: usize, end: usize) -> Vec<Token>
+	{
+		let mut result = Vec::new();
+
+		for token in &self.tokens[start..end]
+		{
+			result.push(token.clone());
+		}
+
+		result
+	}
+
+
 	pub fn get_next_spans(&self, count: usize) -> diagn::Span
 	{
 		if self.index >= self.tokens.len()
@@ -129,6 +142,40 @@ impl<'a> Parser<'a>
 	}
 
 
+	pub fn slice_until_linebreak_over_nested_braces<'b>(&'b mut self) -> Parser<'a>
+	{
+		let start = self.get_current_token_index();
+		let mut brace_nesting = 0;
+
+		while !self.is_over() && (!self.next_is_linebreak() || brace_nesting > 0)
+		{
+			if self.next_is(0, TokenKind::BraceOpen)
+			{
+				brace_nesting += 1;
+				self.advance();
+				continue;
+			}
+			
+			if self.next_is(0, TokenKind::BraceClose) && brace_nesting > 0
+			{
+				brace_nesting -= 1;
+				self.advance();
+				continue;
+			}
+
+			if brace_nesting > 0
+			{
+				self.advance();
+				continue;
+			}
+
+			self.advance();
+		}
+
+		self.clone_slice(start, self.get_current_token_index())
+	}
+
+
 	pub fn slice_until_token<'b>(&'b mut self, kind: TokenKind) -> Parser<'a>
 	{
 		let start = self.get_current_token_index();
@@ -140,6 +187,40 @@ impl<'a> Parser<'a>
 		}
 
 		self.clone_slice(start, end)
+	}
+
+
+	pub fn slice_until_token_over_nested_braces<'b>(&'b mut self, kind: TokenKind) -> Parser<'a>
+	{
+		let start = self.get_current_token_index();
+		let mut brace_nesting = 0;
+
+		while !self.is_over() && (!self.next_is(0, kind) || brace_nesting > 0)
+		{
+			if self.next_is(0, TokenKind::BraceOpen)
+			{
+				brace_nesting += 1;
+				self.advance();
+				continue;
+			}
+			
+			if self.next_is(0, TokenKind::BraceClose) && brace_nesting > 0
+			{
+				brace_nesting -= 1;
+				self.advance();
+				continue;
+			}
+
+			if brace_nesting > 0
+			{
+				self.advance();
+				continue;
+			}
+
+			self.advance();
+		}
+
+		self.clone_slice(start, self.get_current_token_index())
 	}
 
 
