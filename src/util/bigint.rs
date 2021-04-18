@@ -192,8 +192,8 @@ impl BigInt
     
     pub fn concat(&self, lhs_slice: (usize, usize), rhs: &BigInt, rhs_slice: (usize, usize)) -> BigInt
     {
-        let lhs_size = lhs_slice.0 + 1 - lhs_slice.1;
-        let rhs_size = rhs_slice.0 + 1 - rhs_slice.1;
+        let lhs_size = lhs_slice.0 - lhs_slice.1;
+        let rhs_size = rhs_slice.0 - rhs_slice.1;
         let lhs = self.slice(lhs_slice.0, lhs_slice.1).shl(rhs_size);
         let rhs = rhs.slice(rhs_slice.0, rhs_slice.1);
 
@@ -209,12 +209,12 @@ impl BigInt
         use num_traits::One;
 
         let mut mask = num_bigint::BigInt::zero();
-        for _ in 0..(left - right + 1)
+        for _ in 0..(left - right)
             { mask = (mask << 1) + num_bigint::BigInt::one(); }
         
         let shifted_mask = BigInt::new(mask, None).shl(right);
         let mut result = (self & &shifted_mask).shr(right);
-        result.size = Some(left + 1 - right);
+        result.size = Some(left - right);
         result
     }
 

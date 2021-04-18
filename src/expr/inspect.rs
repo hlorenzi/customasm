@@ -36,7 +36,7 @@ impl expr::Expr
 		{
 			&expr::Expr::Literal(_, expr::Value::Integer(util::BigInt { size: Some(size), .. })) =>
 			{
-				Some((size - 1, 0))
+				Some((size, 0))
 			}
 			
 			&expr::Expr::BinaryOp(_, _, expr::BinaryOp::Concat, ref lhs, ref rhs) =>
@@ -47,7 +47,7 @@ impl expr::Expr
 				if lhs_width.is_none() || rhs_width.is_none()
 					{ return None; }
 					
-				Some((lhs_width.unwrap() + rhs_width.unwrap() - 1, 0))
+				Some((lhs_width.unwrap() + rhs_width.unwrap(), 0))
 			}
 			
 			&expr::Expr::BitSlice(_, _, left, right, _) => Some((left, right)),
@@ -64,7 +64,7 @@ impl expr::Expr
 				if true_width.unwrap() != false_width.unwrap()
 					{ return None; }
 					
-				Some((true_width.unwrap() - 1, 0))
+				Some((true_width.unwrap(), 0))
 			}
 			
 			&expr::Expr::Block(_, ref exprs) =>

@@ -1257,9 +1257,9 @@ impl State
 				else
 				{
 					result = result.concat(
-						(result.size.unwrap() - 1, 0),
+						(result.size.unwrap(), 0),
 						&bigint,
-						(size - 1, 0));
+						(size, 0));
 				}
 			}
 

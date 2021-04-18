@@ -298,7 +298,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 			return Err(());
 		}
 			
-		Ok(expr::Expr::BitSlice(span, slice_span, leftmost, rightmost, Box::new(inner)))
+		Ok(expr::Expr::BitSlice(span, slice_span, leftmost + 1, rightmost, Box::new(inner)))
 	}
 	
 	
@@ -321,16 +321,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 		let span = inner.span().join(&tk_size.span);
 		let size_span = tk_grave.span.join(&tk_size.span);
 
-		if size < 1
-		{
-			if let Some(ref report) = self.parser.report
-			{
-				report.error_span("invalid size specifier", &size_span);
-				return Err(());
-			}
-		}
-
-		Ok(expr::Expr::BitSlice(span, size_span, size - 1, 0, Box::new(inner)))
+		Ok(expr::Expr::BitSlice(span, size_span, size, 0, Box::new(inner)))
 	}
 	
 	

@@ -253,7 +253,7 @@ impl expr::Expr
 
 									match (lhs.size, rhs.size)
 									{
-										(Some(lhs_width), Some(rhs_width)) => Ok(expr::Value::make_integer(lhs.concat((lhs_width - 1, 0), &rhs, (rhs_width - 1, 0)))),
+										(Some(lhs_width), Some(rhs_width)) => Ok(expr::Value::make_integer(lhs.concat((lhs_width, 0), &rhs, (rhs_width, 0)))),
 										(None, _) => Err(report.error_span("argument to concatenation with unspecified size", &lhs_expr.span())),
 										(_, None) => Err(report.error_span("argument to concatenation with unspecified size", &rhs_expr.span()))
 									}

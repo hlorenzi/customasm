@@ -136,6 +136,8 @@ fn test_ops_arithmetic()
 	test("-4 >> 1", Pass(expr::Value::make_integer(util::BigInt::new(-2, None))));
 	test("-4 >> 2", Pass(expr::Value::make_integer(util::BigInt::new(-1, None))));
 	test("-4 >> 3", Pass(expr::Value::make_integer(util::BigInt::new(-1, None))));
+	
+	test("123`0 + 2", Pass(expr::Value::make_integer(util::BigInt::new(2, None))));
 }
 
 
@@ -207,6 +209,11 @@ fn test_ops_slice()
 	test("0xff`8",  Pass(expr::Value::make_integer(util::BigInt::new(0xff, Some(8)))));
 	test("0x101`8", Pass(expr::Value::make_integer(util::BigInt::new(0x1, Some(8)))));
 	
+	test("0`0",  Pass(expr::Value::make_integer(util::BigInt::new(0, Some(0)))));
+	test("0x0`0",  Pass(expr::Value::make_integer(util::BigInt::new(0, Some(0)))));
+	test("0x100`0",  Pass(expr::Value::make_integer(util::BigInt::new(0, Some(0)))));
+	test("0xfff`0",  Pass(expr::Value::make_integer(util::BigInt::new(0, Some(0)))));
+
 	test("0x00[0:0]", Pass(expr::Value::make_integer(util::BigInt::new(0, Some(1)))));
 	test("0x0f[0:0]", Pass(expr::Value::make_integer(util::BigInt::new(1, Some(1)))));
 	test("0xff[0:0]", Pass(expr::Value::make_integer(util::BigInt::new(1, Some(1)))));
@@ -238,8 +245,6 @@ fn test_ops_slice()
 	test(" 1[1000:1000]", Pass(expr::Value::make_integer(util::BigInt::new(0, Some(1)))));
 	test("-1[1000:1000]", Pass(expr::Value::make_integer(util::BigInt::new(1, Some(1)))));
 	
-	test("0x100`0", Fail(("test", 1, "invalid")));
-	
 	test("0x00[0:7]", Fail(("test", 1, "invalid")));
 	
 	test("0x00[0x1_ffff_ffff_ffff_ffff:7]", Fail(("test", 1, "large")));
@@ -253,6 +258,10 @@ fn test_ops_concat()
 	test("0x12`8  @ 0x34`8",  Pass(expr::Value::make_integer(util::BigInt::new(0x1234, Some(16)))));
 	test("0x12`16 @ 0x34`16", Pass(expr::Value::make_integer(util::BigInt::new(0x120034, Some(32)))));
 	
+	test("0`8     @ 0`0 @ 0`8",     Pass(expr::Value::make_integer(util::BigInt::new(0, Some(16)))));
+	test("0x12`8  @ 0`0 @ 0x34`8",  Pass(expr::Value::make_integer(util::BigInt::new(0x1234, Some(16)))));
+	test("0x12`16 @ 0`0 @ 0x34`16", Pass(expr::Value::make_integer(util::BigInt::new(0x120034, Some(32)))));
+
 	test("(6 + 6)[3:0] @ (5 + 5)[3:0]", Pass(expr::Value::make_integer(util::BigInt::new(0xca, Some(8)))));
 	
 	test("4`6 @ 0`5", Pass(expr::Value::make_integer(util::BigInt::new(0b10000000, Some(11)))));
