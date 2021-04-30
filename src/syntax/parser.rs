@@ -120,6 +120,17 @@ impl<'a> Parser<'a>
 
 		span
 	}
+	
+	
+	pub fn get_span_after_prev(&self) -> diagn::Span
+	{
+		if self.index_prev >= self.tokens.len()
+		{
+			return diagn::Span::new_dummy();
+		}
+		
+		self.tokens[self.index_prev].span.after()
+	}
 
 
 	pub fn clone_slice<'b>(&'b self, start: usize, end: usize) -> Parser<'a>

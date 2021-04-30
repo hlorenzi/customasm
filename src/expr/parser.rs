@@ -388,9 +388,9 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 			
 		else
 		{
-			let span = self.parser.prev().span.after();
 			if let Some(ref report) = self.parser.report
 			{
+				let span = self.parser.get_span_after_prev();
 				report.error_span("expected expression", &span);
 			}
 			Err(())
