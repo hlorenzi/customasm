@@ -5,7 +5,7 @@
     halt => 0x66
 }
 
-halt ; error: multiple matches
+halt ; error: failed / error: multiple matches
 
 
 ; ::: include

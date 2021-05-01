@@ -435,7 +435,7 @@ impl State
 
 		for invoc in &bankdata.invocations
 		{
-			let resolved = match invoc.kind
+			let maybe_resolved = match invoc.kind
 			{
 				asm::InvocationKind::Rule(_) =>
 				{
@@ -448,7 +448,7 @@ impl State
 						&invoc,
 						fileserver,
 						true,
-						&mut expr::EvalContext::new())?
+						&mut expr::EvalContext::new())
 				}
 				
 				asm::InvocationKind::Data(_) =>
@@ -461,7 +461,7 @@ impl State
 						report.clone(),
 						&invoc,
 						fileserver,
-						true)?
+						true)
 				}
 				
 				asm::InvocationKind::Label(_) =>
@@ -483,6 +483,12 @@ impl State
 
 					continue;
 				}
+			};
+
+			let resolved = match maybe_resolved
+			{
+				Ok(r) => r,
+				Err(_) => continue,
 			};
 
 			let expr_name = match invoc.kind
@@ -705,9 +711,20 @@ impl State
 			{
 				if successful_candidates.len() > 1
 				{
-					report.error_span(
+					let _guard = report.push_parent(
 						"multiple matches for instruction",
 						&invocation.span);
+
+					for c in successful_candidates
+					{
+						let rule_group = &self.rulesets[c.0.rule_ref.ruleset_ref.index];
+						let rule = &rule_group.rules[c.0.rule_ref.index];
+		
+						report.note_span(
+							"matching rule candidate:",
+							&rule.span);
+					}
+						
 					return Err(())
 				}
 
