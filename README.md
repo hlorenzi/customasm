@@ -1,9 +1,9 @@
 # customasm
 This is an assembler that takes custom, user-defined instruction sets
 and uses them to assemble source files.  
-This can be useful if you'd like to test out a new virtual machine's bytecode,
-or even if you're eager to write programs for that new processor architecture 
-you just implemented in FPGA!
+It can be useful, for example, if you're trying to test the bytecode of a new virtual machine,
+or if you're eager to write programs for that new microprocessor architecture 
+you just implemented in an FPGA chip!
 
 [![crates.io][badge-cratesio-img]][badge-cratesio-url]
 [![Latest Release][badge-latest-img]][badge-latest-url]
@@ -23,14 +23,16 @@ you just implemented in FPGA!
 [badge-discord-img]: https://img.shields.io/discord/394999035540275222?label=Join%20the%20Discord%20server!&logo=discord
 [badge-discord-url]: https://discord.com/invite/pXeDXGD
 
-[📱 Try it right now on your browser!](https://hlorenzi.github.io/customasm/web/)
+[🖥️ Try it right now on your browser!](https://hlorenzi.github.io/customasm/web/)
+
+[📜 Check out the changelog](/CHANGELOG.md) for new features!
  
 [📖 Check out the User Guide](https://github.com/hlorenzi/customasm/wiki/User-Guide)
 for instructions!
 
-[🕹 Check out an example project](/examples/nes/) which targets the NES!
+[🕹️ Check out an example project](/examples/nes/) which targets the NES!
 
-[💻 Install the VSCode syntax highlight extension!](https://marketplace.visualstudio.com/items?itemName=hlorenzi.customasm-vscode)
+[⌨️ Install the VSCode syntax highlight extension!](https://marketplace.visualstudio.com/items?itemName=hlorenzi.customasm-vscode)
 
 [❤️ Support me!](https://accounts.hlorenzi.com/supporters)
 
