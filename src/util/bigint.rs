@@ -219,6 +219,13 @@ impl BigInt
     }
 
 
+    pub fn convert_le(&self) -> BigInt
+    {
+        let new_value = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, &self.bigint.to_bytes_le().1);
+        BigInt::new(new_value, self.size)
+    }
+
+
     fn combine_bits<F>(&self, rhs: &BigInt, f: F) -> BigInt
     where F: Fn(u8, u8) -> u8
     {
