@@ -221,7 +221,13 @@ impl BigInt
 
     pub fn convert_le(&self) -> BigInt
     {
-        let new_value = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, &self.bigint.to_bytes_le().1);
+        let mut be_bytes = self.bigint.to_bytes_le().1;
+        while be_bytes.len() < self.size.unwrap() / 8
+        {
+            be_bytes.push(0);
+        }
+
+        let new_value = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, &be_bytes);
         BigInt::new(new_value, self.size)
     }
 

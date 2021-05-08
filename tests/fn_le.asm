@@ -7,6 +7,20 @@
 ; :::
 #d le(0xff) ; = 0xff
 ; :::
+#d le(0x00ff) ; = 0xff00
+; :::
+#d le(0x0000ff) ; = 0xff0000
+; :::
+#d le(0x00ff00) ; = 0x00ff00
+; :::
+#d le(0x000000ff) ; = 0xff000000
+; :::
+#d le(0xff000000) ; = 0x000000ff
+; :::
+#d le(le(0x000000ff)) ; = 0x000000ff
+; :::
+#d le(le(le(0x000000ff))) ; = 0xff000000
+; :::
 #d le(0x0123) ; = 0x2301
 ; :::
 #d le(0x1234) ; = 0x3412
@@ -24,6 +38,18 @@
 #d le(le(le(0xffeeddccbbaa))) ; = 0xaabbccddeeff
 ; :::
 #d le(1234`16) ; = 0xd204
+
+
+; :::
+#ruledef
+{
+    ld {addr: u16} => 0xaa @ le(addr)
+}
+
+ld 0 ; = 0xaa0000
+ld 12 ; = 0xaa0c00
+ld 0xff ; = 0xaaff00
+ld 0x1234 ; = 0xaa3412
 
 
 ; :::
