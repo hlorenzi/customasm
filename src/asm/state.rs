@@ -705,6 +705,32 @@ impl State
 			}
 		}
 
+		// Retain only the candidates which produced the fewest bits
+		let mut smallest_output = usize::MAX;
+		for c in &successful_candidates
+		{
+			if let expr::Value::Integer(ref bigint) = c.1
+			{
+				if let Some(size) = bigint.size
+				{
+					smallest_output = std::cmp::min(smallest_output, size);
+				}
+			}
+		}
+
+		successful_candidates.retain(|c|
+		{
+			if let expr::Value::Integer(ref bigint) = c.1
+			{
+				if let Some(size) = bigint.size
+				{
+					return size == smallest_output;
+				}
+			}
+
+			false
+		});
+		
 		if successful_candidates.len() > 0
 		{
 			if final_pass
@@ -712,7 +738,7 @@ impl State
 				if successful_candidates.len() > 1
 				{
 					let _guard = report.push_parent(
-						"multiple matches for instruction",
+						"multiple matches for instruction with the same output size",
 						&invocation.span);
 
 					for c in successful_candidates
