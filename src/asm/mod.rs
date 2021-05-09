@@ -31,4 +31,5 @@ pub use self::bank::Bank;
 pub use self::bank::BankData;
 pub use self::symbol::SymbolManager;
 pub use self::symbol::Symbol;
+pub use self::symbol::SymbolKind;
 pub use self::symbol::SymbolContext;

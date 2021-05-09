@@ -62,7 +62,7 @@ pub struct RuleRef
 pub struct AssemblyOutput
 {
 	pub binary: util::BitVec,
-	pub symbols: asm::SymbolManager,
+	pub state: State,
 }
 
 
@@ -87,7 +87,7 @@ impl Assembler
 	
 	
 	pub fn assemble(
-        &mut self,
+        mut self,
         report: diagn::RcReport,
 		fileserver: &dyn util::FileServer,
 		max_iterations: usize)
@@ -172,8 +172,8 @@ impl Assembler
 
 				return Ok(AssemblyOutput
 				{
+					state: self.state,
 					binary: full_output,
-					symbols: std::mem::replace(&mut self.state.symbols, asm::SymbolManager::new()),
 				});
 			}
 

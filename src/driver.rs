@@ -22,6 +22,13 @@ enum OutputFormat
 }
 
 
+enum SymbolFormat
+{
+	Default,
+	MesenMlb,
+}
+
+
 pub fn drive(args: &Vec<String>, fileserver: &mut dyn util::FileServer) -> Result<(), ()>
 {
 	let opts = make_opts();
@@ -106,6 +113,18 @@ fn drive_inner(
 			return Err(true);
 		}
 	};
+
+	let symbol_format = match matches.opt_str("symbol-format").as_ref().map(|s| s.as_ref())
+	{
+		None |
+		Some("default")   => SymbolFormat::Default,
+		Some("mesen-mlb") => SymbolFormat::MesenMlb,
+		Some(_) =>
+		{
+			report.error("invalid symbol format");
+			return Err(true);
+		}
+	};
 	
 	if matches.free.len() < 1
 	{
@@ -176,7 +195,19 @@ fn drive_inner(
 
 	let binary = output.binary;
 
-	let output_symbol_data = output.symbols.format_output();
+	let output_symbol_data = if output_symbol_file.is_none()
+	{
+		None
+	}
+	else
+	{
+		Some(match symbol_format
+		{
+			SymbolFormat::Default  => output.state.symbols.format_default(),
+			SymbolFormat::MesenMlb => output.state.symbols.format_mesen_mlb(&output.state),
+		})
+	};
+
 	let output_data: Vec<u8> = match out_format
 	{
 		OutputFormat::Binary    => binary.format_binary(),
@@ -210,7 +241,10 @@ fn drive_inner(
 			{ println!("{}", String::from_utf8_lossy(&output_data)); }
 			
 		if output_symbol_requested || output_symbol_file.is_some()
-			{ println!("{}", &output_symbol_data); }
+		{
+			if let Some(output_symbol_data) = output_symbol_data
+				{ println!("{}", &output_symbol_data); }
+		}
 	}
 	else
 	{
@@ -223,11 +257,14 @@ fn drive_inner(
 			any_files_written = true;
 		}
 
-		if let Some(ref output_symbol_file) = output_symbol_file
+		if let Some(output_symbol_data) = output_symbol_data
 		{
-			println!("writing `{}`...", &output_symbol_file);
-			fileserver.write_bytes(report.clone(), &output_symbol_file, &output_symbol_data.bytes().collect::<Vec<u8>>(), None).map_err(|_| false)?;
-			any_files_written = true;
+			if let Some(ref output_symbol_file) = output_symbol_file
+			{
+				println!("writing `{}`...", &output_symbol_file);
+				fileserver.write_bytes(report.clone(), &output_symbol_file, &output_symbol_data.bytes().collect::<Vec<u8>>(), None).map_err(|_| false)?;
+				any_files_written = true;
+			}
 		}
 
 		if !any_files_written
@@ -246,6 +283,7 @@ fn make_opts() -> getopts::Options
     let mut opts = getopts::Options::new();
     opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16", "FORMAT");
     opts.opt("o", "output", "The name of the output file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
+    opts.optopt("", "symbol-format", "The format of the symbol file. Possible formats: default, mesen-mlb", "SYMBOL-FORMAT");
     opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.opt("t", "iter", "The max number of passes the assembler will attempt (default: 10).", "NUM", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");

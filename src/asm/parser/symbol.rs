@@ -19,9 +19,11 @@ pub fn parse_symbol(
     span = span.join(&tk_name.span);
 
     let ctx;
+    let kind;
     
     let value = if state.parser.maybe_expect(syntax::TokenKind::Equal).is_some()
-    {		
+    {
+        kind = asm::SymbolKind::Constant;
         ctx = state.asm_state.get_ctx(state);
         let expr = expr::Expr::parse(&mut state.parser)?;
         let value = state.asm_state.eval_expr(
@@ -37,6 +39,8 @@ pub fn parse_symbol(
     }
     else
     {
+        kind = asm::SymbolKind::Label;
+
         if hierarchy_level == 0 && state.asm_state.cur_labelalign != 0
         {
             let bankdata = state.asm_state.get_bankdata(state.asm_state.cur_bank);
@@ -73,8 +77,10 @@ pub fn parse_symbol(
     state.asm_state.symbols.create(
         &ctx.symbol_ctx, 
         name, 
-        hierarchy_level, 
-        value, 
+        hierarchy_level,
+        kind,
+        value,
+        state.asm_state.cur_bank,
         state.report.clone(), 
         &span)?;
 

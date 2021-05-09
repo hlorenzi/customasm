@@ -15,7 +15,17 @@ pub struct Symbol
 {
     pub value: expr::Value,
     pub decl_span: diagn::Span,
+    pub kind: SymbolKind,
+    pub bankref: asm::BankRef,
     children: HashMap<String, Symbol>,
+}
+
+
+#[derive(Debug)]
+pub enum SymbolKind
+{
+    Label,
+    Constant,
 }
 
 
@@ -163,7 +173,9 @@ impl SymbolManager
         ctx: &SymbolContext,
         name: String,
         hierarchy_level: usize,
+        kind: SymbolKind,
         value: expr::Value,
+        bankref: asm::BankRef,
         report: diagn::RcReport,
         span: &diagn::Span)
         -> Result<(), ()>
@@ -190,6 +202,8 @@ impl SymbolManager
         {
            value, 
            decl_span: span.clone(),
+           kind,
+           bankref,
            children: HashMap::new(),
         });
 
@@ -200,43 +214,99 @@ impl SymbolManager
     }
 
 
-    pub fn format_output(&self) -> String
+    pub fn format_default(&self) -> String
+	{
+        self.format(&mut |result: &mut String, _: &Symbol, name: &str, bigint: &util::BigInt|
+        {
+            result.push_str(name);
+            result.push_str(&format!(" = 0x{:x}\n", bigint));
+        })
+    }
+
+
+    pub fn format_mesen_mlb(&self, state: &asm::State) -> String
+	{
+        self.format(&mut |result: &mut String, symbol: &Symbol, name: &str, bigint: &util::BigInt|
+        {
+            if let SymbolKind::Constant = symbol.kind
+            {
+                return;
+            }
+
+            let bank = &state.banks[symbol.bankref.index];
+            if let Some(output_offset) = bank.output_offset
+            {
+                if let Some(addr) = bigint.checked_to_usize()
+                {
+                    if let Some(addr_start) = bank.addr_start.checked_to_usize()
+                    {
+                        let prg_offset = addr - addr_start + output_offset / 8 - 0x10;
+                        result.push_str("P:");
+                        result.push_str(&format!("{:x}", prg_offset));
+                        result.push_str(":");
+                        result.push_str(&name.replace(".", "_"));
+                        result.push_str("\n");
+                    }
+                }
+            }
+            else
+            {
+                result.push_str("R:");
+                result.push_str(&format!("{:x}", bigint));
+                result.push_str(":");
+                result.push_str(&name.replace(".", "_"));
+                result.push_str("\n");
+            }
+        })
+    }
+
+
+    pub fn format<FnFormat>(
+        &self,
+        formatter: &mut FnFormat)
+        -> String
+        where FnFormat: FnMut(&mut String, &Symbol, &str, &util::BigInt) -> ()
 	{
 		let mut result = String::new();
 
 		for (name, data) in &self.globals
 		{
-            self.format_output_recursive(
+            self.format_recursive(
                 &mut result,
                 &mut vec![name.clone()],
-                data);
+                data,
+                formatter);
 		}
 
 		result
     }
 
 
-    fn format_output_recursive(
+    fn format_recursive<FnFormat>(
         &self,
         result: &mut String,
         hierarchy: &mut Vec<String>,
-        data: &Symbol)
+        data: &Symbol,
+        formatter: &mut FnFormat)
+        where FnFormat: FnMut(&mut String, &Symbol, &str, &util::BigInt) -> ()
     {
         match &data.value
         {
             expr::Value::Integer(ref bigint) =>
             {
+                let mut name = String::new();
+
                 for i in 0..hierarchy.len()
                 {
                     if i > 0
                     {
-                        result.push_str(".");
+                        name.push_str(".");
                     }
 
-                    result.push_str(&format!("{}", hierarchy[i]));
+                    name.push_str(&format!("{}", hierarchy[i]));
                 }
 
-                result.push_str(&format!(" = 0x{:x}\n", bigint));
+                formatter(result, data, &name, &bigint);
             }
             _ => {}
         }
@@ -245,10 +315,11 @@ impl SymbolManager
         {
             hierarchy.push(child_name.clone());
 
-            self.format_output_recursive(
+            self.format_recursive(
                 result,
                 hierarchy,
-                &child_data);
+                &child_data,
+                formatter);
 
             hierarchy.pop();
         }
