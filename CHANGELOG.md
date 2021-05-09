@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.11.9
+
+- Makes it so the assembler will select the rule with the fewest amount of
+output bits in the case of multiple matches.
+- Adds the `mesen-mlb` symbol output format, for use with the Mesen NES emulator.
+
 ## v0.11.8
 
 - Adds the built-in function `le()`, which reverses the bytes of an integer,
