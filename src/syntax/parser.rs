@@ -289,7 +289,7 @@ impl<'a> Parser<'a>
 
 		let end = self.get_previous_token_index() + 1;
 
-		if self.is_at_partial()
+		if self.is_at_partial() || start > end
 		{
 			None
 		}
