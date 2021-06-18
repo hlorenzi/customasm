@@ -25,20 +25,18 @@ you just implemented in an FPGA chip!
 
 [🖥️ Try it right now on your browser!](https://hlorenzi.github.io/customasm/web/)
 
-[📜 Check out the changelog](/CHANGELOG.md) for new features!
- 
-[📖 Check out the User Guide](https://github.com/hlorenzi/customasm/wiki/User-Guide)
-for instructions!
-
 [🕹️ Check out an example project](/examples/nes/) which targets the NES!
+
+[📜 Check out the changelog](/CHANGELOG.md) for new features!
 
 [⌨️ Install the VSCode syntax highlight extension!](https://marketplace.visualstudio.com/items?itemName=hlorenzi.customasm-vscode)
 
 [❤️ Support me!](https://accounts.hlorenzi.com/supporters)
 
-## New v0.11
+## Documentation
 
-[📖 Check out instructions for migration from older versions to v0.11!](https://github.com/hlorenzi/customasm/wiki/Migrating-to-v0.11)
+[📚 Check out the Documentation](https://github.com/hlorenzi/customasm/wiki/User-Guide)
+for advanced features and a how-to guide!
 
 ## Installation
 
@@ -52,6 +50,10 @@ You can also download pre-built executables from the
 You can compile from source yourself by first cloning the repository and
 then simply running `cargo build`.
 There's also a battery of tests available at `cargo test`.
+
+## Upgrade to v0.11
+
+[📖 Check out instructions for migration from older versions to v0.11!](https://github.com/hlorenzi/customasm/wiki/Migrating-to-v0.11)
 
 ## Example
 
