@@ -738,19 +738,22 @@ impl State
 				if successful_candidates.len() > 1
 				{
 					let _guard = report.push_parent(
-						"multiple matches for instruction with the same output size",
+						"multiple matches with the same output size",
 						&invocation.span);
+
+					let mut candidate_notes = Vec::new();
 
 					for c in successful_candidates
 					{
 						let rule_group = &self.rulesets[c.0.rule_ref.ruleset_ref.index];
 						let rule = &rule_group.rules[c.0.rule_ref.index];
 		
-						report.note_span(
+						candidate_notes.push(diagn::Message::note_span(
 							"matching rule candidate:",
-							&rule.span);
+							&rule.span));
 					}
-						
+
+					report.push_multiple(candidate_notes);					
 					return Err(())
 				}
 

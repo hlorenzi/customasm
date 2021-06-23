@@ -27,7 +27,7 @@ fn generate_tests()
 
     generate_tests_from_folder(
         &mut f,
-        &std::env::current_dir().unwrap().join("tests2"),
+        &std::env::current_dir().unwrap().join("tests"),
         &String::new());
 }
 
