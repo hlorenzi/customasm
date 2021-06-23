@@ -4,7 +4,6 @@ use crate::*;
 pub struct ExpressionParser<'a, 'parser: 'a>
 {
 	parser: &'a mut syntax::Parser<'parser>,
-	//rule_params: Option<&'a [RuleParameter]>,
 }
 
 
@@ -14,23 +13,16 @@ impl expr::Expr
 	{
 		ExpressionParser::new(parser).parse_expr()
 	}
-
-
-	/*pub fn parse_for_rule(parser: &mut Parser, rule_params: &[RuleParameter]) -> Result<expr::Expr, ()>
-	{
-		ExpressionParser::new(parser, Some(rule_params)).parse_expr()
-	}*/
 }
 
 
 impl<'a, 'parser> ExpressionParser<'a, 'parser>
 {
-	pub fn new(parser: &'a mut syntax::Parser<'parser>/*, rule_params: Option<&'a [RuleParameter]>*/) -> ExpressionParser<'a, 'parser>
+	pub fn new(parser: &'a mut syntax::Parser<'parser>) -> ExpressionParser<'a, 'parser>
 	{
 		ExpressionParser
 		{
 			parser,
-			//rule_params,
 		}
 	}
 	
@@ -272,6 +264,9 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	{
 		let inner = self.parse_size()?;
 		
+		if self.parser.next_is_linebreak()
+			{ return Ok(inner); }
+
 		let tk_open = match self.parser.maybe_expect(syntax::TokenKind::BracketOpen)
 		{
 			Some(tk) => tk,
@@ -305,6 +300,9 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	fn parse_size(&mut self) -> Result<expr::Expr, ()>
 	{
 		let inner = self.parse_unary()?;
+		
+		if self.parser.next_is_linebreak()
+			{ return Ok(inner); }
 		
 		let tk_grave = match self.parser.maybe_expect(syntax::TokenKind::Grave)
 		{

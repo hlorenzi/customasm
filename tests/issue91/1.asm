@@ -1,0 +1,8 @@
+#ruledef
+{
+    halt => 0x01
+	[ld] => 0x02
+}
+
+halt ; = 0x01
+[ld] ; = 0x02
