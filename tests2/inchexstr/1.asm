@@ -1,0 +1,1 @@
+#d inchexstr("data1.txt") ; = 0x0180

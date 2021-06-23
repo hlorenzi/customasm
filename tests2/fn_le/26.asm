@@ -1,0 +1,1 @@
+#d le(0x123) ; error: not a multiple

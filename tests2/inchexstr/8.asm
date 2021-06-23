@@ -1,0 +1,1 @@
+#d inchexstr() ; error: wrong

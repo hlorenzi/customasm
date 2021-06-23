@@ -1,0 +1,1 @@
+#d incbinstr("data4.txt") ; error: invalid character

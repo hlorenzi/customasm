@@ -1,0 +1,1 @@
+#d incbinstr("data1.txt") ; = 0x18

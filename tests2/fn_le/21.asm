@@ -1,0 +1,9 @@
+#ruledef
+{
+    ld {addr: u16} => 0xaa @ le(addr)
+}
+
+ld 0 ; = 0xaa0000
+ld 12 ; = 0xaa0c00
+ld 0xff ; = 0xaaff00
+ld 0x1234 ; = 0xaa3412

@@ -117,7 +117,7 @@ impl FileServer for FileServerReal
 		let filename_path = &Path::new(filename);
 		
 		if !filename_path.exists()
-			{ return Err(error(report, format!("file does not exist: `{}`", filename), span)); }
+			{ return Err(error(report, format!("file not found: `{}`", filename), span)); }
 		
 		let mut file = match File::open(filename_path)
 		{

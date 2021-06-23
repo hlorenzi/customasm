@@ -25,61 +25,43 @@ fn generate_tests()
     println!("{:?}", destination);
     let mut f = std::fs::File::create(&destination).unwrap();
 
-    generate_tests_from_folder(&mut f, &std::env::current_dir().unwrap().join("tests"));
+    generate_tests_from_folder(
+        &mut f,
+        &std::env::current_dir().unwrap().join("tests2"),
+        &String::new());
 }
 
 
-fn generate_tests_from_folder(f: &mut dyn std::io::Write, folder: &std::path::Path)
+fn generate_tests_from_folder(f: &mut dyn std::io::Write, folder: &std::path::Path, test_name: &String)
 {
     for entry in std::fs::read_dir(folder).unwrap()
     {
         let entry = entry.unwrap();
         let path = entry.path();
+        let file_stem = path.file_stem().unwrap().to_string_lossy();
         println!("cargo:rerun-if-changed={}", path.to_string_lossy());
 
         if path.is_file()
         {
-            let contents = std::fs::read_to_string(&path).unwrap();
-            //println!("{:?}: {:?}", &path, &contents);
-            generate_tests_from_file(f, &path, &contents);
+            let mut new_test_name = test_name.clone();
+            new_test_name.push_str(&file_stem);
+            
+            write!(f,
+                "#[test]
+                fn {}()
+                {{
+                    test_file({:?});
+                }}",
+                new_test_name.replace(".", "_"),
+                path).unwrap();
         }
         else
         {
-            generate_tests_from_folder(f, &path);
-        }
-    }
-}
+            let mut new_test_name = test_name.clone();
+            new_test_name.push_str(&file_stem);
+            new_test_name.push_str("_");
 
-
-fn generate_tests_from_file(f: &mut dyn std::io::Write, filepath: &std::path::PathBuf, contents: &str)
-{
-    let filename = filepath.file_stem().unwrap().to_string_lossy();
-    let mut auto_subfile_index = 1;
-
-    for line in contents.lines()
-    {
-        if line.starts_with("; :::")
-        {
-            let mut name = format!("{}", &line.get(5..).unwrap().trim());
-            if name.len() > 0
-            {
-                continue;
-            }
-
-            if name.len() == 0
-            {
-                name = format!("{}", auto_subfile_index);
-                auto_subfile_index += 1;
-            }
-
-            write!(f,
-                "#[test]
-                fn {}_{}()
-                {{
-                    test_subfile({:?}, {:?});
-                }}",
-                filename, name,
-                filepath, name).unwrap();
+            generate_tests_from_folder(f, &path, &new_test_name);
         }
     }
 }

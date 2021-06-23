@@ -1,0 +1,1 @@
+#d inchexstr("data4.txt") ; error: invalid character

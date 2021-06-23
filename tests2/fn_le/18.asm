@@ -1,0 +1,1 @@
+#d le(le(0xffeeddccbbaa)) ; = 0xffeeddccbbaa

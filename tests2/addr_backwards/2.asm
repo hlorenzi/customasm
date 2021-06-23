@@ -1,0 +1,1 @@
+#addr -1 ; error: valid range

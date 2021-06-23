@@ -1,0 +1,1 @@
+#d incbinstr("data2.txt") ; = 0b101

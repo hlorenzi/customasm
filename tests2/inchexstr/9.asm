@@ -1,0 +1,1 @@
+#d inchexstr("data1.txt", "data2.txt") ; error: wrong

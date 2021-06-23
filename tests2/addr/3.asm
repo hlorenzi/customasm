@@ -1,0 +1,10 @@
+#ruledef test
+{
+    ld {x} => 0x55 @ x`8
+}
+
+
+ld $ ; = 0x5500
+#addr 0x03 ; = 0x00
+#addr 0x04 ; = 0x00
+ld $ ; = 0x5504

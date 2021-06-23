@@ -1,0 +1,1 @@
+#d0x8 0x0 ; error: unknown directive
