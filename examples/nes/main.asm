@@ -57,6 +57,10 @@ reset:
 	.vblankwait2:
 		bit PPU_STATUS
 		bpl .vblankwait2
+
+	; load first palette color
+	lda 0x0d
+	jsr loadPalette
 		
 	; enable rendering
 	lda #PPU_MASK_SHOWBKG | PPU_MASK_LEFTBKG
@@ -83,16 +87,9 @@ nmi:
 		sta varTimer
 		
 		; update background color
-		lda PPU_STATUS
-		
-		lda #VRAM_PALETTE[15:8]
-		sta PPU_ADDR
-		lda #VRAM_PALETTE[7:0]
-		sta PPU_ADDR
-		
 		ldx varPaletteIndex
 		lda palette, x
-		sta PPU_DATA
+		jsr loadPalette
 		
 		; increment palette index
 		inc varPaletteIndex
@@ -107,7 +104,25 @@ nmi:
 .end:
 irq:
 	rti
+
+
+loadPalette:
+	; store color from A in all palette slots
+	ldx PPU_STATUS
 	
+	ldx #VRAM_PALETTE[15:8]
+	stx PPU_ADDR
+	ldx #VRAM_PALETTE[7:0]
+	stx PPU_ADDR
+	
+	ldy #0x20
+	.palleteLoop:
+		sta PPU_DATA
+		dey
+		bne .palleteLoop
+
+	rts
+
 	
 palette:
 	#d8 0x0d, 0x01, 0x12, 0x21, 0x31, 0x21, 0x12, 0x01, 0x0d ; blues
