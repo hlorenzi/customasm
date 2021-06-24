@@ -63,6 +63,7 @@ pub struct AssemblyOutput
 {
 	pub binary: util::BitVec,
 	pub state: State,
+	pub iterations: usize,
 }
 
 
@@ -174,6 +175,7 @@ impl Assembler
 				{
 					state: self.state,
 					binary: full_output,
+					iterations: iteration,
 				});
 			}
 

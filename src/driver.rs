@@ -233,7 +233,9 @@ fn drive_inner(
 	{
 		if !quiet
 		{
-			println!("success");
+			println!("success after {} iteration{}",
+				output.iterations,
+				if output.iterations == 1 { "" } else { "s" });
 			println!("");
 		}
 		
@@ -271,7 +273,11 @@ fn drive_inner(
 			{ println!("no files written"); }
 
 		if !quiet
-			{ println!("success"); }
+		{
+			println!("success after {} iteration{}",
+				output.iterations,
+				if output.iterations == 1 { "" } else { "s" });
+		}
 	}
 	
 	Ok(())
