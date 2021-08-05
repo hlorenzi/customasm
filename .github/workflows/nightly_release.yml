@@ -31,7 +31,7 @@
 #      uses: actions-rs/cargo@v1
 #      with:
 #        command: test
-#        args: --release --verbose
+#        args: --release --verbose --workspace
 #
 #    - name: Get previous nightly Release info
 #      uses: octokit/request-action@v2.x
@@ -73,7 +73,7 @@
 #      with:
 #        use-cross: true
 #        command: build
-#        args: --release --verbose --target=x86_64-pc-windows-gnu
+#        args: --release --verbose --package customasm-cli --target=x86_64-pc-windows-gnu
 #
 #    - name: Create remote nightly tag
 #      env:

@@ -7,7 +7,7 @@ Remove-Item -Path .gitignore
 Copy-Item -Path .gitignore.ghpages -Destination .gitignore
 
 # Build wasm binary
-cargo build --lib --target wasm32-unknown-unknown --release
+cargo build --lib --target wasm32-unknown-unknown --release --workspace
 
 # Reduce binary size
 wasm-gc "./target/wasm32-unknown-unknown/release/customasm.wasm" -o "./target/wasm32-unknown-unknown/release/customasm.gc.wasm"

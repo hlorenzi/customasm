@@ -9,7 +9,7 @@ repository = "https://github.com/hlorenzi/customasm"
 readme = "README.md"
 license = "Apache-2.0"
 keywords = ["asm", "assembler", "assembly", "custom"]
-categories = ["command-line-utilities", "hardware-support"]
+categories = ["hardware-support"]
 exclude = ["web/*"]
 build = "src/build.rs"
 
@@ -18,12 +18,7 @@ crate-type = ["lib", "cdylib"]
 name = "customasm"
 path = "src/lib.rs"
 
-[[bin]]
-name = "customasm"
-path = "src/main.rs"
-
 [dependencies]
-getopts = "0.2.17"
 num-bigint = { version = "0.1", default_features = false }
 num-traits = { version = "0.1", default_features = false }
 num-integer = { version = "0.1", default_features = false }
@@ -31,5 +26,7 @@ num-integer = { version = "0.1", default_features = false }
 [dev-dependencies]
 sha2 = "0.9.1"
 
-[build-dependencies]
-vergen = "3.1.0"
+[workspace]
+members = [
+    "customasm-cli",
+]
