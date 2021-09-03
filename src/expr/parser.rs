@@ -508,7 +508,11 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 		
 		let expr = expr::Expr::Literal(
 			tk_str.span.clone(),
-			expr::Value::Integer(util::BigInt::new_from_str(&string)));
+			expr::Value::String(expr::ValueString
+			{
+				utf8_contents: string,
+				encoding: "utf8".to_string(),
+			}));
 
 		Ok(expr)
 	}

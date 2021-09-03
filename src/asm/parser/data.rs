@@ -40,9 +40,9 @@ pub fn parse_directive_data(
             Some(elem_size) => invocation.size_guess = elem_size,
             None =>
             {
-                invocation.size_guess = match resolved
+                invocation.size_guess = match resolved.map(|r| r.get_bigint())
                 {
-                    Ok(expr::Value::Integer(bigint)) =>
+                    Ok(Some(bigint)) =>
                     {
                         match bigint.size
                         {

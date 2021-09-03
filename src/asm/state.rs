@@ -500,9 +500,9 @@ impl State
 				_ => unreachable!(),
 			};
 
-			let (bigint, size) = match resolved
+			let (bigint, size) = match resolved.get_bigint()
 			{
-				expr::Value::Integer(bigint) =>
+				Some(bigint) =>
 				{
 					match bigint.size
 					{
@@ -536,7 +536,7 @@ impl State
 					}
 				}
 
-				_ =>
+				None =>
 				{
 					report.error_span(
 						format!(
@@ -1036,7 +1036,7 @@ impl State
 			}
 			else if self.is_first_pass
 			{
-				Ok(expr::Value::make_integer(0))
+				Ok(expr::Value::Unknown)
 			}
 			else
 			{
@@ -1077,52 +1077,88 @@ impl State
 			expr::Value::Bool(value) => Ok(value),
 			_ =>
 			{
-				info.report.error_span("expected boolean argument", info.span);
+				info.report.error_span("expected boolean argument", &info.arg_spans[index]);
 				Err(true)
 			}
 		}
 	}
 
 
-	fn eval_fn_get_bigint_arg<'a>(
+	fn eval_fn_check_unknown_arg<'a>(
+		info: &'a expr::EvalFunctionInfo,
+		index: usize,
+		is_first_pass: bool)
+		-> bool
+	{
+		if !is_first_pass
+		{
+			return false;
+		}
+		
+		match &info.args[index]
+		{
+			expr::Value::Unknown => true,
+			_ => false,
+		}
+	}
+
+
+	fn eval_fn_get_string_arg<'a>(
 		info: &'a expr::EvalFunctionInfo,
 		index: usize)
-		-> Result<&'a util::BigInt, bool>
+		-> Result<&'a expr::ValueString, bool>
 	{
 		match &info.args[index]
 		{
-			expr::Value::Integer(value) => Ok(value),
+			expr::Value::String(value) => Ok(value),
 			_ =>
 			{
-				info.report.error_span("expected integer argument", info.span);
+				info.report.error_span("expected string argument", &info.arg_spans[index]);
 				Err(true)
 			}
 		}
 	}
 
 
-	fn eval_fn_get_sized_bigint_arg<'a>(
-		info: &'a expr::EvalFunctionInfo,
+	fn eval_fn_get_bigint_arg(
+		info: &expr::EvalFunctionInfo,
 		index: usize)
-		-> Result<&'a util::BigInt, bool>
+		-> Result<util::BigInt, bool>
 	{
-		match &info.args[index]
+		match info.args[index].get_bigint()
 		{
-			expr::Value::Integer(value) =>
+			Some(value) => Ok(value),
+			None =>
+			{
+				info.report.error_span("expected integer argument", &info.arg_spans[index]);
+				Err(true)
+			}
+		}
+	}
+
+
+	fn eval_fn_get_sized_bigint_arg(
+		info: &expr::EvalFunctionInfo,
+		index: usize)
+		-> Result<util::BigInt, bool>
+	{
+		match info.args[index].get_bigint()
+		{
+			Some(value) =>
 			{
 				match value.size
 				{
 					Some(_) => Ok(value),
 					None =>
 					{
-						info.report.error_span("unsized integer argument", info.span);
+						info.report.error_span("unsized integer argument", &info.arg_spans[index]);
 						Err(true)
 					}
 				}
 			}
-			_ =>
+			None =>
 			{
-				info.report.error_span("expected integer argument", info.span);
+				info.report.error_span("expected integer argument", &info.arg_spans[index]);
 				Err(true)
 			}
 		}
@@ -1178,12 +1214,16 @@ impl State
 					"inchexstr" =>
 					{
 						State::eval_fn_check_arg_number(info, 1)?;
-						let bigint = State::eval_fn_get_bigint_arg(info, 0)?;
-						let filename = bigint.as_string();
+						if State::eval_fn_check_unknown_arg(info, 0, self.is_first_pass)
+						{
+							return Ok(expr::Value::make_integer(util::BigInt::new_from_str("")));
+						}
+
+						let value_string = State::eval_fn_get_string_arg(info, 0)?;
 						let new_filename = util::filename_navigate(
 							info.report.clone(),
 							&ctx.cur_filename,
-							&filename,
+							&value_string.utf8_contents,
 							&info.span)
 							.map_err(|_| true)?;
 
@@ -1337,9 +1377,9 @@ impl State
 				true,
 				info.args)?;
 				
-			let (bigint, size) = match value
+			let (bigint, size) = match value.get_bigint()
 			{
-				expr::Value::Integer(bigint) =>
+				Some(bigint) =>
 				{
 					match bigint.size
 					{

@@ -6,6 +6,7 @@ mod eval;
 
 pub use self::expression::Expr;
 pub use self::expression::Value;
+pub use self::expression::ValueString;
 pub use self::expression::UnaryOp;
 pub use self::expression::BinaryOp;
 pub use self::eval::EvalContext;

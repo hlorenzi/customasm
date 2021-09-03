@@ -20,10 +20,20 @@ pub enum Expr
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Value
 {
+	Unknown,
 	Void,
 	Integer(util::BigInt),
+	String(ValueString),
 	Bool(bool),
 	Function(String)
+}
+
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ValueString
+{
+	pub utf8_contents: String,
+	pub encoding: String,
 }
 
 
@@ -99,8 +109,19 @@ impl Value
 	{
 		match self
 		{
+			&Value::Unknown => Some(util::BigInt::from(0)),
 			&Value::Integer(ref bigint) => Some(bigint.clone()),
+			&Value::String(ref rc_string) => Some(rc_string.to_bigint()),
 			_ => None,
 		}
+	}
+}
+
+
+impl ValueString
+{
+	pub fn to_bigint(&self) -> util::BigInt
+	{
+		util::BigInt::new_from_str(&self.utf8_contents)
 	}
 }

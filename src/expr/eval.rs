@@ -66,6 +66,7 @@ pub struct EvalFunctionInfo<'a>
 	pub report: diagn::RcReport,
 	pub func: expr::Value,
 	pub args: Vec<expr::Value>,
+	pub arg_spans: Vec<diagn::Span>,
 	pub span: &'a diagn::Span,
 }
 
@@ -201,9 +202,33 @@ impl expr::Expr
 				
 				else
 				{
-					match (lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?, rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?)
+					let lhs = lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
+					let rhs = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
+
+					match (&lhs, &rhs)
 					{
-						(expr::Value::Integer(ref lhs), expr::Value::Integer(ref rhs)) =>
+						(expr::Value::Bool(lhs), expr::Value::Bool(rhs)) =>
+						{
+							return match op
+							{
+								expr::BinaryOp::And => Ok(expr::Value::Bool(lhs & rhs)),
+								expr::BinaryOp::Or  => Ok(expr::Value::Bool(lhs | rhs)),
+								expr::BinaryOp::Xor => Ok(expr::Value::Bool(lhs ^ rhs)),
+								expr::BinaryOp::Eq  => Ok(expr::Value::Bool(lhs == rhs)),
+								expr::BinaryOp::Ne  => Ok(expr::Value::Bool(lhs != rhs)),
+								_ => Err(report.error_span("invalid argument types to operator", &span))
+							}
+						}
+
+						_ => {}
+					}
+					
+					let lhs_bigint = lhs.get_bigint();
+					let rhs_bigint = rhs.get_bigint();
+
+					match (lhs_bigint, rhs_bigint)
+					{
+						(Some(ref lhs), Some(ref rhs)) =>
 						{
 							match op
 							{
@@ -247,10 +272,6 @@ impl expr::Expr
 								
 								expr::BinaryOp::Concat =>
 								{
-									// FIXME: wrongly evaluates lhs and rhs again, with possible duplicated side-effects
-									//let lhs_sliced = lhs_expr.eval_slice(report.clone(), ctx, eval_var, eval_fn)?;
-									//let rhs_sliced = rhs_expr.eval_slice(report.clone(), ctx, eval_var, eval_fn)?;
-
 									match (lhs.size, rhs.size)
 									{
 										(Some(lhs_width), Some(rhs_width)) => Ok(expr::Value::make_integer(lhs.concat((lhs_width, 0), &rhs, (rhs_width, 0)))),
@@ -259,19 +280,6 @@ impl expr::Expr
 									}
 								}
 
-								_ => Err(report.error_span("invalid argument types to operator", &span))
-							}
-						}
-						
-						(expr::Value::Bool(lhs), expr::Value::Bool(rhs)) =>
-						{
-							match op
-							{
-								expr::BinaryOp::And => Ok(expr::Value::Bool(lhs & rhs)),
-								expr::BinaryOp::Or  => Ok(expr::Value::Bool(lhs | rhs)),
-								expr::BinaryOp::Xor => Ok(expr::Value::Bool(lhs ^ rhs)),
-								expr::BinaryOp::Eq  => Ok(expr::Value::Bool(lhs == rhs)),
-								expr::BinaryOp::Ne  => Ok(expr::Value::Bool(lhs != rhs)),
 								_ => Err(report.error_span("invalid argument types to operator", &span))
 							}
 						}
@@ -293,10 +301,10 @@ impl expr::Expr
 			
 			&expr::Expr::BitSlice(ref span, _, left, right, ref inner) =>
 			{
-				match inner.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?
+				match inner.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?.get_bigint()
 				{
-					expr::Value::Integer(ref x) => Ok(expr::Value::make_integer(x.slice(left, right))),
-					_ => Err(report.error_span("invalid argument type to slice", &span))
+					Some(ref x) => Ok(expr::Value::make_integer(x.slice(left, right))),
+					None => Err(report.error_span("invalid argument type to slice", &span))
 				}
 			}
 			
@@ -324,14 +332,20 @@ impl expr::Expr
 					expr::Value::Function(_) =>
 					{
 						let mut args = Vec::new();
+						let mut arg_spans = Vec::new();
 						for expr in arg_exprs
-							{ args.push(expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?); }
+						{
+							let arg = expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
+							args.push(arg);
+							arg_spans.push(expr.span());
+						}
 
 						let info = EvalFunctionInfo
 						{
 							report: report.clone(),
 							func,
 							args,
+							arg_spans,
 							span,
 						};
 						

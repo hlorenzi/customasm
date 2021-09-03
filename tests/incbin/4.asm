@@ -1,1 +1,1 @@
-#d incbin("unk" @ 0xffff) ; error: not found
+#d incbin("unk" @ 0xffff) ; error: expected string

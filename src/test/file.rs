@@ -166,6 +166,15 @@ pub fn test_file(filepath: &str)
 	assembler.register_file(&stripped_filename);
 	let maybe_output = assembler.assemble(report.clone(), &mut fileserver, 10);
 	
+    let output = if let Ok(output) = maybe_output
+    {
+        output.binary
+    }
+    else
+    {
+        util::BitVec::new()
+    };
+
 	let mut msgs = Vec::<u8>::new();
 	report.print_all(&mut msgs, &fileserver);
     print!("{}", String::from_utf8(msgs).unwrap());
@@ -186,6 +195,7 @@ pub fn test_file(filepath: &str)
     
     if has_msg_mismatch
     {
+        println!("got output: 0x{:x}", &output);
         panic!("test failed");
     }
 
@@ -196,18 +206,10 @@ pub fn test_file(filepath: &str)
             > expected {} messages, got {}\n",
             expectations.messages.len(), report.len());
             
+        println!("got output: 0x{:x}", &output);
         panic!("test failed");
     }
     
-    let output = if let Ok(output) = maybe_output
-    {
-        output.binary
-    }
-    else
-    {
-        util::BitVec::new()
-    };
-
     if format!("{:x}", output) != format!("{:x}", expectations.output)
     {
         println!("\n\
