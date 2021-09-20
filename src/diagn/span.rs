@@ -5,17 +5,19 @@ use std::rc::Rc;
 pub struct Span
 {
 	pub file: Rc<String>,
+	pub line: Option<usize>,
 	pub location: Option<(usize, usize)>
 }
 
 
 impl Span
 {
-	pub fn new(filename: Rc<String>, start: usize, end: usize) -> Span
+	pub fn new(filename: Rc<String>, line: usize, start: usize, end: usize) -> Span
 	{
 		Span
 		{
 			file: filename,
+			line: Some(line),
 			location: Some((start, end))
 		}
 	}
@@ -26,6 +28,7 @@ impl Span
 		Span
 		{
 			file: Rc::new("".to_string()),
+			line: None,
 			location: None
 		}
 	}
@@ -43,6 +46,7 @@ impl Span
 			Span
 			{
 				file: self.file.clone(),
+				line: self.line,
 				location: Some((start, start))
 			}
 		}
@@ -61,6 +65,7 @@ impl Span
 			Span
 			{
 				file: self.file.clone(),
+				line: self.line,
 				location: Some((end, end))
 			}
 		}
@@ -84,11 +89,21 @@ impl Span
 			let end   = max(self.location.unwrap().1, other.location.unwrap().1);
 			Some((start, end))
 		};
+
+		let line = if self.location.unwrap().0 <= other.location.unwrap().0
+		{
+			self.line
+		}
+		else
+		{
+			other.line
+		};
 		
 		Span
 		{
 			file: self.file.clone(),
-			location: location
+			line,
+			location
 		}
 	}
 }

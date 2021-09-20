@@ -16,7 +16,7 @@ fn test(src: &str, expected: ExpectedResult<&str>)
 	let mut fileserver = util::FileServerMock::new();
 	fileserver.add("test", src_quoted);
 	
-	let span = diagn::Span::new(Rc::new("test".to_string()), 0, 0);
+	let span = diagn::Span::new(Rc::new("test".to_string()), 0, 0, 0);
 	
 	let result = syntax::excerpt_as_string_contents(report.clone(), src_quoted, &span).ok();
 	let result = result.as_ref().map(|s| s.as_ref());

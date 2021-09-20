@@ -476,4 +476,55 @@ impl util::BitVec
 		
 		result
 	}
+
+	pub fn format_debugger(&self) -> String
+	{
+		let mut result = String::new();
+		
+		let mut addr_width = 4;
+		let mut line_width = 4;
+						
+		let mut sorted_spans = self.spans.clone();
+        sorted_spans.sort_by(|a, b|
+        {
+            a.offset.cmp(&b.offset)
+        });
+		
+        for span in &sorted_spans
+        {
+			addr_width = std::cmp::max(
+				addr_width,
+				format!("{:x}", span.addr).len());
+
+			if let Some(line) = span.span.line
+			{
+				line_width = std::cmp::max(
+					line_width,
+					format!("{}", line).len());
+			}
+		}
+		
+		result.push_str(&format!(" {:>1$} |", "addr", addr_width));
+		result.push_str(&format!(" {:>1$} | file", "line", line_width));
+		result.push_str("\n");
+		result.push_str("\n");
+		
+		let mut prev_filename = "";
+        
+        for span in &sorted_spans
+        {
+            result.push_str(&format!(" {:1$x} | ", span.addr, addr_width));
+			result.push_str(&format!("{:1$} | ", span.span.line.unwrap_or_default(), line_width));
+            
+            if &*span.span.file != prev_filename
+            {
+                prev_filename = &*span.span.file;
+            }
+            
+			result.push_str(prev_filename);
+            result.push_str("\n");
+		}
+		
+		result
+	}
 }

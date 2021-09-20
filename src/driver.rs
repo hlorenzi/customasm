@@ -19,6 +19,7 @@ enum OutputFormat
 	HexC,
 	LogiSim8,
 	LogiSim16,
+	Debugger,
 }
 
 
@@ -101,6 +102,7 @@ fn drive_inner(
 		Some("c")         => OutputFormat::HexC,
 		Some("logisim8")  => OutputFormat::LogiSim8,
 		Some("logisim16") => OutputFormat::LogiSim16,
+		Some("debugger")  => OutputFormat::Debugger,
 		
 		None => if out_stdout
 			{ OutputFormat::AnnotatedHex }
@@ -224,6 +226,7 @@ fn drive_inner(
 		OutputFormat::HexC      => binary.format_c_array (16).bytes().collect(),
 		OutputFormat::LogiSim8  => binary.format_logisim (8) .bytes().collect(),
 		OutputFormat::LogiSim16 => binary.format_logisim (16).bytes().collect(),
+		OutputFormat::Debugger  => binary.format_debugger()  .bytes().collect(),
 		
 		OutputFormat::AnnotatedHex => binary.format_annotated_hex(fileserver).bytes().collect(),
 		OutputFormat::AnnotatedBin => binary.format_annotated_bin(fileserver).bytes().collect(),
@@ -287,7 +290,7 @@ fn drive_inner(
 fn make_opts() -> getopts::Options
 {
     let mut opts = getopts::Options::new();
-    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16", "FORMAT");
+    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16, debugger", "FORMAT");
     opts.opt("o", "output", "The name of the output file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.optopt("", "symbol-format", "The format of the symbol file. Possible formats: default, mesen-mlb", "SYMBOL-FORMAT");
     opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
