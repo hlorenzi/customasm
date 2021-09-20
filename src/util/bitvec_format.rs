@@ -476,4 +476,55 @@ impl util::BitVec
 		
 		result
 	}
+
+    
+    pub fn format_addrspan(&self, fileserver: &dyn util::FileServer) -> String
+    {
+        let mut result = String::new();
+        
+        let mut sorted_spans = self.spans.clone();
+        sorted_spans.sort_by(|a, b| a.offset.cmp(&b.offset));
+        
+        result.push_str("; ");
+        result.push_str("physical address : bit offset | ");
+        result.push_str("logical address | ");
+        result.push_str("file : line start : column start : line end : column end\n");
+        
+        for span in &sorted_spans
+        {
+            let chars = fileserver.get_chars(diagn::RcReport::new(), &span.span.file, None).ok().unwrap();
+            let counter = util::CharCounter::new(&chars);
+
+            if let Some(offset) = span.offset
+            {
+                result.push_str(&format!("{:x}:{:x} | ", offset / 8, offset % 8));
+            }
+            else
+            {
+                result.push_str(&format!("-:- | "));
+            }
+
+            result.push_str(&format!("{:x} | ", span.addr));
+            
+            if let Some((start, end)) = span.span.location
+            {
+                let (line_start, col_start) = counter.get_line_column_at_index(start);
+                let (line_end, col_end) = counter.get_line_column_at_index(end);
+
+                result.push_str(
+                    &format!("{}:{}:{}:{}:{}",
+                        &span.span.file,
+                        line_start, col_start,
+                        line_end, col_end));
+            }
+            else
+            {
+                result.push_str(&format!("{}:-:-:-:-", &span.span.file));
+            };
+            
+            result.push_str("\n");
+        }
+        
+        result
+    }
 }
