@@ -101,7 +101,7 @@ pub fn match_rule_invocation(
             false,
             &mut expr::EvalContext::new());
 
-        //println!("{} = {:?}", fileserver.get_excerpt(&invocation.span), &resolved);
+        //println!("early value for `{}` = {:?}", fileserver.get_excerpt(&invocation.span), &resolved);
 
         // TODO: can provide an exact guess even if resolution fails,
         // if we have an exact candidate, and
@@ -116,10 +116,19 @@ pub fn match_rule_invocation(
                     None => 0,
                 }
             }
-            _ => 0
+            _ =>
+            {
+                // If the production expression couldn't be resolved,
+                // try using a size guess from a previous iteration.
+                match asm_state.instruction_size_guesses.get(&invocation.span)
+                {
+                    Some(guess) => *guess,
+                    None => 0,
+                }
+            }
         };
 
-        //println!("{} = {}", fileserver.get_excerpt(&invocation.span), invocation.size_guess);
+        //println!("size guess for `{}` = {}", fileserver.get_excerpt(&invocation.span), invocation.size_guess);
 
         return Ok(invocation);
     }
