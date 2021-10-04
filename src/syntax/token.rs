@@ -243,7 +243,6 @@ where S: Into<String>
 	let filename = Rc::new(src_filename.into());
 	let mut tokens = Vec::new();
 	let mut index = 0;
-	let mut line = 0;
 	let mut had_error = false;
 	
 	while index < src.len()
@@ -258,12 +257,7 @@ where S: Into<String>
 			check_for_string    (&src[index..]).unwrap_or_else(||
 			(TokenKind::Error, 1)))))));
 
-		if kind == TokenKind::LineBreak
-		{
-			line += 1;
-		}
-		
-		let span = Span::new(filename.clone(), line, index, index + length);
+		let span = Span::new(filename.clone(), index, index + length);
 		
 		// Get the source excerpt for variable tokens (e.g. identifiers).
 		let excerpt = match kind.needs_excerpt()

@@ -226,10 +226,10 @@ fn drive_inner(
 		OutputFormat::HexC      => binary.format_c_array (16).bytes().collect(),
 		OutputFormat::LogiSim8  => binary.format_logisim (8) .bytes().collect(),
 		OutputFormat::LogiSim16 => binary.format_logisim (16).bytes().collect(),
-		OutputFormat::Debugger  => binary.format_debugger()  .bytes().collect(),
 		
 		OutputFormat::AnnotatedHex => binary.format_annotated_hex(fileserver).bytes().collect(),
 		OutputFormat::AnnotatedBin => binary.format_annotated_bin(fileserver).bytes().collect(),
+		OutputFormat::Debugger     => binary.format_debugger     (fileserver).bytes().collect(),
 	};
 	
 	if out_stdout

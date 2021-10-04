@@ -1,4 +1,6 @@
 use crate::*;
+use crate::util::CharCounter;
+use crate::diagn::RcReport;
 
 
 impl util::BitVec
@@ -477,7 +479,7 @@ impl util::BitVec
 		result
 	}
 
-	pub fn format_debugger(&self) -> String
+	pub fn format_debugger(&self, fileserver: &dyn util::FileServer) -> String
 	{
 		let mut result = String::new();
 		
@@ -489,15 +491,19 @@ impl util::BitVec
         {
             a.offset.cmp(&b.offset)
         });
-		
+
         for span in &sorted_spans
         {
+			let chars = fileserver.get_chars(RcReport::new(), &span.span.file, None).ok().unwrap();
+			let counter = CharCounter::new(&chars);
+
 			addr_width = std::cmp::max(
 				addr_width,
 				format!("{:x}", span.addr).len());
 
-			if let Some(line) = span.span.line
+			if let Some((start, _)) = span.span.location
 			{
+				let (line, _) = counter.get_line_column_at_index(start);
 				line_width = std::cmp::max(
 					line_width,
 					format!("{}", line).len());
@@ -513,8 +519,21 @@ impl util::BitVec
         
         for span in &sorted_spans
         {
+			let chars = fileserver.get_chars(RcReport::new(), &span.span.file, None).ok().unwrap();
+			let counter = CharCounter::new(&chars);
+
+			let line = if let Some((start, _)) = span.span.location
+			{
+				let (l, _) = counter.get_line_column_at_index(start);
+				l
+			}
+			else
+			{
+				0
+			};
+
             result.push_str(&format!(" {:1$x} | ", span.addr, addr_width));
-			result.push_str(&format!("{:1$} | ", span.span.line.unwrap_or_default(), line_width));
+			result.push_str(&format!("{:1$} | ", line, line_width));
             
             if &*span.span.file != prev_filename
             {
