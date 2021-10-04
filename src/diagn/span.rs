@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq)]
 pub struct Span
 {
 	pub file: Rc<String>,

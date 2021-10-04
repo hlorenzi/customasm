@@ -4,8 +4,7 @@
     test {x} => asm { emit x }
 }
 
-; weird error?!
-test 0x12 ; error: converge
+test 0x12 ; = 0x12
 
 #ruledef
 {

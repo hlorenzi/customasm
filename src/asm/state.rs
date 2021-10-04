@@ -1,4 +1,5 @@
 use crate::*;
+use std::collections::HashMap;
 
 
 static DEBUG_CANDIDATE_RESOLUTION: bool = false;
@@ -18,6 +19,7 @@ pub struct State
 	pub bankdata: Vec<asm::BankData>,
 	pub symbols: asm::SymbolManager,
 	pub symbol_guesses: asm::SymbolManager,
+	pub instruction_size_guesses: HashMap<diagn::Span, usize>,
 	pub rulesets: Vec<asm::Ruleset>,
 	pub active_rulesets: Vec<RulesetRef>,
 	pub cur_bank: BankRef,
@@ -95,6 +97,7 @@ impl Assembler
         -> Result<AssemblyOutput, ()>
 	{
 		let mut symbol_guesses = asm::SymbolManager::new();
+		let mut instruction_size_guesses = HashMap::<diagn::Span, usize>::new();
 
 		let mut iteration = 0;
 		loop
@@ -102,12 +105,14 @@ impl Assembler
 			self.state = State::new();
 			self.state.is_first_pass = iteration == 0;
 			std::mem::swap(&mut self.state.symbol_guesses, &mut symbol_guesses);
+			std::mem::swap(&mut self.state.instruction_size_guesses, &mut instruction_size_guesses);
 
 			iteration += 1;
 			//dbg!(iteration);
 
 			//dbg!(&symbol_guesses);
 			//dbg!(&self.state.symbols);
+			//dbg!(&self.state.instruction_size_guesses);
 
 			let pass_report = diagn::RcReport::new();
 
@@ -143,7 +148,8 @@ impl Assembler
 					pass_report.clone(),
 					bank,
 					bankdata,
-					fileserver);
+					fileserver,
+					&mut instruction_size_guesses);
 					
 				if pass_report.has_errors() || !bank_output.is_ok()
 				{
@@ -202,6 +208,7 @@ impl State
 			bankdata: Vec::new(),
 			symbols: asm::SymbolManager::new(),
 			symbol_guesses: asm::SymbolManager::new(),
+			instruction_size_guesses: HashMap::new(),
 			rulesets: Vec::new(),
 			active_rulesets: Vec::new(),
 			cur_bank: BankRef { index: 0 },
@@ -430,7 +437,8 @@ impl State
 		report: diagn::RcReport,
 		bank: &asm::Bank,
 		bankdata: &asm::BankData,
-		fileserver: &dyn util::FileServer)
+		fileserver: &dyn util::FileServer,
+		instruction_size_guesses: &mut HashMap<diagn::Span, usize>)
 		-> Result<util::BitVec, ()>
 	{
 		let mut bitvec = util::BitVec::new();
@@ -508,6 +516,14 @@ impl State
 					{
 						Some(size) =>
 						{
+							// Set latest resolved value as the size guess
+							// for next iterations, but only if the early size guess
+							// couldn't be inferred.
+							if invoc.size_guess == 0
+							{
+								instruction_size_guesses.insert(invoc.span.clone(), size);
+							}
+							
 							if size == invoc.size_guess
 							{
 								(bigint, size)
@@ -1376,6 +1392,8 @@ impl State
 				fileserver,
 				true,
 				info.args)?;
+			
+			//println!("  value = {:?}", value);
 				
 			let (bigint, size) = match value.get_bigint()
 			{
@@ -1423,6 +1441,7 @@ impl State
 			parser.expect_linebreak()?;
 		}
 
+		//println!("  result size = {:?}", result.size);
 		Ok(expr::Value::make_integer(result))
 	}
 }
