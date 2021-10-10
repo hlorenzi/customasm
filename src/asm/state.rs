@@ -608,7 +608,7 @@ impl State
 	{
 		let data_invoc = &invocation.get_data_invoc();
 
-		let mut resolved = self.eval_expr(
+		let resolved = self.eval_expr(
 			report.clone(),
 			&data_invoc.expr,
 			&invocation.ctx,
@@ -618,9 +618,9 @@ impl State
 
 		if let Some(elem_size) = data_invoc.elem_size
 		{
-			match resolved
+			match resolved.get_bigint()
 			{
-				expr::Value::Integer(ref mut bigint) =>
+				Some(mut bigint) =>
 				{
 					let mut size = bigint.min_size();
 					if let Some(intrinsic_size) = bigint.size
@@ -639,8 +639,9 @@ impl State
 					}
 
 					bigint.size = Some(elem_size);
+					return Ok(expr::Value::make_integer(bigint));
 				}
-				_ => {}
+				None => {}
 			}
 		}
 
@@ -900,7 +901,7 @@ impl State
 
 			asm::PatternParameterType::Unsigned(size) =>
 			{
-				if let expr::Value::Integer(value_int) = value
+				if let Some(mut value_int) = value.get_bigint()
 				{
 					if value_int.sign() == -1 ||
 						value_int.min_size() > size
@@ -913,6 +914,7 @@ impl State
 					else
 					{
 						value_int.size = Some(size);
+						*value = expr::Value::make_integer(value_int);
 						Ok(())
 					}
 				}
@@ -927,7 +929,7 @@ impl State
 
 			asm::PatternParameterType::Signed(size) =>
 			{
-				if let expr::Value::Integer(value_int) = value
+				if let Some(mut value_int) = value.get_bigint()
 				{
 					if (value_int.sign() == 0 && size == 0) ||
 						(value_int.sign() == 1 && value_int.min_size() >= size) ||
@@ -941,6 +943,7 @@ impl State
 					else
 					{
 						value_int.size = Some(size);
+						*value = expr::Value::make_integer(value_int);
 						Ok(())
 					}
 				}
@@ -955,7 +958,7 @@ impl State
 
 			asm::PatternParameterType::Integer(size) =>
 			{
-				if let expr::Value::Integer(value_int) = value
+				if let Some(mut value_int) = value.get_bigint()
 				{
 					if value_int.min_size() > size
 					{
@@ -967,6 +970,7 @@ impl State
 					else
 					{
 						value_int.size = Some(size);
+						*value = expr::Value::make_integer(value_int);
 						Ok(())
 					}
 				}
