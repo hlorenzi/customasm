@@ -25,14 +25,14 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: test
-        args: --release --verbose
+        args: --release --verbose --workspace
 
     - name: Build
       uses: actions-rs/cargo@v1
       with:
         use-cross: true
         command: build
-        args: --release --verbose --target=x86_64-pc-windows-gnu
+        args: --release --verbose --package customasm-cli --target=x86_64-pc-windows-gnu
 
     - name: Create Release
       id: create_release

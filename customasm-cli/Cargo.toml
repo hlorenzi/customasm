@@ -1,0 +1,22 @@
+[package]
+name = "customasm-cli"
+version = "0.11.10"
+edition = "2018"
+authors = ["hlorenzi <https://hlorenzi.com>"]
+description = "An assembler for custom, user-defined instruction sets!"
+homepage = "https://github.com/hlorenzi/customasm"
+repository = "https://github.com/hlorenzi/customasm"
+license = "Apache-2.0"
+keywords = ["asm", "assembler", "assembly", "custom"]
+categories = ["command-line-utilities", "hardware-support"]
+
+[dependencies]
+customasm = { path = "../" }
+getopts = "0.2.17"
+
+[build-dependencies]
+vergen = "3.1.0"
+
+[[bin]]
+name = "customasm"
+path = "src/main.rs"

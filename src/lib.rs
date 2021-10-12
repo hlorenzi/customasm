@@ -1,18 +1,10 @@
 #![allow(dead_code)]
 
-
-extern crate num_bigint;
-extern crate num_traits;
-extern crate num_integer;
-extern crate getopts;
-
-
 pub mod diagn;
 pub mod syntax;
 pub mod expr;
 pub mod asm;
 pub mod util;
-pub mod driver;
 
 
 pub mod webasm;
