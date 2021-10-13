@@ -1330,6 +1330,9 @@ impl State
 		fileserver: &dyn util::FileServer)
 		-> Result<expr::Value, ()>
 	{
+
+		let mut rel_ctx = ctx.clone();
+
 		let mut result = util::BigInt::new(0, Some(0));
 		
 		let mut parser = syntax::Parser::new(Some(info.report.clone()), info.tokens);
@@ -1386,7 +1389,7 @@ impl State
 			let matches = asm::parser::match_rule_invocation(
 				&self,
 				subparser,
-				ctx.clone(),
+				rel_ctx.clone(),
 				fileserver,
 				info.report.clone())?;
 
@@ -1440,6 +1443,8 @@ impl State
 						&bigint,
 						(size, 0));
 				}
+
+				rel_ctx.bit_offset += size;
 			}
 
 			parser.expect_linebreak()?;
