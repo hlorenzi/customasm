@@ -1,18 +1,6 @@
 name: Test Build
 
-on:
-  push:
-    branches:
-      - master
-      - dev
-      - 'dev-*'
-      - 'feature-*'
-  pull_request:
-    branches:
-      - master
-      - dev
-      - 'dev-*'
-      - 'feature-*'
+on: [push, pull_request]
 
 jobs:
   build:
