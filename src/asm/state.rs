@@ -1386,68 +1386,82 @@ impl State
 			subparser.suppress_reports();
 
 			//println!("> after subs `{:?}`", subs_tokens);
-		
-			let matches = asm::parser::match_rule_invocation(
-				&self,
-				subparser,
-				inner_ctx.clone(),
-				fileserver,
-				info.report.clone())?;
-
-			let value = self.resolve_rule_invocation(
-				info.report.clone(),
-				&matches,
-				fileserver,
-				true,
-				info.args)?;
 			
-			//println!("  value = {:?}", value);
-				
-			let (bigint, size) = match value.get_bigint()
+			if subparser.next_is(0, syntax::TokenKind::Identifier) &&
+			subparser.next_is(1, syntax::TokenKind::Colon)
 			{
-				Some(bigint) =>
-				{
-					match bigint.size
-					{
-						Some(size) => (bigint, size),
-						None =>
-						{
-							info.report.error_span(
-								"cannot infer size of instruction",
-								&subparser_span);
+				let label_tk = subparser.expect(syntax::TokenKind::Identifier)?;
+				let label_name = label_tk.excerpt.as_ref().unwrap();
+				info.args.set_local(
+					label_name,
+					expr::Value::make_integer(
+						self.get_addr(info.report.clone(), &inner_ctx, &subparser_span)?)
+				);					
+				subparser.expect(syntax::TokenKind::Colon)?;
+			}
+			else
+			{
+				let matches = asm::parser::match_rule_invocation(
+					&self,
+					subparser,
+					inner_ctx.clone(),
+					fileserver,
+					info.report.clone())?;
 
-							return Err(());
+				let value = self.resolve_rule_invocation(
+					info.report.clone(),
+					&matches,
+					fileserver,
+					true,
+					info.args)?;
+				
+				//println!("  value = {:?}", value);
+					
+				let (bigint, size) = match value.get_bigint()
+				{
+					Some(bigint) =>
+					{
+						match bigint.size
+						{
+							Some(size) => (bigint, size),
+							None =>
+							{
+								info.report.error_span(
+									"cannot infer size of instruction",
+									&subparser_span);
+
+								return Err(());
+							}
 						}
 					}
-				}
 
-				_ =>
-				{
-					info.report.error_span(
-						"wrong type returned from instruction",
-						&subparser_span);
+					_ =>
+					{
+						info.report.error_span(
+							"wrong type returned from instruction",
+							&subparser_span);
 
-					return Err(());
-				}
-			};
+						return Err(());
+					}
+				};
 
-			if size > 0
-			{
-				if result.size.unwrap() == 0
+				if size > 0
 				{
-					result = bigint;
+					if result.size.unwrap() == 0
+					{
+						result = bigint;
+					}
+					else
+					{
+						result = result.concat(
+							(result.size.unwrap(), 0),
+							&bigint,
+							(size, 0));
+					}
+					
+					inner_ctx.bit_offset += size;
 				}
-				else
-				{
-					result = result.concat(
-						(result.size.unwrap(), 0),
-						&bigint,
-						(size, 0));
-				}
-				
-				inner_ctx.bit_offset += size;
 			}
-
 			parser.expect_linebreak()?;
 		}
 
