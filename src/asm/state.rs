@@ -1330,141 +1330,161 @@ impl State
 		fileserver: &dyn util::FileServer)
 		-> Result<expr::Value, ()>
 	{
-		// Clone the context in order to advance the logical address
-		// between instructions.
-		let mut inner_ctx = ctx.clone();
-
 		let mut result = util::BigInt::new(0, Some(0));
-		
-		let mut parser = syntax::Parser::new(Some(info.report.clone()), info.tokens);
 
-		//println!("asm block `{}`", fileserver.get_excerpt(&parser.get_full_span()));
-		
-		while !parser.is_over()
-		{
-			// Substitute `{x}` occurrences with tokens from the argument
-			let mut subs_parser = parser.slice_until_linebreak_over_nested_braces();
-			let subparser_span = subs_parser.get_full_span();
+		// Parse the tokens twice, once to find the labels
+		// and then to assemble the output
+		for found_labels in 0..2 {
 
-			//println!("> instr `{}`", fileserver.get_excerpt(&subparser_span));
+			// Clone the context in order to advance the logical address
+			// between instructions.
+			let mut inner_ctx = ctx.clone();
 
-			let mut subs_tokens: Vec<syntax::Token> = Vec::new();
-			while !subs_parser.is_over()
+			let mut parser = syntax::Parser::new(Some(info.report.clone()), info.tokens);
+
+			//println!("asm block `{}`", fileserver.get_excerpt(&parser.get_full_span()));
+			
+			while !parser.is_over()
 			{
-				if let Some(open_token) = subs_parser.maybe_expect(syntax::TokenKind::BraceOpen)
+				// Substitute `{x}` occurrences with tokens from the argument
+				let mut subs_parser = parser.slice_until_linebreak_over_nested_braces();
+				let subparser_span = subs_parser.get_full_span();
+
+				//println!("> instr `{}`", fileserver.get_excerpt(&subparser_span));
+
+				let mut subs_tokens: Vec<syntax::Token> = Vec::new();
+				while !subs_parser.is_over()
 				{
-					let arg_name_token = subs_parser.expect(syntax::TokenKind::Identifier)?;
-					let arg_name = arg_name_token.excerpt.as_ref().unwrap();
-
-					let token_sub = match info.args.get_token_sub(&arg_name)
+					if let Some(open_token) = subs_parser.maybe_expect(syntax::TokenKind::BraceOpen)
 					{
-						None =>
+						let arg_name_token = subs_parser.expect(syntax::TokenKind::Identifier)?;
+						let arg_name = arg_name_token.excerpt.as_ref().unwrap();
+
+						let token_sub = match info.args.get_token_sub(&arg_name)
 						{
-							info.report.error_span("unknown argument", &arg_name_token.span);
-							return Err(());
+							None =>
+							{
+								info.report.error_span("unknown argument", &arg_name_token.span);
+								return Err(());
+							}
+							Some(t) => t
+						};
+
+						let close_token = subs_parser.expect(syntax::TokenKind::BraceClose)?;
+						let sub_span = open_token.span.join(&close_token.span);
+
+						for token in token_sub
+						{
+							let mut sub_token = token.clone();
+							sub_token.span = sub_span.clone();
+							subs_tokens.push(sub_token);
 						}
-						Some(t) => t
-					};
-
-					let close_token = subs_parser.expect(syntax::TokenKind::BraceClose)?;
-					let sub_span = open_token.span.join(&close_token.span);
-
-					for token in token_sub
-					{
-						let mut sub_token = token.clone();
-						sub_token.span = sub_span.clone();
-						subs_tokens.push(sub_token);
 					}
+					else
+					{
+						subs_tokens.push(subs_parser.advance());
+					}
+				}
+
+				let mut subparser = syntax::Parser::new(Some(info.report.clone()), &subs_tokens);
+				subparser.suppress_reports();
+
+				//println!("> after subs `{:?}`", subs_tokens);
+				
+				if subparser.next_is(0, syntax::TokenKind::Identifier) &&
+				subparser.next_is(1, syntax::TokenKind::Colon)
+				{
+					let label_tk = subparser.expect(syntax::TokenKind::Identifier)?;
+					let label_name = label_tk.excerpt.as_ref().unwrap();
+					info.args.set_local(
+						label_name,
+						expr::Value::make_integer(
+							self.get_addr(info.report.clone(), &inner_ctx, &subparser_span)?));					
+					subparser.expect(syntax::TokenKind::Colon)?;
 				}
 				else
 				{
-					subs_tokens.push(subs_parser.advance());
-				}
-			}
+					let matches = asm::parser::match_rule_invocation(
+						&self,
+						subparser,
+						inner_ctx.clone(),
+						fileserver,
+						info.report.clone())?;
 
-			let mut subparser = syntax::Parser::new(Some(info.report.clone()), &subs_tokens);
-			subparser.suppress_reports();
-
-			//println!("> after subs `{:?}`", subs_tokens);
-			
-			if subparser.next_is(0, syntax::TokenKind::Identifier) &&
-			subparser.next_is(1, syntax::TokenKind::Colon)
-			{
-				let label_tk = subparser.expect(syntax::TokenKind::Identifier)?;
-				let label_name = label_tk.excerpt.as_ref().unwrap();
-				info.args.set_local(
-					label_name,
-					expr::Value::make_integer(
-						self.get_addr(info.report.clone(), &inner_ctx, &subparser_span)?)
-				);					
-				subparser.expect(syntax::TokenKind::Colon)?;
-			}
-			else
-			{
-				let matches = asm::parser::match_rule_invocation(
-					&self,
-					subparser,
-					inner_ctx.clone(),
-					fileserver,
-					info.report.clone())?;
-
-				let value = self.resolve_rule_invocation(
-					info.report.clone(),
-					&matches,
-					fileserver,
-					true,
-					info.args)?;
-				
-				//println!("  value = {:?}", value);
-					
-				let (bigint, size) = match value.get_bigint()
-				{
-					Some(bigint) =>
-					{
-						match bigint.size
+						let value: expr::Value;
+						if found_labels == 0
 						{
-							Some(size) => (bigint, size),
-							None =>
+							// Ignore errors while parsing for labels
+							value = self.resolve_rule_invocation(
+								info.report.clone(),
+								&matches,
+								fileserver,
+								false,
+								info.args).unwrap_or(expr::Value::make_integer(0));
+						}
+						else
+						{
+							value = self.resolve_rule_invocation(
+								info.report.clone(),
+								&matches,
+								fileserver,
+								true,
+								info.args)?;
+						}
+					
+					//println!("  value = {:?}", value);
+					
+					if value.get_bigint().is_some() {
+						let bigint = value.get_bigint().unwrap();
+
+						if bigint.size.is_some()
+						{
+							let size = bigint.size.unwrap();
+
+							if size > 0
+							{
+								// Assemble output in final pass
+								if found_labels == 1
+								{
+									if result.size.unwrap() == 0
+									{
+										result = bigint;
+									}
+									else
+									{
+										result = result.concat(
+											(result.size.unwrap(), 0),
+											&bigint,
+											(size, 0));
+									}
+								}
+								inner_ctx.bit_offset += size;
+							}
+						} else {
+							// Throw error on final pass
+							if found_labels == 1
 							{
 								info.report.error_span(
 									"cannot infer size of instruction",
 									&subparser_span);
-
 								return Err(());
 							}
 						}
-					}
 
-					_ =>
-					{
-						info.report.error_span(
-							"wrong type returned from instruction",
-							&subparser_span);
-
-						return Err(());
+					} else {
+						// Throw error on final pass
+						if found_labels == 1
+						{
+							info.report.error_span(
+								"wrong type returned from instruction",
+								&subparser_span);
+							return Err(());
+						}
 					}
-				};
-
-				if size > 0
-				{
-					if result.size.unwrap() == 0
-					{
-						result = bigint;
-					}
-					else
-					{
-						result = result.concat(
-							(result.size.unwrap(), 0),
-							&bigint,
-							(size, 0));
-					}
-					
-					inner_ctx.bit_offset += size;
 				}
+				parser.expect_linebreak()?;
 			}
-			parser.expect_linebreak()?;
 		}
-
 		//println!("  result size = {:?}", result.size);
 		Ok(expr::Value::make_integer(result))
 	}
