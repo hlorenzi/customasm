@@ -9,4 +9,5 @@ pub struct State<'a>
     pub filename: std::rc::Rc<String>,
     pub parser: syntax::Parser<'a>,
     pub parsed_filenames: &'a mut std::collections::HashSet<String>,
+    pub ignored_filenames: &'a mut std::collections::HashSet<String>,
 }

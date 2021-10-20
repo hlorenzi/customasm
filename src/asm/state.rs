@@ -124,6 +124,7 @@ impl Assembler
 					fileserver,
 					filename,
 					None,
+					&mut std::collections::HashSet::new(),
 					&mut std::collections::HashSet::new());
 				
 				if pass_report.has_errors() || result.is_err()

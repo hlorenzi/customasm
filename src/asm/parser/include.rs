@@ -29,5 +29,16 @@ pub fn parse_directive_include(
         state.fileserver,
         new_filename,
         Some(&tk_filename.span),
-        state.parsed_filenames)
+        state.parsed_filenames,
+        state.ignored_filenames)
+}
+
+pub fn parse_directive_once(
+    state: &mut asm::parser::State)
+    -> Result<(), ()>
+{
+    state.ignored_filenames.insert(
+        state.filename.as_ref().clone()); 
+
+    Ok(())
 }
