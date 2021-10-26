@@ -5,7 +5,7 @@ pub fn parse_directive_include(
     state: &mut asm::parser::State)
     -> Result<(), ()>
 {
-    let tk_filename = state.parser.expect(syntax::TokenKind::String)?;
+    let tk_filename = state.parser.expect(syntax::TokenKind::String(expr::StringEncoding::Utf8))?;
     let filename = syntax::excerpt_as_string_contents(
         state.report.clone(),
         tk_filename.excerpt.as_ref().unwrap(),
