@@ -7,10 +7,17 @@ pub fn parse_file<TFilename: Into<String>>(
     fileserver: &dyn util::FileServer,
     filename: TFilename,
     span: Option<&diagn::Span>,
-    parsed_filenames: &mut std::collections::HashSet<String>)
+    parsed_filenames: &mut std::collections::HashSet<String>,
+    once_filenames: &mut std::collections::HashSet<String>)
     -> Result<(), ()>
 {
     let filename = filename.into();
+ 
+    if once_filenames.contains(&filename)
+    {
+        return Ok(());
+    }
+
     let chars = fileserver.get_chars(report.clone(), &filename, span)?;
     let tokens = syntax::tokenize(report.clone(), &filename, &chars)?;
     let parser = syntax::Parser::new(Some(report.clone()), &tokens);
@@ -25,6 +32,7 @@ pub fn parse_file<TFilename: Into<String>>(
         filename: std::rc::Rc::new(filename.clone()),
         parser,
         parsed_filenames,
+        once_filenames,
     };
 
     //println!("{:#?}", state.parser.tokens.iter().map(|t| t.kind).collect::<Vec<_>>());
@@ -33,7 +41,7 @@ pub fn parse_file<TFilename: Into<String>>(
     {
         parse_line(&mut state)?;
     }
-	
+    
     parsed_filenames.remove(&filename);
 	Ok(())
 }
@@ -109,6 +117,7 @@ pub fn parse_directive(state: &mut asm::parser::State)
             "ruledef" | "cpudef" => asm::parser::parse_directive_ruledef(state, &tk_directive, true)?,
             "subruledef" | "tokendef" => asm::parser::parse_directive_ruledef(state, &tk_directive, false)?,
             "include" => asm::parser::parse_directive_include(state)?,
+            "once" => asm::parser::parse_directive_once(state)?,
             "res" => asm::parser::parse_directive_res(state)?,
             "align" => asm::parser::parse_directive_align(state)?,
             "labelalign" => asm::parser::parse_directive_labelalign(state)?,
