@@ -478,72 +478,54 @@ impl util::BitVec
 		
 		result
 	}
-
-	pub fn format_debugger(&self, fileserver: &dyn util::FileServer) -> String
-	{
-		let mut result = String::new();
-		
-		let mut addr_width = 4;
-		let mut line_width = 4;
-						
-		let mut sorted_spans = self.spans.clone();
-        sorted_spans.sort_by(|a, b|
-        {
-            a.offset.cmp(&b.offset)
-        });
-
-        for span in &sorted_spans
-        {
-			let chars = fileserver.get_chars(RcReport::new(), &span.span.file, None).ok().unwrap();
-			let counter = CharCounter::new(&chars);
-
-			addr_width = std::cmp::max(
-				addr_width,
-				format!("{:x}", span.addr).len());
-
-			if let Some((start, _)) = span.span.location
-			{
-				let (line, _) = counter.get_line_column_at_index(start);
-				line_width = std::cmp::max(
-					line_width,
-					format!("{}", line).len());
-			}
-		}
-		
-		result.push_str(&format!(" {:>1$} |", "addr", addr_width));
-		result.push_str(&format!(" {:>1$} | file", "line", line_width));
-		result.push_str("\n");
-		result.push_str("\n");
-		
-		let mut prev_filename = "";
+    
+    pub fn format_addrspan(&self, fileserver: &dyn util::FileServer) -> String
+    {
+        let mut result = String::new();
+        
+        let mut sorted_spans = self.spans.clone();
+        sorted_spans.sort_by(|a, b| a.offset.cmp(&b.offset));
+        
+        result.push_str("; ");
+        result.push_str("physical address : bit offset | ");
+        result.push_str("logical address | ");
+        result.push_str("file : line start : column start : line end : column end\n");
         
         for span in &sorted_spans
         {
-			let chars = fileserver.get_chars(RcReport::new(), &span.span.file, None).ok().unwrap();
-			let counter = CharCounter::new(&chars);
+            let chars = fileserver.get_chars(diagn::RcReport::new(), &span.span.file, None).ok().unwrap();
+            let counter = util::CharCounter::new(&chars);
 
-			let line = if let Some((start, _)) = span.span.location
-			{
-				let (l, _) = counter.get_line_column_at_index(start);
-				l
-			}
-			else
-			{
-				0
-			};
-
-            result.push_str(&format!(" {:1$x} | ", span.addr, addr_width));
-			result.push_str(&format!("{:1$} | ", line, line_width));
-            
-            if &*span.span.file != prev_filename
+            if let Some(offset) = span.offset
             {
-                prev_filename = &*span.span.file;
+                result.push_str(&format!("{:x}:{:x} | ", offset / 8, offset % 8));
             }
+            else
+            {
+                result.push_str(&format!("-:- | "));
+            }
+
+            result.push_str(&format!("{:x} | ", span.addr));
             
-			result.push_str(prev_filename);
+            if let Some((start, end)) = span.span.location
+            {
+                let (line_start, col_start) = counter.get_line_column_at_index(start);
+                let (line_end, col_end) = counter.get_line_column_at_index(end);
+
+                result.push_str(
+                    &format!("{}:{}:{}:{}:{}",
+                        &span.span.file,
+                        line_start, col_start,
+                        line_end, col_end));
+            }
+            else
+            {
+                result.push_str(&format!("{}:-:-:-:-", &span.span.file));
+            };
+            
             result.push_str("\n");
-		}
-		
-		result
-	}
+        }
+        
+        result
+    }
 }
