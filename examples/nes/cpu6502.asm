@@ -35,19 +35,19 @@
 	and ({zaddr: u8 }), y  => 0x31 @ zaddr
 
 	asl  a               => 0x0a
-	asl <{zaddr: u8 }    => 0x07 @ zaddr
+	asl <{zaddr: u8 }    => 0x06 @ zaddr
 	asl <{zaddr: u8 }, x => 0x16 @ zaddr
-	asl  {zaddr: u8 }    => 0x07 @ zaddr
+	asl  {zaddr: u8 }    => 0x06 @ zaddr
 	asl  {zaddr: u8 }, x => 0x16 @ zaddr
 	asl  {addr:  u16}    => 0x0e @ le(addr)
 	asl  {addr:  u16}, x => 0x1e @ le(addr)
 
 	bcc {addr: cpu6502_reladdr} => 0x90 @ addr
-	bcs {addr: cpu6502_reladdr} => 0x80 @ addr
+	bcs {addr: cpu6502_reladdr} => 0xb0 @ addr
 	beq {addr: cpu6502_reladdr} => 0xf0 @ addr
 
 	bit <{zaddr: u8 } => 0x24 @ zaddr
-	bit  {addr:  u16} => 0x2C @ le(addr)
+	bit  {addr:  u16} => 0x2c @ le(addr)
 
 	bmi {addr: cpu6502_reladdr} => 0x30 @ addr
 	bne {addr: cpu6502_reladdr} => 0xd0 @ addr
