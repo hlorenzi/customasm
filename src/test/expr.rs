@@ -64,6 +64,27 @@ fn test_literals()
 
 
 #[test]
+fn test_string_literals()
+{
+	test("\"\"",  Pass(expr::Value::make_string("", expr::StringEncoding::Utf8)));
+	test("\"\"W", Pass(expr::Value::make_string("", expr::StringEncoding::Utf16BE)));
+	test("\"\"w", Pass(expr::Value::make_string("", expr::StringEncoding::Utf16LE)));
+	test("\"\"U", Pass(expr::Value::make_string("", expr::StringEncoding::UnicodeBE)));
+	test("\"\"u", Pass(expr::Value::make_string("", expr::StringEncoding::UnicodeLE)));
+	test("\"\"a", Pass(expr::Value::make_string("", expr::StringEncoding::Ascii)));
+	test("\"\"x", Fail(("test", 1, "unexpected character")));
+
+	test("\"abc\"",  Pass(expr::Value::make_string("abc", expr::StringEncoding::Utf8)));
+	test("\"abc\"W", Pass(expr::Value::make_string("abc", expr::StringEncoding::Utf16BE)));
+	test("\"abc\"w", Pass(expr::Value::make_string("abc", expr::StringEncoding::Utf16LE)));
+	test("\"abc\"U", Pass(expr::Value::make_string("abc", expr::StringEncoding::UnicodeBE)));
+	test("\"abc\"u", Pass(expr::Value::make_string("abc", expr::StringEncoding::UnicodeLE)));
+	test("\"abc\"a", Pass(expr::Value::make_string("abc", expr::StringEncoding::Ascii)));
+	test("\"abc\"x", Fail(("test", 1, "unexpected character")));
+}
+
+
+#[test]
 fn test_variables()
 {
 	test(" a", Fail(("test", 1, "unknown")));

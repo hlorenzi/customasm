@@ -22,18 +22,6 @@ impl BigInt
     }
 
 
-    pub fn new_from_str(s: &str) -> BigInt
-    {
-        let bytes = s.bytes().collect::<Vec<u8>>();
-        let bigint = num_bigint::BigInt::from_signed_bytes_be(&bytes);
-        BigInt
-        {
-            bigint,
-            size: Some(bytes.len() * 8),
-        }
-    }
-
-
     pub fn as_string(&self) -> String
     {
         String::from_utf8_lossy(&self.bigint.to_signed_bytes_be()).to_string()

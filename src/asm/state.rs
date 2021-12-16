@@ -919,6 +919,23 @@ impl State
 						Ok(())
 					}
 				}
+				else if let expr::Value::String(value_s) = value
+				{
+					let mut value_int = value_s.to_bigint();
+
+					if value_int.min_size() > size
+					{
+						report.error_span(
+							&format!("argument out of range for type `u{}`", size),
+							&span);
+						Err(())
+					}
+					else
+					{
+						value_int.size = Some(size);
+						Ok(())
+					}
+				}
 				else
 				{
 					report.error_span(
@@ -948,6 +965,24 @@ impl State
 						Ok(())
 					}
 				}
+				else if let expr::Value::String(value_s) = value
+				{
+					let mut value_int = value_s.to_bigint();
+
+					if (value_int.sign() == 0 && size == 0) ||
+						(value_int.min_size() >= size)
+					{
+						report.error_span(
+							&format!("argument out of range for type `s{}`", size),
+							&span);
+						Err(())
+					}
+					else
+					{
+						value_int.size = Some(size);
+						Ok(())
+					}
+				}
 				else
 				{
 					report.error_span(
@@ -972,6 +1007,23 @@ impl State
 					{
 						value_int.size = Some(size);
 						*value = expr::Value::make_integer(value_int);
+						Ok(())
+					}
+				}
+				else if let expr::Value::String(value_s) = value
+				{
+					let mut value_int = value_s.to_bigint();
+
+					if value_int.min_size() > size
+					{
+						report.error_span(
+							&format!("argument out of range for type `i{}`", size),
+							&span);
+						Err(())
+					}
+					else
+					{
+						value_int.size = Some(size);
 						Ok(())
 					}
 				}
@@ -1237,7 +1289,7 @@ impl State
 						State::eval_fn_check_arg_number(info, 1)?;
 						if State::eval_fn_check_unknown_arg(info, 0, self.is_first_pass)
 						{
-							return Ok(expr::Value::make_integer(util::BigInt::new_from_str("")));
+							return Ok(expr::Value::make_integer(util::BigInt::from_bytes_be(&"".bytes().collect::<Vec<u8>>())));
 						}
 
 						let value_string = State::eval_fn_get_string_arg(info, 0)?;

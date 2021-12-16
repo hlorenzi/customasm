@@ -1,4 +1,6 @@
 use crate::*;
+use crate::util::CharCounter;
+use crate::diagn::RcReport;
 
 
 impl util::BitVec
@@ -476,7 +478,6 @@ impl util::BitVec
 		
 		result
 	}
-
     
     pub fn format_addrspan(&self, fileserver: &dyn util::FileServer) -> String
     {

@@ -1,4 +1,5 @@
 use crate::diagn::{Span, RcReport};
+use crate::expr::StringEncoding;
 use std::rc::Rc;
 
 
@@ -20,7 +21,7 @@ pub enum TokenKind
 	LineBreak,
 	Identifier,
 	Number,
-	String,
+	String(StringEncoding),
 	KeywordAsm,
 	ParenOpen,
 	ParenClose,
@@ -66,11 +67,19 @@ pub enum TokenKind
 
 impl TokenKind
 {
+	pub fn is_string(self) -> Option<StringEncoding> {
+		if let TokenKind::String(encoding) = self {
+			Some(encoding)
+		} else {
+			None
+		}
+	}
+
 	fn needs_excerpt(self) -> bool
 	{
 		self == TokenKind::Identifier ||
 		self == TokenKind::Number ||
-		self == TokenKind::String
+		self.is_string().is_some()
 	}
 	
 	
@@ -130,7 +139,7 @@ impl TokenKind
 			TokenKind::LineBreak => "line break",
 			TokenKind::Identifier => "identifier",
 			TokenKind::Number => "number",
-			TokenKind::String => "string",
+			TokenKind::String(_) => "string",
 			TokenKind::KeywordAsm => "`asm` keyword",
 			TokenKind::ParenOpen => "`(`",
 			TokenKind::ParenClose => "`)`",
@@ -256,13 +265,23 @@ where S: Into<String>
 			check_for_number    (&src[index..]).unwrap_or_else(||
 			check_for_string    (&src[index..]).unwrap_or_else(||
 			(TokenKind::Error, 1)))))));
-		
-		let span = Span::new(filename.clone(), index, index + length);
+
+		let length_offset = if let Some(encoding) = kind.is_string() {
+			if encoding != StringEncoding::Utf8 {
+				1
+			} else {
+				0
+			}
+		} else {
+			0
+		};
+
+		let span = Span::new(filename.clone(), index, index + length - length_offset);
 		
 		// Get the source excerpt for variable tokens (e.g. identifiers).
 		let excerpt = match kind.needs_excerpt()
 		{
-			true => Some(src[index..].iter().cloned().take(length).collect()),
+			true => Some(src[index..].iter().cloned().take(length - length_offset).collect()),
 			false => None
 		};
 		
@@ -401,10 +420,33 @@ fn check_for_string(src: &[char]) -> Option<(TokenKind, usize)>
 		
 	if src[length] != '\"'
 		{ return None; }
-		
+
 	length += 1;
+
+	let encoding = if length >= src.len() {
+		StringEncoding::Utf8
+	} else if src[length] == 'W' {
+		length += 1;
+		StringEncoding::Utf16BE
+	} else if src[length] == 'U' {
+		length += 1;
+		StringEncoding::UnicodeBE
+	} else if src[length] == 'w' {
+		length += 1;
+		StringEncoding::Utf16LE
+	} else if src[length] == 'u' {
+		length += 1;
+		StringEncoding::UnicodeLE
+	} else if src[length] == 'a' {
+		length += 1;
+		StringEncoding::Ascii
+	} else if src[length].is_alphanumeric() {
+		return None
+	} else {
+		StringEncoding::Utf8
+	};
 		
-	Some((TokenKind::String, length))
+	Some((TokenKind::String(encoding), length))
 }
 
 

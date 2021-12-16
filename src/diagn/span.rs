@@ -84,11 +84,11 @@ impl Span
 			let end   = max(self.location.unwrap().1, other.location.unwrap().1);
 			Some((start, end))
 		};
-		
+
 		Span
 		{
 			file: self.file.clone(),
-			location: location
+			location
 		}
 	}
 }

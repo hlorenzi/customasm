@@ -29,11 +29,23 @@ pub enum Value
 }
 
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum StringEncoding
+{
+	Utf8,
+	Utf16BE,
+	Utf16LE,
+	UnicodeBE,
+	UnicodeLE,
+	Ascii,
+}
+
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ValueString
 {
 	pub utf8_contents: String,
-	pub encoding: String,
+	pub encoding: StringEncoding,
 }
 
 
@@ -105,6 +117,15 @@ impl Value
 	}
 
 
+	pub fn make_string(s: &str, encoding: expr::StringEncoding) -> Value
+	{
+		Value::String(ValueString {
+			utf8_contents: s.to_string(),
+			encoding
+		})
+	}
+
+
 	pub fn get_bigint(&self) -> Option<util::BigInt>
 	{
 		match self
@@ -122,6 +143,15 @@ impl ValueString
 {
 	pub fn to_bigint(&self) -> util::BigInt
 	{
-		util::BigInt::new_from_str(&self.utf8_contents)
+		let bytes: Vec<u8> = match self.encoding
+		{
+    		StringEncoding::Utf8 => self.utf8_contents.bytes().collect(),
+    		StringEncoding::Utf16BE => self.utf8_contents.encode_utf16().flat_map(|v| v.to_be_bytes()).collect(),
+			StringEncoding::Utf16LE => self.utf8_contents.encode_utf16().flat_map(|v| v.to_le_bytes()).collect(),
+    		StringEncoding::UnicodeBE => self.utf8_contents.chars().flat_map(|c| (c as u32).to_be_bytes()).collect(),
+			StringEncoding::UnicodeLE => self.utf8_contents.chars().flat_map(|c| (c as u32).to_le_bytes()).collect(),
+			StringEncoding::Ascii => self.utf8_contents.chars().map(|c| (c as u32) as u8).collect(), // can potentially contain invalid chars
+		};
+		util::BigInt::from_bytes_be(&bytes)
 	}
 }

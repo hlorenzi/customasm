@@ -449,6 +449,27 @@ impl<'a> Parser<'a>
 
 		self.tokens[index].kind == kind
 	}
+
+
+	pub fn next_is_string(&self, mut nth: usize) -> Option<expr::StringEncoding>
+	{
+		let mut index = self.index;
+		
+		while nth > 0 && index < self.tokens.len()
+		{
+			nth -= 1;
+			index += 1;
+			while index < self.tokens.len() && self.tokens[index].kind.ignorable()
+				{ index += 1; }
+		}
+		
+		if index >= self.tokens.len()
+		{
+			return None;
+		}
+
+		self.tokens[index].kind.is_string()
+	}
 	
 	
 	pub fn maybe_expect(&mut self, kind: TokenKind) -> Option<Token>

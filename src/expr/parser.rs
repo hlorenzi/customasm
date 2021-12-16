@@ -378,8 +378,8 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 		else if self.parser.next_is(0, syntax::TokenKind::Number)
 			{ self.parse_number() }
 			
-		else if self.parser.next_is(0, syntax::TokenKind::String)
-			{ self.parse_string() }
+		else if let Some(encoding) = self.parser.next_is_string(0)
+			{ self.parse_string(encoding) }
 	
 		else if self.parser.next_is(0, syntax::TokenKind::KeywordAsm)
 			{ self.parse_asm() }
@@ -497,9 +497,9 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	}
 	
 	
-	fn parse_string(&mut self) -> Result<expr::Expr, ()>
+	fn parse_string(&mut self, encoding: expr::StringEncoding) -> Result<expr::Expr, ()>
 	{
-		let tk_str = self.parser.expect(syntax::TokenKind::String)?;
+		let tk_str = self.parser.expect(syntax::TokenKind::String(encoding))?;
 
 		let string = syntax::excerpt_as_string_contents(
 			self.parser.report.clone().unwrap_or(diagn::RcReport::new()),
@@ -511,7 +511,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 			expr::Value::String(expr::ValueString
 			{
 				utf8_contents: string,
-				encoding: "utf8".to_string(),
+				encoding,
 			}));
 
 		Ok(expr)
