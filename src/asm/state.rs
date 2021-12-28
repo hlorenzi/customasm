@@ -1034,7 +1034,13 @@ impl State
 				"incbin" |
 				"incbinstr" |
 				"inchexstr" |
-				"le" =>
+				"le" |
+				"utf8" |
+				"utf16be" |
+				"utf16le" |
+				"utf32be" |
+				"utf32le" |
+				"ascii" =>
 				{
 					return Ok(expr::Value::Function(info.hierarchy[0].clone()));
 				}
@@ -1237,7 +1243,7 @@ impl State
 						State::eval_fn_check_arg_number(info, 1)?;
 						if State::eval_fn_check_unknown_arg(info, 0, self.is_first_pass)
 						{
-							return Ok(expr::Value::make_integer(util::BigInt::new_from_str("")));
+							return Ok(expr::Value::make_integer(util::BigInt::from_bytes_be(&[])));
 						}
 
 						let value_string = State::eval_fn_get_string_arg(info, 0)?;
@@ -1313,6 +1319,17 @@ impl State
 
 							_ => unreachable!()
 						}
+					}
+
+					"utf8" |
+					"utf16be" |
+					"utf16le" |
+					"utf32be" |
+					"utf32le" |
+					"ascii" =>
+					{
+						let s = State::eval_fn_get_string_arg(info, 0)?;
+						Ok(expr::Value::make_string(&s.utf8_contents, name))
 					}
 
 					_ => unreachable!()

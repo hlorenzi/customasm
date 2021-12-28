@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.11.13
+
+- Adds string encoding conversion functions: `utf8()`, `ascii()`, `utf16be()`,
+`utf16le()`, `utf32be()`, and `utf32le()`. For example: `utf16be("abc")` will
+give you `0x0061_0062_0063`. The default encoding is UTF-8. The ASCII encoding
+will convert unavailable codepoints to `0x00`.
+
 ## v0.11.9
 
 - Makes it so the assembler will select the rule with the fewest amount of

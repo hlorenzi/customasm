@@ -105,13 +105,23 @@ impl Value
 	}
 
 
+	pub fn make_string<T: Into<String>, S: Into<String>>(value: T, encoding: S) -> Value
+	{
+		Value::String(ValueString
+		{
+			utf8_contents: value.into(),
+			encoding: encoding.into(),
+		})
+	}
+
+
 	pub fn get_bigint(&self) -> Option<util::BigInt>
 	{
 		match self
 		{
 			&Value::Unknown => Some(util::BigInt::from(0)),
 			&Value::Integer(ref bigint) => Some(bigint.clone()),
-			&Value::String(ref rc_string) => Some(rc_string.to_bigint()),
+			&Value::String(ref s) => Some(s.to_bigint()),
 			_ => None,
 		}
 	}
@@ -122,6 +132,79 @@ impl ValueString
 {
 	pub fn to_bigint(&self) -> util::BigInt
 	{
-		util::BigInt::new_from_str(&self.utf8_contents)
+		match &*self.encoding
+		{
+			"utf8" => util::BigInt::from_bytes_be(&self.utf8_contents.as_bytes()),
+			"utf16be" =>
+			{
+				let units = self.utf8_contents.encode_utf16();
+				let mut bytes = Vec::new();
+				for unit in units
+				{
+					bytes.push(((unit >> 8) & 0xff) as u8);
+					bytes.push(((unit >> 0) & 0xff) as u8);
+				}
+					
+				util::BigInt::from_bytes_be(&bytes[..])
+			}
+			"utf16le" =>
+			{
+				let units = self.utf8_contents.encode_utf16();
+				let mut bytes = Vec::new();
+				for unit in units
+				{
+					bytes.push(((unit >> 0) & 0xff) as u8);
+					bytes.push(((unit >> 8) & 0xff) as u8);
+				}
+					
+				util::BigInt::from_bytes_be(&bytes[..])
+			}
+			"utf32be" =>
+			{
+				let units = self.utf8_contents.chars();
+				let mut bytes = Vec::new();
+				for unit in units
+				{
+					bytes.push(((unit as u32 >> 24) & 0xff) as u8);
+					bytes.push(((unit as u32 >> 16) & 0xff) as u8);
+					bytes.push(((unit as u32 >> 8) & 0xff) as u8);
+					bytes.push(((unit as u32 >> 0) & 0xff) as u8);
+				}
+					
+				util::BigInt::from_bytes_be(&bytes[..])
+			}
+			"utf32le" =>
+			{
+				let units = self.utf8_contents.chars();
+				let mut bytes = Vec::new();
+				for unit in units
+				{
+					bytes.push(((unit as u32 >> 0) & 0xff) as u8);
+					bytes.push(((unit as u32 >> 8) & 0xff) as u8);
+					bytes.push(((unit as u32 >> 16) & 0xff) as u8);
+					bytes.push(((unit as u32 >> 24) & 0xff) as u8);
+				}
+					
+				util::BigInt::from_bytes_be(&bytes[..])
+			}
+			"ascii" =>
+			{
+				let units = self.utf8_contents.chars();
+				let bytes = units.map(|c|
+				{
+					if c as u32 >= 0x100
+					{
+						0x00
+					}
+					else
+					{
+						c as u8
+					}
+				});
+					
+				util::BigInt::from_bytes_be(&bytes.collect::<Vec<_>>()[..])
+			}
+			_ => panic!("invalid string encoding"),
+		}
 	}
 }
