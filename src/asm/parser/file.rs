@@ -122,6 +122,7 @@ pub fn parse_directive(state: &mut asm::parser::State)
             "align" => asm::parser::parse_directive_align(state)?,
             "labelalign" => asm::parser::parse_directive_labelalign(state)?,
             "addr" => asm::parser::parse_directive_addr(state)?,
+            "fn" => asm::parser::parse_directive_fn(state)?,
             //"enable" => asm::parser::parse_directive_enable(state)?,
             _ =>
             {

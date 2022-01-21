@@ -18,7 +18,7 @@ where S: Into<Vec<u8>>
 			report.clone(),
 			&mut expr::EvalContext::new(),
 			&|_| Err(false),
-			&|_| Err(false),
+			&|_| Err(()),
 			&|_| Err(()))?;
 		
 		Ok(expr_value)

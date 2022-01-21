@@ -4,6 +4,7 @@ mod ruleset;
 mod invocation;
 mod bank;
 mod symbol;
+mod function;
 
 
 pub mod parser;
@@ -33,3 +34,4 @@ pub use self::symbol::SymbolManager;
 pub use self::symbol::Symbol;
 pub use self::symbol::SymbolKind;
 pub use self::symbol::SymbolContext;
+pub use self::function::Function;

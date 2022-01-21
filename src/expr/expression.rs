@@ -25,7 +25,8 @@ pub enum Value
 	Integer(util::BigInt),
 	String(ValueString),
 	Bool(bool),
-	Function(String)
+	BuiltInFunction(String),
+	Function(usize),
 }
 
 

@@ -8,6 +8,7 @@ mod symbol;
 mod data;
 mod addr_related;
 mod include;
+mod function;
 
 
 pub use self::state::State;
@@ -20,3 +21,4 @@ pub use self::symbol::*;
 pub use self::data::*;
 pub use self::addr_related::*;
 pub use self::include::*;
+pub use self::function::*;

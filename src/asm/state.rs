@@ -22,6 +22,7 @@ pub struct State
 	pub instruction_size_guesses: HashMap<diagn::Span, usize>,
 	pub rulesets: Vec<asm::Ruleset>,
 	pub active_rulesets: Vec<RulesetRef>,
+	pub functions: Vec<asm::Function>,
 	pub cur_bank: BankRef,
 	pub cur_wordsize: usize,
 	pub cur_labelalign: usize,
@@ -212,6 +213,7 @@ impl State
 			instruction_size_guesses: HashMap::new(),
 			rulesets: Vec::new(),
 			active_rulesets: Vec::new(),
+			functions: Vec::new(),
 			cur_bank: BankRef { index: 0 },
 			cur_wordsize: 8,
 			cur_labelalign: 0,
@@ -1042,10 +1044,15 @@ impl State
 				"utf32le" |
 				"ascii" =>
 				{
-					return Ok(expr::Value::Function(info.hierarchy[0].clone()));
+					return Ok(expr::Value::BuiltInFunction(info.hierarchy[0].clone()));
 				}
 
 				_ => {}
+			}
+			
+			if let Some(function_index) = self.functions.iter().position(|f| f.name == info.hierarchy[0])
+			{
+				return Ok(expr::Value::Function(function_index));
 			}
 		}
 
@@ -1080,12 +1087,12 @@ impl State
 	fn eval_fn_check_arg_number(
 		info: &expr::EvalFunctionInfo,
 		expected: usize)
-		-> Result<(), bool>
+		-> Result<(), ()>
 	{
 		if info.args.len() != expected
 		{
 			info.report.error_span("wrong number of arguments", info.span);
-			Err(true)
+			Err(())
 		}
 		else
 		{
@@ -1097,7 +1104,7 @@ impl State
 	fn eval_fn_get_bool_arg(
 		info: &expr::EvalFunctionInfo,
 		index: usize)
-		-> Result<bool, bool>
+		-> Result<bool, ()>
 	{
 		match info.args[index]
 		{
@@ -1105,7 +1112,7 @@ impl State
 			_ =>
 			{
 				info.report.error_span("expected boolean argument", &info.arg_spans[index]);
-				Err(true)
+				Err(())
 			}
 		}
 	}
@@ -1133,7 +1140,7 @@ impl State
 	fn eval_fn_get_string_arg<'a>(
 		info: &'a expr::EvalFunctionInfo,
 		index: usize)
-		-> Result<&'a expr::ValueString, bool>
+		-> Result<&'a expr::ValueString, ()>
 	{
 		match &info.args[index]
 		{
@@ -1141,7 +1148,7 @@ impl State
 			_ =>
 			{
 				info.report.error_span("expected string argument", &info.arg_spans[index]);
-				Err(true)
+				Err(())
 			}
 		}
 	}
@@ -1150,7 +1157,7 @@ impl State
 	fn eval_fn_get_bigint_arg(
 		info: &expr::EvalFunctionInfo,
 		index: usize)
-		-> Result<util::BigInt, bool>
+		-> Result<util::BigInt, ()>
 	{
 		match info.args[index].get_bigint()
 		{
@@ -1158,7 +1165,7 @@ impl State
 			None =>
 			{
 				info.report.error_span("expected integer argument", &info.arg_spans[index]);
-				Err(true)
+				Err(())
 			}
 		}
 	}
@@ -1167,7 +1174,7 @@ impl State
 	fn eval_fn_get_sized_bigint_arg(
 		info: &expr::EvalFunctionInfo,
 		index: usize)
-		-> Result<util::BigInt, bool>
+		-> Result<util::BigInt, ()>
 	{
 		match info.args[index].get_bigint()
 		{
@@ -1179,14 +1186,14 @@ impl State
 					None =>
 					{
 						info.report.error_span("unsized integer argument", &info.arg_spans[index]);
-						Err(true)
+						Err(())
 					}
 				}
 			}
 			None =>
 			{
 				info.report.error_span("expected integer argument", &info.arg_spans[index]);
-				Err(true)
+				Err(())
 			}
 		}
 	}
@@ -1197,11 +1204,11 @@ impl State
 		ctx: &Context,
 		info: &expr::EvalFunctionInfo,
 		fileserver: &dyn util::FileServer)
-		-> Result<expr::Value, bool>
+		-> Result<expr::Value, ()>
 	{
 		match info.func
 		{
-			expr::Value::Function(ref name) =>
+			expr::Value::BuiltInFunction(ref name) =>
 			{
 				match name.as_ref()
 				{
@@ -1214,7 +1221,7 @@ impl State
 							false =>
 							{
 								info.report.error_span("assertion failed", info.span);
-								Err(true)
+								Err(())
 							}
 						}
 					}
@@ -1230,7 +1237,7 @@ impl State
 								format!("argument size (= {}) is not a multiple of 8",
 									bigint.size.unwrap()),
 								info.span);
-							return Err(true);
+							return Err(());
 						}
 
 						Ok(expr::Value::make_integer(bigint.convert_le()))
@@ -1251,8 +1258,7 @@ impl State
 							info.report.clone(),
 							&ctx.cur_filename,
 							&value_string.utf8_contents,
-							&info.span)
-							.map_err(|_| true)?;
+							&info.span)?;
 
 						match name.as_ref()
 						{
@@ -1261,8 +1267,7 @@ impl State
 								let bytes = fileserver.get_bytes(
 									info.report.clone(),
 									&new_filename,
-									Some(&info.span))
-									.map_err(|_| true)?;
+									Some(&info.span))?;
 
 								Ok(expr::Value::make_integer(util::BigInt::from_bytes_be(&bytes)))
 							}
@@ -1273,8 +1278,7 @@ impl State
 								let chars = fileserver.get_chars(
 									info.report.clone(),
 									&new_filename,
-									Some(&info.span))
-									.map_err(|_| true)?;
+									Some(&info.span))?;
 
 								let mut bitvec = util::BitVec::new();
 
@@ -1302,7 +1306,7 @@ impl State
 											info.report.error_span(
 												"invalid character in file contents",
 												&info.span);
-											return Err(true);
+											return Err(());
 										}
 									};
 									
@@ -1334,6 +1338,40 @@ impl State
 
 					_ => unreachable!()
 				}
+			}
+			
+			expr::Value::Function(function_index) =>
+			{
+				let function = &self.functions[function_index];
+				
+				let _guard = info.report.push_parent(
+					"failed to resolve function",
+					&info.span);
+
+				let mut args_ctx = expr::EvalContext::new();
+
+				if info.args.len() != function.params.len()
+				{
+					info.report.error_span("wrong number of arguments given to function", info.span);
+					return Err(());
+				}
+
+				for param_index in 0..function.params.len()
+				{
+					let param_name = &function.params[param_index];
+					let param_value = &info.args[param_index];
+					args_ctx.set_local(param_name, param_value.clone());
+				}
+
+				let value = self.eval_expr(
+					info.report.clone(),
+					&function.body,
+					ctx,
+					&mut args_ctx,
+					fileserver,
+					true)?;
+
+				Ok(value)
 			}
 			
 			_ => unreachable!()

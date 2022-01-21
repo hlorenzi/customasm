@@ -92,7 +92,7 @@ impl expr::Expr
 		-> Result<expr::Value, ()>
 	where
 		FVar: Fn(&EvalVariableInfo) -> Result<expr::Value, bool>,
-		FFn: Fn(&EvalFunctionInfo) -> Result<expr::Value, bool>,
+		FFn: Fn(&EvalFunctionInfo) -> Result<expr::Value, ()>,
 		FAsm: Fn(&mut EvalAsmInfo) -> Result<expr::Value, ()>
 	{
 		match self
@@ -329,6 +329,7 @@ impl expr::Expr
 
 				match func
 				{
+					expr::Value::BuiltInFunction(_) |
 					expr::Value::Function(_) =>
 					{
 						let mut args = Vec::new();
@@ -352,9 +353,11 @@ impl expr::Expr
 						match eval_fn(&info)
 						{
 							Ok(value) => Ok(value),
-							Err(_handled) => Err(())
+							Err(()) => Err(())
 						}
 					}
+
+					expr::Value::Unknown => Err(report.error_span("unknown function", &target.span())),
 					
 					_ => Err(report.error_span("expression is not callable", &target.span()))
 				}
