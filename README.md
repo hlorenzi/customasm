@@ -27,16 +27,14 @@ you just implemented in an FPGA chip!
 
 [🕹️ Check out an example project](/examples/nes/) which targets the NES!
 
-[📜 Check out the changelog](/CHANGELOG.md) for new features!
-
 [⌨️ Install the VSCode syntax highlight extension!](https://marketplace.visualstudio.com/items?itemName=hlorenzi.customasm-vscode)
 
 [❤️ Support me!](https://accounts.hlorenzi.com/supporters)
 
 ## Documentation
 
-[📚 Check out the Documentation](https://github.com/hlorenzi/customasm/wiki/User-Guide)
-for advanced features and a how-to guide!
+[📚 Check out the wiki](https://github.com/hlorenzi/customasm/wiki)
+for a changelog, details on advanced features, and a how-to guide!
 
 ## Installation
 

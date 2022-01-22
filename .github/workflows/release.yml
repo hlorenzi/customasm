@@ -42,7 +42,7 @@ jobs:
       with:
         tag_name: ${{ github.ref }}
         release_name: ${{ github.ref }}
-        body: Here's a new release!
+        body: Here's a new release! [Check out the changelog!](https://github.com/hlorenzi/customasm/wiki/Changelog)
         draft: false
         prerelease: false
 
