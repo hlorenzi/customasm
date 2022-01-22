@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.11.14
+
+- Adds user-declared `#fn` functions. [See the wiki for details](https://github.com/hlorenzi/customasm/wiki/Functions).
+
 ## v0.11.13
 
 - Adds the `#once` directive, that prevents files from being included more than once.

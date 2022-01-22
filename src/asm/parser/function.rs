@@ -8,7 +8,14 @@ pub fn parse_directive_fn(
     let tk_name = state.parser.expect(syntax::TokenKind::Identifier)?;
     let name = tk_name.excerpt.unwrap().clone();
 
-    let _tk_open_paren = state.parser.expect(syntax::TokenKind::ParenOpen)?;
+    if let Some(duplicate) = state.asm_state.functions.iter().find(|r| r.name == name)
+    {
+        let _guard = state.report.push_parent("duplicate function", &tk_name.span);
+        state.report.note_span("first declared here", &duplicate.decl_span);
+        return Err(());
+    }
+
+    state.parser.expect(syntax::TokenKind::ParenOpen)?;
 
     let mut params = Vec::new();
     while !state.parser.is_over() && !state.parser.next_is(0, syntax::TokenKind::ParenClose)
@@ -20,9 +27,7 @@ pub fn parse_directive_fn(
         state.parser.maybe_expect(syntax::TokenKind::Comma);
     }
 
-    let tk_close_paren = state.parser.expect(syntax::TokenKind::ParenClose)?;
-
-    let decl_span = tk_name.span.join(&tk_close_paren.span);
+    state.parser.expect(syntax::TokenKind::ParenClose)?;
 
     state.parser.expect(syntax::TokenKind::HeavyArrowRight)?;
 
@@ -30,7 +35,7 @@ pub fn parse_directive_fn(
 
     let function = asm::Function
     {
-        decl_span,
+        decl_span: tk_name.span.clone(),
         name,
         params,
         body,
