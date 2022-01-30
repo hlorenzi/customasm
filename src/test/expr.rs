@@ -391,6 +391,10 @@ fn test_ops_ternary()
 	test("(1 == 1) ? 123 : 456", Pass(expr::Value::make_integer(util::BigInt::new(123, None))));
 	test("(1 == 0) ? 123 : 456", Pass(expr::Value::make_integer(util::BigInt::new(456, None))));
 	
+	test("(1 == 1) ? 123 : (1 == 0) ? 456 : 789", Pass(expr::Value::make_integer(util::BigInt::new(123, None))));
+	test("(1 == 0) ? 123 : (1 == 1) ? 456 : 789", Pass(expr::Value::make_integer(util::BigInt::new(456, None))));
+	test("(1 == 0) ? 123 : (1 == 0) ? 456 : 789", Pass(expr::Value::make_integer(util::BigInt::new(789, None))));
+	
 	test("(1 == 1) ? 123 : (1 == 1)", Pass(expr::Value::make_integer(util::BigInt::new(123, None))));
 	test("(1 == 0) ? 123 : (1 == 1)", Pass(expr::Value::Bool(true)));
 	test("(1 == 1) ? (1 == 1) : 123", Pass(expr::Value::Bool(true)));

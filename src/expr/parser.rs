@@ -129,7 +129,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 			let false_branch =
 			{
 				if self.parser.maybe_expect(syntax::TokenKind::Colon).is_some()
-					{ self.parse_assignment()? }
+					{ self.parse_expr()? }
 				else
 					{ expr::Expr::Block(true_branch.span(), Vec::new()) }
 			};
@@ -455,29 +455,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 			}
 		}
 		
-		let expr_var = expr::Expr::Variable(span, hierarchy_level, hierarchy);
-
-		/*if let Some(rule_params) = self.rule_params
-		{
-			if let Some(rule_param) = rule_params.iter().find(|p| p.name == name)
-			{
-				let width = match rule_param.typ
-				{
-					RuleParameterType::Unsigned(w) => Some(w),
-					RuleParameterType::Signed(w) => Some(w),
-					RuleParameterType::Integer(w) => Some(w),
-					_ => None
-				};
-
-				if let Some(width) = width
-				{
-					if width > 0
-						{ return Ok(expr::Expr::SoftSlice(expr_span.clone(), expr_span.clone(), width - 1, 0, Box::new(expr_var))); }
-				}
-			}
-		}*/
-
-		Ok(expr_var)
+		Ok(expr::Expr::Variable(span, hierarchy_level, hierarchy))
 	}
 	
 	
