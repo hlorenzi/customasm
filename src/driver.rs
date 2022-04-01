@@ -34,7 +34,9 @@ pub enum OutputFormat
 	BinDump,
 	HexDump,
 	Mif,
-	IntelHex,
+	IntelHex {
+		address_unit: usize,
+	},
 	DecComma,
 	HexComma,
 	DecSpace,
@@ -567,6 +569,11 @@ pub fn parse_output_format(
 		[2, 16].contains(&base)
 	};
 
+	let check_8_16_or_32 = &mut |base: usize| -> bool
+	{
+		[8, 16, 32].contains(&base)
+	};
+
 	let format = {
 		match format_id
 		{
@@ -594,7 +601,9 @@ pub fn parse_output_format(
 			"hexdump" => OutputFormat::HexDump,
 
 			"mif" => OutputFormat::Mif,
-			"intelhex" => OutputFormat::IntelHex,
+			"intelhex" => OutputFormat::IntelHex {
+				address_unit: get_arg_usize("addr_unit", 8, check_8_16_or_32)?,
+			},
 
 			"deccomma" => OutputFormat::DecComma,
 			"hexcomma" => OutputFormat::HexComma,
@@ -759,7 +768,8 @@ pub fn format_output(
 			OutputFormat::HexDump => output.format_hexdump(),
 
 			OutputFormat::Mif => output.format_mif(),
-			OutputFormat::IntelHex => output.format_intelhex(),
+			OutputFormat::IntelHex { address_unit } =>
+				output.format_intelhex(address_unit),
 
 			OutputFormat::DecComma => output.format_separator(10, ", "),
 			OutputFormat::HexComma => output.format_separator(16, ", "),

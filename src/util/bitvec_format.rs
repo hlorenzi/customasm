@@ -205,10 +205,10 @@ impl util::BitVec
 		result.push_str("END;");
 		result
 	}
-
-
-	pub fn format_intelhex(&self) -> String
-	{
+	
+	
+	pub fn format_intelhex(&self, address_unit: usize) -> String
+	{	
 		let mut result = String::new();
 
 		let mut bytes_left = self.len() / 8 + if self.len() % 8 != 0 { 1 } else { 0 };
@@ -220,13 +220,13 @@ impl util::BitVec
 
 			result.push(':');
 			result.push_str(&format!("{:02X}", bytes_in_row));
-			result.push_str(&format!("{:04X}", index / 8));
+			result.push_str(&format!("{:04X}", index / address_unit));
 			result.push_str("00");
 
 			let mut checksum = 0_u8;
 			checksum = checksum.wrapping_add(bytes_in_row as u8);
-			checksum = checksum.wrapping_add(((index / 8) >> 8) as u8);
-			checksum = checksum.wrapping_add((index / 8) as u8);
+			checksum = checksum.wrapping_add(((index / address_unit) >> 8) as u8);
+			checksum = checksum.wrapping_add((index / address_unit) as u8);
 
 			for _ in 0..bytes_in_row
 			{

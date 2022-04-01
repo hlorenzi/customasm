@@ -71,7 +71,7 @@ Examples:
 * `hexdump`  
 
 * `mif`  
-* `intelhex`  
+* `intelhex,addr_unit:8`  
 
 * `deccomma`  
 * `hexcomma`  
