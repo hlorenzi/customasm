@@ -29,6 +29,6 @@
 
 
 #bank vectors
-#d16   nmi[7:0] @   nmi[15:8]
-#d16 reset[7:0] @ reset[15:8]
-#d16   irq[7:0] @   irq[15:8]
+#d16 le(nmi`16)
+#d16 le(reset`16)
+#d16 le(irq`16)
