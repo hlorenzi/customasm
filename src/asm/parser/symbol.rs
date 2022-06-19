@@ -82,7 +82,8 @@ pub fn parse_symbol(
         value,
         state.asm_state.cur_bank,
         state.report.clone(), 
-        &span)?;
+        &span,
+        !state.asm_state.is_noemit)?;
 
     Ok(())
 }

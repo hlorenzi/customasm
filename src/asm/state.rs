@@ -26,6 +26,7 @@ pub struct State
 	pub cur_bank: BankRef,
 	pub cur_wordsize: usize,
 	pub cur_labelalign: usize,
+	pub is_noemit: bool,
 }
 
 
@@ -217,6 +218,7 @@ impl State
 			cur_bank: BankRef { index: 0 },
 			cur_wordsize: 8,
 			cur_labelalign: 0,
+			is_noemit: false,
 		};
 
 		state.create_bank(asm::Bank::new_default(), diagn::RcReport::new()).unwrap();

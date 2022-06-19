@@ -9,6 +9,7 @@ mod data;
 mod addr_related;
 mod include;
 mod function;
+mod noemit;
 
 
 pub use self::state::State;
@@ -22,3 +23,4 @@ pub use self::data::*;
 pub use self::addr_related::*;
 pub use self::include::*;
 pub use self::function::*;
+pub use self::noemit::*;

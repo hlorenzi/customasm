@@ -17,6 +17,7 @@ pub struct Symbol
     pub decl_span: diagn::Span,
     pub kind: SymbolKind,
     pub bankref: asm::BankRef,
+    pub emit: bool,
     children: HashMap<String, Symbol>,
 }
 
@@ -177,7 +178,8 @@ impl SymbolManager
         value: expr::Value,
         bankref: asm::BankRef,
         report: diagn::RcReport,
-        span: &diagn::Span)
+        span: &diagn::Span,
+        emit: bool)
         -> Result<(), ()>
     {
         if hierarchy_level > ctx.hierarchy.len()
@@ -205,6 +207,7 @@ impl SymbolManager
            kind,
            bankref,
            children: HashMap::new(),
+           emit: emit,
         });
 
         self.cur_ctx.hierarchy = ctx.hierarchy[0..hierarchy_level].iter().cloned().collect();
@@ -290,25 +293,28 @@ impl SymbolManager
         formatter: &mut FnFormat)
         where FnFormat: FnMut(&mut String, &Symbol, &str, &util::BigInt) -> ()
     {
-        match &data.value
+        if data.emit
         {
-            expr::Value::Integer(ref bigint) =>
+            match &data.value
             {
-                let mut name = String::new();
-
-                for i in 0..hierarchy.len()
+                expr::Value::Integer(ref bigint) =>
                 {
-                    if i > 0
+                    let mut name = String::new();
+
+                    for i in 0..hierarchy.len()
                     {
-                        name.push_str(".");
+                        if i > 0
+                        {
+                            name.push_str(".");
+                        }
+
+                        name.push_str(&format!("{}", hierarchy[i]));
                     }
 
-                    name.push_str(&format!("{}", hierarchy[i]));
+                    formatter(result, data, &name, &bigint);
                 }
-
-                formatter(result, data, &name, &bigint);
+                _ => {}
             }
-            _ => {}
         }
 
         for (child_name, child_data) in &data.children
