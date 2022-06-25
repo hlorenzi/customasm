@@ -1,6 +1,6 @@
 [package]
 name = "customasm"
-version = "0.11.14"
+version = "0.11.15"
 edition = "2021"
 authors = ["hlorenzi <https://hlorenzi.com>"]
 description = "An assembler for custom, user-defined instruction sets!"
