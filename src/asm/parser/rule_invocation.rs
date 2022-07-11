@@ -374,20 +374,41 @@ pub fn match_rule<'a>(
                             }
                         }
 
-                        asm::PatternParameterType::Ruleset(rule_group_ref) =>
+                        asm::PatternParameterType::Ruleset(ruleset_ref) =>
                         {
-                            if DEBUG
+                            let token_start = branch.parser.get_current_token_index();
+
+                            let mut subparser = branch.parser.clone();
+                            let mut subparser_using_slice = false;
+                            let mut subparser_offset = 0;
+
+                            let next_part = rule.pattern.get(index + 1);
+
+                            if let Some(asm::PatternPart::Exact(next_part_char)) = next_part
                             {
-                                println!("- branch {}, try match subrule {:?}", branch_index, rule_group_ref);
+                                if let Some(slice_parser) = subparser.slice_until_char_or_nesting(*next_part_char)
+                                {
+                                    subparser = slice_parser;
+                                    subparser_using_slice = true;
+                                    subparser_offset = token_start;
+                                }
                             }
 
-                            let token_start = branch.parser.get_current_token_index();
+                            if DEBUG
+                            {
+                                println!(
+                                    "  branch {}, try match subrule {:?}, parser {}at `{}`",
+                                    branch_index,
+                                    ruleset_ref,
+                                    if subparser_using_slice { "using slice " } else { "" },
+                                    fileserver.get_excerpt(&subparser.get_next_spans(100)));
+                            }
 
                             let subcandidates = match_ruleset(
                                 asm_state,
-                                rule_group_ref,
-                                &mut branch.parser,
-                                false,
+                                ruleset_ref,
+                                &mut subparser,
+                                subparser_using_slice,
                                 fileserver,
                                 report.clone())?;
 
@@ -400,19 +421,29 @@ pub fn match_rule<'a>(
 
                                 for subcandidate in subcandidates.into_iter()
                                 {
-                                    let token_end = subcandidate.1.get_current_token_index();
+                                    let mut new_parser = branch.parser.clone();
+                                    new_parser.restore_with_offset(subcandidate.1.save(), subparser_offset);
+                                    
+                                    let token_end = new_parser.get_current_token_index();
 
                                     let mut args_clone = branch.args.clone();
                                     args_clone.push(asm::RuleInvocationArgument::NestedRuleset(subcandidate.0));
 
                                     let mut token_args_clone = branch.token_args.clone();
-                                    token_args_clone.push(Some(branch.parser.get_cloned_tokens_by_index(token_start, token_end)));
+                                    token_args_clone.push(Some(new_parser.get_cloned_tokens_by_index(token_start, token_end)));
 
+                                    if DEBUG
+                                    {
+                                        println!(
+                                            "  continue branch, parser at `{}`",
+                                            fileserver.get_excerpt(&new_parser.get_next_spans(100)));
+                                    }
+        
                                     new_branches.push(ParsingBranch
                                     {
                                         args: args_clone,
                                         token_args: token_args_clone,
-                                        parser: subcandidate.1,
+                                        parser: new_parser,
                                         dead: false,
                                     });
                                 }

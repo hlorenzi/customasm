@@ -9,4 +9,4 @@
     ld {x: inner}$ => 0x55 @ x`16
 }
 
-ld 0xaa$$ ; = 0x5522aa
+ld 0xaa$$ ; error: no match

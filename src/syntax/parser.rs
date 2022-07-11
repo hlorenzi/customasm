@@ -262,8 +262,20 @@ impl<'a> Parser<'a>
 
 		let mut paren_nesting = 0;
 
-		while !self.is_over() && (paren_nesting > 0 || self.next_partial() != c)
+		loop
 		{
+			if self.is_over()
+			{
+				break;
+			}
+
+			if self.next_partial() == c &&
+				paren_nesting == 0 &&
+				self.get_current_token_index() > start
+			{
+				break;
+			}
+
 			if self.next_is(0, TokenKind::ParenOpen)
 			{
 				paren_nesting += 1;
@@ -318,6 +330,17 @@ impl<'a> Parser<'a>
 		self.index_prev = state.index_prev;
 		self.read_linebreak = state.read_linebreak;
 		self.partial_index = state.partial_index;
+		self.skip_ignorable();
+	}
+	
+	
+	pub fn restore_with_offset(&mut self, state: ParserState, offset: usize)
+	{
+		self.index = state.index + offset;
+		self.index_prev = state.index_prev + offset;
+		self.read_linebreak = state.read_linebreak;
+		self.partial_index = state.partial_index;
+		self.skip_ignorable();
 	}
 	
 	
