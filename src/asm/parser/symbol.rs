@@ -32,7 +32,19 @@ pub fn parse_symbol(
             &ctx,
             &mut expr::EvalContext::new(),
             state.fileserver,
-            true)?;
+            false)?;
+        
+        let bankdata = state.asm_state.get_bankdata_mut(state.asm_state.cur_bank);
+        bankdata.push_invocation(asm::Invocation
+        {
+            ctx: ctx.clone(),
+            size_guess: 0,
+            span: span.clone(),
+            kind: asm::InvocationKind::Constant(asm::ConstantInvocation {
+                expr,
+                value_guess: value.clone(),
+            }),
+        });
 
         state.parser.expect_linebreak()?;
         value

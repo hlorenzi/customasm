@@ -28,6 +28,7 @@ pub use self::invocation::RuleInvocationCandidate;
 pub use self::invocation::RuleInvocationArgument;
 pub use self::invocation::DataInvocation;
 pub use self::invocation::LabelInvocation;
+pub use self::invocation::ConstantInvocation;
 pub use self::bank::Bank;
 pub use self::bank::BankData;
 pub use self::symbol::SymbolManager;

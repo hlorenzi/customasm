@@ -498,6 +498,26 @@ impl State
 
 					continue;
 				}
+				
+				asm::InvocationKind::Constant(ref constant_invoc) =>
+				{
+					let final_value = self.eval_expr(
+						report.clone(),
+						&constant_invoc.expr,
+						&invoc.ctx,
+						&mut expr::EvalContext::new(),
+						fileserver,
+						true)?;
+
+					if final_value != constant_invoc.value_guess
+					{
+						report.error_span(
+							"constant value did not converge after iterations",
+							&invoc.span);
+					}
+
+					continue;
+				}
 			};
 
 			let resolved = match maybe_resolved

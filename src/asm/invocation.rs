@@ -17,6 +17,7 @@ pub enum InvocationKind
     Rule(RuleInvocation),
     Data(DataInvocation),
     Label(LabelInvocation),
+    Constant(ConstantInvocation),
 }
 
 
@@ -55,6 +56,14 @@ pub struct DataInvocation
 
 #[derive(Debug)]
 pub struct LabelInvocation;
+
+
+#[derive(Debug)]
+pub struct ConstantInvocation
+{
+    pub expr: expr::Expr,
+    pub value_guess: expr::Value,
+}
 
 
 impl Invocation
