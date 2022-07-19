@@ -47,6 +47,7 @@
 	beq {addr: cpu6502_reladdr} => 0xf0 @ addr
 
 	bit <{zaddr: u8 } => 0x24 @ zaddr
+	bit  {zaddr: u8 } => 0x24 @ zaddr
 	bit  {addr:  u16} => 0x2c @ le(addr)
 
 	bmi {addr: cpu6502_reladdr} => 0x30 @ addr
