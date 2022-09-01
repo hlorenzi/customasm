@@ -34,6 +34,13 @@ jobs:
         command: build
         args: --release --verbose --target=x86_64-pc-windows-gnu
 
+    - name: Build
+      uses: actions-rs/cargo@v1
+      with:
+        use-cross: true
+        command: build
+        args: --release --verbose --target=x86_64-unknown-linux-gnu
+
     - name: Create Release
       id: create_release
       uses: actions/create-release@latest
@@ -49,9 +56,11 @@ jobs:
     - name: Prepare Release asset
       env:
         TARGET_EXE: ./target/x86_64-pc-windows-gnu/release/customasm.exe
+        TARGETLinux: ./target/x86_64-unknown-linux-gnu/release/customasm
       run: |
         mkdir ./pkg
         mv $TARGET_EXE ./pkg/customasm.exe
+        mv $TARGET_Linux ./pkg/customasm
         mv ./examples ./pkg/examples
         mv ./README_PKG.txt ./pkg/README.txt
         cd ./pkg
