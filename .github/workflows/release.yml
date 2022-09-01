@@ -6,8 +6,7 @@ on:
     - 'v*'
 
 jobs:
-  build:
-
+  install:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,12 +20,22 @@ jobs:
           override: true
           target: x86_64-pc-windows-gnu
 
+  test:
+    needs: [install]
+    runs-on: ubuntu-latest
+
+    steps:
     - name: Run tests
       uses: actions-rs/cargo@v1
       with:
         command: test
         args: --release --verbose
 
+  windows_build:
+    needs: [test]
+    runs-on: ubuntu-latest
+
+    steps:
     - name: Build
       uses: actions-rs/cargo@v1
       with:
@@ -34,6 +43,11 @@ jobs:
         command: build
         args: --release --verbose --target=x86_64-pc-windows-gnu
 
+  linux_build:
+    needs: [test]
+    runs-on: ubuntu-latest
+
+    steps:
     - name: Build
       uses: actions-rs/cargo@v1
       with:
@@ -41,6 +55,11 @@ jobs:
         command: build
         args: --release --verbose --target=x86_64-unknown-linux-gnu
 
+  release:
+    needs: [windows_build, linux_build]
+    runs-on: ubuntu-latest
+
+    steps:
     - name: Create Release
       id: create_release
       uses: actions/create-release@latest
