@@ -11,7 +11,7 @@ function main()
 	window.onkeydown = onKeyDown
 	window.onbeforeunload = onBeforeUnload
 	
-	fetch("customasm.gc.wasm")
+	fetch("customasm.gc.wasm", {mode: 'no-cors'})
 		.then(r => r.arrayBuffer())
 		.then(r => WebAssembly.instantiate(r))
 		.then(wasm =>
@@ -31,9 +31,9 @@ function setupEditor()
 		tabSize: 4, indentUnit: 4, mode: "z80"
 	})
 	
-	fetch("../examples/basic.asm")
-		.then(r => r.text())
-		.then(r => g_codeEditor.setValue(r))
+	fetch('../examples/basic.asm', {mode: 'no-cors'})
+        .then((r) => r.text())
+        .then((r) => g_codeEditor.setValue(r));
 	
 	g_codeEditor.refresh()
 }

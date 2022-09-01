@@ -50,6 +50,22 @@ impl util::BitVec
 	{
 		self.format_str(4)
 	}
+
+	pub fn format_binline(&self) -> String
+	{
+		self.format_str(4).chars()
+			.enumerate()
+			.flat_map(|(i, c)| {
+				if i != 0 && i % 8 == 0 {
+					Some('\n')
+				} else {
+					None
+				}
+				.into_iter()
+				.chain(std::iter::once(c))
+			})
+			.collect::<String>()
+	}
 	
 	
 	pub fn format_str(&self, bits_per_digit: usize) -> String
