@@ -106,10 +106,13 @@ Usage: customasm [options] <asm-file-1> ... <asm-file-N>
 
 Options:
     -f, --format FORMAT The format of the output file. Possible formats:
-                        binary, annotated, annotatedbin, binstr, hexstr,
-                        bindump, hexdump, mif, intelhex, deccomma, hexcomma,
-                        decc, hexc, logisim8, logisim16
+                        binary, annotated, annotatedbin, binstr, binline,
+                        hexstr, bindump, hexdump, mif, intelhex, deccomma,
+                        hexcomma, decc, hexc, logisim8, logisim16, addrspan
     -o, --output [FILE] The name of the output file.
+        --symbol-format SYMBOL-FORMAT
+                        The format of the symbol file. Possible formats:
+                        default, mesen-mlb
     -s, --symbol [FILE] The name of the output symbol file.
     -t, --iter [NUM]    The max number of passes the assembler will attempt
                         (default: 10).
