@@ -6,18 +6,13 @@ on:
     - 'v*'
 
 jobs:
-  setup:
+  test:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@master
 
-  test:
-    needs: [setup]
-    runs-on: ubuntu-latest
-
-    steps:
     - name: Install latest Rust stable
       uses: actions-rs/toolchain@v1
       with:
@@ -32,10 +27,14 @@ jobs:
         args: --release --verbose
 
   windows_build:
-    needs: [test]
+    name: Windows Build
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
+    - name: Checkout code
+      uses: actions/checkout@master
+
     - name: Install latest Rust stable
       uses: actions-rs/toolchain@v1
       with:
@@ -51,10 +50,14 @@ jobs:
         args: --release --verbose --target=x86_64-pc-windows-gnu
 
   linux_build:
-    needs: [test]
+    name: Linux Build
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
+    - name: Checkout code
+      uses: actions/checkout@master
+
     - name: Install latest Rust stable
       uses: actions-rs/toolchain@v1
       with:
