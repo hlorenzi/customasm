@@ -8,6 +8,7 @@ enum OutputFormat
 	AnnotatedHex,
 	AnnotatedBin,
 	BinStr,
+	BinLine,
 	HexStr,
 	BinDump,
 	HexDump,
@@ -89,6 +90,7 @@ fn drive_inner(
 		Some("annotatedbin") => OutputFormat::AnnotatedBin,
 		
 		Some("binstr")    => OutputFormat::BinStr,
+		Some("binline")    => OutputFormat::BinLine,
 		Some("bindump")   => OutputFormat::BinDump,
 		Some("hexstr")    => OutputFormat::HexStr,
 		Some("hexdump")   => OutputFormat::HexDump,
@@ -215,6 +217,7 @@ fn drive_inner(
 		OutputFormat::Binary    => binary.format_binary(),
 		
 		OutputFormat::BinStr    => binary.format_binstr  ()  .bytes().collect(),
+		OutputFormat::BinLine    => binary.format_binline  ()  .bytes().collect(),
 		OutputFormat::HexStr    => binary.format_hexstr  ()  .bytes().collect(),
 		OutputFormat::BinDump   => binary.format_bindump ()  .bytes().collect(),
 		OutputFormat::HexDump   => binary.format_hexdump ()  .bytes().collect(),
@@ -290,7 +293,7 @@ fn drive_inner(
 fn make_opts() -> getopts::Options
 {
     let mut opts = getopts::Options::new();
-    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16, addrspan", "FORMAT");
+    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, binline, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16, addrspan", "FORMAT");
     opts.opt("o", "output", "The name of the output file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.optopt("", "symbol-format", "The format of the symbol file. Possible formats: default, mesen-mlb", "SYMBOL-FORMAT");
     opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
