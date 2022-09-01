@@ -51,7 +51,7 @@ impl util::BitVec
 		self.format_str(4)
 	}
 
-	pub fn format_binline(&self) -> String
+	pub fn format_hexline(&self) -> String
 	{
 		self.format_str(4).chars()
 			.enumerate()
