@@ -6,25 +6,25 @@ on:
     - 'v*'
 
 jobs:
-  install:
+  setup:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@master
 
-    - name: Install latest Rust stable
-      uses: actions-rs/toolchain@v1
-      with:
-          toolchain: stable
-          override: true
-          target: x86_64-pc-windows-gnu
-
   test:
-    needs: [install]
+    needs: [setup]
     runs-on: ubuntu-latest
 
     steps:
+    - name: Install latest Rust stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        target: x86_64-pc-windows-gnu
+
     - name: Run tests
       uses: actions-rs/cargo@v1
       with:
@@ -36,6 +36,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Install latest Rust stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        target: x86_64-pc-windows-gnu
+
     - name: Build
       uses: actions-rs/cargo@v1
       with:
@@ -48,6 +55,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Install latest Rust stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        target: x86_64-unknown-linux-gnu
+
     - name: Build
       uses: actions-rs/cargo@v1
       with:
@@ -92,5 +106,5 @@ jobs:
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./pkg/pkg.zip
-        asset_name: customasm_win64.zip
+        asset_name: customasm.zip
         asset_content_type: application/zip
