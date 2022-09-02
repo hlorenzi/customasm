@@ -166,7 +166,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v3
       with:
-        name: web-unknown-everywhere.html
+        name: any-unknown-any-web.html
         path: ./web/customasm.html
 
   deploy:
@@ -234,7 +234,7 @@ jobs:
     - name: Download Standalone Web Build
       uses: actions/download-artifact@v3
       with:
-        name: web-unknown-everywhere.html
+        name: any-unknown-any-web.html
 
     - name: Prepare Release asset
       run: zip -r customasm.zip .

@@ -70,7 +70,6 @@ fn drive_inner(
 	
 	if matches.opt_present("h")
 	{
-		print_version();
 		print_usage(&opts);
 		return Ok(());
 	}
