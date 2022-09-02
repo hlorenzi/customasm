@@ -24,7 +24,7 @@ you just implemented in an FPGA chip!
 [badge-discord-img]: https://img.shields.io/discord/394999035540275222?label=Join%20the%20Discord%20server!&logo=discord
 [badge-discord-url]: https://discord.com/invite/pXeDXGD
 
-[🖥️ Try it right now on your browser!](https://hlorenzi.github.io/customasm/web/)
+[🖥️ Try it right now on your browser!](https://hlorenzi.github.io/customasm/)
 
 [🕹️ Check out an example project](/examples/nes/) which targets the NES!
 
