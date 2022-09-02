@@ -5,24 +5,10 @@ It can be useful, for example, if you're trying to test the bytecode of a new vi
 or if you're eager to write programs for that new microprocessor architecture 
 you just implemented in an FPGA chip!
 
-[![crates.io][badge-cratesio-img]][badge-cratesio-url]
-[![Latest Release][badge-latest-img]][badge-latest-url]
-[![Releases][badge-downloads-img]][badge-downloads-url]
-[![Release](https://github.com/JosephAbbey/customasm/actions/workflows/release.yml/badge.svg?event=release)](https://github.com/JosephAbbey/customasm/actions/workflows/release.yml)
-
-[![Discord][badge-discord-img]][badge-discord-url]
-
-[badge-cratesio-img]: https://img.shields.io/crates/v/customasm
-[badge-cratesio-url]: https://crates.io/crates/customasm
-
-[badge-latest-img]: https://img.shields.io/github/v/release/hlorenzi/customasm
-[badge-latest-url]: https://github.com/hlorenzi/customasm/releases
-
-[badge-downloads-img]: https://img.shields.io/github/downloads/hlorenzi/customasm/total
-[badge-downloads-url]: https://github.com/hlorenzi/customasm/releases
-
-[badge-discord-img]: https://img.shields.io/discord/394999035540275222?label=Join%20the%20Discord%20server!&logo=discord
-[badge-discord-url]: https://discord.com/invite/pXeDXGD
+[![crates.io](https://img.shields.io/crates/v/customasm)](https://crates.io/crates/customasm)
+[![Latest Release](https://img.shields.io/github/v/release/josephabbey/customasm)](https://github.com/josephabbey/customasm/releases)
+[![Releases](https://img.shields.io/github/downloads/josephabbey/customasm/total)](https://github.com/josephabbey/customasm/releases)
+[![Release workflow](https://github.com/JosephAbbey/customasm/actions/workflows/release.yml/badge.svg)](https://github.com/JosephAbbey/customasm/actions/workflows/release.yml)
 
 [🖥️ Try it right now on your browser!](https://hlorenzi.github.io/customasm/)
 
