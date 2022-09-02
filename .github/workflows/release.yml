@@ -106,7 +106,7 @@ jobs:
       with:
         use-cross: true
         command: build
-        args: --lib --release --verbose --gc-sections --target wasm32-unknown-unknown
+        args: --lib --release --verbose --target wasm32-unknown-unknown
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3
