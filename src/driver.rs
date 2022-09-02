@@ -50,7 +50,7 @@ pub fn drive(args: &Vec<String>, fileserver: &mut dyn util::FileServer) -> Resul
 	{
 		if show_usage
 		{
-			print_version_short();
+			print_version();
 			print_usage(&opts);
 		}
 	}
@@ -70,14 +70,14 @@ fn drive_inner(
 	
 	if matches.opt_present("h")
 	{
-		print_version_full();
+		print_version();
 		print_usage(&opts);
 		return Ok(());
 	}
 	
 	if matches.opt_present("v")
 	{
-		print_version_full();
+		print_version();
 		return Ok(());
 	}
 	
@@ -180,7 +180,7 @@ fn drive_inner(
 	};
 	
 	if !quiet
-		{ print_version_short(); }
+		{ print_version(); }
 	
 	let mut assembler = asm::Assembler::new();
 	for filename in matches.free
@@ -327,7 +327,7 @@ fn print_usage(opts: &getopts::Options)
 }
 
 
-fn print_version_short()
+fn print_version()
 {
 	let mut version = env!("VERGEN_SEMVER_LIGHTWEIGHT").to_string();
 	if version == "UNKNOWN"
@@ -348,13 +348,6 @@ fn print_version_short()
 		version,
 		date,
 		env!("VERGEN_TARGET_TRIPLE"));
-}
-
-
-fn print_version_full()
-{
-	print_version_short();
-	println!("https://github.com/hlorenzi/customasm");
 }
 
 

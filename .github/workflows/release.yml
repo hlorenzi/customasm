@@ -61,6 +61,9 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
 
+    outputs:
+      help: ${{ steps.help.outputs.help }}
+
     steps:
     - name: Checkout code
       uses: actions/checkout@master
@@ -84,6 +87,10 @@ jobs:
       with:
         name: x86_64-unknown-linux-gnu
         path: ./target/x86_64-unknown-linux-gnu/release/customasm
+
+    - name: Get help message
+      id: help
+      run: echo "::set-output name=help::$(./target/x86_64-unknown-linux-gnu/release/customasm -hq)"
 
   web_build:
     name: GitHub Pages (Web) Build
@@ -142,7 +149,8 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: 16
-    - run: |
+    - name: Install node modules
+      run: |
             npm install node-html-parser
             npm install minify
 
@@ -163,6 +171,9 @@ jobs:
     needs: web_build
     runs-on: ubuntu-latest
 
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+
     permissions:
       pages: write
       id-token: write
@@ -180,7 +191,7 @@ jobs:
         uses: actions/deploy-pages@v1
 
   release:
-    needs: [windows_build, linux_build, standalone_web_build]
+    needs: [windows_build, linux_build, standalone_web_build, deploy]
     runs-on: ubuntu-latest
 
     steps:
@@ -192,7 +203,14 @@ jobs:
       with:
         tag_name: ${{ github.ref }}
         release_name: ${{ github.ref }}
-        body: Here's a new release! [Check out the changelog!](https://github.com/hlorenzi/customasm/wiki/Changelog)
+        body: |
+          New release!
+
+          - Try on the web: ${{ needs.deploy.outputs.page_url }}
+
+          ```
+          ${{ needs.linux_build.outputs.help }}
+          ```
         draft: false
         prerelease: false
 
