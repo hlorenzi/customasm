@@ -136,7 +136,7 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: wasm32-unknown-unknown.wasm
-        working-directory: ./web
+        path: ./web/customasm.wasm
 
     - name: Setup node
       uses: actions/setup-node@v3
@@ -147,7 +147,7 @@ jobs:
             npm install minify
 
     - name: Scriptify wasm
-      run: node -e 'require(\"fs\").writeFileSync(\"./web/customasm.js\", \"const customasm=new Promise(r => r(new Uint8Array(\" + JSON.stringify([...require(\"fs\").readFileSync(\"./web/customasm.wasm\")]) + \")))\")'
+      run: node -e 'require("fs").writeFileSync("./web/customasm.js", "const customasm=new Promise(r => r(new Uint8Array(" + JSON.stringify([...require("fs").readFileSync("./web/customasm.wasm")]) + ")))")'
 
     - name: Collect files
       run: node ./htmlCollector.js ./web/index.html ./web/customasm.html
