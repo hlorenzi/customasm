@@ -8,6 +8,7 @@ you just implemented in an FPGA chip!
 [![crates.io][badge-cratesio-img]][badge-cratesio-url]
 [![Latest Release][badge-latest-img]][badge-latest-url]
 [![Releases][badge-downloads-img]][badge-downloads-url]
+[![Release](https://github.com/JosephAbbey/customasm/actions/workflows/release.yml/badge.svg?event=release)](https://github.com/JosephAbbey/customasm/actions/workflows/release.yml)
 
 [![Discord][badge-discord-img]][badge-discord-url]
 
