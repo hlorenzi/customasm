@@ -180,7 +180,7 @@ jobs:
         uses: actions/deploy-pages@v1
 
   release:
-    needs: [windows_build, linux_build]
+    needs: [windows_build, linux_build, standalone_web_build]
     runs-on: ubuntu-latest
 
     steps:
