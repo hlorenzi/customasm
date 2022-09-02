@@ -11,9 +11,7 @@ function main()
 	window.onkeydown = onKeyDown
 	window.onbeforeunload = onBeforeUnload
 	
-	fetch("customasm.gc.wasm", {mode: 'no-cors'})
-		.then(r => r.arrayBuffer())
-		.then(r => WebAssembly.instantiate(r))
+	customasm.then(r => WebAssembly.instantiate(r))
 		.then(wasm =>
 		{
 			g_wasm = wasm
@@ -31,9 +29,7 @@ function setupEditor()
 		tabSize: 4, indentUnit: 4, mode: "z80"
 	})
 	
-	fetch('../examples/basic.asm', {mode: 'no-cors'})
-        .then((r) => r.text())
-        .then((r) => g_codeEditor.setValue(r));
+	g_codeEditor.setValue(default_text)
 	
 	g_codeEditor.refresh()
 }
@@ -116,7 +112,8 @@ function assemble()
 	output = output.replace(/\x1b\[97m/g, "</span><span style='color:black;'>")
 	output = output.replace(/\x1b\[1m/g, "</span><span style='font-weight:bold;'>")
 	output = output.replace(/\x1b\[0m/g, "</span><span style='color:black;'>")
-	
+	//</span>
+
 	output = "<span style='color:black;'>" + output + "</span>"
 	
 	let divText = document.getElementById("divOutputText")

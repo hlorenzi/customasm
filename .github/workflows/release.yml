@@ -7,6 +7,7 @@ on:
 
 jobs:
   test:
+    name: Test
     runs-on: ubuntu-latest
 
     steps:
@@ -84,6 +85,100 @@ jobs:
         name: x86_64-unknown-linux-gnu
         path: ./target/x86_64-unknown-linux-gnu/release/customasm
 
+  web_build:
+    name: GitHub Pages (Web) Build
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@master
+
+    - name: Install latest Rust stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        target: wasm32-unknown-unknown
+
+    - name: Build
+      uses: actions-rs/cargo@v1
+      with:
+        use-cross: true
+        command: build
+        args: --lib --release --verbose --gc-sections --target wasm32-unknown-unknown
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: wasm32-unknown-unknown.wasm
+        path: ./target/wasm32-unknown-unknown/release/customasm.wasm
+
+    - name: Copy artifact
+      run: cp ./target/wasm32-unknown-unknown/release/customasm.wasm
+
+    - name: Upload pages artifact
+      uses: actions/upload-pages-artifact@v0
+      with:
+        path: ./web
+        retention-days: 1
+
+  standalone_web_build:
+    name: Standalone Web Build
+    needs: web_build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@master
+
+    - name: Download Web Build
+      uses: actions/download-artifact@v3
+      with:
+        name: wasm32-unknown-unknown.wasm
+        working-directory: ./web
+
+    - name: Setup node
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16
+    - run: |
+            npm install node-html-parser
+            npm install minify
+
+    - name: Scriptify wasm
+      run: node -e 'require(\"fs\").writeFileSync(\"./web/customasm.js\", \"const customasm=new Promise(r => r(new Uint8Array(\" + JSON.stringify([...require(\"fs\").readFileSync(\"./web/customasm.wasm\")]) + \")))\")'
+
+    - name: Collect files
+      run: node ./htmlCollector.js ./web/index.html ./web/customasm.html
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: web-unknown-everywhere.html
+        path: ./web/customasm.html
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: web_build
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v2
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
+
   release:
     needs: [windows_build, linux_build]
     runs-on: ubuntu-latest
@@ -111,8 +206,13 @@ jobs:
       with:
         name: x86_64-unknown-linux-gnu
 
+    - name: Download Standalone Web Build
+      uses: actions/download-artifact@v3
+      with:
+        name: web-unknown-everywhere.html
+
     - name: Prepare Release asset
-      run: zip -r pkg.zip .
+      run: zip -r customasm.zip .
 
     - name: Upload Release asset
       uses: actions/upload-release-asset@v1
@@ -120,6 +220,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./pkg.zip
+        asset_path: ./customasm.zip
         asset_name: customasm.zip
         asset_content_type: application/zip

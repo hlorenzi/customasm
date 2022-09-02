@@ -2,7 +2,7 @@
 name = "customasm"
 version = "0.12.0"
 edition = "2021"
-authors = ["hlorenzi <https://hlorenzi.com>"]
+authors = ["hlorenzi <https://hlorenzi.com>", "josephabbey <https://joseph.abbey1.org.uk>"]
 description = "An assembler for custom, user-defined instruction sets!"
 homepage = "https://github.com/hlorenzi/customasm"
 repository = "https://github.com/hlorenzi/customasm"
