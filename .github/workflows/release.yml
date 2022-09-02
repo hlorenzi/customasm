@@ -136,7 +136,7 @@ jobs:
       uses: actions/download-artifact@v3
       with:
         name: wasm32-unknown-unknown.wasm
-        path: ./web/customasm.wasm
+        path: ./web
 
     - name: Setup node
       uses: actions/setup-node@v3
