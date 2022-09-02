@@ -115,7 +115,7 @@ jobs:
         path: ./target/wasm32-unknown-unknown/release/customasm.wasm
 
     - name: Copy artifact
-      run: cp ./target/wasm32-unknown-unknown/release/customasm.wasm
+      run: cp ./target/wasm32-unknown-unknown/release/customasm.wasm ./web
 
     - name: Upload pages artifact
       uses: actions/upload-pages-artifact@v0
