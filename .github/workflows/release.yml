@@ -155,9 +155,7 @@ jobs:
       with:
         node-version: 16
     - name: Install node modules
-      run: |
-            npm install node-html-parser
-            npm install minify
+      run: npm i node-html-parser minify
 
     - name: Scriptify wasm
       run: node -e 'require("fs").writeFileSync("./web/customasm.js", "const customasm=new Promise(r => r(new Uint8Array(" + JSON.stringify([...require("fs").readFileSync("./web/customasm.wasm")]) + ")))")'

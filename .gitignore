@@ -1,6 +1,5 @@
 /target/
 /pkg/
 /.pkgtemp/
-/Cargo.lock
 /web/customasm.html
 /web/customasm.wasm
