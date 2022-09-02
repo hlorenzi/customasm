@@ -53,7 +53,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-integer",
- "num-traits 0.2.15",
+ "num-traits",
  "time",
  "wasm-bindgen",
  "winapi",
@@ -91,7 +91,7 @@ dependencies = [
  "getopts",
  "num-bigint",
  "num-integer",
- "num-traits 0.1.43",
+ "num-traits",
  "sha2",
  "vergen",
 ]
@@ -170,7 +170,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e63899ad0da84ce718c14936262a41cee2c79c981fc0a0e7c7beb47d5a07e8c1"
 dependencies = [
  "num-integer",
- "num-traits 0.2.15",
+ "num-traits",
 ]
 
 [[package]]
@@ -180,16 +180,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "225d3389fb3509a24c93f5c29eb6bde2586b98d9f016636dff58d7c6f7569cd9"
 dependencies = [
  "autocfg",
- "num-traits 0.2.15",
-]
-
-[[package]]
-name = "num-traits"
-version = "0.1.43"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92e5113e9fd4cc14ded8e499429f396a20f98c772a47cc8622a736e1ec843c31"
-dependencies = [
- "num-traits 0.2.15",
+ "num-traits",
 ]
 
 [[package]]
