@@ -90,7 +90,12 @@ jobs:
 
     - name: Get help message
       id: help
-      run: echo "::set-output name=help::$(./target/x86_64-unknown-linux-gnu/release/customasm -hq)"
+      run: |
+        out="$(./target/x86_64-unknown-linux-gnu/release/customasm -hq)"
+        out="${out//'%'/'%25'}"
+        out="${out//$'\n'/'%0A'}"
+        out="${out//$'\r'/'%0D'}"
+        echo "::set-output name=help::${out}"
 
   web_build:
     name: GitHub Pages (Web) Build
@@ -193,6 +198,10 @@ jobs:
   release:
     needs: [windows_build, linux_build, standalone_web_build, deploy]
     runs-on: ubuntu-latest
+
+    environment:
+      name: github-releases
+      url: ${{ steps.create_release.outputs.html_url }}
 
     steps:
     - name: Create Release
