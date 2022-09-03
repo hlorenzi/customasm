@@ -14,7 +14,7 @@ jobs:
     - name: Install latest Rust stable
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: stable
+        toolchain: nightly
         override: true
         target: x86_64-unknown-linux-gnu
 
