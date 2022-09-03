@@ -30,12 +30,12 @@ impl util::BitVec
 		self.format_str(1)
 	}
 
-	pub fn format_binline(&self) -> String
+	pub fn format_binline(&self, wordsize: usize) -> String
 	{
 		self.format_str(1).chars()
 			.enumerate()
 			.flat_map(|(i, c)| {
-				if i != 0 && i % 8 == 0 {
+				if i != 0 && i % wordsize == 0 {
 					Some('\n')
 				} else {
 					None
@@ -51,12 +51,12 @@ impl util::BitVec
 		self.format_str(4)
 	}
 
-	pub fn format_hexline(&self) -> String
+	pub fn format_hexline(&self, wordsize: usize) -> String
 	{
 		self.format_str(4).chars()
 			.enumerate()
 			.flat_map(|(i, c)| {
-				if i != 0 && i % 8 == 0 {
+				if i != 0 && i % (wordsize / 4) == 0 {
 					Some('\n')
 				} else {
 					None

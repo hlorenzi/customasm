@@ -218,9 +218,9 @@ fn drive_inner(
 		OutputFormat::Binary    => binary.format_binary(),
 		
 		OutputFormat::BinStr    => binary.format_binstr  ()  .bytes().collect(),
-		OutputFormat::BinLine    => binary.format_binline()  .bytes().collect(),
+		OutputFormat::BinLine   => binary.format_binline (output.state.cur_wordsize)  .bytes().collect(),
 		OutputFormat::HexStr    => binary.format_hexstr  ()  .bytes().collect(),
-		OutputFormat::HexLine    => binary.format_hexline()  .bytes().collect(),
+		OutputFormat::HexLine   => binary.format_hexline (output.state.cur_wordsize)  .bytes().collect(),
 		OutputFormat::BinDump   => binary.format_bindump ()  .bytes().collect(),
 		OutputFormat::HexDump   => binary.format_hexdump ()  .bytes().collect(),
 		OutputFormat::Mif       => binary.format_mif     ()  .bytes().collect(),
