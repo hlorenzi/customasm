@@ -9,6 +9,7 @@ you just implemented in an FPGA chip!
 [![Latest Release](https://img.shields.io/github/v/release/josephabbey/customasm)](https://github.com/josephabbey/customasm/releases)
 [![Releases](https://img.shields.io/github/downloads/josephabbey/customasm/total)](https://github.com/josephabbey/customasm/releases)
 [![Release workflow](https://github.com/JosephAbbey/customasm/actions/workflows/release.yml/badge.svg)](https://github.com/JosephAbbey/customasm/actions/workflows/release.yml)
+[![Coverage Status](https://coveralls.io/repos/github/JosephAbbey/customasm/badge.svg?branch=main)](https://coveralls.io/github/JosephAbbey/customasm?branch=main)
 
 [🖥️ Try it right now on your browser!](https://hlorenzi.github.io/customasm/)
 
