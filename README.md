@@ -11,7 +11,7 @@ you just implemented in an FPGA chip!
 [![Release workflow](https://github.com/JosephAbbey/customasm/actions/workflows/release.yml/badge.svg)](https://github.com/JosephAbbey/customasm/actions/workflows/release.yml)
 [![Coverage Status](https://coveralls.io/repos/github/JosephAbbey/customasm/badge.svg?branch=main)](https://coveralls.io/github/JosephAbbey/customasm?branch=main)
 
-[🖥️ Try it right now on your browser!](https://hlorenzi.github.io/customasm/)
+[🖥️ Try it right now on your browser!](https://josephabbey.github.io/customasm/)
 
 [🕹️ Check out an example project](/examples/nes/) which targets the NES!
 
