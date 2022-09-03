@@ -105,6 +105,11 @@ function assemble()
 	dropRustString(outputPtr)
 	
 	output = output.replace(/\n/g, "<br>")
+	output = output.replace(
+        /(\d+):(\d+)/g,
+        (_, line, column) =>
+            `<button class="a" onclick="g_codeEditor.focus();g_codeEditor.setCursor({line:${line - 1},ch:${column - 1}})">${line}:${column}</button>`
+    );
 	output = output.replace(/\x1b\[90m/g, "</span><span style='color:gray;'>")
 	output = output.replace(/\x1b\[91m/g, "</span><span style='color:red;'>")
 	output = output.replace(/\x1b\[93m/g, "</span><span style='color:#f80;'>")
