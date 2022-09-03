@@ -4,3 +4,6 @@ llvm: true
 filter: covered
 output-type: lcov
 output-path: ./lcov.info
+ignore: |
+  ../*
+  target/*
