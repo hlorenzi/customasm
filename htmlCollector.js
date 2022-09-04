@@ -191,6 +191,7 @@ async function HTML([file, s]) {
 
     return html.toString();
 }
+
 get(process.argv[2])
     .then(HTML)
     .then((s) =>
@@ -201,6 +202,6 @@ get(process.argv[2])
     )
     .then(([a]) =>
         a
-            .minify(process.argv[3], {})
+            .minify(process.argv[3])
             .then((s) => fs.writeFileSync(process.argv[3], s))
     );

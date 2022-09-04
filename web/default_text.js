@@ -1,4 +1,4 @@
-const default_text = `#ruledef
+const default_text = window.default_text_override ?? `#ruledef
 {
     load r1, {value} => 0x11 @ value\`8
     load r2, {value} => 0x12 @ value\`8
