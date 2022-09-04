@@ -1,6 +1,7 @@
 let g_wasm = null
 let g_codeEditor = null
 
+//? COLLECTION FUNCTION 'WASM' (BUFFER -> STRING): `(w) => "new Promise(r => r(new Uint8Array(" + JSON.stringify([...w]) + ")))"`
 
 function main()
 {
@@ -11,7 +12,10 @@ function main()
 	window.onkeydown = onKeyDown
 	window.onbeforeunload = onBeforeUnload
 	
-	customasm.then(r => WebAssembly.instantiate(r))
+	//? COLLECTION FROM "./customasm.wasm" AS (BUFFER) WITH 'WASM' [
+	fetch('./customasm.wasm').then((r) => r.arrayBuffer())
+	//? ]
+		.then(r => WebAssembly.instantiate(r))
 		.then(wasm =>
 		{
 			g_wasm = wasm
