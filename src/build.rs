@@ -1,18 +1,17 @@
 extern crate vergen;
 
 
-use vergen::{ConstantsFlags, generate_cargo_keys};
+use vergen::{Config, vergen, TimestampKind, SemverKind};
 
 
 fn main()
 {
-    let mut flags = ConstantsFlags::empty();
-    flags.toggle(ConstantsFlags::REBUILD_ON_HEAD_CHANGE);
-    flags.toggle(ConstantsFlags::SEMVER_LIGHTWEIGHT);
-    flags.toggle(ConstantsFlags::COMMIT_DATE);
-    flags.toggle(ConstantsFlags::TARGET_TRIPLE);
+    let mut config = Config::default();
+    *config.git_mut().semver_kind_mut() = SemverKind::Lightweight;
+    *config.git_mut().commit_timestamp_kind_mut() = TimestampKind::DateOnly;
+    *config.cargo_mut().target_triple_mut() = true;
     
-    generate_cargo_keys(flags).expect("Unable to generate the cargo keys!");
+    vergen(config).expect("Unable to generate the cargo keys!");
 
     generate_tests();
 }

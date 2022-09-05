@@ -83,10 +83,10 @@ impl BigInt
         if self.bigint < num_bigint::BigInt::zero()
         {
             let y: num_bigint::BigInt = &self.bigint + 1;
-            y.bits() + 1
+            (y.bits() + 1).try_into().unwrap()
         }
         else
-            { self.bigint.bits() }
+            { self.bigint.bits().try_into().unwrap() }
     }
 
 

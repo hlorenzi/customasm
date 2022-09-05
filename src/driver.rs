@@ -328,14 +328,14 @@ fn print_usage(opts: &getopts::Options)
 
 fn print_version()
 {
-	let mut version = env!("VERGEN_SEMVER_LIGHTWEIGHT").to_string();
+	let mut version = env!("VERGEN_GIT_SEMVER_LIGHTWEIGHT").to_string();
 	if version == "UNKNOWN"
 	{
 		version = format!("v{}", env!("CARGO_PKG_VERSION"));
 	}
 
 
-	let mut date = format!("{}, ", env!("VERGEN_COMMIT_DATE"));
+	let mut date = format!("{}, ", env!("VERGEN_GIT_COMMIT_DATE"));
 	if date == "UNKNOWN, "
 	{
 		date = "".to_string();
@@ -346,7 +346,7 @@ fn print_version()
 		env!("CARGO_PKG_NAME"),
 		version,
 		date,
-		env!("VERGEN_TARGET_TRIPLE"));
+		env!("VERGEN_CARGO_TARGET_TRIPLE"));
 }
 
 

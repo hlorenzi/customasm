@@ -1,6 +1,6 @@
 [package]
 name = "customasm"
-version = "0.12.0"
+version = "0.12.18"
 edition = "2021"
 authors = ["hlorenzi <https://hlorenzi.com>", "josephabbey <https://joseph.abbey1.org.uk>"]
 description = "An assembler for custom, user-defined instruction sets!"
@@ -23,13 +23,13 @@ name = "customasm"
 path = "src/main.rs"
 
 [dependencies]
-getopts = "0.2.17"
-num-bigint = { version = "0.1", default_features = false }
-num-traits = { version = "0.2", default_features = false }
-num-integer = { version = "0.1", default_features = false }
+getopts = "0.2.21"
+num-bigint = { version = "0.4.3", default_features = false }
+num-traits = { version = "0.2.15", default_features = false }
+num-integer = { version = "0.1.45", default_features = false }
 
 [dev-dependencies]
-sha2 = "0.10.3"
+sha2 = "0.10.5"
 
 [build-dependencies]
-vergen = "3.1.0"
+vergen = "7.4.2"
