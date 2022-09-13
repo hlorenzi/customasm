@@ -74,6 +74,7 @@ jobs:
     name: Linux Build
     needs: test
     runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux2014_x86_64
 
     outputs:
       help: ${{ steps.help.outputs.help }}
