@@ -245,7 +245,7 @@ jobs:
         body: |
           New release!
 
-          - Try on the web: ${{ needs.deploy.outputs.page_url }}/web
+          - Try on the web: ${{ needs.deploy.outputs.page_url }}web
 
           ```
           ${{ needs.test.outputs.help }}
