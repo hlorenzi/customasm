@@ -2,5 +2,5 @@
 /pkg/
 /.pkgtemp/
 /test.asm
-
-/web/customasm.gc.wasm
+/web/customasm.html
+/web/customasm.wasm

@@ -1,6 +1,7 @@
 let g_wasm = null
 let g_codeEditor = null
 
+//? COLLECTION FUNCTION 'WASM' (BUFFER -> STRING): `(w) => "new Promise(r => r(new Uint8Array(" + JSON.stringify([...w]) + ")))"`
 
 function main()
 {
@@ -11,8 +12,9 @@ function main()
 	window.onkeydown = onKeyDown
 	window.onbeforeunload = onBeforeUnload
 	
-	fetch("customasm.gc.wasm")
-		.then(r => r.arrayBuffer())
+	//? COLLECTION FROM "./customasm.wasm" AS (BUFFER) WITH 'WASM' [
+	fetch('./customasm.wasm').then((r) => r.arrayBuffer())
+	//? ]
 		.then(r => WebAssembly.instantiate(r))
 		.then(wasm =>
 		{
@@ -31,9 +33,7 @@ function setupEditor()
 		tabSize: 4, indentUnit: 4, mode: "z80"
 	})
 	
-	fetch("../examples/basic.asm")
-		.then(r => r.text())
-		.then(r => g_codeEditor.setValue(r))
+	g_codeEditor.setValue(default_text)
 	
 	g_codeEditor.refresh()
 }
@@ -110,11 +110,12 @@ function assemble()
 	
 	output = output.replace(/\n/g, "<br>")
 	output = output.replace(
-		/ --> asm:\x1b\[0m\x1b\[90m(\d+):(\d+)/g,
-		(_, line, column) =>
-			` --> asm:<button class="a" onclick="g_codeEditor.focus();g_codeEditor.setCursor({line:${line - 1
-			},ch:${column - 1}})">${line}:${column}</button>`
-	);
+        / --> asm:\x1b\[0m\x1b\[90m(\d+):(\d+)/g,
+        (_, line, column) =>
+            ` --> asm:<button class="a" onclick="g_codeEditor.focus();g_codeEditor.setCursor({line:${
+                line - 1
+            },ch:${column - 1}})">${line}:${column}</button>`
+    );
 	output = output.replace(/\x1b\[90m/g, "</span><span style='color:gray;'>")
 	output = output.replace(/\x1b\[91m/g, "</span><span style='color:red;'>")
 	output = output.replace(/\x1b\[93m/g, "</span><span style='color:#f80;'>")
@@ -123,7 +124,7 @@ function assemble()
 	output = output.replace(/\x1b\[1m/g, "</span><span style='font-weight:bold;'>")
 	output = output.replace(/\x1b\[0m/g, "</span><span style='color:black;'>")
 	//</span>
-	
+
 	output = "<span style='color:black;'>" + output + "</span>"
 	
 	let divText = document.getElementById("divOutputText")

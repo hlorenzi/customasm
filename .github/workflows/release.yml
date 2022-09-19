@@ -6,8 +6,63 @@ on:
     - 'v*'
 
 jobs:
-  build:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
 
+    outputs:
+      help: ${{ steps.help.outputs.help }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@master
+
+    - name: Install latest Rust stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        override: true
+        target: x86_64-unknown-linux-gnu
+
+    - name: Build
+      uses: actions-rs/cargo@v1
+      with:
+        use-cross: false
+        command: build
+        args: --release --verbose --target=x86_64-unknown-linux-gnu
+
+    - name: Run tests
+      uses: actions-rs/cargo@v1
+      with:
+        command: test
+        args: --verbose --no-fail-fast
+      env:
+        CARGO_INCREMENTAL: '0'
+        RUSTFLAGS: '-Zprofile'
+
+    - name: Get help message
+      id: help
+      run: |
+        out="$(./target/x86_64-unknown-linux-gnu/release/customasm -hq)"
+        out="${out//'%'/'%25'}"
+        out="${out//$'\n'/'%0A'}"
+        out="${out//$'\r'/'%0D'}"
+        echo "::set-output name=help::${out}"
+
+    # - name: Get test coverage
+    #   id: coverage
+    #   uses: actions-rs/grcov@v0.1
+
+    # - name: Coveralls upload
+    #   uses: coverallsapp/github-action@master
+    #   with:
+    #     github-token: ${{ secrets.GITHUB_TOKEN }}
+    #     path-to-lcov: ${{ steps.coverage.outputs.report }}
+    #     git-branch: ${{ github.ref }}
+
+  windows_build:
+    name: Windows Build
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
@@ -17,15 +72,9 @@ jobs:
     - name: Install latest Rust stable
       uses: actions-rs/toolchain@v1
       with:
-          toolchain: stable
-          override: true
-          target: x86_64-pc-windows-gnu
-
-    - name: Run tests
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: --release --verbose
+        toolchain: stable
+        override: true
+        target: x86_64-pc-windows-gnu
 
     - name: Build
       uses: actions-rs/cargo@v1
@@ -34,6 +83,144 @@ jobs:
         command: build
         args: --release --verbose --target=x86_64-pc-windows-gnu
 
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: x86_64-pc-windows-gnu.exe
+        path: ./target/x86_64-pc-windows-gnu/release/customasm.exe
+
+  linux_build:
+    name: Linux Build
+    needs: test
+    runs-on: ubuntu-latest
+    container: quay.io/pypa/manylinux2014_x86_64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@master
+
+    - name: Install latest Rust stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        target: x86_64-unknown-linux-gnu
+
+    - name: Build
+      uses: actions-rs/cargo@v1
+      with:
+        use-cross: false
+        command: build
+        args: --release --verbose --target=x86_64-unknown-linux-gnu
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: x86_64-unknown-linux-gnu
+        path: ./target/x86_64-unknown-linux-gnu/release/customasm
+
+  web_build:
+    name: GitHub Pages (Web) Build
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@master
+
+    - name: Install latest Rust stable
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+        target: wasm32-unknown-unknown
+
+    - name: Build
+      uses: actions-rs/cargo@v1
+      with:
+        use-cross: true
+        command: build
+        args: --lib --release --verbose --target wasm32-unknown-unknown
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: wasm32-unknown-unknown.wasm
+        path: ./target/wasm32-unknown-unknown/release/customasm.wasm
+
+    - name: Copy artifact
+      run: cp ./target/wasm32-unknown-unknown/release/customasm.wasm ./web
+
+    - name: Upload pages artifact
+      uses: actions/upload-pages-artifact@v0
+      with:
+        path: ./web
+        retention-days: 1
+
+  standalone_web_build:
+    name: Standalone Web Build
+    needs: web_build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@master
+
+    - name: Download Web Build
+      uses: actions/download-artifact@v3
+      with:
+        name: wasm32-unknown-unknown.wasm
+        path: ./web
+
+    - name: Setup node
+      uses: actions/setup-node@v3
+      with:
+        node-version: 16
+    - name: Install node modules
+      run: npm i node-html-parser minify
+
+    - name: Collect files
+      run: node ./htmlCollector.js ./web/index.html ./web/customasm.html
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: any-unknown-any-web.html
+        path: ./web/customasm.html
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: web_build
+    runs-on: ubuntu-latest
+
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v2
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
+
+  release:
+    needs: [windows_build, linux_build, standalone_web_build, deploy]
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-releases
+      url: ${{ steps.create_release.outputs.html_url }}
+
+    steps:
     - name: Create Release
       id: create_release
       uses: actions/create-release@latest
@@ -42,20 +229,44 @@ jobs:
       with:
         tag_name: ${{ github.ref }}
         release_name: ${{ github.ref }}
-        body: Here's a new release! [Check out the changelog!](https://github.com/hlorenzi/customasm/wiki/Changelog)
+        # body: |
+        #   New release!
+
+        #   [![Coverage Status](https://coveralls.io/repos/github/JosephAbbey/customasm/badge.svg?branch=${{ github.ref }})](https://coveralls.io/github/JosephAbbey/customasm?branch=${{ github.ref }})
+
+        #   - Try on the web: ${{ needs.deploy.outputs.page_url }}
+
+        #   ```
+        #   ${{ needs.test.outputs.help }}
+        #   ```
+        body: |
+          New release!
+
+          - Try on the web: ${{ needs.deploy.outputs.page_url }}
+
+          ```
+          ${{ needs.linux_build.outputs.help }}
+          ```
         draft: false
         prerelease: false
 
+    - name: Download Windows Build
+      uses: actions/download-artifact@v3
+      with:
+        name: x86_64-pc-windows-gnu.exe
+
+    - name: Download Linux Build
+      uses: actions/download-artifact@v3
+      with:
+        name: x86_64-unknown-linux-gnu
+
+    - name: Download Standalone Web Build
+      uses: actions/download-artifact@v3
+      with:
+        name: any-unknown-any-web.html
+
     - name: Prepare Release asset
-      env:
-        TARGET_EXE: ./target/x86_64-pc-windows-gnu/release/customasm.exe
-      run: |
-        mkdir ./pkg
-        mv $TARGET_EXE ./pkg/customasm.exe
-        mv ./examples ./pkg/examples
-        mv ./README_PKG.txt ./pkg/README.txt
-        cd ./pkg
-        zip -r pkg.zip .
+      run: zip -r customasm.zip .
 
     - name: Upload Release asset
       uses: actions/upload-release-asset@v1
@@ -63,6 +274,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./pkg/pkg.zip
-        asset_name: customasm_win64.zip
+        asset_path: ./customasm.zip
+        asset_name: customasm.zip
         asset_content_type: application/zip
