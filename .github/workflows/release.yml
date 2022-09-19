@@ -149,12 +149,15 @@ jobs:
         path: ./target/wasm32-unknown-unknown/release/customasm.wasm
 
     - name: Copy artifact
-      run: cp ./target/wasm32-unknown-unknown/release/customasm.wasm ./web
+      run: |
+        cp ./target/wasm32-unknown-unknown/release/customasm.wasm ./web
+        mkdir build
+        cp -r ./web ./build/web
 
     - name: Upload pages artifact
       uses: actions/upload-pages-artifact@v0
       with:
-        path: ./web
+        path: ./build
         retention-days: 1
 
   standalone_web_build:
@@ -242,10 +245,10 @@ jobs:
         body: |
           New release!
 
-          - Try on the web: ${{ needs.deploy.outputs.page_url }}
+          - Try on the web: ${{ needs.deploy.outputs.page_url }}/web
 
           ```
-          ${{ needs.linux_build.outputs.help }}
+          ${{ needs.test.outputs.help }}
           ```
         draft: false
         prerelease: false
