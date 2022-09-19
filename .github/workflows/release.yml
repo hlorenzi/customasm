@@ -213,7 +213,7 @@ jobs:
         uses: actions/deploy-pages@v1
 
   release:
-    needs: [windows_build, linux_build, standalone_web_build, deploy]
+    needs: [test, windows_build, linux_build, standalone_web_build, deploy]
     runs-on: ubuntu-latest
 
     environment:
