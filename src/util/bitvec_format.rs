@@ -29,11 +29,42 @@ impl util::BitVec
 	{
 		self.format_str(1)
 	}
-	
+
+	pub fn format_binline(&self, wordsize: usize) -> String
+	{
+		self.format_str(1).chars()
+			.enumerate()
+			.flat_map(|(i, c)| {
+				if i != 0 && i % wordsize == 0 {
+					Some('\n')
+				} else {
+					None
+				}
+				.into_iter()
+				.chain(std::iter::once(c))
+			})
+			.collect::<String>()
+	}
 	
 	pub fn format_hexstr(&self) -> String
 	{
 		self.format_str(4)
+	}
+
+	pub fn format_hexline(&self, wordsize: usize) -> String
+	{
+		self.format_str(4).chars()
+			.enumerate()
+			.flat_map(|(i, c)| {
+				if i != 0 && i % (wordsize / 4) == 0 {
+					Some('\n')
+				} else {
+					None
+				}
+				.into_iter()
+				.chain(std::iter::once(c))
+			})
+			.collect::<String>()
 	}
 	
 	
@@ -377,7 +408,7 @@ impl util::BitVec
 		let byte_bits = byte_digits * digit_bits;
 		
 		let mut outp_width = 2;
-		let outp_bit_width = format!("{:x}", digit_bits - 1).len();
+		let outp_bit_width = (digit_bits as f32 - 1f32).log(16f32).ceil() as usize;
 		let mut addr_width = 4;
 		let mut content_width = (byte_digits + 1) * 1 - 1;
 						

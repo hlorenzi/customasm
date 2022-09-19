@@ -8,7 +8,9 @@ enum OutputFormat
 	AnnotatedHex,
 	AnnotatedBin,
 	BinStr,
+	BinLine,
 	HexStr,
+	HexLine,
 	BinDump,
 	HexDump,
 	Mif,
@@ -48,7 +50,7 @@ pub fn drive(args: &Vec<String>, fileserver: &mut dyn util::FileServer) -> Resul
 	{
 		if show_usage
 		{
-			print_version_short();
+			print_version();
 			print_usage(&opts);
 		}
 	}
@@ -68,14 +70,13 @@ fn drive_inner(
 	
 	if matches.opt_present("h")
 	{
-		print_version_full();
 		print_usage(&opts);
 		return Ok(());
 	}
 	
 	if matches.opt_present("v")
 	{
-		print_version_full();
+		print_version();
 		return Ok(());
 	}
 	
@@ -89,8 +90,10 @@ fn drive_inner(
 		Some("annotatedbin") => OutputFormat::AnnotatedBin,
 		
 		Some("binstr")    => OutputFormat::BinStr,
+		Some("binline")    => OutputFormat::BinLine,
 		Some("bindump")   => OutputFormat::BinDump,
 		Some("hexstr")    => OutputFormat::HexStr,
+		Some("hexline")    => OutputFormat::HexLine,
 		Some("hexdump")   => OutputFormat::HexDump,
 		Some("binary")    => OutputFormat::Binary,
 		Some("mif")       => OutputFormat::Mif,
@@ -176,7 +179,7 @@ fn drive_inner(
 	};
 	
 	if !quiet
-		{ print_version_short(); }
+		{ print_version(); }
 	
 	let mut assembler = asm::Assembler::new();
 	for filename in matches.free
@@ -215,7 +218,9 @@ fn drive_inner(
 		OutputFormat::Binary    => binary.format_binary(),
 		
 		OutputFormat::BinStr    => binary.format_binstr  ()  .bytes().collect(),
+		OutputFormat::BinLine   => binary.format_binline (output.state.cur_wordsize)  .bytes().collect(),
 		OutputFormat::HexStr    => binary.format_hexstr  ()  .bytes().collect(),
+		OutputFormat::HexLine   => binary.format_hexline (output.state.cur_wordsize)  .bytes().collect(),
 		OutputFormat::BinDump   => binary.format_bindump ()  .bytes().collect(),
 		OutputFormat::HexDump   => binary.format_hexdump ()  .bytes().collect(),
 		OutputFormat::Mif       => binary.format_mif     ()  .bytes().collect(),
@@ -290,7 +295,7 @@ fn drive_inner(
 fn make_opts() -> getopts::Options
 {
     let mut opts = getopts::Options::new();
-    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16, addrspan", "FORMAT");
+    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, binline, hexstr, hexline, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16, addrspan", "FORMAT");
     opts.opt("o", "output", "The name of the output file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.optopt("", "symbol-format", "The format of the symbol file. Possible formats: default, mesen-mlb", "SYMBOL-FORMAT");
     opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
@@ -321,16 +326,16 @@ fn print_usage(opts: &getopts::Options)
 }
 
 
-fn print_version_short()
+fn print_version()
 {
-	let mut version = env!("VERGEN_SEMVER_LIGHTWEIGHT").to_string();
+	let mut version = env!("VERGEN_GIT_SEMVER_LIGHTWEIGHT").to_string();
 	if version == "UNKNOWN"
 	{
 		version = format!("v{}", env!("CARGO_PKG_VERSION"));
 	}
 
 
-	let mut date = format!("{}, ", env!("VERGEN_COMMIT_DATE"));
+	let mut date = format!("{}, ", env!("VERGEN_GIT_COMMIT_DATE"));
 	if date == "UNKNOWN, "
 	{
 		date = "".to_string();
@@ -341,14 +346,7 @@ fn print_version_short()
 		env!("CARGO_PKG_NAME"),
 		version,
 		date,
-		env!("VERGEN_TARGET_TRIPLE"));
-}
-
-
-fn print_version_full()
-{
-	print_version_short();
-	println!("https://github.com/hlorenzi/customasm");
+		env!("VERGEN_CARGO_TARGET_TRIPLE"));
 }
 
 

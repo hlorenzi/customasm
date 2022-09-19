@@ -1,7 +1,6 @@
 /target/
 /pkg/
 /.pkgtemp/
-/Cargo.lock
 /test.asm
 
 /web/customasm.gc.wasm
