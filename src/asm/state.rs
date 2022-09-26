@@ -1457,6 +1457,11 @@ impl State
 				else
 				{
 					subs_tokens.push(subs_parser.advance());
+
+					if let Some(tk_whitespace) = subs_parser.maybe_expect_unacknowledged_whitespace()
+					{
+						subs_tokens.push(tk_whitespace);
+					}
 				}
 			}
 

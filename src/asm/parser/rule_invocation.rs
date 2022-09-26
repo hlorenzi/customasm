@@ -249,6 +249,9 @@ pub fn match_rule<'a>(
             "> try match rule `{}`",
             fileserver.get_excerpt(&rule.span));
         println!(
+            "> rule patterns:\n{:#?}",
+            &rule.pattern);
+        println!(
             "  parser at `{}`",
             fileserver.get_excerpt(&subparser.get_next_spans(100)));
     }
@@ -271,10 +274,20 @@ pub fn match_rule<'a>(
                 {
                     if DEBUG
                     {
-                        println!("- branch {}, try match exact `{}`", branch_index, c);
+                        println!(
+                            "- branch {}, try match exact `{}`, parser at `{}` (ws: {})",
+                            branch_index,
+                            c,
+                            fileserver.get_excerpt(&branch.parser.get_next_spans(100)),
+                            branch.parser.next_is_whitespace());
                     }
-                    
-                    if branch.parser.next_partial().to_ascii_lowercase() != *c
+
+                    if branch.parser.next_is_whitespace() &&
+                        !branch.parser.is_whitespace_acknowledged()
+                    {
+                        branch.dead = true;
+                    }
+                    else if branch.parser.next_partial().to_ascii_lowercase() != *c
                     {
                         branch.dead = true;
                     }
@@ -284,7 +297,36 @@ pub fn match_rule<'a>(
 
                         if DEBUG
                         {
-                            println!("  branch {}, exact matched! parser at `{}`",
+                            println!(
+                                "  branch {}, exact matched! parser at `{}` (ws: {})",
+                                branch_index,
+                                fileserver.get_excerpt(&branch.parser.get_next_spans(100)),
+                                branch.parser.next_is_whitespace());
+                        }
+                    }
+                }
+
+                asm::PatternPart::Whitespace =>
+                {
+                    if DEBUG
+                    {
+                        println!(
+                            "- branch {}, try match whitespace, parser at `{}` (ws: {:?})",
+                            branch_index,
+                            fileserver.get_excerpt(&branch.parser.get_next_spans(100)),
+                            branch.parser.next_is_whitespace());
+                    }
+
+                    if let None = branch.parser.maybe_expect_whitespace()
+                    {
+                        branch.dead = true;
+                    }
+                    else
+                    {
+                        if DEBUG
+                        {
+                            println!(
+                                "  branch {}, whitespace matched! parser at `{}`",
                                 branch_index,
                                 fileserver.get_excerpt(&branch.parser.get_next_spans(100)));
                         }
@@ -304,7 +346,10 @@ pub fn match_rule<'a>(
                         {
                             if DEBUG
                             {
-                                println!("- branch {}, try match expr", branch_index);
+                                println!(
+                                    "- branch {}, try match expr, parser at `{}`",
+                                    branch_index,
+                                    fileserver.get_excerpt(&branch.parser.get_next_spans(100)));
                             }
                             
                             if branch.parser.is_at_partial()
@@ -328,7 +373,15 @@ pub fn match_rule<'a>(
                                 let mut expr_parser = branch.parser.clone();
                                 let mut expr_using_slice = false;
 
-                                let next_part = rule.pattern.get(index + 1);
+                                let next_part = rule.pattern_get_next_non_whitespace(index);
+
+                                if DEBUG
+                                {
+                                    println!(
+                                        "  branch {}, expr check next pattern part: {:?}",
+                                        branch_index,
+                                        next_part);
+                                }
 
                                 if let Some(asm::PatternPart::Exact(next_part_char)) = next_part
                                 {
@@ -342,7 +395,7 @@ pub fn match_rule<'a>(
                                 if DEBUG
                                 {
                                     println!(
-                                        "  branch {}, parser {}at `{}`",
+                                        "  branch {}, expr parser {}at `{}`",
                                         branch_index,
                                         if expr_using_slice { "using slice " } else { "" },
                                         fileserver.get_excerpt(&expr_parser.get_next_spans(100)));
@@ -366,9 +419,10 @@ pub fn match_rule<'a>(
 
                                     if DEBUG
                                     {
-                                        println!("  branch {}, expr matched! parser at `{}`",
+                                        println!("  branch {}, expr matched! parser at `{}` (ws: {:?})",
                                             branch_index,
-                                            fileserver.get_excerpt(&branch.parser.get_next_spans(100)));
+                                            fileserver.get_excerpt(&branch.parser.get_next_spans(100)),
+                                            branch.parser.next_is_whitespace());
                                     }
                                 }
                             }
@@ -382,7 +436,15 @@ pub fn match_rule<'a>(
                             let mut subparser_using_slice = false;
                             let mut subparser_offset = 0;
 
-                            let next_part = rule.pattern.get(index + 1);
+                            let next_part = rule.pattern_get_next_non_whitespace(index);
+
+                            if DEBUG
+                            {
+                                println!(
+                                    "  branch {}, subrule check next pattern part: {:?}",
+                                    branch_index,
+                                    next_part);
+                            }
 
                             if let Some(asm::PatternPart::Exact(next_part_char)) = next_part
                             {
@@ -435,8 +497,9 @@ pub fn match_rule<'a>(
                                     if DEBUG
                                     {
                                         println!(
-                                            "  continue branch, parser at `{}`",
-                                            fileserver.get_excerpt(&new_parser.get_next_spans(100)));
+                                            "  continue branch, parser at `{}` (ws: {:?})",
+                                            fileserver.get_excerpt(&new_parser.get_next_spans(100)),
+                                            new_parser.next_is_whitespace());
                                     }
         
                                     new_branches.push(ParsingBranch

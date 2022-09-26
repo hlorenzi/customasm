@@ -11,6 +11,8 @@ pub struct Parser<'a>
 	index: usize,
 	index_prev: usize,
 	read_linebreak: bool,
+	read_whitespace_index: Option<usize>,
+	read_whitespace_acknowledged: bool,
 	partial_index: usize
 }
 
@@ -20,6 +22,8 @@ pub struct ParserState
 	index: usize,
 	index_prev: usize,
 	read_linebreak: bool,
+	read_whitespace_index: Option<usize>,
+	read_whitespace_acknowledged: bool,
 	partial_index: usize
 }
 
@@ -37,6 +41,8 @@ impl<'a> Parser<'a>
 			index: 0,
 			index_prev: 0,
 			read_linebreak: false,
+			read_whitespace_index: None,
+			read_whitespace_acknowledged: true,
 			partial_index: 0
 		};
 		
@@ -319,6 +325,8 @@ impl<'a> Parser<'a>
 			index: self.index,
 			index_prev: self.index_prev,
 			read_linebreak: self.read_linebreak,
+			read_whitespace_index: self.read_whitespace_index,
+			read_whitespace_acknowledged: self.read_whitespace_acknowledged,
 			partial_index: self.partial_index
 		}
 	}
@@ -326,11 +334,7 @@ impl<'a> Parser<'a>
 	
 	pub fn restore(&mut self, state: ParserState)
 	{
-		self.index = state.index;
-		self.index_prev = state.index_prev;
-		self.read_linebreak = state.read_linebreak;
-		self.partial_index = state.partial_index;
-		self.skip_ignorable();
+		self.restore_with_offset(state, 0);
 	}
 	
 	
@@ -339,6 +343,8 @@ impl<'a> Parser<'a>
 		self.index = state.index + offset;
 		self.index_prev = state.index_prev + offset;
 		self.read_linebreak = state.read_linebreak;
+		self.read_whitespace_index = state.read_whitespace_index;
+		self.read_whitespace_acknowledged = state.read_whitespace_acknowledged;
 		self.partial_index = state.partial_index;
 		self.skip_ignorable();
 	}
@@ -350,7 +356,7 @@ impl<'a> Parser<'a>
 	}
 	
 	
-	fn skip_ignorable(&mut self)
+	pub fn skip_ignorable(&mut self)
 	{
 		while self.index < self.tokens.len() &&
 			self.tokens[self.index].kind.ignorable()
@@ -358,10 +364,12 @@ impl<'a> Parser<'a>
 			if self.tokens[self.index].kind == TokenKind::LineBreak
 				{ self.read_linebreak = true; }
 			
-			/*if self.tokens[self.index].kind == TokenKind::Comment &&
-				self.tokens[self.index].excerpt.as_ref().unwrap().chars().any(|c| c == '\n')
-				{ self.read_linebreak = true; }*/
-
+			if self.tokens[self.index].kind == TokenKind::Whitespace
+			{
+				self.read_whitespace_index = Some(self.index);
+				self.read_whitespace_acknowledged = false;
+			}
+			
 			self.index += 1;
 		}
 	}
@@ -380,6 +388,7 @@ impl<'a> Parser<'a>
 			{ self.index += 1; }
 		
 		self.read_linebreak = false;
+		
 		self.skip_ignorable();
 		token
 	}
@@ -439,12 +448,6 @@ impl<'a> Parser<'a>
 	{
 		self.tokens[self.index_prev].clone()
 	}
-	
-	
-	pub fn clear_linebreak(&mut self)
-	{
-		self.read_linebreak = false;
-	}
 
 
 	pub fn is_at_partial(&self) -> bool
@@ -477,7 +480,10 @@ impl<'a> Parser<'a>
 	pub fn maybe_expect(&mut self, kind: TokenKind) -> Option<Token>
 	{
 		if self.next_is(0, kind)
-			{ Some(self.advance()) }
+		{
+			self.acknowledge_whitespace();
+			Some(self.advance())
+		}
 		else
 			{ None }
 	}
@@ -520,6 +526,88 @@ impl<'a> Parser<'a>
 	}
 	
 	
+	pub fn acknowledge_whitespace(&mut self)
+	{
+		self.read_whitespace_acknowledged = true;
+	}
+
+
+	pub fn is_whitespace_acknowledged(&self) -> bool
+	{
+		self.read_whitespace_acknowledged
+	}
+	
+	
+	pub fn next_is_whitespace(&self) -> bool
+	{
+		if self.is_over()
+		{
+			true
+		}
+		else if let Some(index) = self.read_whitespace_index
+		{
+			if index + 1 == self.index
+			{
+				true
+			}
+			else
+			{
+				false
+			}
+		}
+		else
+		{
+			false
+		}
+	}
+	
+	
+	pub fn maybe_expect_whitespace(&mut self) -> Option<Token>
+	{
+		if let Some(index) = self.read_whitespace_index
+		{
+			let token = self.tokens[index].clone();
+			self.acknowledge_whitespace();
+			Some(token)
+		}
+		else if self.is_over()
+		{
+			let token = syntax::Token {
+				kind: TokenKind::Whitespace,
+				span: diagn::Span::new_dummy(),
+				excerpt: None,
+			};
+			Some(token)
+		}
+		else
+			{ None }
+	}
+	
+	
+	pub fn maybe_expect_unacknowledged_whitespace(&mut self) -> Option<Token>
+	{
+		if self.read_whitespace_acknowledged
+		{
+			return None;
+		}
+
+		if let Some(index) = self.read_whitespace_index
+		{
+			let token = self.tokens[index].clone();
+			self.acknowledge_whitespace();
+			Some(token)
+		}
+		else
+			{ None }
+	}
+	
+	
+	pub fn clear_linebreak(&mut self)
+	{
+		self.read_linebreak = false;
+	}
+	
+	
 	pub fn next_is_linebreak(&self) -> bool
 	{
 		self.read_linebreak || self.is_over()
@@ -530,7 +618,7 @@ impl<'a> Parser<'a>
 	{
 		if self.next_is_linebreak()
 		{
-			self.read_linebreak = false;
+			self.clear_linebreak();
 			Some(())
 		}
 		else

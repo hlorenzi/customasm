@@ -16,6 +16,7 @@ pub enum PatternPart
 {
     Exact(char),
     Parameter(usize),
+    Whitespace,
 }
 
 
@@ -62,12 +63,37 @@ impl Rule
 	}
 	
 	
+	pub fn pattern_add_whitespace(&mut self)
+	{
+		self.pattern.push(PatternPart::Whitespace);
+	}
+	
+	
 	pub fn pattern_add_parameter(&mut self, param: PatternParameter)
 	{
         let param_index = self.parameters.len();
         self.parameters.push(param);
 		self.pattern.push(PatternPart::Parameter(param_index));
 	}
+
+
+    pub fn pattern_get_next_non_whitespace(&self, next_from: usize) -> Option<&PatternPart>
+    {
+        let mut i = next_from + 1;
+
+        while i < self.pattern.len()
+        {
+            if let PatternPart::Whitespace = self.pattern[i]
+            {
+                i += 1;
+                continue;
+            }
+
+            return Some(&self.pattern[i]);
+        }
+
+        None
+    }
 
 
     pub fn get_specificity_score(&self) -> usize

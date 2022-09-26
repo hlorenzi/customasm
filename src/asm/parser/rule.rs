@@ -9,6 +9,8 @@ pub fn parse_rule(
     let mut rule = asm::Rule::new();
     let mut empty_pattern = false;
 
+    state.parser.acknowledge_whitespace();
+
     while !state.parser.next_is(0, syntax::TokenKind::HeavyArrowRight)
     {
         let tk = state.parser.advance();
@@ -66,6 +68,14 @@ pub fn parse_rule(
         {
             state.report.error_span("invalid pattern token", &tk.span);
             return Err(());
+        }
+
+        if !state.parser.next_is(0, syntax::TokenKind::HeavyArrowRight)
+        {
+            if state.parser.maybe_expect_unacknowledged_whitespace().is_some()
+            {
+                rule.pattern_add_whitespace();
+            }
         }
     }
 

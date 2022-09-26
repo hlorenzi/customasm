@@ -112,14 +112,6 @@ impl TokenKind
 	}
 	
 	
-	pub fn is_allowed_after_pattern_parameter(self) -> bool
-	{
-		self == TokenKind::ParenClose ||
-		self == TokenKind::BracketClose ||
-		self == TokenKind::Comma
-	}
-	
-	
 	pub fn printable(self) -> &'static str
 	{
 		match self
