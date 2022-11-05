@@ -378,34 +378,34 @@ impl util::BitVec
 	
 	pub fn format_vhdl_b_array(&self, wordsize: usize) -> String
 	{
-		"(\n  \"".to_owned() + self.format_str(1).chars()
+		"(\n  \"".to_owned() + &self.format_str(1).chars()
 			.enumerate()
 			.flat_map(|(i, c)| {
 				if i != 0 && i % wordsize == 0 {
-					Some('\n')
+					vec!['"', ',', '\n', ' ', ' ', '"']
 				} else {
-					None
+					vec![]
 				}
 				.into_iter()
 				.chain(std::iter::once(c))
 			})
-			.collect::<String>().replace("\n", "\",\n  \"").remove_last().remove_last().remove_last() + ")"
+			.collect::<String>() + "\"\n)"
 	}
 
 	pub fn format_vhdl_h_array(&self, wordsize: usize) -> String
 	{
-		"(\n  x\"".to_owned() + self.format_str(4).chars()
+		"(\n  x\"".to_owned() + &self.format_str(4).chars()
 			.enumerate()
 			.flat_map(|(i, c)| {
 				if i != 0 && i % (wordsize / 4) == 0 {
-					Some('\n')
+					vec!['"', ',', '\n', ' ', ' ', 'x', '"']
 				} else {
-					None
+					vec![]
 				}
 				.into_iter()
 				.chain(std::iter::once(c))
 			})
-			.collect::<String>().replace("\n", "\",\n  x\"").remove_last().remove_last().remove_last().remove_last() + ")"
+			.collect::<String>() + "\"\n)"
 	}
 
 	
