@@ -1,5 +1,18 @@
 use crate::*;
 
+trait StrExt {
+    fn remove_last(&self) -> &str;
+}
+
+impl StrExt for str {
+    fn remove_last(&self) -> &str {
+        match self.char_indices().next_back() {
+            Some((i, _)) => &self[..i],
+            None => self,
+        }
+    }
+}
+
 
 impl util::BitVec
 {
@@ -362,6 +375,39 @@ impl util::BitVec
 		result
 	}
 	
+	
+	pub fn format_vhdl_b_array(&self, wordsize: usize) -> String
+	{
+		"(\n  \"".to_owned() + self.format_str(1).chars()
+			.enumerate()
+			.flat_map(|(i, c)| {
+				if i != 0 && i % wordsize == 0 {
+					Some('\n')
+				} else {
+					None
+				}
+				.into_iter()
+				.chain(std::iter::once(c))
+			})
+			.collect::<String>().replace("\n", "\",\n  \"").remove_last().remove_last().remove_last() + ")"
+	}
+
+	pub fn format_vhdl_h_array(&self, wordsize: usize) -> String
+	{
+		"(\n  x\"".to_owned() + self.format_str(4).chars()
+			.enumerate()
+			.flat_map(|(i, c)| {
+				if i != 0 && i % (wordsize / 4) == 0 {
+					Some('\n')
+				} else {
+					None
+				}
+				.into_iter()
+				.chain(std::iter::once(c))
+			})
+			.collect::<String>().replace("\n", "\",\n  x\"").remove_last().remove_last().remove_last().remove_last() + ")"
+	}
+
 	
 	// From: https://github.com/milanvidakovic/customasm/blob/master/src/asm/binary_output.rs#L84
 	pub fn format_logisim(&self, bits_per_chunk: usize) -> String

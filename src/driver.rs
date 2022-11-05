@@ -19,6 +19,8 @@ enum OutputFormat
 	HexComma,
 	DecC,
 	HexC,
+	BinVHDL,
+	HexVHDL,
 	LogiSim8,
 	LogiSim16,
 	AddressSpan,
@@ -103,6 +105,9 @@ fn drive_inner(
 		Some("decc")      => OutputFormat::DecC,
 		Some("hexc")      => OutputFormat::HexC,
 		Some("c")         => OutputFormat::HexC,
+		Some("binvhdl")      => OutputFormat::BinVHDL,
+		Some("hexvhdl")      => OutputFormat::HexVHDL,
+		Some("vhdl")         => OutputFormat::HexVHDL,
 		Some("logisim8")  => OutputFormat::LogiSim8,
 		Some("logisim16") => OutputFormat::LogiSim16,
 		Some("addrspan")  => OutputFormat::AddressSpan,
@@ -217,20 +222,22 @@ fn drive_inner(
 	{
 		OutputFormat::Binary    => binary.format_binary(),
 		
-		OutputFormat::BinStr    => binary.format_binstr  ()  .bytes().collect(),
-		OutputFormat::BinLine   => binary.format_binline (output.state.cur_wordsize)  .bytes().collect(),
-		OutputFormat::HexStr    => binary.format_hexstr  ()  .bytes().collect(),
-		OutputFormat::HexLine   => binary.format_hexline (output.state.cur_wordsize)  .bytes().collect(),
-		OutputFormat::BinDump   => binary.format_bindump ()  .bytes().collect(),
-		OutputFormat::HexDump   => binary.format_hexdump ()  .bytes().collect(),
-		OutputFormat::Mif       => binary.format_mif     ()  .bytes().collect(),
-		OutputFormat::IntelHex  => binary.format_intelhex()  .bytes().collect(),
-		OutputFormat::DecComma  => binary.format_comma   (10).bytes().collect(),
-		OutputFormat::HexComma  => binary.format_comma   (16).bytes().collect(),
-		OutputFormat::DecC      => binary.format_c_array (10).bytes().collect(),
-		OutputFormat::HexC      => binary.format_c_array (16).bytes().collect(),
-		OutputFormat::LogiSim8  => binary.format_logisim (8) .bytes().collect(),
-		OutputFormat::LogiSim16 => binary.format_logisim (16).bytes().collect(),
+		OutputFormat::BinStr    => binary.format_binstr      ()  .bytes().collect(),
+		OutputFormat::BinLine   => binary.format_binline     (output.state.cur_wordsize)  .bytes().collect(),
+		OutputFormat::HexStr    => binary.format_hexstr      ()  .bytes().collect(),
+		OutputFormat::HexLine   => binary.format_hexline     (output.state.cur_wordsize)  .bytes().collect(),
+		OutputFormat::BinDump   => binary.format_bindump     ()  .bytes().collect(),
+		OutputFormat::HexDump   => binary.format_hexdump     ()  .bytes().collect(),
+		OutputFormat::Mif       => binary.format_mif         ()  .bytes().collect(),
+		OutputFormat::IntelHex  => binary.format_intelhex    ()  .bytes().collect(),
+		OutputFormat::DecComma  => binary.format_comma       (10).bytes().collect(),
+		OutputFormat::HexComma  => binary.format_comma       (16).bytes().collect(),
+		OutputFormat::DecC      => binary.format_c_array     (10).bytes().collect(),
+		OutputFormat::HexC      => binary.format_c_array     (16).bytes().collect(),
+		OutputFormat::BinVHDL   => binary.format_vhdl_b_array(output.state.cur_wordsize)  .bytes().collect(),
+		OutputFormat::HexVHDL   => binary.format_vhdl_h_array(output.state.cur_wordsize)  .bytes().collect(),
+		OutputFormat::LogiSim8  => binary.format_logisim     (8) .bytes().collect(),
+		OutputFormat::LogiSim16 => binary.format_logisim     (16).bytes().collect(),
 		
 		OutputFormat::AnnotatedHex => binary.format_annotated_hex(fileserver).bytes().collect(),
 		OutputFormat::AnnotatedBin => binary.format_annotated_bin(fileserver).bytes().collect(),
@@ -295,7 +302,7 @@ fn drive_inner(
 fn make_opts() -> getopts::Options
 {
     let mut opts = getopts::Options::new();
-    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, binline, hexstr, hexline, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16, addrspan", "FORMAT");
+    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, binline, hexstr, hexline, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, binvhdl, hexvhdl, logisim8, logisim16, addrspan", "FORMAT");
     opts.opt("o", "output", "The name of the output file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.optopt("", "symbol-format", "The format of the symbol file. Possible formats: default, mesen-mlb", "SYMBOL-FORMAT");
     opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
