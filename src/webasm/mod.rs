@@ -35,10 +35,10 @@ pub unsafe extern fn wasm_assemble(format: u32, src: *mut String) -> *mut String
 			11 => Ok(binary.format_comma       (16)),
 			12 => Ok(binary.format_c_array     (10)),
 			13 => Ok(binary.format_c_array     (16)),
-			12 => Ok(binary.format_vhdl_b_array(output.state.cur_wordsize)),
-			13 => Ok(binary.format_vhdl_h_array(output.state.cur_wordsize)),
-			14 => Ok(binary.format_logisim     (8)),
-			15 => Ok(binary.format_logisim     (16)),
+			14 => Ok(binary.format_vhdl_b_array(output.state.cur_wordsize)),
+			15 => Ok(binary.format_vhdl_h_array(output.state.cur_wordsize)),
+			16 => Ok(binary.format_logisim     (8)),
+			17 => Ok(binary.format_logisim     (16)),
 			_ => unreachable!()
 		}
 	};
