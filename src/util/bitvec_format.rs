@@ -218,7 +218,7 @@ impl util::BitVec {
 
         let addr_max_width = format!("{:x}", byte_num - 1).len();
 
-        let fmt_byte: Fn(u8) -> String = match data_radix {
+        let fmt_byte: impl Fn(u8) -> String = match data_radix {
             1 => |byte: u8| -> String { format!("{:01$b};\n", byte, wordsize / 1) },
             2 => |byte: u8| -> String { format!("{:01$o};\n", byte, wordsize / 2) },
             4 => |byte: u8| -> String { format!("{:01$X};\n", byte, wordsize / 4) },
