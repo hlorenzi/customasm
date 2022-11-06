@@ -219,10 +219,10 @@ impl util::BitVec {
         let addr_max_width = format!("{:x}", byte_num - 1).len();
 
         let fmt_byte = match data_radix {
-            1 => |byte: u8| format!("{:02b};\n", byte),
-            2 => |byte: u8| format!("{:02o};\n", byte),
-            4 => |byte: u8| format!("{:02X};\n", byte),
-            _ => |byte: u8| format!("{:02X};\n", byte),
+            1 => |byte: u8| format!("{:01$b};\n", byte),
+            2 => |byte: u8| format!("{:01$o};\n", byte),
+            4 => |byte: u8| format!("{:01$X};\n", byte),
+            _ => |byte: u8| format!("{:01$X};\n", byte),
         };
 
         let mut index = 0;
