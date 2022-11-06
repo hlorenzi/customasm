@@ -39,6 +39,22 @@ impl util::BitVec {
             .collect::<String>()
     }
 
+    pub fn format_coe(&self, wordsize: usize) -> String {
+        "memory_initialization_radix=2;\nmemory_initialization_vector=\n".to_owned() + &self.format_str(1)
+            .chars()
+            .enumerate()
+            .flat_map(|(i, c)| {
+                if i != 0 && i % wordsize == 0 {
+                    vec![',', '\n']
+                } else {
+                    vec![]
+                }
+                .into_iter()
+                .chain(std::iter::once(c))
+            })
+            .collect::<String>() + ";"
+    }
+
     pub fn format_hexstr(&self) -> String {
         self.format_str(4)
     }
