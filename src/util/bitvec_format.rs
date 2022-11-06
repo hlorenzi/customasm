@@ -218,25 +218,26 @@ impl util::BitVec {
 
         let addr_max_width = format!("{:x}", byte_num - 1).len();
 
-        let fmt_byte: dyn Fn(u8) -> String = match data_radix {
-            1 => |byte: u8| -> String { format!("{:01$b};\n", byte, wordsize / 1) },
-            2 => |byte: u8| -> String { format!("{:01$o};\n", byte, wordsize / 2) },
-            4 => |byte: u8| -> String { format!("{:01$X};\n", byte, wordsize / 4) },
-            _ => |byte: u8| -> String { format!("{:01$X};\n", byte, wordsize / 4) },
+        let word_length = (wordsize + data_radix-1) / data_radix;
+        let fmt_word: _ = match data_radix {
+            1 => |word: usize| format!("{:b}", word),
+            2 => |word: usize| format!("{:o}", word),
+            4 => |word: usize| format!("{:X}", word),
+            _ => |word: usize| format!("{:X}", word),
         };
 
         let mut index = 0;
         while index < self.len() {
             result.push_str(&format!(" {:1$X}: ", index / 8, addr_max_width));
 
-            let mut byte: u8 = 0;
-            for _ in 0..8 {
-                byte <<= 1;
-                byte |= if self.read(index) { 1 } else { 0 };
+            let mut word: usize = 0;
+            for _ in 0..wordsize {
+                word <<= 1;
+                word |= if self.read(index) { 1 } else { 0 };
                 index += 1;
             }
 
-            result.push_str(&fmt_byte(byte));
+            result.push_str(&format!("{:0>1$};\n", fmt_word(word), word_length));
         }
 
         result.push_str("END;");
