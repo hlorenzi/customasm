@@ -228,50 +228,6 @@ pub fn excerpt_as_bigint(report: Option<RcReport>, excerpt: &str, span: &Span) -
 }
 
 
-fn parse_width(report: RcReport, chars: &[char], span: &Span) -> Result<(Option<usize>, usize), ()>
-{
-	if !chars.iter().any(|c| *c == '\'')
-		{ return Ok((None, 0)); }
-
-	let mut width: usize = 0;
-	let mut index = 0;
-	loop
-	{
-		let c = chars[index];
-		index += 1;
-		
-		if c == '_'
-			{ continue; }
-			
-		if c == '\''
-			{ break; }
-		
-		let digit = match c.to_digit(10)
-		{
-			Some(d) => d,
-			None => return Err(report.error_span("invalid digits in width specifier", span))
-		};
-		
-		width = match width.checked_mul(10)
-		{
-			Some(v) => v,
-			None => return Err(report.error_span("width specifier is too large", span))
-		};
-		
-		width = match width.checked_add(digit as usize)
-		{
-			Some(v) => v,
-			None => return Err(report.error_span("width specifier is too large", span))
-		};
-	}
-	
-	if width == 0
-		{ return Err(report.error_span("invalid width specifier", span)); }
-	
-	Ok((Some(width), index))
-}
-
-
 fn parse_radix(chars: &[char], index: usize) -> (usize, usize)
 {
 	if chars[index] == '0' && index + 1 < chars.len()

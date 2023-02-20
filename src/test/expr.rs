@@ -57,9 +57,10 @@ fn test_literals()
 	test("0o10a", Fail(("test", 1, "invalid")));
 	test("0x10g", Fail(("test", 1, "invalid")));
 	
-	test("8'0x0",    Fail(("test", 1, "invalid")));
-	test("0b8'0x00", Fail(("test", 1, "invalid")));
-	test("0x8'0x00", Fail(("test", 1, "invalid")));
+	test("8'5",      Fail(("test", 1, "unexpected character")));
+	test("8'0x0",    Fail(("test", 1, "unexpected character")));
+	test("0b8'0x00", Fail(("test", 1, "unexpected character")));
+	test("0x8'0x00", Fail(("test", 1, "unexpected character")));
 }
 
 
