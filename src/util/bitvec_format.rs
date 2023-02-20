@@ -252,7 +252,7 @@ impl util::BitVec
 	}
 	
 	
-	pub fn format_comma(&self, radix: usize) -> String
+	pub fn format_separator(&self, radix: usize, separator: &str) -> String
 	{
 		let mut result = String::new();
 		
@@ -276,7 +276,7 @@ impl util::BitVec
 			
 			if index < self.len()
 			{ 
-				result.push_str(", ");
+				result.push_str(separator);
 				
 				if (index / 8) % 16 == 0
 					{ result.push('\n'); }

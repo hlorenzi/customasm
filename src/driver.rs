@@ -15,6 +15,8 @@ enum OutputFormat
 	IntelHex,
 	DecComma,
 	HexComma,
+	DecSpace,
+	HexSpace,
 	DecC,
 	HexC,
 	LogiSim8,
@@ -97,6 +99,8 @@ fn drive_inner(
 		Some("intelhex")  => OutputFormat::IntelHex,
 		Some("deccomma")  => OutputFormat::DecComma,
 		Some("hexcomma")  => OutputFormat::HexComma,
+		Some("decspace")  => OutputFormat::DecSpace,
+		Some("hexspace")  => OutputFormat::HexSpace,
 		Some("decc")      => OutputFormat::DecC,
 		Some("hexc")      => OutputFormat::HexC,
 		Some("c")         => OutputFormat::HexC,
@@ -214,18 +218,20 @@ fn drive_inner(
 	{
 		OutputFormat::Binary    => binary.format_binary(),
 		
-		OutputFormat::BinStr    => binary.format_binstr  ()  .bytes().collect(),
-		OutputFormat::HexStr    => binary.format_hexstr  ()  .bytes().collect(),
-		OutputFormat::BinDump   => binary.format_bindump ()  .bytes().collect(),
-		OutputFormat::HexDump   => binary.format_hexdump ()  .bytes().collect(),
-		OutputFormat::Mif       => binary.format_mif     ()  .bytes().collect(),
-		OutputFormat::IntelHex  => binary.format_intelhex()  .bytes().collect(),
-		OutputFormat::DecComma  => binary.format_comma   (10).bytes().collect(),
-		OutputFormat::HexComma  => binary.format_comma   (16).bytes().collect(),
-		OutputFormat::DecC      => binary.format_c_array (10).bytes().collect(),
-		OutputFormat::HexC      => binary.format_c_array (16).bytes().collect(),
-		OutputFormat::LogiSim8  => binary.format_logisim (8) .bytes().collect(),
-		OutputFormat::LogiSim16 => binary.format_logisim (16).bytes().collect(),
+		OutputFormat::BinStr    => binary.format_binstr()           .bytes().collect(),
+		OutputFormat::HexStr    => binary.format_hexstr()           .bytes().collect(),
+		OutputFormat::BinDump   => binary.format_bindump()          .bytes().collect(),
+		OutputFormat::HexDump   => binary.format_hexdump()          .bytes().collect(),
+		OutputFormat::Mif       => binary.format_mif()              .bytes().collect(),
+		OutputFormat::IntelHex  => binary.format_intelhex()         .bytes().collect(),
+		OutputFormat::DecComma  => binary.format_separator(10, ", ").bytes().collect(),
+		OutputFormat::HexComma  => binary.format_separator(16, ", ").bytes().collect(),
+		OutputFormat::DecSpace  => binary.format_separator(10, " ") .bytes().collect(),
+		OutputFormat::HexSpace  => binary.format_separator(16, " ") .bytes().collect(),
+		OutputFormat::DecC      => binary.format_c_array(10)        .bytes().collect(),
+		OutputFormat::HexC      => binary.format_c_array(16)        .bytes().collect(),
+		OutputFormat::LogiSim8  => binary.format_logisim(8)         .bytes().collect(),
+		OutputFormat::LogiSim16 => binary.format_logisim(16)        .bytes().collect(),
 		
 		OutputFormat::AnnotatedHex => binary.format_annotated_hex(fileserver).bytes().collect(),
 		OutputFormat::AnnotatedBin => binary.format_annotated_bin(fileserver).bytes().collect(),
@@ -290,7 +296,7 @@ fn drive_inner(
 fn make_opts() -> getopts::Options
 {
     let mut opts = getopts::Options::new();
-    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, logisim8, logisim16, addrspan", "FORMAT");
+    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decspace, hexspace, decc, hexc, logisim8, logisim16, addrspan", "FORMAT");
     opts.opt("o", "output", "The name of the output file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.optopt("", "symbol-format", "The format of the symbol file. Possible formats: default, mesen-mlb", "SYMBOL-FORMAT");
     opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);

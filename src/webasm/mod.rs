@@ -29,12 +29,14 @@ pub unsafe extern fn wasm_assemble(format: u32, src: *mut String) -> *mut String
 			 5 => Ok(binary.format_binstr  ()),
 			 6 => Ok(binary.format_mif     ()),
 			 7 => Ok(binary.format_intelhex()),
-			 8 => Ok(binary.format_comma   (10)),
-			 9 => Ok(binary.format_comma   (16)),
-			10 => Ok(binary.format_c_array (10)),
-			11 => Ok(binary.format_c_array (16)),
-			12 => Ok(binary.format_logisim (8)),
-			13 => Ok(binary.format_logisim (16)),
+			 8 => Ok(binary.format_separator(10, ", ")),
+			 9 => Ok(binary.format_separator(16, ", ")),
+			10 => Ok(binary.format_separator(10, " ")),
+			11 => Ok(binary.format_separator(16, " ")),
+			12 => Ok(binary.format_c_array (10)),
+			13 => Ok(binary.format_c_array (16)),
+			14 => Ok(binary.format_logisim (8)),
+			15 => Ok(binary.format_logisim (16)),
 			_ => unreachable!()
 		}
 	};
