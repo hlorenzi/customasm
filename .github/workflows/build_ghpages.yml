@@ -1,0 +1,39 @@
+name: Build GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@master
+      with:
+        fetch-depth: 0
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        target: wasm32-unknown-unknown
+        profile: minimal
+        override: true
+
+    - run: git branch -D ghpages
+      continue-on-error: true
+
+    - run: git checkout -b ghpages
+    - run: rm .gitignore
+    - run: mv .gitignore.ghpages .gitignore
+    - run: cargo build --lib --target wasm32-unknown-unknown --release
+    - run: cargo install wasm-gc
+    - run: wasm-gc ./target/wasm32-unknown-unknown/release/customasm.wasm -o ./target/wasm32-unknown-unknown/release/customasm.gc.wasm
+    - run: mv ./target/wasm32-unknown-unknown/release/customasm.gc.wasm ./web/customasm.gc.wasm
+    - run: git config user.name github-actions
+    - run: git config user.email github-actions@github.com
+    - run: git add -A
+    - run: git commit -m "build GitHub Pages"
+    - run: git push -f origin ghpages
