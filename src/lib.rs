@@ -14,6 +14,8 @@ pub mod asm;
 pub mod util;
 pub mod driver;
 
+pub mod asm2;
+
 
 pub mod webasm;
 

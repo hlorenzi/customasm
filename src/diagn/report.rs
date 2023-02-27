@@ -42,6 +42,9 @@ pub enum MessageKind
 }
 
 
+pub struct ReportErrorGuard(usize);
+
+
 #[derive(Clone)]
 pub struct RcReport
 {
@@ -205,6 +208,26 @@ impl Report
 		{
 			self.messages.push(msg);
 		}
+	}
+
+
+	pub fn get_error_guard(&self) -> ReportErrorGuard
+	{
+		ReportErrorGuard(self.messages.len())
+	}
+
+
+	pub fn stop_at_errors(&self, since: ReportErrorGuard) -> Result<(), ()>
+	{
+		for msg in &self.messages[since.0..]
+		{
+			if let MessageKind::Error = msg.kind
+			{
+				return Err(());
+			}
+		}
+
+		Ok(())
 	}
 	
 	

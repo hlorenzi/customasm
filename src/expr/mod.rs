@@ -1,5 +1,6 @@
 mod expression;
 mod parser;
+mod parser2;
 mod inspect;
 mod eval;
 
@@ -13,3 +14,4 @@ pub use self::eval::EvalContext;
 pub use self::eval::EvalVariableInfo;
 pub use self::eval::EvalFunctionInfo;
 pub use self::eval::EvalAsmInfo;
+pub use self::parser2::parse;
