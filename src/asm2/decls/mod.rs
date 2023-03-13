@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::*;
 
 
@@ -29,13 +31,12 @@ pub struct DeclMaps<T>
 }
 
 
-#[derive(Debug)]
 pub struct ItemRef<T>(pub(super) usize, std::marker::PhantomData<*const T>);
 
 
 impl<T> ItemRef<T>
 {
-    fn new(value: usize) -> Self
+    pub(super) fn new(value: usize) -> Self
     {
         ItemRef(value, std::marker::PhantomData)
     }
@@ -52,6 +53,22 @@ impl<T> Clone for ItemRef<T>
 
 
 impl<T> Copy for ItemRef<T> {}
+
+
+impl<T> Debug for ItemRef<T>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    {
+        let name = std::any::type_name::<T>();
+
+        f.write_str("ItemRef<")?;
+        f.write_str(name.rsplit_once("::").map(|n| n.1).unwrap_or(name))?;
+        f.write_str(">(")?;
+        self.0.fmt(f)?;
+        f.write_str(")")?;
+        Ok(())
+    }
+}
 
 
 impl<T> DeclMaps<T>

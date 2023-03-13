@@ -1,17 +1,18 @@
-use std::rc::Rc;
-
-
-#[derive(Debug, Clone, Hash, Eq)]
+#[derive(Clone, Hash, Eq)]
 pub struct Span
 {
-	pub file: Rc<String>,
+	pub file: std::rc::Rc<String>,
 	pub location: Option<(usize, usize)>
 }
 
 
 impl Span
 {
-	pub fn new(filename: Rc<String>, start: usize, end: usize) -> Span
+	pub fn new(
+		filename: std::rc::Rc<String>,
+		start: usize,
+		end: usize)
+		-> Span
 	{
 		Span
 		{
@@ -25,7 +26,7 @@ impl Span
 	{
 		Span
 		{
-			file: Rc::new("".to_string()),
+			file: std::rc::Rc::new("".to_string()),
 			location: None
 		}
 	}
@@ -100,4 +101,26 @@ impl PartialEq for Span
 	{
 		self.file == other.file && self.location == other.location
 	}
+}
+
+
+impl std::fmt::Debug for Span
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    {
+        f.write_str("Span(")?;
+        f.write_str(&self.file)?;
+
+		if let Some(location) = self.location
+		{
+			f.write_str("[")?;
+			<usize as std::fmt::Debug>::fmt(&location.0, f)?;
+			f.write_str("..")?;
+			<usize as std::fmt::Debug>::fmt(&location.1, f)?;
+			f.write_str("]")?;
+		}
+
+        f.write_str(")")?;
+        Ok(())
+    }
 }

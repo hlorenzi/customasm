@@ -5,6 +5,8 @@ use super::*;
 pub struct AstInstruction
 {
     pub tokens: Vec<syntax::Token>,
+
+    pub matches: asm2::InstructionMatches,
 }
 
 
@@ -21,5 +23,6 @@ pub fn parse(
     
     Ok(AstInstruction {
         tokens,
+        matches: asm2::InstructionMatches::new(),
     })
 }

@@ -323,7 +323,9 @@ impl<'tokens> TokenWalker<'tokens>
 		}
 		else
 		{
-			Some(self.clone_slice(start, end))
+			let mut new_walker = self.clone();
+			new_walker.tokens = &self.tokens[0..end];
+			Some(new_walker)
 		}
 	}
 	

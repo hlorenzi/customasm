@@ -40,11 +40,22 @@ pub mod defs;
 pub use defs::{
     ItemDefs,
     Ruledef,
+    Rule,
+    RuleParameter,
+    RuleParameterType,
+    RulePatternPart,
+};
+
+pub mod matcher;
+pub use matcher::{
+    InstructionMatches,
+    InstructionMatch,
+    InstructionArgument,
 };
 
 
 #[test]
-fn test_ast() -> Result<(), ()>
+fn test_new_asm() -> Result<(), ()>
 {
     let mut report = diagn::Report::new();
 
@@ -54,16 +65,25 @@ fn test_ast() -> Result<(), ()>
         #include "include.asm"
 
         loop:
+            hlt
             jmp loop
+            jmp loop 0x6666
+            jmp loop, 0x7777
     "#);
 
     fileserver.add("include.asm", r#"
         #ruledef {
-            jmp {addr: u16} {addr2: u32} => 0x55 @ addr
+            hlt => 0x1234
+            hlt => 0x5678
+            cld => 0x1111
+            jmp {addr: u16} {addr2: u32} => 0xa0 @ addr
+            jmp {addr: u16}, {addr2: u32} => 0xa1 @ addr
         }
 
         #ruledef hey {
-            jmp {addr: u16} => 0x55 @ addr
+            hlt => 0x9abc
+            jmp {addr: u16} => 0xb0 @ addr
+            jmp loop => 0xb1
         }
     "#);
 
@@ -77,7 +97,7 @@ fn test_ast() -> Result<(), ()>
 
         println!("{:#?}", ast);
 
-        let decls = decls::collect(
+        let mut decls = decls::collect(
             &mut report,
             &mut ast)?;
             
@@ -86,9 +106,15 @@ fn test_ast() -> Result<(), ()>
         let defs = defs::resolve(
             &mut report,
             &ast,
-            &decls)?;
+            &mut decls)?;
             
         println!("{:#?}", defs);
+
+        matcher::match_all(
+            &mut report,
+            &mut ast,
+            &decls,
+            &defs)?;
 
         Ok(())
     };

@@ -15,3 +15,4 @@ pub use self::eval::EvalVariableInfo;
 pub use self::eval::EvalFunctionInfo;
 pub use self::eval::EvalAsmInfo;
 pub use self::parser2::parse;
+pub use self::parser2::parse_optional;

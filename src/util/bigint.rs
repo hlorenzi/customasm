@@ -1,7 +1,7 @@
 use num_bigint;
 
 
-#[derive(Clone, Debug, Eq)]
+#[derive(Clone, Eq)]
 pub struct BigInt
 {
     bigint: num_bigint::BigInt,
@@ -253,6 +253,15 @@ impl BigInt
         }
         
         num_bigint::BigInt::from_signed_bytes_le(&lhs_bytes).into()
+    }
+}
+
+
+impl std::fmt::Debug for BigInt
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    {
+        f.write_str(&format!("{:#x}", self.bigint))
     }
 }
 

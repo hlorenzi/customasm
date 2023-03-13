@@ -2,7 +2,13 @@ use crate::*;
 
 
 mod ruledef;
-pub use ruledef::Ruledef;
+pub use ruledef::{
+    Ruledef,
+    Rule,
+    RuleParameter,
+    RuleParameterType,
+    RulePatternPart,
+};
 
 
 #[derive(Debug)]
@@ -51,7 +57,7 @@ impl<T> DefList<T>
 pub fn resolve(
     report: &mut diagn::Report,
     ast: &asm2::parser::AstTopLevel,
-    decls: &asm2::decls::ItemDecls)
+    decls: &mut asm2::decls::ItemDecls)
     -> Result<ItemDefs, ()>
 {
     let mut defs = ItemDefs {

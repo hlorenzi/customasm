@@ -51,7 +51,7 @@ pub enum RuleParameterType
 pub fn resolve(
     report: &mut diagn::Report,
     ast: &asm2::AstTopLevel,
-    decls: &asm2::ItemDecls,
+    decls: &mut asm2::ItemDecls,
     defs: &mut ItemDefs)
     -> Result<(), ()>
 {
@@ -60,7 +60,6 @@ pub fn resolve(
         if let asm2::AstNodeAny::DirectiveRuledef(node) = any_node
         {
             let item_ref = node.item_ref.unwrap();
-            let decl = decls.ruledefs.get(item_ref);
             
             let mut rules = Vec::new();
 
@@ -68,12 +67,13 @@ pub fn resolve(
             {
                 let rule = resolve_rule(
                     report,
-                    &decls,
+                    decls,
                     &node_rule)?;
 
                 rules.push(rule);
             }
 
+            let decl = decls.ruledefs.get(item_ref);
             let ruledef = Ruledef {
                 name_span: decl.span.clone(),
                 name: decl.name.clone(),
@@ -91,7 +91,7 @@ pub fn resolve(
 
 pub fn resolve_rule(
     report: &mut diagn::Report,
-    decls: &asm2::ItemDecls,
+    decls: &mut asm2::ItemDecls,
     ast_rule: &asm2::AstRule)
     -> Result<Rule, ()>
 {
@@ -136,7 +136,7 @@ pub fn resolve_rule(
 
 pub fn resolve_rule_parameter(
     report: &mut diagn::Report,
-    decls: &asm2::ItemDecls,
+    decls: &mut asm2::ItemDecls,
     parameters: &mut Vec::<RuleParameter>,
     ast_param: &asm2::AstRuleParameter)
     -> Result<usize, ()>
@@ -160,6 +160,10 @@ pub fn resolve_rule_parameter(
             {
                 if let Some(item_ref) = decls.ruledefs.get_from_name(&ruledef_name)
                 {
+                    decls.ruledefs.add_span_ref(
+                        ast_param.type_span.clone(),
+                        item_ref);
+                    
                     RuleParameterType::RuledefRef(item_ref)
                 }
                 else
