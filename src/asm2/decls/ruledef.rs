@@ -9,7 +9,7 @@ pub fn collect(
 {
     for any_node in &mut ast.nodes
     {
-        if let asm2::AstNodeAny::DirectiveRuledef(ref mut node) = any_node
+        if let asm2::AstAny::DirectiveRuledef(ref mut node) = any_node
         {
             let name = node.name
                 .clone()

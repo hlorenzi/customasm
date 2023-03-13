@@ -60,7 +60,7 @@ pub use label_or_constant::AstLabel;
 
 
 #[derive(Debug)]
-pub enum AstNodeAny
+pub enum AstAny
 {
     DirectiveAddr(AstDirectiveAddr),
     DirectiveAlign(AstDirectiveAlign),
@@ -84,7 +84,7 @@ pub enum AstNodeAny
 #[derive(Debug)]
 pub struct AstTopLevel
 {
-    pub nodes: Vec<AstNodeAny>,
+    pub nodes: Vec<AstAny>,
 }
 
 
@@ -103,7 +103,7 @@ pub fn parse_and_resolve_includes(
     {
         let node = &root_ast.nodes[node_index];
 
-        if let AstNodeAny::DirectiveInclude(dir_include) = node
+        if let AstAny::DirectiveInclude(dir_include) = node
         {
             let included_filename = util::filename_navigate(
                 diagn::RcReport::new(),
@@ -170,7 +170,7 @@ pub fn parse(
 fn parse_line(
     report: &mut diagn::Report,
     walker: &mut syntax::TokenWalker)
-    -> Result<Option<AstNodeAny>, ()>
+    -> Result<Option<AstAny>, ()>
 {
     // Directives (starting with a hash sign)
     if walker.next_is(0, syntax::TokenKind::Hash)
@@ -207,7 +207,7 @@ fn parse_line(
     // Everything else is regarded as an instruction
     else
     {
-        Ok(Some(AstNodeAny::Instruction(
+        Ok(Some(AstAny::Instruction(
             instruction::parse(report, walker)?)))
     }
 }

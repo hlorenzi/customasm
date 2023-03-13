@@ -23,7 +23,7 @@ pub struct AstConstant
 pub fn parse(
     report: &mut diagn::Report,
     walker: &mut syntax::TokenWalker)
-    -> Result<AstNodeAny, ()>
+    -> Result<AstAny, ()>
 {
     let mut decl_span = diagn::Span::new_dummy();
     let mut depth = 0;
@@ -44,7 +44,7 @@ pub fn parse(
         let expr = expr::parse(report, walker)?;
         walker.expect_linebreak(report)?;
         
-        Ok(AstNodeAny::Constant(AstConstant {
+        Ok(AstAny::Constant(AstConstant {
             decl_span,
             depth,
             name,
@@ -56,7 +56,7 @@ pub fn parse(
         let tk_colon = walker.expect(report, syntax::TokenKind::Colon)?;
         decl_span = decl_span.join(&tk_colon.span);
         
-        Ok(AstNodeAny::Label(AstLabel {
+        Ok(AstAny::Label(AstLabel {
             decl_span,
             depth,
             name,

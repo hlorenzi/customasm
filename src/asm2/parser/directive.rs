@@ -4,7 +4,7 @@ use super::*;
 pub fn parse(
     report: &mut diagn::Report,
     walker: &mut syntax::TokenWalker)
-    -> Result<AstNodeAny, ()>
+    -> Result<AstAny, ()>
 {
     let tk_hash = walker.expect(report, syntax::TokenKind::Hash)?;
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
@@ -16,7 +16,7 @@ pub fn parse(
     {
         if name == "d"
         {
-            return Ok(AstNodeAny::DirectiveData(
+            return Ok(AstAny::DirectiveData(
                 directive_data::parse(
                     report,
                     walker,
@@ -25,7 +25,7 @@ pub fn parse(
         }
         else if let Ok(elem_size) = usize::from_str_radix(&name[1..], 10)
         {
-            return Ok(AstNodeAny::DirectiveData(
+            return Ok(AstAny::DirectiveData(
                 directive_data::parse(
                     report,
                     walker,
@@ -36,43 +36,43 @@ pub fn parse(
     
     match name.as_ref()
     {
-        "addr" => Ok(AstNodeAny::DirectiveAddr(
+        "addr" => Ok(AstAny::DirectiveAddr(
             directive_addr::parse(report, walker, header_span)?)),
         
-        "align" => Ok(AstNodeAny::DirectiveAlign(
+        "align" => Ok(AstAny::DirectiveAlign(
             directive_align::parse(report, walker, header_span)?)),
         
-        "bank" => Ok(AstNodeAny::DirectiveBank(
+        "bank" => Ok(AstAny::DirectiveBank(
             directive_bank::parse(report, walker, header_span)?)),
         
-        "bankdef" => Ok(AstNodeAny::DirectiveBankdef(
+        "bankdef" => Ok(AstAny::DirectiveBankdef(
             directive_bankdef::parse(report, walker, header_span)?)),
             
-        "bits" => Ok(AstNodeAny::DirectiveBits(
+        "bits" => Ok(AstAny::DirectiveBits(
             directive_bits::parse(report, walker, header_span)?)),
         
-        "fn" => Ok(AstNodeAny::DirectiveFn(
+        "fn" => Ok(AstAny::DirectiveFn(
             directive_fn::parse(report, walker, header_span)?)),
         
-        "include" => Ok(AstNodeAny::DirectiveInclude(
+        "include" => Ok(AstAny::DirectiveInclude(
             directive_include::parse(report, walker, header_span)?)),
         
-        "labelalign" => Ok(AstNodeAny::DirectiveLabelAlign(
+        "labelalign" => Ok(AstAny::DirectiveLabelAlign(
             directive_labelalign::parse(report, walker, header_span)?)),
         
-        "noemit" => Ok(AstNodeAny::DirectiveNoEmit(
+        "noemit" => Ok(AstAny::DirectiveNoEmit(
             directive_noemit::parse(report, walker, header_span)?)),
         
-        "once" => Ok(AstNodeAny::DirectiveOnce(
+        "once" => Ok(AstAny::DirectiveOnce(
             directive_once::parse(report, walker, header_span)?)),
             
-        "res" => Ok(AstNodeAny::DirectiveRes(
+        "res" => Ok(AstAny::DirectiveRes(
             directive_res::parse(report, walker, header_span)?)),
         
-        "ruledef" => Ok(AstNodeAny::DirectiveRuledef(
+        "ruledef" => Ok(AstAny::DirectiveRuledef(
             directive_ruledef::parse(report, walker, false, header_span)?)),
         
-        "subruledef" => Ok(AstNodeAny::DirectiveRuledef(
+        "subruledef" => Ok(AstAny::DirectiveRuledef(
             directive_ruledef::parse(report, walker, true, header_span)?)),
         
         _ =>

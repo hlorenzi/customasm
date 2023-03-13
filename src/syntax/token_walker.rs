@@ -111,6 +111,27 @@ impl<'tokens> TokenWalker<'tokens>
 			result.push(token.clone());
 		}
 
+		if let Some(last_token) = result.last()
+		{
+			if last_token.kind.is_ignorable()
+			{
+				result.pop();
+			}
+		}
+
+		result
+	}
+
+
+	pub fn debug_remaining(&self) -> String
+	{
+		let mut result = String::new();
+		
+		for i in self.index..self.tokens.len()
+		{
+			result.push_str(&self.tokens[i].text());
+		}
+
 		result
 	}
 
@@ -167,7 +188,7 @@ impl<'tokens> TokenWalker<'tokens>
 	}
 
 
-	pub fn slice_until_linebreak_over_nested_braces<'b>(
+	pub fn cutoff_at_linebreak_while_respecting_braces<'b>(
 		&'b mut self)
 		-> TokenWalker<'tokens>
 	{
@@ -272,8 +293,12 @@ impl<'tokens> TokenWalker<'tokens>
 	}
 
 
-	pub fn slice_until_char_or_nesting<'b>(&'b mut self, c: char) -> Option<TokenWalker<'tokens>>
+	pub fn cutoff_at_char_while_respecting_parens<'b>(
+		&'b mut self,
+		c: char)
+		-> Option<TokenWalker<'tokens>>
 	{
+		let mut new_walker = self.clone();
 		let start = self.get_current_token_index();
 
 		let mut paren_nesting = 0;
@@ -323,7 +348,6 @@ impl<'tokens> TokenWalker<'tokens>
 		}
 		else
 		{
-			let mut new_walker = self.clone();
 			new_walker.tokens = &self.tokens[0..end];
 			Some(new_walker)
 		}
@@ -360,6 +384,18 @@ impl<'tokens> TokenWalker<'tokens>
 		self.partial_index = state.partial_index;
 		self.skip_ignorable();
 	}
+
+
+	pub fn copy_state_from(&mut self, other: &TokenWalker)
+	{
+		self.index = other.index;
+		self.index_prev = other.index_prev;
+		self.read_linebreak = other.read_linebreak;
+		self.read_whitespace_index = other.read_whitespace_index;
+		self.read_whitespace_acknowledged = other.read_whitespace_acknowledged;
+		self.partial_index = other.partial_index;
+		self.skip_ignorable();
+	}
 	
 	
 	pub fn is_over(&self) -> bool
@@ -371,7 +407,7 @@ impl<'tokens> TokenWalker<'tokens>
 	pub fn skip_ignorable(&mut self)
 	{
 		while self.index < self.tokens.len() &&
-			self.tokens[self.index].kind.ignorable()
+			self.tokens[self.index].kind.is_ignorable()
 		{
 			if self.tokens[self.index].kind == syntax::TokenKind::LineBreak
 				{ self.read_linebreak = true; }
@@ -476,7 +512,7 @@ impl<'tokens> TokenWalker<'tokens>
 		{
 			nth -= 1;
 			index += 1;
-			while index < self.tokens.len() && self.tokens[index].kind.ignorable()
+			while index < self.tokens.len() && self.tokens[index].kind.is_ignorable()
 				{ index += 1; }
 		}
 		

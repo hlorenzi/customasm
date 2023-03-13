@@ -3,6 +3,7 @@ use crate::*;
 
 pub mod parser;
 pub use parser::{
+    AstAny,
     AstConstant,
     AstDirectiveAddr,
     AstDirectiveAlign,
@@ -22,7 +23,6 @@ pub use parser::{
     AstFnParameter,
     AstInstruction,
     AstLabel,
-    AstNodeAny,
     AstRule,
     AstRuleParameter,
     AstRuleParameterType,
@@ -43,6 +43,7 @@ pub use defs::{
     Rule,
     RuleParameter,
     RuleParameterType,
+    RulePattern,
     RulePatternPart,
 };
 
@@ -51,6 +52,7 @@ pub use matcher::{
     InstructionMatches,
     InstructionMatch,
     InstructionArgument,
+    InstructionArgumentKind,
 };
 
 
@@ -68,7 +70,10 @@ fn test_new_asm() -> Result<(), ()>
             hlt
             jmp loop
             jmp loop 0x6666
-            jmp loop, 0x7777
+            jmp loop + 0x7777
+            jmp a b
+            xyz
+            abc def + ghi
     "#);
 
     fileserver.add("include.asm", r#"
@@ -77,13 +82,19 @@ fn test_new_asm() -> Result<(), ()>
             hlt => 0x5678
             cld => 0x1111
             jmp {addr: u16} {addr2: u32} => 0xa0 @ addr
-            jmp {addr: u16}, {addr2: u32} => 0xa1 @ addr
+            jmp {addr: u16} + {addr2: u32} => 0xa1 @ addr
+        }
+
+        #ruledef inner {
+            a => 0x99
+            a => 0xdd
         }
 
         #ruledef hey {
             hlt => 0x9abc
             jmp {addr: u16} => 0xb0 @ addr
             jmp loop => 0xb1
+            jmp {arg: inner} b => 0x44 @ arg
         }
     "#);
 
@@ -113,7 +124,6 @@ fn test_new_asm() -> Result<(), ()>
         matcher::match_all(
             &mut report,
             &mut ast,
-            &decls,
             &defs)?;
 
         Ok(())

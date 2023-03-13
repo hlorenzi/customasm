@@ -14,10 +14,13 @@ pub struct Ruledef
 pub struct Rule
 {
     pub pattern_span: diagn::Span,
-    pub pattern: Vec<RulePatternPart>,
+    pub pattern: RulePattern,
     pub parameters: Vec<RuleParameter>,
     pub expr: expr::Expr,
 }
+
+
+pub type RulePattern = Vec<RulePatternPart>;
 
 
 #[derive(Debug)]
@@ -57,7 +60,7 @@ pub fn resolve(
 {
     for any_node in &ast.nodes
     {
-        if let asm2::AstNodeAny::DirectiveRuledef(node) = any_node
+        if let asm2::AstAny::DirectiveRuledef(node) = any_node
         {
             let item_ref = node.item_ref.unwrap();
             
@@ -95,7 +98,7 @@ pub fn resolve_rule(
     ast_rule: &asm2::AstRule)
     -> Result<Rule, ()>
 {
-    let mut pattern = Vec::<RulePatternPart>::new();
+    let mut pattern = RulePattern::new();
     let mut parameters = Vec::<RuleParameter>::new();
 
     for ast_part in &ast_rule.pattern

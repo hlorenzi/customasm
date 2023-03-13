@@ -74,7 +74,7 @@ impl TokenKind
 	}
 	
 	
-	pub fn ignorable(self) -> bool
+	pub fn is_ignorable(self) -> bool
 	{
 		self == TokenKind::Whitespace ||
 		self == TokenKind::Comment ||
@@ -183,6 +183,10 @@ impl Token
 	{
 		match self.kind
 		{
+			TokenKind::Error => "�",
+			TokenKind::Comment => ";* *;",
+			TokenKind::Whitespace => " ",
+			TokenKind::LineBreak => "\\n",
 			TokenKind::KeywordAsm => "asm",
 			TokenKind::ParenOpen => "(",
 			TokenKind::ParenClose => ")",

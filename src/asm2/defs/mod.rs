@@ -7,6 +7,7 @@ pub use ruledef::{
     Rule,
     RuleParameter,
     RuleParameterType,
+    RulePattern,
     RulePatternPart,
 };
 

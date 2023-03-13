@@ -359,7 +359,7 @@ impl<'a> Parser<'a>
 	pub fn skip_ignorable(&mut self)
 	{
 		while self.index < self.tokens.len() &&
-			self.tokens[self.index].kind.ignorable()
+			self.tokens[self.index].kind.is_ignorable()
 		{
 			if self.tokens[self.index].kind == TokenKind::LineBreak
 				{ self.read_linebreak = true; }
@@ -464,7 +464,7 @@ impl<'a> Parser<'a>
 		{
 			nth -= 1;
 			index += 1;
-			while index < self.tokens.len() && self.tokens[index].kind.ignorable()
+			while index < self.tokens.len() && self.tokens[index].kind.is_ignorable()
 				{ index += 1; }
 		}
 		
