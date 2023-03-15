@@ -5,8 +5,10 @@ use super::*;
 pub struct AstLabel
 {
     pub decl_span: diagn::Span,
-    pub depth: usize,
+    pub hierarchy_level: usize,
     pub name: String,
+    
+    pub item_ref: Option<util::ItemRef::<asm2::Symbol>>,
 }
 
 
@@ -14,9 +16,11 @@ pub struct AstLabel
 pub struct AstConstant
 {
     pub decl_span: diagn::Span,
-    pub depth: usize,
+    pub hierarchy_level: usize,
     pub name: String,
     pub expr: expr::Expr,
+    
+    pub item_ref: Option<util::ItemRef::<asm2::Symbol>>,
 }
 
 
@@ -26,11 +30,11 @@ pub fn parse(
     -> Result<AstAny, ()>
 {
     let mut decl_span = diagn::Span::new_dummy();
-    let mut depth = 0;
+    let mut hierarchy_level = 0;
     
     while let Some(tk_dot) = walker.maybe_expect(syntax::TokenKind::Dot)
     {
-        depth += 1;
+        hierarchy_level += 1;
         decl_span = decl_span.join(&tk_dot.span);
     }
 
@@ -46,9 +50,11 @@ pub fn parse(
         
         Ok(AstAny::Constant(AstConstant {
             decl_span,
-            depth,
+            hierarchy_level,
             name,
             expr,
+
+            item_ref: None,
         }))
     }
     else
@@ -58,8 +64,10 @@ pub fn parse(
         
         Ok(AstAny::Label(AstLabel {
             decl_span,
-            depth,
+            hierarchy_level,
             name,
+
+            item_ref: None,
         }))
     }
 }

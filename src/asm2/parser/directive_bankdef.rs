@@ -5,8 +5,17 @@ use super::*;
 pub struct AstDirectiveBankdef
 {
     pub header_span: diagn::Span,
+    pub name_span: diagn::Span,
     pub name: String,
-    pub fields: AstFields,
+
+    pub addr_unit: Option<expr::Expr>,
+    pub label_align: Option<expr::Expr>,
+	pub addr_start: Option<expr::Expr>,
+	pub addr_size: Option<expr::Expr>,
+	pub output_offset: Option<expr::Expr>,
+	pub fill: bool,
+    
+    pub item_ref: Option<util::ItemRef::<asm2::Bankdef>>,
 }
 
 
@@ -18,21 +27,53 @@ pub fn parse(
 {
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
     let name = tk_name.excerpt.clone().unwrap();
+    let name_span = tk_name.span.clone();
 
     walker.expect(report, syntax::TokenKind::BraceOpen)?;
 
-    let fields = fields::parse(report, walker)?;
-    fields::validate_names(
+    let mut fields = fields::parse(report, walker)?;
+    
+    let addr_unit = fields.extract_as_optional_expr(
         report,
-        &fields,
-        &["addr", "size", "fill", "output", "bits", "labelalign"])?;
+        "bits")?;
+        
+    let label_align = fields.extract_as_optional_expr(
+        report,
+        "labelalign")?;
+
+    let addr_start = fields.extract_as_optional_expr(
+        report,
+        "addr")?;
+        
+    let addr_size = fields.extract_as_optional_expr(
+        report,
+        "size")?;
+        
+    let output_offset = fields.extract_as_optional_expr(
+        report,
+        "outp")?;
+        
+    let fill = fields.extract_as_bool(
+        report,
+        "fill")?;
+
+    fields.report_remaining(report)?;
 
     walker.expect(report, syntax::TokenKind::BraceClose)?;
     walker.expect_linebreak(report)?;
 
     Ok(AstDirectiveBankdef {
         header_span,
+        name_span,
         name,
-        fields,
+        
+        addr_unit,
+        label_align,
+        addr_start,
+        addr_size,
+        output_offset,
+        fill,
+
+        item_ref: None,
     })
 }

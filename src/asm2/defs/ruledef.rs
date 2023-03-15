@@ -1,11 +1,10 @@
-use super::*;
+use crate::*;
 
 
 #[derive(Debug)]
 pub struct Ruledef
 {
-    pub name_span: diagn::Span,
-    pub name: String,
+    pub item_ref: util::ItemRef<Self>,
     pub rules: Vec<Rule>,
 }
 
@@ -44,7 +43,7 @@ pub struct RuleParameter
 pub enum RuleParameterType
 {
     Unspecified,
-    RuledefRef(asm2::ItemRef<Ruledef>),
+    RuledefRef(util::ItemRef<Ruledef>),
     Unsigned(usize),
     Signed(usize),
     Integer(usize),
@@ -55,7 +54,7 @@ pub fn resolve(
     report: &mut diagn::Report,
     ast: &asm2::AstTopLevel,
     decls: &mut asm2::ItemDecls,
-    defs: &mut ItemDefs)
+    defs: &mut asm2::ItemDefs)
     -> Result<(), ()>
 {
     for any_node in &ast.nodes
@@ -76,10 +75,8 @@ pub fn resolve(
                 rules.push(rule);
             }
 
-            let decl = decls.ruledefs.get(item_ref);
             let ruledef = Ruledef {
-                name_span: decl.span.clone(),
-                name: decl.name.clone(),
+                item_ref,
                 rules,
             };
 
@@ -161,7 +158,10 @@ pub fn resolve_rule_parameter(
             
             asm2::AstRuleParameterType::Ruledef(ruledef_name) =>
             {
-                if let Some(item_ref) = decls.ruledefs.get_from_name(&ruledef_name)
+                let maybe_item_ref = decls.ruledefs.get_by_name_global(
+                    ruledef_name);
+
+                if let Some(item_ref) = maybe_item_ref
                 {
                     decls.ruledefs.add_span_ref(
                         ast_param.type_span.clone(),

@@ -9,19 +9,13 @@ pub fn collect(
 {
     for any_node in &mut ast.nodes
     {
-        if let asm2::AstAny::DirectiveRuledef(ref mut node) = any_node
+        if let asm2::AstAny::DirectiveBankdef(ref mut node) = any_node
         {
-            let name = node.name
-                .clone()
-                .unwrap_or_else(||
-                    decls.ruledefs.generate_anonymous_name());
-
-
-            let (item_ref, _) = decls.ruledefs.declare(
+            let (item_ref, _) = decls.banks.declare(
                 report,
                 &node.name_span,
                 &util::SymbolContext::new_global(),
-                name,
+                node.name.clone(),
                 0)?;
                 
             node.item_ref = Some(item_ref);

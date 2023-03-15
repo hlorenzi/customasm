@@ -14,8 +14,8 @@ pub type InstructionMatches = Vec<InstructionMatch>;
 #[derive(Clone, Debug)]
 pub struct InstructionMatch
 {
-    pub ruledef_ref: asm2::ItemRef<asm2::Ruledef>,
-    pub rule_ref: asm2::ItemRef<asm2::Rule>,
+    pub ruledef_ref: util::ItemRef<asm2::Ruledef>,
+    pub rule_ref: util::ItemRef<asm2::Rule>,
     pub args: Vec<InstructionArgument>,
 }
 
@@ -51,7 +51,7 @@ pub fn match_all(
         {
             let matches = match_instr(
                 defs,
-                ast_instr)?;
+                &ast_instr.tokens);
 
             
             if matches.len() == 0
@@ -71,39 +71,39 @@ pub fn match_all(
 
 
 /// Runs the instruction-matching algorithm on the given
-/// AST instruction-node, and returns the matches.
+/// Token slice, and returns the matches.
 pub fn match_instr(
     defs: &asm2::ItemDefs,
-    ast_instr: &asm2::AstInstruction)
-    -> Result<InstructionMatches, ()>
+    tokens: &[syntax::Token])
+    -> InstructionMatches
 {
     let mut matches = WorkingMatches::new();
 
     for i in 0..defs.ruledefs.defs.len()
     {
-        let ruledef_ref = asm2::ItemRef::<asm2::Ruledef>::new(i);
+        let ruledef_ref = util::ItemRef::<asm2::Ruledef>::new(i);
 
-        let mut walker = syntax::TokenWalker::new(&ast_instr.tokens);
+        let mut walker = syntax::TokenWalker::new(tokens);
 
         let ruledef_matches = match_with_ruledef(
             defs,
             ruledef_ref,
             &mut walker,
-            true)?;
+            true);
 
         matches.extend(ruledef_matches);
     }
 
-    Ok(matches.into_iter().map(|m| m.0).collect())
+    matches.into_iter().map(|m| m.0).collect()
 }
 
 
 fn match_with_ruledef<'tokens>(
     defs: &asm2::ItemDefs,
-    ruledef_ref: asm2::ItemRef<asm2::Ruledef>,
+    ruledef_ref: util::ItemRef<asm2::Ruledef>,
     walker: &mut syntax::TokenWalker<'tokens>,
     needs_consume_all_tokens: bool)
-    -> Result<WorkingMatches<'tokens>, ()>
+    -> WorkingMatches<'tokens>
 {
     let mut matches = WorkingMatches::new();
 
@@ -111,7 +111,7 @@ fn match_with_ruledef<'tokens>(
 
     for rule_index in 0..ruledef.rules.len()
     {
-        let rule_ref = asm2::ItemRef::<asm2::Rule>::new(rule_index);
+        let rule_ref = util::ItemRef::<asm2::Rule>::new(rule_index);
         let rule = &ruledef.rules[rule_index];
 
         let rule_matches = match_with_rule(
@@ -124,12 +124,12 @@ fn match_with_ruledef<'tokens>(
                 ruledef_ref,
                 rule_ref,
                 args: Vec::new(),
-            })?;
+            });
             
         matches.extend(rule_matches);
     }
 
-    Ok(matches)
+    matches
 }
 
 
@@ -140,7 +140,7 @@ fn match_with_rule<'tokens>(
     needs_consume_all_tokens: bool,
     at_pattern_part: usize,
     match_so_far: &mut InstructionMatch)
-    -> Result<WorkingMatches<'tokens>, ()>
+    -> WorkingMatches<'tokens>
 {
     for part_index in at_pattern_part..rule.pattern.len()
     {
@@ -153,12 +153,12 @@ fn match_with_rule<'tokens>(
                 if walker.next_is_whitespace() &&
                     !walker.is_whitespace_acknowledged()
                 {
-                    return Ok(vec![]);
+                    return vec![];
                 }
                 
                 if walker.next_partial().to_ascii_lowercase() != *c
                 {
-                    return Ok(vec![]);
+                    return vec![];
                 }
                 
                 walker.advance_partial();
@@ -168,7 +168,7 @@ fn match_with_rule<'tokens>(
             {
                 if let None = walker.maybe_expect_whitespace()
                 {
-                    return Ok(vec![]);
+                    return vec![];
                 }
             }
 
@@ -210,11 +210,11 @@ fn match_with_rule<'tokens>(
 
     if !walker.is_over() && needs_consume_all_tokens
     {
-        Ok(vec![])
+        vec![]
     }
     else
     {
-        Ok(vec![(match_so_far.clone(), walker.clone())])
+        vec![(match_so_far.clone(), walker.clone())]
     }
 }
 
@@ -226,13 +226,13 @@ fn match_with_expr<'tokens>(
     needs_consume_all_tokens: bool,
     at_pattern_part: usize,
     match_so_far: &mut InstructionMatch)
-    -> Result<WorkingMatches<'tokens>, ()>
+    -> WorkingMatches<'tokens>
 {
     if walker.is_at_partial()
     {
         match walker.maybe_expect_partial_usize()
         {
-            None => Ok(vec![]),
+            None => vec![],
             Some(value) =>
             {
                 let expr = expr::Value::make_integer(value).make_literal();
@@ -242,7 +242,7 @@ fn match_with_expr<'tokens>(
                     tokens: Vec::new(),
                 });
 
-                Ok(vec![(match_so_far.clone(), walker.clone())])
+                vec![(match_so_far.clone(), walker.clone())]
             }
         }
     }
@@ -262,7 +262,7 @@ fn match_with_expr<'tokens>(
             match maybe_expr
             {
                 Some(expr) => expr,
-                None => return Ok(vec![]),
+                None => return vec![],
             }
         };
 
@@ -286,13 +286,13 @@ fn match_with_expr<'tokens>(
 
 fn match_with_nested_ruledef<'tokens>(
     defs: &asm2::ItemDefs,
-    nested_ruledef_ref: asm2::ItemRef<asm2::Ruledef>,
+    nested_ruledef_ref: util::ItemRef<asm2::Ruledef>,
     rule: &asm2::Rule,
     walker: &mut syntax::TokenWalker<'tokens>,
     needs_consume_all_tokens: bool,
     at_pattern_part: usize,
     match_so_far: &mut InstructionMatch)
-    -> Result<WorkingMatches<'tokens>, ()>
+    -> WorkingMatches<'tokens>
 {
     let token_start = walker.get_current_token_index();
 
@@ -304,7 +304,7 @@ fn match_with_nested_ruledef<'tokens>(
             defs,
             nested_ruledef_ref,
             walker,
-            false))?;
+            false));
 
     
     let mut matches = WorkingMatches::new();
@@ -332,12 +332,12 @@ fn match_with_nested_ruledef<'tokens>(
             &mut walker,
             needs_consume_all_tokens,
             at_pattern_part + 1,
-            &mut match_so_far)?;
+            &mut match_so_far);
             
         matches.extend(resumed_matches);
     }
 
-    Ok(matches)
+    matches
 }
 
 

@@ -33,18 +33,19 @@ pub use parser::{
 pub mod decls;
 pub use decls::{
     ItemDecls,
-    ItemRef,
 };
 
 pub mod defs;
 pub use defs::{
     ItemDefs,
+    Bankdef,
     Ruledef,
     Rule,
     RuleParameter,
     RuleParameterType,
     RulePattern,
     RulePatternPart,
+    Symbol,
 };
 
 pub mod matcher;
@@ -70,13 +71,19 @@ fn test_new_asm() -> Result<(), ()>
             hlt
             jmp loop
             jmp loop 0x6666
+        .inner:
             jmp loop + 0x7777
             jmp a b
+        ..inner:
             xyz
             abc def + ghi
     "#);
 
     fileserver.add("include.asm", r#"
+        #bankdef a {
+            bits = 16 * 4
+        }
+        
         #ruledef {
             hlt => 0x1234
             hlt => 0x5678

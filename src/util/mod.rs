@@ -5,6 +5,8 @@ mod bitvec_format;
 mod fileserver;
 mod filename;
 mod windows_console;
+mod symbol_manager;
+mod item_ref;
 
 
 pub use self::char_counter::CharCounter;
@@ -17,3 +19,5 @@ pub use self::fileserver::FileServerReal;
 pub use self::filename::filename_validate;
 pub use self::filename::filename_navigate;
 pub use self::windows_console::enable_windows_ansi_support;
+pub use self::symbol_manager::*;
+pub use self::item_ref::*;

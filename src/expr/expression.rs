@@ -126,6 +126,62 @@ impl Value
 			_ => None,
 		}
 	}
+
+
+	pub fn expect_bigint(
+		&self,
+		report: &mut diagn::Report,
+		span: &diagn::Span)
+		-> Result<&util::BigInt, ()>
+	{
+		match self
+		{
+			&Value::Integer(ref bigint) => Ok(&bigint),
+			_ =>
+			{
+				report.error_span(
+					"expected integer",
+					span);
+
+				Err(())
+			}
+		}
+	}
+
+
+	pub fn expect_usize(
+		&self,
+		report: &mut diagn::Report,
+		span: &diagn::Span)
+		-> Result<usize, ()>
+	{
+		match self
+		{
+			&Value::Integer(ref bigint) =>
+			{
+				match bigint.checked_to_usize()
+				{
+					Some(value) => Ok(value),
+					None =>
+					{
+						report.error_span(
+							"value out of supported range",
+							span);
+
+						Err(())
+					}
+				}
+			}
+			_ =>
+			{
+				report.error_span(
+					"expected integer",
+					span);
+
+				Err(())
+			}
+		}
+	}
 }
 
 

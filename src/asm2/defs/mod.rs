@@ -1,6 +1,11 @@
 use crate::*;
 
 
+mod bankdef;
+pub use bankdef::{
+    Bankdef,
+};
+
 mod ruledef;
 pub use ruledef::{
     Ruledef,
@@ -9,6 +14,11 @@ pub use ruledef::{
     RuleParameterType,
     RulePattern,
     RulePatternPart,
+};
+
+mod symbol;
+pub use symbol::{
+    Symbol,
 };
 
 
@@ -36,19 +46,19 @@ impl<T> DefList<T>
     }
 
 
-    pub fn set(&mut self, item_ref: asm2::decls::ItemRef<T>, item: T)
+    pub fn set(&mut self, item_ref: util::ItemRef<T>, item: T)
     {
         self.defs.insert(item_ref.0, item);
     }
 
 
-    pub fn get(&self, item_ref: asm2::decls::ItemRef<T>) -> &T
+    pub fn get(&self, item_ref: util::ItemRef<T>) -> &T
     {
         &self.defs[item_ref.0]
     }
 
 
-    pub fn get_mut(&mut self, item_ref: asm2::decls::ItemRef<T>) -> &mut T
+    pub fn get_mut(&mut self, item_ref: util::ItemRef<T>) -> &mut T
     {
         &mut self.defs[item_ref.0]
     }
@@ -68,6 +78,7 @@ pub fn resolve(
 
     let guard = report.get_error_guard();
 
+    bankdef::resolve(report, ast, decls, &mut defs)?;
     ruledef::resolve(report, ast, decls, &mut defs)?;
 
     report.stop_at_errors(guard)?;

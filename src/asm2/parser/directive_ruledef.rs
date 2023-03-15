@@ -10,7 +10,7 @@ pub struct AstDirectiveRuledef
     pub name: Option<String>,
     pub rules: Vec<AstRule>,
 
-    pub item_ref: Option<asm2::ItemRef::<asm2::Ruledef>>,
+    pub item_ref: Option<util::ItemRef::<asm2::Ruledef>>,
 }
 
 
