@@ -12,9 +12,9 @@ pub fn collect(
 
     for any_node in &mut ast.nodes
     {
-        if let asm2::AstAny::Constant(ref mut node) = any_node
+        if let asm2::AstAny::Symbol(ref mut node) = any_node
         {
-            let (item_ref, new_ctx) = decls.symbols.declare(
+            let item_ref = decls.symbols.declare(
                 report,
                 &node.decl_span,
                 &symbol_ctx,
@@ -23,21 +23,7 @@ pub fn collect(
                 
             node.item_ref = Some(item_ref);
 
-            symbol_ctx = new_ctx;
-        }
-        
-        else if let asm2::AstAny::Label(ref mut node) = any_node
-        {
-            let (item_ref, new_ctx) = decls.symbols.declare(
-                report,
-                &node.decl_span,
-                &symbol_ctx,
-                node.name.clone(),
-                node.hierarchy_level)?;
-                
-            node.item_ref = Some(item_ref);
-
-            symbol_ctx = new_ctx;
+            symbol_ctx = decls.symbols.get(item_ref).ctx.clone();
         }
     }
 

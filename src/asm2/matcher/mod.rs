@@ -45,6 +45,8 @@ pub fn match_all(
     defs: &asm2::ItemDefs)
     -> Result<(), ()>
 {
+    let error_guard = report.get_error_guard();
+
     for any_node in &mut ast.nodes
     {
         if let asm2::AstAny::Instruction(ast_instr) = any_node
@@ -66,7 +68,7 @@ pub fn match_all(
         }
     }
 
-    Ok(())
+    report.stop_at_errors(error_guard)
 }
 
 

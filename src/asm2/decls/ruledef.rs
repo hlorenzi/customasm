@@ -17,7 +17,7 @@ pub fn collect(
                     decls.ruledefs.generate_anonymous_name());
 
 
-            let (item_ref, _) = decls.ruledefs.declare(
+            let item_ref = decls.ruledefs.declare(
                 report,
                 &node.name_span,
                 &util::SymbolContext::new_global(),

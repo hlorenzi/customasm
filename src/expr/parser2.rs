@@ -459,21 +459,42 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 		let mut span = diagn::Span::new_dummy();
 		let mut hierarchy_level = 0;
 		
-		while let Some(tk_dot) = self.walker.maybe_expect(syntax::TokenKind::Dot)
+		loop
 		{
-			hierarchy_level += 1;
-			span = span.join(&tk_dot.span);
+			if self.walker.next_is_linebreak()
+			{
+				break;
+			}
+
+			if let Some(tk_dot) = self.walker.maybe_expect(syntax::TokenKind::Dot)
+			{
+				hierarchy_level += 1;
+				span = span.join(&tk_dot.span);
+				continue;
+			}
+
+			break;
 		}
 
 		let mut hierarchy = Vec::new();
 
 		loop
 		{
+			if self.walker.next_is_linebreak()
+			{
+				break;
+			}
+			
 			let tk_name = self.walker.expect(self.report, syntax::TokenKind::Identifier)?;
 			let name = tk_name.excerpt.clone().unwrap();
 			hierarchy.push(name);
 			span = span.join(&tk_name.span);
 
+			if self.walker.next_is_linebreak()
+			{
+				break;
+			}
+			
 			if self.walker.maybe_expect(syntax::TokenKind::Dot).is_none()
 			{
 				break;

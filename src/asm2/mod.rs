@@ -4,7 +4,6 @@ use crate::*;
 pub mod parser;
 pub use parser::{
     AstAny,
-    AstConstant,
     AstDirectiveAddr,
     AstDirectiveAlign,
     AstDirectiveBank,
@@ -22,7 +21,9 @@ pub use parser::{
     AstFields,
     AstFnParameter,
     AstInstruction,
-    AstLabel,
+    AstSymbol,
+    AstSymbolKind,
+    AstSymbolConstant,
     AstRule,
     AstRuleParameter,
     AstRuleParameterType,
@@ -56,6 +57,8 @@ pub use matcher::{
     InstructionArgumentKind,
 };
 
+pub mod resolver;
+
 
 #[test]
 fn test_new_asm() -> Result<(), ()>
@@ -66,6 +69,24 @@ fn test_new_asm() -> Result<(), ()>
 
     fileserver.add("main.asm", r#"
         #include "include.asm"
+
+        res = w + ww + yy
+        x = 0
+        .a = 0x111
+        .b = 0x222
+        .c = 0x333
+        .d = .a + .b + .c
+        .e = x.a + x.b + x.c + y.e
+        y = 1
+        .a = 0x1000
+        .b = 0x2000
+        .c = 0x3000
+        .d = .a + .b + .c
+        .e = y.a + y.b + y.c
+        z = 2
+        w = x + y + z
+        ww = x.a + x.b + x.c
+        yy = y.a + y.b + y.c
 
         loop:
             hlt
@@ -121,18 +142,24 @@ fn test_new_asm() -> Result<(), ()>
             
         println!("{:#?}", decls);
 
-        let defs = defs::resolve(
+        let mut defs = defs::resolve(
             &mut report,
             &ast,
             &mut decls)?;
             
         println!("{:#?}", defs);
 
+        resolver::resolve_constants(
+            &mut report,
+            &ast,
+            &decls,
+            &mut defs)?;
+
         matcher::match_all(
             &mut report,
             &mut ast,
             &defs)?;
-
+    
         Ok(())
     };
 

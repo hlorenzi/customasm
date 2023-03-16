@@ -82,13 +82,13 @@ pub struct EvalAsmInfo2<'a>
 
 pub struct EvalProvider<'f, FVar, FFn, FAsm>
 where
-    FVar: Fn(&mut EvalVariableInfo2) -> Result<expr::Value, ()>,
-    FFn: Fn(&mut EvalFunctionInfo2) -> Result<expr::Value, ()>,
-    FAsm: Fn(&mut EvalAsmInfo2) -> Result<expr::Value, ()>
+    FVar: FnMut(&mut EvalVariableInfo2) -> Result<expr::Value, ()>,
+    FFn: FnMut(&mut EvalFunctionInfo2) -> Result<expr::Value, ()>,
+    FAsm: FnMut(&mut EvalAsmInfo2) -> Result<expr::Value, ()>
 {
-    pub eval_var: &'f FVar,
-    pub eval_fn: &'f FFn,
-    pub eval_asm: &'f FAsm,
+    pub eval_var: &'f mut FVar,
+    pub eval_fn: &'f mut FFn,
+    pub eval_asm: &'f mut FAsm,
 }
 
 
@@ -128,17 +128,93 @@ pub fn dummy_eval_asm() -> impl Fn(&mut EvalAsmInfo2) -> Result<expr::Value, ()>
 }
 
 
+macro_rules! propagate_unknown {
+	($expr: expr) => {
+		match $expr
+		{
+			expr::Value::Unknown => return Ok(expr::Value::Unknown),
+			value => value,
+		}
+	};
+}
+
+
 impl expr::Expr
 {
+	pub fn eval_usize<'f, FVar, FFn, FAsm>(
+		&self,
+		report: &mut diagn::Report,
+		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
+		-> Result<usize, ()>
+        where
+            FVar: FnMut(&mut EvalVariableInfo2) -> Result<expr::Value, ()>,
+            FFn: FnMut(&mut EvalFunctionInfo2) -> Result<expr::Value, ()>,
+            FAsm: FnMut(&mut EvalAsmInfo2) -> Result<expr::Value, ()>
+	{
+        self
+			.eval2_with_ctx(
+				report,
+				&mut EvalContext2::new(),
+				provider)?
+			.expect_usize(
+				report,
+				&self.span())
+	}
+
+
+	pub fn eval_nonzero_usize<'f, FVar, FFn, FAsm>(
+		&self,
+		report: &mut diagn::Report,
+		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
+		-> Result<usize, ()>
+        where
+            FVar: FnMut(&mut EvalVariableInfo2) -> Result<expr::Value, ()>,
+            FFn: FnMut(&mut EvalFunctionInfo2) -> Result<expr::Value, ()>,
+            FAsm: FnMut(&mut EvalAsmInfo2) -> Result<expr::Value, ()>
+	{
+        self
+			.eval2_with_ctx(
+				report,
+				&mut EvalContext2::new(),
+				provider)?
+			.expect_nonzero_usize(
+				report,
+				&self.span())
+	}
+
+
+	pub fn eval_bigint<'f, FVar, FFn, FAsm>(
+		&self,
+		report: &mut diagn::Report,
+		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
+		-> Result<util::BigInt, ()>
+        where
+            FVar: FnMut(&mut EvalVariableInfo2) -> Result<expr::Value, ()>,
+            FFn: FnMut(&mut EvalFunctionInfo2) -> Result<expr::Value, ()>,
+            FAsm: FnMut(&mut EvalAsmInfo2) -> Result<expr::Value, ()>
+	{
+        let result = self.eval2_with_ctx(
+			report,
+			&mut EvalContext2::new(),
+			provider)?;
+
+		let bigint = result.expect_bigint(
+			report,
+			&self.span())?;
+
+		Ok(bigint.clone())
+	}
+
+
 	pub fn eval2<'f, FVar, FFn, FAsm>(
 		&self,
 		report: &mut diagn::Report,
-		provider: &EvalProvider<'f, FVar, FFn, FAsm>)
+		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
 		-> Result<expr::Value, ()>
         where
-            FVar: Fn(&mut EvalVariableInfo2) -> Result<expr::Value, ()>,
-            FFn: Fn(&mut EvalFunctionInfo2) -> Result<expr::Value, ()>,
-            FAsm: Fn(&mut EvalAsmInfo2) -> Result<expr::Value, ()>
+            FVar: FnMut(&mut EvalVariableInfo2) -> Result<expr::Value, ()>,
+            FFn: FnMut(&mut EvalFunctionInfo2) -> Result<expr::Value, ()>,
+            FAsm: FnMut(&mut EvalAsmInfo2) -> Result<expr::Value, ()>
 	{
         self.eval2_with_ctx(
             report,
@@ -151,12 +227,12 @@ impl expr::Expr
 		&self,
 		report: &mut diagn::Report,
 		ctx: &mut EvalContext2,
-		provider: &EvalProvider<'f, FVar, FFn, FAsm>)
+		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
 		-> Result<expr::Value, ()>
         where
-            FVar: Fn(&mut EvalVariableInfo2) -> Result<expr::Value, ()>,
-            FFn: Fn(&mut EvalFunctionInfo2) -> Result<expr::Value, ()>,
-            FAsm: Fn(&mut EvalAsmInfo2) -> Result<expr::Value, ()>
+            FVar: FnMut(&mut EvalVariableInfo2) -> Result<expr::Value, ()>,
+            FFn: FnMut(&mut EvalFunctionInfo2) -> Result<expr::Value, ()>,
+            FAsm: FnMut(&mut EvalAsmInfo2) -> Result<expr::Value, ()>
 	{
 		match self
 		{
@@ -186,7 +262,8 @@ impl expr::Expr
 			
 			&expr::Expr::UnaryOp(ref span, _, op, ref inner_expr) =>
 			{
-				match inner_expr.eval2_with_ctx(report, ctx, provider)?
+				match propagate_unknown!(
+					inner_expr.eval2_with_ctx(report, ctx, provider)?)
 				{
 					expr::Value::Integer(ref x) => match op
 					{
@@ -216,7 +293,8 @@ impl expr::Expr
 						{
 							if hierarchy_level == 0 && hierarchy.len() == 1
 							{
-								let value = rhs_expr.eval2_with_ctx(report, ctx, provider)?;
+								let value = propagate_unknown!(
+									rhs_expr.eval2_with_ctx(report, ctx, provider)?);
 								ctx.set_local(hierarchy[0].clone(), value);
 								return Ok(expr::Value::Void);
 							}
@@ -230,7 +308,8 @@ impl expr::Expr
 				
 				else if op == expr::BinaryOp::LazyOr || op == expr::BinaryOp::LazyAnd
 				{
-					let lhs = lhs_expr.eval2_with_ctx(report, ctx, provider)?;
+					let lhs = propagate_unknown!(
+						lhs_expr.eval2_with_ctx(report, ctx, provider)?);
 					
 					match (op, &lhs)
 					{
@@ -241,7 +320,8 @@ impl expr::Expr
 						_ => return Err(report.error_span("invalid argument type to operator", &lhs_expr.span()))
 					}
 					
-					let rhs = rhs_expr.eval2_with_ctx(report, ctx, provider)?;
+					let rhs = propagate_unknown!(
+						rhs_expr.eval2_with_ctx(report, ctx, provider)?);
 					
 					match (op, &rhs)
 					{
@@ -255,8 +335,11 @@ impl expr::Expr
 				
 				else
 				{
-					let lhs = lhs_expr.eval2_with_ctx(report, ctx, provider)?;
-					let rhs = rhs_expr.eval2_with_ctx(report, ctx, provider)?;
+					let lhs = propagate_unknown!(
+						lhs_expr.eval2_with_ctx(report, ctx, provider)?);
+
+					let rhs = propagate_unknown!(
+						rhs_expr.eval2_with_ctx(report, ctx, provider)?);
 
 					match (&lhs, &rhs)
 					{
@@ -346,15 +429,18 @@ impl expr::Expr
 			{
 				match cond.eval2_with_ctx(report, ctx, provider)?
 				{
-					expr::Value::Bool(true)  => true_branch.eval2_with_ctx(report, ctx, provider),
-					expr::Value::Bool(false) => false_branch.eval2_with_ctx(report, ctx, provider),
+					expr::Value::Bool(true)  => Ok(propagate_unknown!(
+						true_branch.eval2_with_ctx(report, ctx, provider)?)),
+					expr::Value::Bool(false) => Ok(propagate_unknown!(
+						false_branch.eval2_with_ctx(report, ctx, provider)?)),
 					_ => Err(report.error_span("invalid condition type", &cond.span()))
 				}
 			}
 			
 			&expr::Expr::BitSlice(ref span, _, left, right, ref inner) =>
 			{
-				match inner.eval2_with_ctx(report, ctx, provider)?.get_bigint()
+				match propagate_unknown!(
+					inner.eval2_with_ctx(report, ctx, provider)?).get_bigint()
 				{
 					Some(ref x) => Ok(expr::Value::make_integer(x.slice(left, right))),
 					None => Err(report.error_span("invalid argument type to slice", &span))
@@ -371,14 +457,18 @@ impl expr::Expr
 				let mut result = expr::Value::Void;
 				
 				for expr in exprs
-					{ result = expr.eval2_with_ctx(report, ctx, provider)?; }
+				{
+					result = propagate_unknown!(
+						expr.eval2_with_ctx(report, ctx, provider)?);
+				}
 					
 				Ok(result)
 			}
 			
 			&expr::Expr::Call(ref span, ref target, ref arg_exprs) =>
 			{
-				let func = target.eval2_with_ctx(report, ctx, provider)?;
+				let func = propagate_unknown!(
+					target.eval2_with_ctx(report, ctx, provider)?);
 
 				match func
 				{
@@ -389,7 +479,8 @@ impl expr::Expr
 						let mut arg_spans = Vec::new();
 						for expr in arg_exprs
 						{
-							let arg = expr.eval2_with_ctx(report, ctx, provider)?;
+							let arg = propagate_unknown!(
+								expr.eval2_with_ctx(report, ctx, provider)?);
 							args.push(arg);
 							arg_spans.push(expr.span());
 						}
@@ -422,7 +513,6 @@ impl expr::Expr
 					args: ctx,
 				};
 
-				
                 (provider.eval_asm)(&mut info)
 			}
 		}

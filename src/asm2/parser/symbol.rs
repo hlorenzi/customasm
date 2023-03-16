@@ -2,25 +2,29 @@ use super::*;
 
 
 #[derive(Debug)]
-pub struct AstLabel
+pub struct AstSymbol
 {
     pub decl_span: diagn::Span,
     pub hierarchy_level: usize,
     pub name: String,
+    pub kind: AstSymbolKind,
     
     pub item_ref: Option<util::ItemRef::<asm2::Symbol>>,
 }
 
 
 #[derive(Debug)]
-pub struct AstConstant
+pub enum AstSymbolKind
 {
-    pub decl_span: diagn::Span,
-    pub hierarchy_level: usize,
-    pub name: String,
+    Constant(AstSymbolConstant),
+    Label,
+}
+
+
+#[derive(Debug)]
+pub struct AstSymbolConstant
+{
     pub expr: expr::Expr,
-    
-    pub item_ref: Option<util::ItemRef::<asm2::Symbol>>,
 }
 
 
@@ -48,11 +52,13 @@ pub fn parse(
         let expr = expr::parse(report, walker)?;
         walker.expect_linebreak(report)?;
         
-        Ok(AstAny::Constant(AstConstant {
+        Ok(AstAny::Symbol(AstSymbol {
             decl_span,
             hierarchy_level,
             name,
-            expr,
+            kind: AstSymbolKind::Constant(AstSymbolConstant {
+                expr,
+            }),
 
             item_ref: None,
         }))
@@ -62,10 +68,11 @@ pub fn parse(
         let tk_colon = walker.expect(report, syntax::TokenKind::Colon)?;
         decl_span = decl_span.join(&tk_colon.span);
         
-        Ok(AstAny::Label(AstLabel {
+        Ok(AstAny::Symbol(AstSymbol {
             decl_span,
             hierarchy_level,
             name,
+            kind: AstSymbolKind::Label,
 
             item_ref: None,
         }))

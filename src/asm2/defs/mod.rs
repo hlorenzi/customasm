@@ -25,7 +25,9 @@ pub use symbol::{
 #[derive(Debug)]
 pub struct ItemDefs
 {
+    pub bankdefs: DefList<Bankdef>,
     pub ruledefs: DefList<Ruledef>,
+    pub symbols: DefList<Symbol>,
 }
 
 
@@ -46,7 +48,7 @@ impl<T> DefList<T>
     }
 
 
-    pub fn set(&mut self, item_ref: util::ItemRef<T>, item: T)
+    pub fn define(&mut self, item_ref: util::ItemRef<T>, item: T)
     {
         self.defs.insert(item_ref.0, item);
     }
@@ -72,7 +74,9 @@ pub fn resolve(
     -> Result<ItemDefs, ()>
 {
     let mut defs = ItemDefs {
+        bankdefs: DefList::new(),
         ruledefs: DefList::new(),
+        symbols: DefList::new(),
     };
 
 
@@ -80,6 +84,7 @@ pub fn resolve(
 
     bankdef::resolve(report, ast, decls, &mut defs)?;
     ruledef::resolve(report, ast, decls, &mut defs)?;
+    symbol::resolve(report, ast, decls, &mut defs)?;
 
     report.stop_at_errors(guard)?;
 

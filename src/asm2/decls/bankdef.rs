@@ -11,7 +11,7 @@ pub fn collect(
     {
         if let asm2::AstAny::DirectiveBankdef(ref mut node) = any_node
         {
-            let (item_ref, _) = decls.banks.declare(
+            let item_ref = decls.banks.declare(
                 report,
                 &node.name_span,
                 &util::SymbolContext::new_global(),

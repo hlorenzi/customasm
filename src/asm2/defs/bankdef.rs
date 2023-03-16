@@ -27,27 +27,55 @@ pub fn resolve(
         {
             let item_ref = node.item_ref.unwrap();
 
-            let provider = expr::EvalProvider {
-                eval_var: &expr::dummy_eval_var(),
-                eval_fn: &expr::dummy_eval_fn(),
-                eval_asm: &expr::dummy_eval_asm(),
+            let mut provider = expr::EvalProvider {
+                eval_var: &mut expr::dummy_eval_var(),
+                eval_fn: &mut expr::dummy_eval_fn(),
+                eval_asm: &mut expr::dummy_eval_asm(),
             };
             
-            let addr_unit = match node.addr_unit
+            let addr_unit = match &node.addr_unit
             {
                 None => 8,
-                Some(ref expr) => expr
-                    .eval2(report, &provider)?
-                    .expect_usize(report, &expr.span())?
+                Some(expr) => expr.eval_usize(report, &mut provider)?,
+            };
+            
+            let label_align = match &node.label_align
+            {
+                None => 0,
+                Some(expr) => expr.eval_usize(report, &mut provider)?,
+            };
+            
+            let addr_start = match &node.addr_start
+            {
+                None => util::BigInt::new(0, None),
+                Some(expr) => expr.eval_bigint(report, &mut provider)?,
+            };
+            
+            let addr_size = match &node.addr_size
+            {
+                None => None,
+                Some(expr) => Some(expr.eval_usize(report, &mut provider)?),
+            };
+            
+            let output_offset = match &node.output_offset
+            {
+                None => None,
+                Some(expr) => Some(expr.eval_usize(report, &mut provider)?),
             };
 
-            println!("bankdef addr_unit = {}", addr_unit);
+            let fill = node.fill;
 
-            /*let ruledef = Bankdef {
+            let bankdef = Bankdef {
                 item_ref,
+                addr_unit,
+                label_align,
+                addr_start,
+                addr_size,
+                output_offset,
+                fill,
             };
 
-            defs.ruledefs.set(item_ref, ruledef);*/
+            defs.bankdefs.define(item_ref, bankdef);
         }
     }
 

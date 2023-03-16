@@ -80,7 +80,7 @@ pub fn resolve(
                 rules,
             };
 
-            defs.ruledefs.set(item_ref, ruledef);
+            defs.ruledefs.define(item_ref, ruledef);
         }
     }
 
@@ -158,25 +158,16 @@ pub fn resolve_rule_parameter(
             
             asm2::AstRuleParameterType::Ruledef(ruledef_name) =>
             {
-                let maybe_item_ref = decls.ruledefs.get_by_name_global(
-                    ruledef_name);
+                let item_ref = decls.ruledefs.get_by_name_global(
+                    report,
+                    &ast_param.type_span,
+                    &ruledef_name)?;
 
-                if let Some(item_ref) = maybe_item_ref
-                {
-                    decls.ruledefs.add_span_ref(
-                        ast_param.type_span.clone(),
-                        item_ref);
-                    
-                    RuleParameterType::RuledefRef(item_ref)
-                }
-                else
-                {
-                    report.error_span(
-                        format!("unknown ruledef `{}`", ruledef_name),
-                        &ast_param.type_span);
-                    
-                    return Err(());
-                }
+                decls.ruledefs.add_span_ref(
+                    ast_param.type_span.clone(),
+                    item_ref);
+                
+                RuleParameterType::RuledefRef(item_ref)
             }
         }
     };

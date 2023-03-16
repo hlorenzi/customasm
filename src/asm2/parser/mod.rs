@@ -54,9 +54,12 @@ pub use fields::AstField;
 mod instruction;
 pub use instruction::AstInstruction;
 
-mod label_or_constant;
-pub use label_or_constant::AstConstant;
-pub use label_or_constant::AstLabel;
+mod symbol;
+pub use symbol::{
+    AstSymbol,
+    AstSymbolKind,
+    AstSymbolConstant,
+};
 
 
 #[derive(Debug)]
@@ -76,8 +79,7 @@ pub enum AstAny
     DirectiveRes(AstDirectiveRes),
     DirectiveRuledef(AstDirectiveRuledef),
     Instruction(AstInstruction),
-    Constant(AstConstant),
-    Label(AstLabel),
+    Symbol(AstSymbol),
 }
 
 
@@ -182,20 +184,20 @@ fn parse_line(
     else if walker.next_is(0, syntax::TokenKind::Identifier) &&
         walker.next_is(1, syntax::TokenKind::Colon)
     {
-        Ok(Some(label_or_constant::parse(report, walker)?))
+        Ok(Some(symbol::parse(report, walker)?))
     }
 
     // Global constants (identifiers followed by equal signs)
     else if walker.next_is(0, syntax::TokenKind::Identifier) &&
         walker.next_is(1, syntax::TokenKind::Equal)
     {
-        Ok(Some(label_or_constant::parse(report, walker)?))
+        Ok(Some(symbol::parse(report, walker)?))
     }
 
     // Local labels or constants (starting with a dot)
     else if walker.next_is(0, syntax::TokenKind::Dot)
     {
-        Ok(Some(label_or_constant::parse(report, walker)?))
+        Ok(Some(symbol::parse(report, walker)?))
     }
 
     // Empty lines

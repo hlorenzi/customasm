@@ -16,6 +16,7 @@ pub struct SymbolDecl<T>
 {
     pub span: diagn::Span,
     pub name: String,
+    pub ctx: SymbolContext,
     children: std::collections::HashMap<String, util::ItemRef<T>>,
 }
 
@@ -45,7 +46,7 @@ impl<T> SymbolManager<T>
         parent_ref: Option<util::ItemRef<T>>,
         hierarchy: &[S])
         -> Option<util::ItemRef<T>>
-        where S: std::borrow::Borrow<String>
+        where S: std::borrow::Borrow<str>
     {
         if hierarchy.len() == 0
         {
@@ -77,7 +78,7 @@ impl<T> SymbolManager<T>
         parent_ref: Option<util::ItemRef<T>>,
         hierarchy: &[S])
         -> Option<util::ItemRef<T>>
-        where S: std::borrow::Borrow<String>
+        where S: std::borrow::Borrow<str>
     {
         if hierarchy.len() == 0
         {
@@ -141,13 +142,16 @@ impl<T> SymbolManager<T>
     }
 
 
-    pub fn get_by_name_global<S>(
+    pub fn get_by_name_global(
         &self,
-        name: S)
-        -> Option<util::ItemRef<T>>
-        where S: std::borrow::Borrow<String>
+        report: &mut diagn::Report,
+        span: &diagn::Span,
+        name: &str)
+        -> Result<util::ItemRef<T>, ()>
     {
         self.get_by_name(
+            report,
+            span,
             &SymbolContext::new_global(),
             0,
             &[name])
@@ -156,24 +160,50 @@ impl<T> SymbolManager<T>
 
     pub fn get_by_name<S>(
         &self,
+        report: &mut diagn::Report,
+        span: &diagn::Span,
         ctx: &SymbolContext,
         hierarchy_level: usize,
         hierarchy: &[S])
-        -> Option<util::ItemRef<T>>
-        where S: std::borrow::Borrow<String>
+        -> Result<util::ItemRef<T>, ()>
+        where S: std::borrow::Borrow<str> + std::fmt::Debug
     {
-        if hierarchy_level > ctx.hierarchy.len()
-        {
-            return None;
-        }
+        let maybe_symbol = {
+            if hierarchy_level > ctx.hierarchy.len()
+            {
+                None
+            }
+            else
+            {
+                let parent = self.get_parent(
+                    None,
+                    &ctx.hierarchy[0..hierarchy_level]);
+                
+                self.traverse(
+                    parent,
+                    hierarchy)
+            }
+        };
 
-        let parent = self.get_parent(
-            None,
-            &ctx.hierarchy[0..hierarchy_level]);
-        
-        self.traverse(
-            parent,
-            hierarchy)
+        match maybe_symbol
+        {
+            Some(symbol) => Ok(symbol),
+            None =>
+            {
+                let hierarchy_string = hierarchy
+                    .iter()
+                    .map(|s| s.borrow().to_string())
+                    .collect::<Vec<String>>();
+                
+                report.error_span(
+                    format!("unknown symbol `{}{}`",
+                        ".".repeat(hierarchy_level),
+                        hierarchy_string.join(".")),
+                    span);
+
+                Err(())
+            }
+        }
     }
 
 
@@ -193,7 +223,7 @@ impl<T> SymbolManager<T>
         ctx: &SymbolContext,
         name: String,
         hierarchy_level: usize)
-        -> Result<(util::ItemRef<T>, SymbolContext), ()>
+        -> Result<util::ItemRef<T>, ()>
     {
         // Check skips in nesting level
         if hierarchy_level > ctx.hierarchy.len()
@@ -238,18 +268,46 @@ impl<T> SymbolManager<T>
         let parent_ref = self.get_parent(
             None,
             &ctx.hierarchy[0..hierarchy_level]);
-
+        
         let children = self.get_children_mut(parent_ref);
 
         children.insert(
             name.clone(),
             item_ref);
-        
+
+
+        // Generate new SymbolContext
+        let new_ctx = {
+            let mut new_hierarchy = ctx.hierarchy[0..hierarchy_level]
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>();
+            
+            new_hierarchy.push(name.clone());
+
+            SymbolContext {
+                hierarchy: new_hierarchy,
+            }
+        };
+
 
         // Create a new declaration and add a Span reference
+        let full_name = {
+            let mut s = String::new();
+            if let Some(parent_ref) = parent_ref
+            {
+                s.push_str(&self.get(parent_ref).name);
+                s.push_str(".");
+            }
+
+            s.push_str(&name);
+            s
+        };
+
         self.decls.push(SymbolDecl {
-            name: name.clone(),
+            name: full_name.clone(),
             span: span.clone(),
+            ctx: new_ctx.clone(),
             children: std::collections::HashMap::new(),
         });
 
@@ -258,20 +316,7 @@ impl<T> SymbolManager<T>
             item_ref);
 
 
-        // Generate new SymbolContext
-        let mut new_ctx = ctx.hierarchy[0..hierarchy_level]
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>();
-        
-        new_ctx.push(name);
-
-        Ok((
-            item_ref,
-            SymbolContext {
-                hierarchy: new_ctx,
-            },
-        ))
+        Ok(item_ref)
     }
 
 

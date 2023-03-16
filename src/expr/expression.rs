@@ -94,6 +94,16 @@ impl Expr
 
 impl Value
 {
+	pub fn is_unknown(&self) -> bool
+	{
+		match self
+		{
+			Value::Unknown => true,
+			_ => false,
+		}
+	}
+
+	
 	pub fn make_literal(&self) -> Expr
 	{
 		Expr::Literal(diagn::Span::new_dummy(), self.clone())
@@ -120,7 +130,6 @@ impl Value
 	{
 		match self
 		{
-			&Value::Unknown => Some(util::BigInt::from(0)),
 			&Value::Integer(ref bigint) => Some(bigint.clone()),
 			&Value::String(ref s) => Some(s.to_bigint()),
 			_ => None,
@@ -170,6 +179,41 @@ impl Value
 
 						Err(())
 					}
+				}
+			}
+			_ =>
+			{
+				report.error_span(
+					"expected integer",
+					span);
+
+				Err(())
+			}
+		}
+	}
+
+
+	pub fn expect_nonzero_usize(
+		&self,
+		report: &mut diagn::Report,
+		span: &diagn::Span)
+		-> Result<usize, ()>
+	{
+		match self
+		{
+			&Value::Integer(ref bigint) =>
+			{
+				match bigint.checked_to_usize()
+				{
+					Some(0) | None =>
+					{
+						report.error_span(
+							"value out of supported range",
+							span);
+
+						Err(())
+					}
+					Some(value) => Ok(value),
 				}
 			}
 			_ =>
