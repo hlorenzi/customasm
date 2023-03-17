@@ -17,6 +17,7 @@ pub struct InstructionMatch
     pub ruledef_ref: util::ItemRef<asm2::Ruledef>,
     pub rule_ref: util::ItemRef<asm2::Rule>,
     pub args: Vec<InstructionArgument>,
+    pub exact_part_count: usize,
 }
 
 
@@ -79,7 +80,7 @@ pub fn match_instr(
     tokens: &[syntax::Token])
     -> InstructionMatches
 {
-    let mut matches = WorkingMatches::new();
+    let mut working_matches = WorkingMatches::new();
 
     for i in 0..defs.ruledefs.defs.len()
     {
@@ -93,10 +94,40 @@ pub fn match_instr(
             &mut walker,
             true);
 
-        matches.extend(ruledef_matches);
+        working_matches.extend(ruledef_matches);
     }
 
-    matches.into_iter().map(|m| m.0).collect()
+    if working_matches.len() == 0
+    {
+        return vec![];
+    }
+
+
+    let mut matches = working_matches
+        .into_iter()
+        .map(|m| m.0)
+        .collect::<Vec<_>>();
+
+    // Calculate recursive "exact" pattern-part count for
+    // each match
+    for mtch in &mut matches
+    {
+        mtch.exact_part_count = get_recursive_exact_part_count(
+            defs,
+            mtch);
+    }
+
+    // Only keep matches with the maximum count of
+    // "exact" pattern-parts
+    let max_exact_count = matches
+        .iter()
+        .max_by_key(|m| m.exact_part_count)
+        .unwrap()
+        .exact_part_count;
+
+    matches.retain(|c| c.exact_part_count == max_exact_count);
+
+    matches
 }
 
 
@@ -126,6 +157,7 @@ fn match_with_ruledef<'tokens>(
                 ruledef_ref,
                 rule_ref,
                 args: Vec::new(),
+                exact_part_count: 0,
             });
             
         matches.extend(rule_matches);
@@ -427,4 +459,28 @@ fn find_lookahead_character(
     }
 
     None
+}
+
+
+fn get_recursive_exact_part_count(
+    defs: &asm2::ItemDefs,
+    instr_match: &InstructionMatch)
+    -> usize
+{
+    let mut count = 0;
+
+    for arg in &instr_match.args
+    {
+        if let InstructionArgumentKind::NestedRuledef(ref nested_match) = arg.kind
+        {
+            count += get_recursive_exact_part_count(
+                defs,
+                nested_match);
+        }
+    }
+
+    let ruledef = defs.ruledefs.get(instr_match.ruledef_ref);
+    let rule = &ruledef.rules[instr_match.rule_ref.0];
+
+    count + rule.exact_part_count
 }

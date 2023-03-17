@@ -33,18 +33,17 @@ pub fn resolve_constants_once(
 {
     println!("== resolve_constants_once ==");
     let mut had_work = false;
-    let mut symbol_ctx = &util::SymbolContext::new_global();
 
-    for any_node in &ast.nodes
+    for item in asm2::resolver::iter_with_context(ast, decls)
     {
-        if let asm2::AstAny::Symbol(ast_symbol) = any_node
+        if let asm2::AstAny::Symbol(ast_symbol) = item.node
         {
             had_work |= resolve_constant(
                 report,
                 ast_symbol,
                 decls,
                 defs,
-                &mut symbol_ctx)?;
+                &item.get_symbol_ctx())?;
         }        
     }
 
@@ -57,11 +56,9 @@ pub fn resolve_constant<'symbol_ctx>(
     ast_symbol: &asm2::AstSymbol,
     decls: &'symbol_ctx asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
-    symbol_ctx: &mut &'symbol_ctx util::SymbolContext)
+    symbol_ctx: &'symbol_ctx util::SymbolContext)
     -> Result<bool, ()>
 {
-    let mut had_work = false;
-
     let item_ref = ast_symbol.item_ref.unwrap();
 
     if let asm2::AstSymbolKind::Constant(ref ast_const) = ast_symbol.kind
@@ -84,12 +81,10 @@ pub fn resolve_constant<'symbol_ctx>(
                 let symbol = defs.symbols.get_mut(item_ref);
                 symbol.value = value;
 
-                had_work = true;
+                return Ok(true);
             }
         }
     }
 
-    *symbol_ctx = &decls.symbols.get(item_ref).ctx;
-
-    Ok(had_work)
+    Ok(false)
 }

@@ -14,6 +14,11 @@ pub struct Rule
 {
     pub pattern_span: diagn::Span,
     pub pattern: RulePattern,
+
+    /// Used in instruction-matching to prioritize matches
+    /// with more "exact" pattern-parts
+    pub exact_part_count: usize,
+    
     pub parameters: Vec<RuleParameter>,
     pub expr: expr::Expr,
 }
@@ -96,6 +101,7 @@ pub fn resolve_rule(
     -> Result<Rule, ()>
 {
     let mut pattern = RulePattern::new();
+    let mut exact_parts = 0;
     let mut parameters = Vec::<RuleParameter>::new();
 
     for ast_part in &ast_rule.pattern
@@ -107,7 +113,10 @@ pub fn resolve_rule(
                     RulePatternPart::Whitespace,
                     
                 asm2::AstRulePatternPart::Exact(c) =>
-                    RulePatternPart::Exact(*c),
+                {
+                    exact_parts += 1;
+                    RulePatternPart::Exact(*c)
+                },
                 
                 asm2::AstRulePatternPart::Parameter(ast_param) =>
                 {
@@ -128,6 +137,7 @@ pub fn resolve_rule(
     Ok(Rule {
         pattern_span: ast_rule.pattern_span.clone(),
         pattern,
+        exact_part_count: exact_parts,
         parameters,
         expr: ast_rule.expr.clone(),
     })

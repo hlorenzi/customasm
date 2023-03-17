@@ -1,6 +1,14 @@
 use crate::*;
 
 
+mod iter;
+pub use iter::{
+    AstIteratorWithContext,
+    AstIteratorWithContextItem,
+    iter_with_context,
+};
+
+
 mod constant;
 pub use constant::{
     resolve_constants,
