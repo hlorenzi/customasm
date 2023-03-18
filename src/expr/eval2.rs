@@ -66,7 +66,7 @@ pub struct EvalFunctionInfo2<'a>
 	pub report: &'a mut diagn::Report,
 	pub func: expr::Value,
 	pub args: Vec<expr::Value>,
-	pub arg_spans: Vec<diagn::Span>,
+	pub arg_spans: Vec<&'a diagn::Span>,
 	pub span: &'a diagn::Span,
 }
 

@@ -152,7 +152,7 @@ pub fn parse_expr_bigint(state: &mut asm::parser::State) -> Result<(util::BigInt
 
     match value.get_bigint()
     {
-        Some(bigint) => Ok((bigint, expr.span())),
+        Some(bigint) => Ok((bigint, expr.span().clone())),
         None =>
         {
             state.report.error_span("expected integer value", &expr.span());

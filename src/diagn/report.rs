@@ -29,6 +29,7 @@ pub struct Message
 	pub descr: String,
 	pub kind: MessageKind,
 	pub span: Option<Span>,
+	pub short_excerpt: bool,
 	pub inner: Vec<Message>,
 }
 
@@ -58,6 +59,18 @@ pub struct ReportParentGuard
 }
 
 
+struct LineInfo
+{
+	line1: usize,
+	col1: usize,
+	line2: usize,
+	col2: usize,
+	excerpt_line1: usize,
+	excerpt_line2: usize,
+	label_width: usize,
+}
+
+
 impl Message
 {
 	pub fn error<S>(descr: S) -> Message
@@ -68,7 +81,8 @@ impl Message
 			descr: descr.into(),
 			kind: MessageKind::Error,
 			span: None,
-			inner: Vec::new()
+			short_excerpt: false,
+			inner: Vec::new(),
 		}
 	}
 	
@@ -81,7 +95,8 @@ impl Message
 			descr: descr.into(),
 			kind: MessageKind::Error,
 			span: Some(span.clone()),
-			inner: Vec::new()
+			short_excerpt: false,
+			inner: Vec::new(),
 		}
 	}
 	
@@ -94,7 +109,8 @@ impl Message
 			descr: descr.into(),
 			kind: MessageKind::Warning,
 			span: None,
-			inner: Vec::new()
+			short_excerpt: false,
+			inner: Vec::new(),
 		}
 	}
 	
@@ -107,7 +123,8 @@ impl Message
 			descr: descr.into(),
 			kind: MessageKind::Warning,
 			span: Some(span.clone()),
-			inner: Vec::new()
+			short_excerpt: false,
+			inner: Vec::new(),
 		}
 	}
 	
@@ -120,7 +137,8 @@ impl Message
 			descr: descr.into(),
 			kind: MessageKind::Note,
 			span: None,
-			inner: Vec::new()
+			short_excerpt: false,
+			inner: Vec::new(),
 		}
 	}
 	
@@ -133,7 +151,8 @@ impl Message
 			descr: descr.into(),
 			kind: MessageKind::Note,
 			span: Some(span.clone()),
-			inner: Vec::new()
+			short_excerpt: false,
+			inner: Vec::new(),
 		}
 	}
 	
@@ -176,12 +195,12 @@ impl Report
 	{
 		for parent in self.parents.iter().rev()
 		{
-			msg = Message
-			{
+			msg = Message {
 				descr: parent.descr.clone(),
 				kind: parent.kind,
 				span: parent.span.clone(),
-				inner: vec![msg]
+				short_excerpt: false,
+				inner: vec![msg],
 			};
 		}
 		
@@ -189,16 +208,16 @@ impl Report
 	}
 	
 	
-	fn push_multiple(&mut self, mut msgs: Vec<Message>)
+	pub fn push_multiple(&mut self, mut msgs: Vec<Message>)
 	{
 		for parent in self.parents.iter().rev()
 		{
-			let msg = Message
-			{
+			let msg = Message {
 				descr: parent.descr.clone(),
 				kind: parent.kind,
 				span: parent.span.clone(),
-				inner: msgs
+				short_excerpt: false,
+				inner: msgs,
 			};
 
 			msgs = vec![msg];
@@ -412,11 +431,11 @@ impl Report
 		let kind_label = msg.kind.get_label();
 		let highlight_color = msg.kind.get_color();
 		
-		//self.print_indent(writer, indent);
+		self.print_indent(writer, indent);
 		write!(writer, "{}", C_LOCATION).unwrap();
 		if indent > 0
 		{
-			write!(writer, " === ").unwrap();
+			write!(writer, "[!] ").unwrap();
 		}
 		else
 		{
@@ -427,11 +446,19 @@ impl Report
 		writeln!(writer, "{}: {}", kind_label, msg.descr).unwrap();
 		write!(writer, "{}", C_DEFAULT).unwrap();
 
-		self.print_msg_src(writer, fileserver, msg, 0);
+		let inner_indent = self.print_msg_src(
+			writer,
+			fileserver,
+			msg,
+			indent);
 		
 		for inner in &msg.inner
 		{
-			self.print_msg(writer, fileserver, &inner, indent + 1);
+			self.print_msg(writer, fileserver, &inner, indent + inner_indent);
+			if indent == 0
+			{
+				writeln!(writer).unwrap();
+			}
 		}
 	}
 	
@@ -439,7 +466,74 @@ impl Report
 	fn print_indent(&self, writer: &mut dyn Write, indent: usize)
 	{
 		for _ in 0..indent
-			{ write!(writer, "     ").unwrap(); }
+			{ write!(writer, " ").unwrap(); }
+	}
+
+
+	fn get_line_info(
+		&self,
+		fileserver: &dyn FileServer,
+		span: &Span,
+		msg: &Message)
+		-> LineInfo
+	{
+		let chars = fileserver.get_chars(
+				RcReport::new(),
+				&span.file,
+				None)
+			.ok()
+			.unwrap();
+			
+		let counter = CharCounter::new(&chars);
+		
+
+		let (start, end) = span.location.unwrap();
+		let (line1, col1) = counter.get_line_column_at_index(start);
+		let (line2, col2) = counter.get_line_column_at_index(end);
+
+
+		let lines_before = {
+			if msg.short_excerpt
+				{ 0 }
+			else
+				{ 2 }
+		};
+
+		let lines_after = {
+			if msg.short_excerpt
+				{ 1 }
+			else
+				{ 3 }
+		};
+		
+
+		let excerpt_line1 = if line1 < lines_before
+			{ 0 }
+		else
+			{ line1 - lines_before };
+			
+		
+		let excerpt_line2 = if (line2 + lines_after) >= counter.get_line_count()
+			{ counter.get_line_count() }
+		else
+			{ line2 + lines_after };
+		
+		
+		let line_label_width =
+			format!(
+				"{}",
+				std::cmp::max(excerpt_line1, excerpt_line2))
+			.len();
+
+		LineInfo {
+			line1,
+			col1,
+			line2,
+			col2,
+			label_width: line_label_width,
+			excerpt_line1,
+			excerpt_line2,
+		}
 	}
 	
 	
@@ -449,63 +543,53 @@ impl Report
 		fileserver: &dyn FileServer,
 		msg: &Message,
 		indent: usize)
+		-> usize
 	{
-		let spans = if msg.span.is_some()
-		{
-			vec![msg.span.as_ref().unwrap()]
-		}
-		else
-		{
-			return;
+		let span = {
+			match msg.span
+			{
+				Some(ref span) => span,
+				None => return 0,
+			}
 		};
 
 		let highlight_color = msg.kind.get_color();
 
 		// Print filename.
-		self.print_indent(writer, indent);
-		write!(writer, "{} --> ", C_LOCATION).unwrap();
-		write!(writer, "{}:", spans[0].file).unwrap();
-		write!(writer, "{}", C_DEFAULT).unwrap();
-
-		if spans[0].location.is_none()
+		if span.location.is_none()
 		{
+			self.print_indent(writer, indent);
+			write!(writer, "{} --> ", C_LOCATION).unwrap();
+			write!(writer, "{}:", span.file).unwrap();
+			write!(writer, "{}", C_DEFAULT).unwrap();
 			writeln!(writer).unwrap();
-			return;
+			return 0;
 		}
 
-		let (start, end) = spans[0].location.unwrap();
+		let line_info = self.get_line_info(
+			fileserver,
+			span,
+			msg);
+
+		self.print_indent(writer, indent + line_info.label_width - 1);
+		write!(writer, "{} --> ", C_LOCATION).unwrap();
+		write!(writer, "{}:", span.file).unwrap();
+		write!(writer, "{}", C_DEFAULT).unwrap();
 
 		// Print location information.
-		let chars = fileserver.get_chars(RcReport::new(), &spans[0].file, None).ok().unwrap();
+		let chars = fileserver.get_chars(RcReport::new(), &span.file, None).ok().unwrap();
 		let counter = CharCounter::new(&chars);
 		
-		let (line1, col1) = counter.get_line_column_at_index(start);
-		let (line2, col2) = counter.get_line_column_at_index(end);
-
 		write!(writer, "{}", C_LOCATION).unwrap();
-		writeln!(writer, "{}:{}:", line1 + 1, col1 + 1).unwrap();
-		
+		writeln!(writer, "{}:{}:", line_info.line1 + 1, line_info.col1 + 1).unwrap();
 
-		let first_line = if (line1 as isize - 2) < 0
-			{ 0 }
-		else
-			{ line1 - 2 };
-			
-		
-		let last_line = if (line2 + 3) >= counter.get_line_count()
-			{ counter.get_line_count() }
-		else
-			{ line2 + 3 };
-		
-		
-		let line_max_width = 1 + format!("{}", std::cmp::max(first_line, last_line)).len();
 
 		// Print annotated source lines.
-		for line in first_line..last_line
+		for line in line_info.excerpt_line1..line_info.excerpt_line2
 		{
 			self.print_indent(writer, indent);
 			write!(writer, "{}", C_LINENUM).unwrap();
-			write!(writer, "{:>1$} | ", line + 1, line_max_width).unwrap();
+			write!(writer, "{:>1$} | ", line + 1, line_info.label_width).unwrap();
 			write!(writer, "{}", C_SRC).unwrap();
 			
 			let line_pos = counter.get_index_range_of_line(line);
@@ -515,7 +599,10 @@ impl Report
 			for p in 0..excerpt.len()
 			{
 				// Add a space for spans of zero characters.
-				if line == line1 && line == line2 && p == col1 && p == col2
+				if line == line_info.line1 &&
+					line == line_info.line2 &&
+					p == line_info.col1 &&
+					p == line_info.col2
 					{ write!(writer, " ").unwrap(); }
 				
 				let c = excerpt[p];
@@ -531,20 +618,22 @@ impl Report
 			writeln!(writer, "").unwrap();
 			
 			// Print markings on line below, if contained in span.
-			if line >= line1 && line <= line2
+			if line >= line_info.line1 && line <= line_info.line2
 			{
 				self.print_indent(writer, indent);
 				write!(writer, "{}", C_LINENUM).unwrap();
-				write!(writer, "{:>1$} | ", "", line_max_width).unwrap();
+				write!(writer, "{:>1$} | ", "", line_info.label_width).unwrap();
 				write!(writer, "{}", highlight_color).unwrap();
 				
 				for p in 0..(excerpt.len() + 1)
 				{
 					// Print markings for spans of zero characters.
-					if p == col1 && p == col2 && line1 == line2
+					if p == line_info.col1 &&
+						p == line_info.col2 &&
+						line_info.line1 == line_info.line2
 						{ write!(writer, "^").unwrap(); }
 						
-					let marking = if (line > line1 || p >= col1) && (line < line2 || p < col2)
+					let marking = if (line > line_info.line1 || p >= line_info.col1) && (line < line_info.line2 || p < line_info.col2)
 						{ "^" }
 					else
 						{ " " };
@@ -560,6 +649,8 @@ impl Report
 		}
 		
 		write!(writer, "{}", C_DEFAULT).unwrap();
+		
+		line_info.label_width
 	}
 }
 

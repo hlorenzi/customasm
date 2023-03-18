@@ -47,6 +47,7 @@ pub use defs::{
     RulePattern,
     RulePatternPart,
     Symbol,
+    Instruction,
 };
 
 pub mod matcher;
@@ -58,6 +59,9 @@ pub use matcher::{
 };
 
 pub mod resolver;
+pub use resolver::{
+    ResolutionState,
+};
 
 
 #[test]
@@ -96,8 +100,9 @@ fn test_new_asm() -> Result<(), ()>
             jmp loop + 0x7777
             jmp a b
         ..inner:
-            xyz
-            abc def + ghi
+            hlt
+            ;xyz
+            ;abc def + ghi
     "#);
 
     fileserver.add("include.asm", r#"
@@ -119,7 +124,7 @@ fn test_new_asm() -> Result<(), ()>
         }
 
         #ruledef hey {
-            hlt => 0x9abc
+            hlt => 0x9a
             jmp {addr: u16} => 0xb0 @ addr
             jmp loop => 0xb1
             jmp {arg: inner} b => 0x44 @ arg
@@ -134,21 +139,15 @@ fn test_new_asm() -> Result<(), ()>
             "main.asm",
             &mut Vec::new())?;
 
-        println!("{:#?}", ast);
-
         let mut decls = decls::collect(
             &mut report,
             &mut ast)?;
             
-        println!("{:#?}", decls);
-
         let mut defs = defs::resolve(
             &mut report,
-            &ast,
+            &mut ast,
             &mut decls)?;
             
-        println!("{:#?}", defs);
-
         resolver::resolve_constants(
             &mut report,
             &ast,
@@ -157,9 +156,23 @@ fn test_new_asm() -> Result<(), ()>
 
         matcher::match_all(
             &mut report,
-            &mut ast,
-            &defs)?;
+            &ast,
+            &mut defs)?;
     
+        println!("{:#?}", ast);
+        println!("{:#?}", decls);
+        println!("{:#?}", defs);
+    
+        resolver::resolve_once(
+            &mut report,
+            &ast,
+            &decls,
+            &mut defs)?;
+            
+        println!("{:#?}", ast);
+        println!("{:#?}", decls);
+        println!("{:#?}", defs);
+
         Ok(())
     };
 

@@ -21,6 +21,11 @@ pub use symbol::{
     Symbol,
 };
 
+mod instruction;
+pub use instruction::{
+    Instruction,
+};
+
 
 #[derive(Debug)]
 pub struct ItemDefs
@@ -28,6 +33,7 @@ pub struct ItemDefs
     pub bankdefs: DefList<Bankdef>,
     pub ruledefs: DefList<Ruledef>,
     pub symbols: DefList<Symbol>,
+    pub instructions: DefList<Instruction>,
 }
 
 
@@ -64,12 +70,18 @@ impl<T> DefList<T>
     {
         &mut self.defs[item_ref.0]
     }
+
+
+    pub fn next_item_ref(&self) -> util::ItemRef<T>
+    {
+        util::ItemRef::new(self.defs.len())
+    }
 }
 
 
 pub fn resolve(
     report: &mut diagn::Report,
-    ast: &asm2::parser::AstTopLevel,
+    ast: &mut asm2::parser::AstTopLevel,
     decls: &mut asm2::decls::ItemDecls)
     -> Result<ItemDefs, ()>
 {
@@ -77,6 +89,7 @@ pub fn resolve(
         bankdefs: DefList::new(),
         ruledefs: DefList::new(),
         symbols: DefList::new(),
+        instructions: DefList::new(),
     };
 
 
@@ -85,6 +98,7 @@ pub fn resolve(
     bankdef::resolve(report, ast, decls, &mut defs)?;
     ruledef::resolve(report, ast, decls, &mut defs)?;
     symbol::resolve(report, ast, decls, &mut defs)?;
+    instruction::resolve(report, ast, decls, &mut defs)?;
 
     report.stop_at_errors(guard)?;
 

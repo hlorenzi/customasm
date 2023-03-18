@@ -1,4 +1,4 @@
-use super::*;
+use crate::*;
 
 
 #[derive(Debug)]
@@ -7,7 +7,7 @@ pub struct AstInstruction
     pub span: diagn::Span,
     pub tokens: Vec<syntax::Token>,
 
-    pub matches: asm2::InstructionMatches,
+    pub item_ref: Option<util::ItemRef<asm2::Instruction>>,
 }
 
 
@@ -24,6 +24,7 @@ pub fn parse(
     Ok(AstInstruction {
         span: cutoff_walker.get_full_span(),
         tokens: cutoff_walker.get_cloned_tokens(),
-        matches: asm2::InstructionMatches::new(),
+
+        item_ref: None,
     })
 }

@@ -7,12 +7,14 @@ pub struct AstIteratorWithContext<'a>
     decls: &'a asm2::ItemDecls,
     index: usize,
     symbol_ctx: Option<&'a util::SymbolContext>,
+    bank_ref: util::ItemRef<asm2::Bankdef>,
 }
 
 
 pub struct AstIteratorWithContextItem<'a>
 {
     pub node: &'a asm2::AstAny,
+    pub bank_ref: util::ItemRef<asm2::Bankdef>,
     pub maybe_symbol_ctx: Option<&'a util::SymbolContext>,
 }
 
@@ -27,6 +29,7 @@ pub fn iter_with_context<'a>(
         decls,
         index: 0,
         symbol_ctx: None,
+        bank_ref: util::ItemRef::new(0),
     }
 }
 
@@ -46,17 +49,28 @@ impl<'a> Iterator for AstIteratorWithContext<'a>
         let ast_any = &self.ast.nodes[self.index];
         self.index += 1;
         
-        if let asm2::AstAny::Symbol(ast_symbol) = ast_any
+        match ast_any
         {
-            let item_ref = ast_symbol.item_ref.unwrap();
-            let decl = self.decls.symbols.get(item_ref);
+            asm2::AstAny::DirectiveBank(ast_bank) =>
+            {
+                self.bank_ref = ast_bank.item_ref.unwrap();
+            }
 
-            self.symbol_ctx = Some(&decl.ctx);
+            asm2::AstAny::Symbol(ast_symbol) =>
+            {
+                let item_ref = ast_symbol.item_ref.unwrap();
+                let decl = self.decls.symbols.get(item_ref);
+
+                self.symbol_ctx = Some(&decl.ctx);
+            }
+
+            _ => {}
         }
 
         Some(AstIteratorWithContextItem {
             node: ast_any,
             maybe_symbol_ctx: self.symbol_ctx,
+            bank_ref: self.bank_ref,
         })
     }
 }

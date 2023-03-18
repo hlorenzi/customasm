@@ -18,6 +18,7 @@ pub struct InstructionMatch
     pub rule_ref: util::ItemRef<asm2::Rule>,
     pub args: Vec<InstructionArgument>,
     pub exact_part_count: usize,
+    pub resolved: Option<util::BigInt>,
 }
 
 
@@ -33,7 +34,7 @@ pub struct InstructionArgument
 pub enum InstructionArgumentKind
 {
     Expr(expr::Expr),
-    NestedRuledef(InstructionMatch),
+    Nested(InstructionMatch),
 }
 
 
@@ -42,13 +43,13 @@ pub enum InstructionArgumentKind
 /// AST nodes themselves.
 pub fn match_all(
     report: &mut diagn::Report,
-    ast: &mut asm2::AstTopLevel,
-    defs: &asm2::ItemDefs)
+    ast: &asm2::AstTopLevel,
+    defs: &mut asm2::ItemDefs)
     -> Result<(), ()>
 {
     let error_guard = report.get_error_guard();
 
-    for any_node in &mut ast.nodes
+    for any_node in &ast.nodes
     {
         if let asm2::AstAny::Instruction(ast_instr) = any_node
         {
@@ -64,8 +65,11 @@ pub fn match_all(
                     &ast_instr.span);
             }
 
-            println!("instr matches: {:#?}", matches);
-            ast_instr.matches = matches;
+
+            let instr = defs.instructions.get_mut(
+                ast_instr.item_ref.unwrap());
+            
+            instr.matches = matches;
         }
     }
 
@@ -142,10 +146,9 @@ fn match_with_ruledef<'tokens>(
 
     let ruledef = defs.ruledefs.get(ruledef_ref);
 
-    for rule_index in 0..ruledef.rules.len()
+    for rule_ref in ruledef.iter_rule_refs()
     {
-        let rule_ref = util::ItemRef::<asm2::Rule>::new(rule_index);
-        let rule = &ruledef.rules[rule_index];
+        let rule = &ruledef.get_rule(rule_ref);
 
         let rule_matches = match_with_rule(
             defs,
@@ -158,6 +161,7 @@ fn match_with_ruledef<'tokens>(
                 rule_ref,
                 args: Vec::new(),
                 exact_part_count: 0,
+                resolved: None,
             });
             
         matches.extend(rule_matches);
@@ -269,7 +273,8 @@ fn match_with_expr<'tokens>(
             None => vec![],
             Some(value) =>
             {
-                let expr = expr::Value::make_integer(value).make_literal();
+                let expr = expr::Value::make_integer(value)
+                    .make_literal();
 
                 match_so_far.args.push(InstructionArgument {
                     kind: InstructionArgumentKind::Expr(expr),
@@ -352,7 +357,7 @@ fn match_with_nested_ruledef<'tokens>(
         let mut match_so_far = match_so_far.clone();
 
         match_so_far.args.push(InstructionArgument {
-            kind: InstructionArgumentKind::NestedRuledef(nested_match.0),
+            kind: InstructionArgumentKind::Nested(nested_match.0),
             tokens: walker.get_cloned_tokens_by_index(
                 token_start,
                 walker.get_current_token_index()),
@@ -471,7 +476,7 @@ fn get_recursive_exact_part_count(
 
     for arg in &instr_match.args
     {
-        if let InstructionArgumentKind::NestedRuledef(ref nested_match) = arg.kind
+        if let InstructionArgumentKind::Nested(ref nested_match) = arg.kind
         {
             count += get_recursive_exact_part_count(
                 defs,

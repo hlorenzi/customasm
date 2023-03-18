@@ -73,20 +73,20 @@ impl Expr
 	}
 
 	
-	pub fn span(&self) -> diagn::Span
+	pub fn span(&self) -> &diagn::Span
 	{
 		match self
 		{
-			&Expr::Literal  (ref span, ..) => span.clone(),
-			&Expr::Variable (ref span, ..) => span.clone(),
-			&Expr::UnaryOp  (ref span, ..) => span.clone(),
-			&Expr::BinaryOp (ref span, ..) => span.clone(),
-			&Expr::TernaryOp(ref span, ..) => span.clone(),
-			&Expr::BitSlice (ref span, ..) => span.clone(),
-			&Expr::SoftSlice(ref span, ..) => span.clone(),
-			&Expr::Block    (ref span, ..) => span.clone(),
-			&Expr::Call     (ref span, ..) => span.clone(),
-			&Expr::Asm      (ref span, ..) => span.clone(),
+			&Expr::Literal  (ref span, ..) => &span,
+			&Expr::Variable (ref span, ..) => &span,
+			&Expr::UnaryOp  (ref span, ..) => &span,
+			&Expr::BinaryOp (ref span, ..) => &span,
+			&Expr::TernaryOp(ref span, ..) => &span,
+			&Expr::BitSlice (ref span, ..) => &span,
+			&Expr::SoftSlice(ref span, ..) => &span,
+			&Expr::Block    (ref span, ..) => &span,
+			&Expr::Call     (ref span, ..) => &span,
+			&Expr::Asm      (ref span, ..) => &span,
 		}
 	}
 }
@@ -145,11 +145,55 @@ impl Value
 	{
 		match self
 		{
-			&Value::Integer(ref bigint) => Ok(&bigint),
+			Value::Integer(ref bigint) => Ok(bigint),
 			_ =>
 			{
 				report.error_span(
 					"expected integer",
+					span);
+
+				Err(())
+			}
+		}
+	}
+
+
+	pub fn expect_bigint_mut(
+		&mut self,
+		report: &mut diagn::Report,
+		span: &diagn::Span)
+		-> Result<&mut util::BigInt, ()>
+	{
+		match self
+		{
+			Value::Integer(ref mut bigint) => Ok(bigint),
+			_ =>
+			{
+				report.error_span(
+					"expected integer",
+					span);
+
+				Err(())
+			}
+		}
+	}
+
+
+	pub fn expect_sized_bigint(
+		&self,
+		report: &mut diagn::Report,
+		span: &diagn::Span)
+		-> Result<&util::BigInt, ()>
+	{
+		let bigint = self.expect_bigint(report, span)?;
+		
+		match bigint.size
+		{
+			Some(_) => Ok(&bigint),
+			None =>
+			{
+				report.error_span(
+					"expected integer with definite size",
 					span);
 
 				Err(())
@@ -166,7 +210,7 @@ impl Value
 	{
 		match self
 		{
-			&Value::Integer(ref bigint) =>
+			Value::Integer(ref bigint) =>
 			{
 				match bigint.checked_to_usize()
 				{
@@ -181,6 +225,7 @@ impl Value
 					}
 				}
 			}
+
 			_ =>
 			{
 				report.error_span(
@@ -201,7 +246,7 @@ impl Value
 	{
 		match self
 		{
-			&Value::Integer(ref bigint) =>
+			Value::Integer(ref bigint) =>
 			{
 				match bigint.checked_to_usize()
 				{
@@ -216,6 +261,7 @@ impl Value
 					Some(value) => Ok(value),
 				}
 			}
+
 			_ =>
 			{
 				report.error_span(

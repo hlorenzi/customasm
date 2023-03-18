@@ -81,7 +81,7 @@ impl expr::Expr
 	}
 	
 	
-	pub fn returned_value_span(&self) -> diagn::Span
+	pub fn returned_value_span(&self) -> &diagn::Span
 	{
 		match self
 		{
@@ -89,7 +89,7 @@ impl expr::Expr
 			{
 				match exprs.last()
 				{
-					None => span.clone(),
+					None => &span,
 					Some(expr) => expr.returned_value_span()
 				}
 			}

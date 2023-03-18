@@ -10,13 +10,13 @@ pub fn resolve_constants(
 {
     loop
     {
-        let had_work = resolve_constants_once(
+        let resolution_state = resolve_constants_once(
             report,
             ast,
             decls,
             defs)?;
 
-        if !had_work
+        if let asm2::ResolutionState::Resolved = resolution_state
         {
             return Ok(());
         }
@@ -29,25 +29,26 @@ pub fn resolve_constants_once(
     ast: &asm2::AstTopLevel,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs)
-    -> Result<bool, ()>
+    -> Result<asm2::ResolutionState, ()>
 {
     println!("== resolve_constants_once ==");
-    let mut had_work = false;
+    let mut resolution_state = asm2::ResolutionState::Resolved;
 
     for item in asm2::resolver::iter_with_context(ast, decls)
     {
         if let asm2::AstAny::Symbol(ast_symbol) = item.node
         {
-            had_work |= resolve_constant(
-                report,
-                ast_symbol,
-                decls,
-                defs,
-                &item.get_symbol_ctx())?;
+            resolution_state.merge(
+                resolve_constant(
+                    report,
+                    ast_symbol,
+                    decls,
+                    defs,
+                    &item.get_symbol_ctx())?);
         }        
     }
 
-    Ok(had_work)
+    Ok(resolution_state)
 }
 
 
@@ -57,7 +58,7 @@ pub fn resolve_constant<'symbol_ctx>(
     decls: &'symbol_ctx asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
     symbol_ctx: &'symbol_ctx util::SymbolContext)
-    -> Result<bool, ()>
+    -> Result<asm2::ResolutionState, ()>
 {
     let item_ref = ast_symbol.item_ref.unwrap();
 
@@ -65,26 +66,31 @@ pub fn resolve_constant<'symbol_ctx>(
     {
         let symbol = defs.symbols.get(item_ref);
 
-        if let expr::Value::Unknown = symbol.value
+        if !symbol.value.is_unknown()
         {
-            let value = asm2::resolver::eval(
-                report,
-                decls,
-                defs,
-                symbol_ctx,
-                &ast_const.expr)?;
-
-            println!("{} = {:?}", decls.symbols.get(item_ref).name, value);
-            
-            if !value.is_unknown()
-            {
-                let symbol = defs.symbols.get_mut(item_ref);
-                symbol.value = value;
-
-                return Ok(true);
-            }
+            return Ok(asm2::ResolutionState::Resolved);
         }
+
+
+        let value = asm2::resolver::eval(
+            report,
+            decls,
+            defs,
+            symbol_ctx,
+            &mut expr::EvalContext2::new(),
+            &ast_const.expr)?;
+
+        println!("{} = {:?}", decls.symbols.get(item_ref).name, value);
+        
+        if value.is_unknown()
+        {
+            return Ok(asm2::ResolutionState::Unresolved);
+        }
+
+
+        let symbol = defs.symbols.get_mut(item_ref);
+        symbol.value = value;
     }
 
-    Ok(false)
+    Ok(asm2::ResolutionState::Resolved)
 }

@@ -1,6 +1,7 @@
 use crate::*;
 
 
+mod bank;
 mod bankdef;
 mod ruledef;
 mod symbol;
@@ -30,6 +31,7 @@ pub fn collect(
     let guard = report.get_error_guard();
 
     bankdef::collect(report, ast, &mut collections)?;
+    bank::collect(report, ast, &mut collections)?;
     ruledef::collect(report, ast, &mut collections)?;
     symbol::collect(report, ast, &mut collections)?;
 

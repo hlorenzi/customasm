@@ -131,7 +131,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 				if self.parser.maybe_expect(syntax::TokenKind::Colon).is_some()
 					{ self.parse_expr()? }
 				else
-					{ expr::Expr::Block(true_branch.span(), Vec::new()) }
+					{ expr::Expr::Block(true_branch.span().clone(), Vec::new()) }
 			};
 			
 			Ok(expr::Expr::TernaryOp(cond.span().join(&false_branch.span()), Box::new(cond), Box::new(true_branch), Box::new(false_branch)))

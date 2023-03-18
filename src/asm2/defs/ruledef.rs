@@ -44,7 +44,7 @@ pub struct RuleParameter
 }
 
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum RuleParameterType
 {
     Unspecified,
@@ -207,4 +207,21 @@ pub fn resolve_rule_parameter(
 
     parameters.push(param);
     Ok(param_index)
+}
+
+
+impl Ruledef
+{
+    pub fn get_rule(&self, rule_ref: util::ItemRef<Rule>) -> &Rule
+    {
+        &self.rules[rule_ref.0]
+    }
+
+
+    pub fn iter_rule_refs(&self) -> impl Iterator<Item = util::ItemRef<Rule>>
+    {
+        (0..self.rules.len())
+            .into_iter()
+            .map(|i| util::ItemRef::<Rule>::new(i))
+    }
 }

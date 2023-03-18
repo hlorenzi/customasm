@@ -15,7 +15,7 @@ pub fn parse_directive_data(
         let span = if is_first
             { expr.span().join(&tk_hash.span) }
         else
-            { expr.span() };
+            { expr.span().clone() };
         
         let mut invocation = asm::Invocation
         {
