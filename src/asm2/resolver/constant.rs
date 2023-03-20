@@ -1,6 +1,11 @@
 use crate::*;
 
 
+/// Tries to resolve the value of constants as much
+/// as possible, for whatever number of iterations it takes.
+/// 
+/// Stops as soon as one iteration reports having resolved
+/// no new constants.
 pub fn resolve_constants(
     report: &mut diagn::Report,
     ast: &asm2::AstTopLevel,
@@ -8,18 +13,22 @@ pub fn resolve_constants(
     defs: &mut asm2::ItemDefs)
     -> Result<(), ()>
 {
+    let mut prev_resolved_count = 0;
+
     loop
     {
-        let resolution_state = resolve_constants_once(
+        let resolved_count = resolve_constants_once(
             report,
             ast,
             decls,
             defs)?;
 
-        if let asm2::ResolutionState::Resolved = resolution_state
+        if resolved_count == prev_resolved_count
         {
             return Ok(());
         }
+
+        prev_resolved_count = resolved_count;
     }
 }
 
@@ -29,35 +38,48 @@ pub fn resolve_constants_once(
     ast: &asm2::AstTopLevel,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs)
-    -> Result<asm2::ResolutionState, ()>
+    -> Result<usize, ()>
 {
-    println!("== resolve_constants_once ==");
-    let mut resolution_state = asm2::ResolutionState::Resolved;
+    let mut resolved_count = 0;
 
-    for item in asm2::resolver::iter_with_context(ast, decls)
+    let mut iter = asm2::ResolveIterator::new(
+        ast,
+        defs,
+        false);
+
+    while let Some(ctx) = iter.next(decls, defs)
     {
-        if let asm2::AstAny::Symbol(ast_symbol) = item.node
+        if let asm2::AstAny::Symbol(ast_symbol) = ctx.node
         {
-            resolution_state.merge(
-                resolve_constant(
+            if let asm2::AstSymbolKind::Constant(_) = ast_symbol.kind
+            {
+                let resolution_state = resolve_constant(
                     report,
                     ast_symbol,
                     decls,
                     defs,
-                    &item.get_symbol_ctx())?);
-        }        
+                    &ctx)?;
+
+                if let asm2::ResolutionState::Resolved = resolution_state
+                {
+                    resolved_count += 1;
+                }
+            }
+        }
+
+        iter.update_after_node(decls, defs);
     }
 
-    Ok(resolution_state)
+    Ok(resolved_count)
 }
 
 
-pub fn resolve_constant<'symbol_ctx>(
+pub fn resolve_constant(
     report: &mut diagn::Report,
     ast_symbol: &asm2::AstSymbol,
-    decls: &'symbol_ctx asm2::ItemDecls,
+    decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
-    symbol_ctx: &'symbol_ctx util::SymbolContext)
+    ctx: &asm2::ResolverContext)
     -> Result<asm2::ResolutionState, ()>
 {
     let item_ref = ast_symbol.item_ref.unwrap();
@@ -76,21 +98,43 @@ pub fn resolve_constant<'symbol_ctx>(
             report,
             decls,
             defs,
-            symbol_ctx,
+            ctx,
             &mut expr::EvalContext2::new(),
+            false,
             &ast_const.expr)?;
 
-        println!("{} = {:?}", decls.symbols.get(item_ref).name, value);
-        
         if value.is_unknown()
         {
+            if ctx.is_final_iteration
+            {
+                report.error_span(
+                    "constant value did not converge",
+                    &ast_symbol.decl_span);
+            }
+
+            let value_guess = asm2::resolver::eval(
+                report,
+                decls,
+                defs,
+                ctx,
+                &mut expr::EvalContext2::new(),
+                true,
+                &ast_const.expr)?;
+
+            let symbol = defs.symbols.get_mut(item_ref);
+            symbol.value_guess = Some(value_guess);
+            
             return Ok(asm2::ResolutionState::Unresolved);
         }
 
 
         let symbol = defs.symbols.get_mut(item_ref);
         symbol.value = value;
-    }
 
-    Ok(asm2::ResolutionState::Resolved)
+        Ok(asm2::ResolutionState::Resolved)
+    }
+    else
+    {
+        unreachable!()
+    }
 }

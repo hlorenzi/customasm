@@ -21,6 +21,7 @@ pub enum Expr
 pub enum Value
 {
 	Unknown,
+	FailedConstraint,
 	Void,
 	Integer(util::BigInt),
 	String(ValueString),
@@ -99,6 +100,17 @@ impl Value
 		match self
 		{
 			Value::Unknown => true,
+			_ => false,
+		}
+	}
+
+
+	pub fn should_propagate(&self) -> bool
+	{
+		match self
+		{
+			Value::Unknown => true,
+			Value::FailedConstraint => true,
 			_ => false,
 		}
 	}
@@ -266,6 +278,27 @@ impl Value
 			{
 				report.error_span(
 					"expected integer",
+					span);
+
+				Err(())
+			}
+		}
+	}
+
+
+	pub fn expect_bool(
+		&self,
+		report: &mut diagn::Report,
+		span: &diagn::Span)
+		-> Result<bool, ()>
+	{
+		match self
+		{
+			expr::Value::Bool(value) => Ok(*value),
+			_ =>
+			{
+				report.error_span(
+					"expected boolean",
 					span);
 
 				Err(())

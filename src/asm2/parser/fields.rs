@@ -29,6 +29,9 @@ pub fn parse(
 
     while !walker.next_is(0, syntax::TokenKind::BraceClose)
     {
+        let deprecated_hash =
+            walker.maybe_expect(syntax::TokenKind::Hash).is_some();
+
         let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
         let name = tk_name.excerpt.as_ref().unwrap().clone();
 
@@ -43,7 +46,8 @@ pub fn parse(
 
 
         let maybe_expr = {
-            if walker.maybe_expect(syntax::TokenKind::Equal).is_some()
+            if deprecated_hash ||
+                walker.maybe_expect(syntax::TokenKind::Equal).is_some()
             {
                 let expr = expr::parse(report, walker)?;
                 fields.span = fields.span.join(&expr.span());

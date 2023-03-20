@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{*, expr::resolve_builtin};
 use std::collections::HashMap;
 
 
@@ -65,8 +65,48 @@ pub struct EvalFunctionInfo2<'a>
 {
 	pub report: &'a mut diagn::Report,
 	pub func: expr::Value,
-	pub args: Vec<expr::Value>,
-	pub arg_spans: Vec<&'a diagn::Span>,
+	pub args: Vec<EvalFunctionArgument<'a>>,
+	pub span: &'a diagn::Span,
+}
+
+
+impl<'a> EvalFunctionInfo2<'a>
+{
+	pub fn ensure_arg_number(
+		&mut self,
+		expected_arg_number: usize)
+		-> Result<(), ()>
+	{
+		if self.args.len() != expected_arg_number
+		{
+			let plural = {
+				if expected_arg_number != 1
+					{ "s" }
+				else
+					{ "" }
+			};
+
+			self.report.error_span(
+				format!(
+					"function expected {} argument{} (but got {})",
+					expected_arg_number,
+					plural,
+					self.args.len()),
+				self.span);
+			
+			Err(())
+		}
+		else
+		{
+			Ok(())
+		}
+	}
+}
+
+
+pub struct EvalFunctionArgument<'a>
+{
+	pub value: expr::Value,
 	pub span: &'a diagn::Span,
 }
 
@@ -128,12 +168,19 @@ pub fn dummy_eval_asm() -> impl Fn(&mut EvalAsmInfo2) -> Result<expr::Value, ()>
 }
 
 
-macro_rules! propagate_unknown {
+macro_rules! propagate {
 	($expr: expr) => {
-		match $expr
 		{
-			expr::Value::Unknown => return Ok(expr::Value::Unknown),
-			value => value,
+			let value: expr::Value = $expr;
+
+			if value.should_propagate()
+			{
+				return Ok(value)
+			}
+			else
+			{
+				value
+			}
 		}
 	};
 }
@@ -240,15 +287,6 @@ impl expr::Expr
 			
 			&expr::Expr::Variable(ref span, hierarchy_level, ref hierarchy) =>
 			{
-				if hierarchy_level == 0 && hierarchy.len() == 1
-				{
-					match ctx.get_local(&hierarchy[0])
-					{
-						Ok(value) => return Ok(value),
-						Err(()) => {}
-					}
-				}
-
 				let mut info = EvalVariableInfo2
 				{
 					report,
@@ -257,12 +295,26 @@ impl expr::Expr
 					span,
 				};
 
+				if hierarchy_level == 0 && hierarchy.len() == 1
+				{
+					if let Some(_) = resolve_builtin(&hierarchy[0])
+					{
+						return Ok(expr::Value::BuiltInFunction(
+							hierarchy[0].clone()));
+					}
+
+					if let Ok(local_value) = ctx.get_local(&hierarchy[0])
+					{
+						return Ok(local_value);
+					}
+				}
+
 				(provider.eval_var)(&mut info)
 			}
 			
 			&expr::Expr::UnaryOp(ref span, _, op, ref inner_expr) =>
 			{
-				match propagate_unknown!(
+				match propagate!(
 					inner_expr.eval2_with_ctx(report, ctx, provider)?)
 				{
 					expr::Value::Integer(ref x) => match op
@@ -293,7 +345,7 @@ impl expr::Expr
 						{
 							if hierarchy_level == 0 && hierarchy.len() == 1
 							{
-								let value = propagate_unknown!(
+								let value = propagate!(
 									rhs_expr.eval2_with_ctx(report, ctx, provider)?);
 								ctx.set_local(hierarchy[0].clone(), value);
 								return Ok(expr::Value::Void);
@@ -308,7 +360,7 @@ impl expr::Expr
 				
 				else if op == expr::BinaryOp::LazyOr || op == expr::BinaryOp::LazyAnd
 				{
-					let lhs = propagate_unknown!(
+					let lhs = propagate!(
 						lhs_expr.eval2_with_ctx(report, ctx, provider)?);
 					
 					match (op, &lhs)
@@ -320,7 +372,7 @@ impl expr::Expr
 						_ => return Err(report.error_span("invalid argument type to operator", &lhs_expr.span()))
 					}
 					
-					let rhs = propagate_unknown!(
+					let rhs = propagate!(
 						rhs_expr.eval2_with_ctx(report, ctx, provider)?);
 					
 					match (op, &rhs)
@@ -335,10 +387,10 @@ impl expr::Expr
 				
 				else
 				{
-					let lhs = propagate_unknown!(
+					let lhs = propagate!(
 						lhs_expr.eval2_with_ctx(report, ctx, provider)?);
 
-					let rhs = propagate_unknown!(
+					let rhs = propagate!(
 						rhs_expr.eval2_with_ctx(report, ctx, provider)?);
 
 					match (&lhs, &rhs)
@@ -429,9 +481,9 @@ impl expr::Expr
 			{
 				match cond.eval2_with_ctx(report, ctx, provider)?
 				{
-					expr::Value::Bool(true)  => Ok(propagate_unknown!(
+					expr::Value::Bool(true)  => Ok(propagate!(
 						true_branch.eval2_with_ctx(report, ctx, provider)?)),
-					expr::Value::Bool(false) => Ok(propagate_unknown!(
+					expr::Value::Bool(false) => Ok(propagate!(
 						false_branch.eval2_with_ctx(report, ctx, provider)?)),
 					_ => Err(report.error_span("invalid condition type", &cond.span()))
 				}
@@ -439,7 +491,7 @@ impl expr::Expr
 			
 			&expr::Expr::BitSlice(ref span, _, left, right, ref inner) =>
 			{
-				match propagate_unknown!(
+				match propagate!(
 					inner.eval2_with_ctx(report, ctx, provider)?).get_bigint()
 				{
 					Some(ref x) => Ok(expr::Value::make_integer(x.slice(left, right))),
@@ -458,7 +510,7 @@ impl expr::Expr
 				
 				for expr in exprs
 				{
-					result = propagate_unknown!(
+					result = propagate!(
 						expr.eval2_with_ctx(report, ctx, provider)?);
 				}
 					
@@ -467,39 +519,42 @@ impl expr::Expr
 			
 			&expr::Expr::Call(ref span, ref target, ref arg_exprs) =>
 			{
-				let func = propagate_unknown!(
+				let func = propagate!(
 					target.eval2_with_ctx(report, ctx, provider)?);
 
-				match func
+				let mut args = Vec::with_capacity(arg_exprs.len());
+				for expr in arg_exprs
 				{
-					expr::Value::BuiltInFunction(_) |
-					expr::Value::Function(_) =>
-					{
-						let mut args = Vec::new();
-						let mut arg_spans = Vec::new();
-						for expr in arg_exprs
-						{
-							let arg = propagate_unknown!(
-								expr.eval2_with_ctx(report, ctx, provider)?);
-							args.push(arg);
-							arg_spans.push(expr.span());
-						}
-
-						let mut info = EvalFunctionInfo2
-						{
-							report,
-							func,
-							args,
-							arg_spans,
-							span,
-						};
-						
-                        (provider.eval_fn)(&mut info)
-					}
-
-					expr::Value::Unknown => Err(report.error_span("unknown function", &target.span())),
+					let value = propagate!(
+						expr.eval2_with_ctx(report, ctx, provider)?);
 					
-					_ => Err(report.error_span("expression is not callable", &target.span()))
+					args.push(EvalFunctionArgument {
+						value,
+						span: expr.span()
+					});
+				}
+
+				let mut info = EvalFunctionInfo2
+				{
+					report,
+					func,
+					args,
+					span,
+				};
+
+				match info.func
+				{
+					expr::Value::BuiltInFunction(_) =>
+						expr::eval_builtin(&mut info),
+
+					expr::Value::Function(_) =>
+						(provider.eval_fn)(&mut info),
+
+					expr::Value::Unknown =>
+						Err(report.error_span("unknown function", &target.span())),
+					
+					_ =>
+						Err(report.error_span("expression is not callable", &target.span()))
 				}
 			}
 			

@@ -18,7 +18,18 @@ pub struct InstructionMatch
     pub rule_ref: util::ItemRef<asm2::Rule>,
     pub args: Vec<InstructionArgument>,
     pub exact_part_count: usize,
-    pub resolved: Option<util::BigInt>,
+    pub encoding_size: Option<usize>,
+    pub encoding_size_guess: Option<usize>,
+    pub resolved: InstructionMatchResolution,
+}
+
+
+#[derive(Clone, Debug)]
+pub enum InstructionMatchResolution
+{
+    Unresolved,
+    FailedConstraint,
+    Resolved(util::BigInt),
 }
 
 
@@ -112,6 +123,7 @@ pub fn match_instr(
         .map(|m| m.0)
         .collect::<Vec<_>>();
 
+
     // Calculate recursive "exact" pattern-part count for
     // each match
     for mtch in &mut matches
@@ -120,6 +132,7 @@ pub fn match_instr(
             defs,
             mtch);
     }
+
 
     // Only keep matches with the maximum count of
     // "exact" pattern-parts
@@ -130,6 +143,38 @@ pub fn match_instr(
         .exact_part_count;
 
     matches.retain(|c| c.exact_part_count == max_exact_count);
+
+
+    // Statically calculate the encoding size of each match,
+    // whenever possible.
+    for mtch in &mut matches
+    {
+        let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
+        let rule = &ruledef.get_rule(mtch.rule_ref);
+    
+        let mut info = expr::StaticSizeInfo::new();
+        for param in &rule.parameters
+        {
+            match param.typ
+            {
+                asm2::RuleParameterType::Integer(size) |
+                asm2::RuleParameterType::Unsigned(size) |
+                asm2::RuleParameterType::Signed(size) =>
+                {
+                    info.locals.insert(param.name.clone(), size);
+                }
+
+                asm2::RuleParameterType::Unspecified => {}
+                asm2::RuleParameterType::RuledefRef(_) => {}
+            }
+        }
+
+        mtch.encoding_size = rule.expr.get_static_size(&info);
+        mtch.encoding_size_guess = mtch.encoding_size;
+
+        println!("static_size = {:?}", rule.expr.get_static_size(&info));
+    }
+
 
     matches
 }
@@ -161,7 +206,9 @@ fn match_with_ruledef<'tokens>(
                 rule_ref,
                 args: Vec::new(),
                 exact_part_count: 0,
-                resolved: None,
+                encoding_size: None,
+                encoding_size_guess: None,
+                resolved: InstructionMatchResolution::Unresolved,
             });
             
         matches.extend(rule_matches);

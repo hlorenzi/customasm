@@ -21,6 +21,22 @@ pub fn resolve(
     defs: &mut asm2::ItemDefs)
     -> Result<(), ()>
 {
+    let initial_item_ref = util::ItemRef::new(0);
+
+    let initial_bankdef = Bankdef {
+        item_ref: initial_item_ref,
+        addr_unit: 8,
+        label_align: 0,
+        addr_start: util::BigInt::new(0, None),
+        addr_size: None,
+        output_offset: Some(0),
+        fill: false,
+    };
+
+    defs.bankdefs.define(initial_item_ref, initial_bankdef);
+
+
+
     for any_node in &ast.nodes
     {
         if let asm2::AstAny::DirectiveBankdef(node) = any_node

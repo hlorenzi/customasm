@@ -1,80 +1,82 @@
 use crate::*;
 
 
+pub struct StaticSizeInfo
+{
+	pub locals: std::collections::HashMap<String, usize>,
+}
+
+
+impl StaticSizeInfo
+{
+	pub fn new() -> StaticSizeInfo
+	{
+		StaticSizeInfo {
+			locals: std::collections::HashMap::new(),
+		}
+	}
+}
+
+
 impl expr::Expr
 {
-	pub fn width(&self) -> Option<usize>
-	{
-		if let Some(slice) = self.slice()
-			{ Some(slice.0 + 1 - slice.1) }
-		else
-			{ None }
-	}
-
-
-	pub fn size(&self) -> Option<usize>
-	{
-		if let Some(slice) = self.slice()
-			{ Some(slice.0 + 1 - slice.1) }
-		else
-			{ None }
-	}
-
-
-	pub fn has_size(&self) -> bool
-	{
-		if let Some(_) = self.slice()
-			{ true }
-		else
-			{ false }
-	}
-	
-	
-	pub fn slice(&self) -> Option<(usize, usize)>
+	pub fn get_static_size(
+		&self,
+		info: &StaticSizeInfo)
+		-> Option<usize>
 	{
 		match self
 		{
-			&expr::Expr::Literal(_, expr::Value::Integer(util::BigInt { size: Some(size), .. })) =>
+			expr::Expr::Variable(_, hierarchy_level, ref hierarchy) =>
 			{
-				Some((size, 0))
-			}
-			
-			&expr::Expr::BinaryOp(_, _, expr::BinaryOp::Concat, ref lhs, ref rhs) =>
-			{
-				let lhs_width = lhs.width();
-				let rhs_width = rhs.width();
-				
-				if lhs_width.is_none() || rhs_width.is_none()
-					{ return None; }
-					
-				Some((lhs_width.unwrap() + rhs_width.unwrap(), 0))
-			}
-			
-			&expr::Expr::BitSlice(_, _, left, right, _) => Some((left, right)),
-			&expr::Expr::SoftSlice(_, _, left, right, _) => Some((left, right)),
-			
-			&expr::Expr::TernaryOp(_, _, ref true_branch, ref false_branch) =>
-			{
-				let true_width = true_branch.width();
-				let false_width = false_branch.width();
-				
-				if true_width.is_none() || false_width.is_none()
-					{ return None; }
-					
-				if true_width.unwrap() != false_width.unwrap()
-					{ return None; }
-					
-				Some((true_width.unwrap(), 0))
-			}
-			
-			&expr::Expr::Block(_, ref exprs) =>
-			{
-				match exprs.last()
+				if *hierarchy_level != 0 ||
+					hierarchy.len() != 1
 				{
-					None => None,
-					Some(expr) => expr.slice()
+					return None;
+				}
+
+				if let Some(size) = info.locals.get(&hierarchy[0])
+				{
+					return Some(*size);
+				}
+
+				None
+			}
+			
+			expr::Expr::Literal(_, expr::Value::Integer(util::BigInt { size: Some(size), .. })) =>
+				Some(*size),
+			
+			expr::Expr::BinaryOp(_, _, expr::BinaryOp::Concat, ref lhs, ref rhs) =>
+			{
+				let lhs_size = lhs.get_static_size(info)?;
+				let rhs_size = rhs.get_static_size(info)?;
+
+				Some(lhs_size + rhs_size)
+			}
+			
+			expr::Expr::BitSlice(_, _, left, right, _) =>
+				Some(left - right),
+
+			expr::Expr::SoftSlice(_, _, left, right, _) =>
+				Some(left - right),
+			
+			expr::Expr::TernaryOp(_, _, ref true_branch, ref false_branch) =>
+			{
+				let true_size = true_branch.get_static_size(info)?;
+				let false_size = false_branch.get_static_size(info)?;
+				
+				if true_size == false_size
+				{
+					Some(true_size)
+				}
+				else
+				{
+					None
 				}
 			}
+			
+			expr::Expr::Block(_, ref exprs) =>
+				exprs.last()?.get_static_size(info),
 			
 			_ => None
 		}

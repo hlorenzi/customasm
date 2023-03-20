@@ -16,6 +16,7 @@ const C_SRC:      &'static str = "\u{001b}[97m";
 const C_BOLD:     &'static str = "\u{001b}[1m";
 
 
+#[derive(Clone)]
 pub struct Report
 {
 	messages: Vec<Message>,
@@ -76,8 +77,7 @@ impl Message
 	pub fn error<S>(descr: S) -> Message
 	where S: Into<String>
 	{
-		Message
-		{
+		Message {
 			descr: descr.into(),
 			kind: MessageKind::Error,
 			span: None,
@@ -90,8 +90,7 @@ impl Message
 	pub fn error_span<S>(descr: S, span: &Span) -> Message
 	where S: Into<String>
 	{
-		Message
-		{
+		Message {
 			descr: descr.into(),
 			kind: MessageKind::Error,
 			span: Some(span.clone()),
@@ -104,8 +103,7 @@ impl Message
 	pub fn warning<S>(descr: S) -> Message
 	where S: Into<String>
 	{
-		Message
-		{
+		Message {
 			descr: descr.into(),
 			kind: MessageKind::Warning,
 			span: None,
@@ -118,8 +116,7 @@ impl Message
 	pub fn warning_span<S>(descr: S, span: &Span) -> Message
 	where S: Into<String>
 	{
-		Message
-		{
+		Message {
 			descr: descr.into(),
 			kind: MessageKind::Warning,
 			span: Some(span.clone()),
@@ -132,8 +129,7 @@ impl Message
 	pub fn note<S>(descr: S) -> Message
 	where S: Into<String>
 	{
-		Message
-		{
+		Message {
 			descr: descr.into(),
 			kind: MessageKind::Note,
 			span: None,
@@ -146,12 +142,24 @@ impl Message
 	pub fn note_span<S>(descr: S, span: &Span) -> Message
 	where S: Into<String>
 	{
-		Message
-		{
+		Message {
 			descr: descr.into(),
 			kind: MessageKind::Note,
 			span: Some(span.clone()),
 			short_excerpt: false,
+			inner: Vec::new(),
+		}
+	}
+	
+	
+	pub fn short_note_span<S>(descr: S, span: &Span) -> Message
+	where S: Into<String>
+	{
+		Message {
+			descr: descr.into(),
+			kind: MessageKind::Note,
+			span: Some(span.clone()),
+			short_excerpt: true,
 			inner: Vec::new(),
 		}
 	}
@@ -182,7 +190,7 @@ impl Report
 	}
 
 
-	fn transfer(&mut self, other: &mut Report)
+	pub fn transfer_to(&mut self, other: &mut Report)
 	{
 		for msg in &self.messages
 		{
@@ -199,7 +207,7 @@ impl Report
 				descr: parent.descr.clone(),
 				kind: parent.kind,
 				span: parent.span.clone(),
-				short_excerpt: false,
+				short_excerpt: parent.short_excerpt,
 				inner: vec![msg],
 			};
 		}
@@ -216,7 +224,7 @@ impl Report
 				descr: parent.descr.clone(),
 				kind: parent.kind,
 				span: parent.span.clone(),
-				short_excerpt: false,
+				short_excerpt: parent.short_excerpt,
 				inner: msgs,
 			};
 
@@ -303,6 +311,13 @@ impl Report
 	where S: Into<String>
 	{
 		self.parents.push(Message::note_span(descr, span));
+	}
+	
+	
+	pub fn push_parent_short_note<S>(&mut self, descr: S, span: &Span)
+	where S: Into<String>
+	{
+		self.parents.push(Message::short_note_span(descr, span));
 	}
 	
 	
@@ -435,7 +450,7 @@ impl Report
 		write!(writer, "{}", C_LOCATION).unwrap();
 		if indent > 0
 		{
-			write!(writer, "[!] ").unwrap();
+			write!(writer, " + ").unwrap();
 		}
 		else
 		{
@@ -665,7 +680,7 @@ impl RcReport
 
 	pub fn transfer_to(&self, other: RcReport)
 	{
-		self.report.borrow_mut().transfer(&mut other.report.borrow_mut());
+		self.report.borrow_mut().transfer_to(&mut other.report.borrow_mut());
 	}
 
 

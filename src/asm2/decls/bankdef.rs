@@ -7,6 +7,16 @@ pub fn collect(
     decls: &mut asm2::ItemDecls)
     -> Result<(), ()>
 {
+    let initial_item_ref = decls.banks.declare(
+        report,
+        &diagn::Span::new_dummy(),
+        &util::SymbolContext::new_global(),
+        "#global_bankdef".to_string(),
+        0)?;
+    
+    debug_assert!(initial_item_ref.0 == 0);
+
+
     for any_node in &mut ast.nodes
     {
         if let asm2::AstAny::DirectiveBankdef(ref mut node) = any_node

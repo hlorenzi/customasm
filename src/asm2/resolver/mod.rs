@@ -3,9 +3,8 @@ use crate::*;
 
 mod iter;
 pub use iter::{
-    AstIteratorWithContext,
-    AstIteratorWithContextItem,
-    iter_with_context,
+    ResolveIterator,
+    ResolverContext,
 };
 
 mod constant;
@@ -15,9 +14,20 @@ pub use constant::{
     resolve_constant,
 };
 
+mod label;
+pub use label::{
+    resolve_label,
+};
+
 mod instruction;
 pub use instruction::{
     resolve_instruction,
+};
+
+mod eval;
+pub use eval::{
+    eval,
+    get_current_address,
 };
 
 
@@ -40,30 +50,75 @@ impl ResolutionState
 }
 
 
+pub fn resolve_iteratively(
+    report: &mut diagn::Report,
+    ast: &asm2::AstTopLevel,
+    decls: &asm2::ItemDecls,
+    defs: &mut asm2::ItemDefs,
+    max_iterations: usize)
+    -> Result<ResolutionState, ()>
+{
+    for i in 0..max_iterations
+    {
+        let resolution_state = resolve_once(
+            report,
+            ast,
+            decls,
+            defs,
+            i + 1 == max_iterations)?;
+
+        if let asm2::ResolutionState::Resolved = resolution_state
+        {
+            return Ok(asm2::ResolutionState::Resolved);
+        }
+    }
+
+    Ok(asm2::ResolutionState::Unresolved)
+}
+
+
 pub fn resolve_once(
     report: &mut diagn::Report,
     ast: &asm2::AstTopLevel,
     decls: &asm2::ItemDecls,
-    defs: &mut asm2::ItemDefs)
+    defs: &mut asm2::ItemDefs,
+    is_final_iteration: bool)
     -> Result<asm2::ResolutionState, ()>
 {
-    println!("== resolve_once ==");
     let mut resolution_state = asm2::ResolutionState::Resolved;
 
-    for item in asm2::resolver::iter_with_context(ast, decls)
+    let mut iter = ResolveIterator::new(
+        ast,
+        defs,
+        is_final_iteration);
+
+    while let Some(ctx) = iter.next(decls, defs)
     {
-        if let asm2::AstAny::Symbol(ast_symbol) = item.node
+        if let asm2::AstAny::Symbol(ast_symbol) = ctx.node
         {
-            resolution_state.merge(
-                resolve_constant(
-                    report,
-                    ast_symbol,
-                    decls,
-                    defs,
-                    &item.get_symbol_ctx())?);
+            if let asm2::AstSymbolKind::Constant(_) = ast_symbol.kind
+            {
+                resolution_state.merge(
+                    resolve_constant(
+                        report,
+                        ast_symbol,
+                        decls,
+                        defs,
+                        &ctx)?);
+            }
+            else
+            {
+                resolution_state.merge(
+                    resolve_label(
+                        report,
+                        ast_symbol,
+                        decls,
+                        defs,
+                        &ctx)?);
+            }
         }
         
-        else if let asm2::AstAny::Instruction(ast_instr) = item.node
+        else if let asm2::AstAny::Instruction(ast_instr) = ctx.node
         {
             resolution_state.merge(
                 resolve_instruction(
@@ -71,44 +126,11 @@ pub fn resolve_once(
                     ast_instr,
                     decls,
                     defs,
-                    &item.get_symbol_ctx())?);
+                    &ctx)?);
         }
+
+        iter.update_after_node(decls, defs);
     }
 
     Ok(resolution_state)
-}
-
-
-pub fn eval(
-    report: &mut diagn::Report,
-    decls: &asm2::ItemDecls,
-    defs: &asm2::ItemDefs,
-    symbol_ctx: &util::SymbolContext,
-    eval_ctx: &mut expr::EvalContext2,
-    expr: &expr::Expr)
-    -> Result<expr::Value, ()>
-{
-    let mut eval_var = |info: &mut expr::EvalVariableInfo2|
-    {
-        let symbol_ref = decls.symbols.get_by_name(
-            info.report,
-            info.span,
-            symbol_ctx,
-            info.hierarchy_level,
-            info.hierarchy)?;
-
-        let symbol = defs.symbols.get(symbol_ref);
-        Ok(symbol.value.clone())
-    };
-
-    let mut provider = expr::EvalProvider {
-        eval_var: &mut eval_var,
-        eval_fn: &mut expr::dummy_eval_fn(),
-        eval_asm: &mut expr::dummy_eval_asm(),
-    };
-
-    expr.eval2_with_ctx(
-        report,
-        eval_ctx,
-        &mut provider)
 }

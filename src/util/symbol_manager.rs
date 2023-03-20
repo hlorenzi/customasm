@@ -196,7 +196,8 @@ impl<T> SymbolManager<T>
                     .collect::<Vec<String>>();
                 
                 report.error_span(
-                    format!("unknown symbol `{}{}`",
+                    format!("unknown {} `{}{}`",
+                        self.report_as,
                         ".".repeat(hierarchy_level),
                         hierarchy_string.join(".")),
                     span);
@@ -332,7 +333,7 @@ impl<T> SymbolManager<T>
 
 impl SymbolContext
 {
-    pub fn new_global() -> SymbolContext
+    pub const fn new_global() -> SymbolContext
     {
         SymbolContext {
             hierarchy: Vec::new(),

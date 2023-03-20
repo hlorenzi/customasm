@@ -458,6 +458,8 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 	{
 		let mut span = diagn::Span::new_dummy();
 		let mut hierarchy_level = 0;
+
+		self.walker.clear_linebreak();
 		
 		loop
 		{

@@ -54,6 +54,7 @@ pub mod matcher;
 pub use matcher::{
     InstructionMatches,
     InstructionMatch,
+    InstructionMatchResolution,
     InstructionArgument,
     InstructionArgumentKind,
 };
@@ -61,6 +62,8 @@ pub use matcher::{
 pub mod resolver;
 pub use resolver::{
     ResolutionState,
+    ResolveIterator,
+    ResolverContext,
 };
 
 
@@ -74,69 +77,60 @@ fn test_new_asm() -> Result<(), ()>
     fileserver.add("main.asm", r#"
         #include "include.asm"
 
-        res = w + ww + yy
-        x = 0
-        .a = 0x111
-        .b = 0x222
-        .c = 0x333
-        .d = .a + .b + .c
-        .e = x.a + x.b + x.c + y.e
-        y = 1
-        .a = 0x1000
-        .b = 0x2000
-        .c = 0x3000
-        .d = .a + .b + .c
-        .e = y.a + y.b + y.c
-        z = 2
-        w = x + y + z
-        ww = x.a + x.b + x.c
-        yy = y.a + y.b + y.c
+        ;res = w + ww + yy
+        ;x = 0
+        ;.a = 0x111
+        ;.b = 0x222
+        ;.c = 0x333
+        ;.d = .a + .b + .c
+        ;.e = x.a + x.b + x.c + y.e
+        ;y = 1
+        ;.a = 0x1000
+        ;.b = 0x2000
+        ;.c = 0x3000
+        ;.d = .a + .b + .c
+        ;.e = y.a + y.b + y.c
+        ;z = 2
+        ;w = x + y + z
+        ;ww = x.a + x.b + x.c
+        ;yy = y.a + y.b + y.c
+        ;zz = loop + loop.inner + loop.inner.inner
 
         loop:
-            hlt
-            jmp loop
-            jmp loop 0x6666
-        .inner:
-            jmp loop + 0x7777
-            jmp a b
-        ..inner:
-            hlt
-            ;xyz
-            ;abc def + ghi
+            ;hlt
+            ;jmp 0x55
+            ;jmp 0x6666
+            jmp end
+
+        end = $
     "#);
 
     fileserver.add("include.asm", r#"
-        #bankdef a {
-            bits = 16 * 4
-        }
-        
         #ruledef {
-            hlt => 0x1234
-            hlt => 0x5678
-            cld => 0x1111
-            jmp {addr: u16} {addr2: u32} => 0xa0 @ addr
-            jmp {addr: u16} + {addr2: u32} => 0xa1 @ addr
-        }
-
-        #ruledef inner {
-            a => 0x99
-            a => 0xdd
-        }
-
-        #ruledef hey {
-            hlt => 0x9a
-            jmp {addr: u16} => 0xb0 @ addr
-            jmp loop => 0xb1
-            jmp {arg: inner} b => 0x44 @ arg
+            hlt => 0xad @ $`8
+            jmp {addr: u8} => 0xaa01 @ addr
+            jmp {addr: u16} => {
+                assert(addr < 0x100)
+                0xaa02 @ addr
+            }
+            jmp {addr: u16} => {
+                assert(addr >= 0x100)
+                0xaa03 @ addr
+            }
         }
     "#);
+
+    let root_file = "main.asm";
+    
+    let mut fileserver = util::FileServerReal::new();
+    let root_file = "examples/nes/main.asm";
 
     let mut run = || -> Result<(), ()>
     {
         let mut ast = parser::parse_and_resolve_includes(
             &mut report,
             &fileserver,
-            "main.asm",
+            root_file,
             &mut Vec::new())?;
 
         let mut decls = decls::collect(
@@ -159,18 +153,15 @@ fn test_new_asm() -> Result<(), ()>
             &ast,
             &mut defs)?;
     
-        println!("{:#?}", ast);
-        println!("{:#?}", decls);
-        println!("{:#?}", defs);
-    
-        resolver::resolve_once(
+        resolver::resolve_iteratively(
             &mut report,
             &ast,
             &decls,
-            &mut defs)?;
+            &mut defs,
+            3)?;
             
-        println!("{:#?}", ast);
-        println!("{:#?}", decls);
+        //println!("{:#?}", ast);
+        //println!("{:#?}", decls);
         println!("{:#?}", defs);
 
         Ok(())

@@ -7,6 +7,9 @@ pub struct Instruction
     pub item_ref: util::ItemRef<Self>,
     pub matches: asm2::InstructionMatches,
     pub chosen_encoding: Option<util::BigInt>,
+    pub address_from_bank_start: Option<usize>,
+    pub encoding_size: Option<usize>,
+    pub encoding_size_guess: Option<usize>,
 }
 
 
@@ -27,6 +30,9 @@ pub fn resolve(
                 item_ref,
                 matches: asm2::InstructionMatches::new(),
                 chosen_encoding: None,
+                address_from_bank_start: None,
+                encoding_size: None,
+                encoding_size_guess: None,
             };
             
             defs.instructions.define(item_ref, instr);

@@ -60,6 +60,12 @@ impl<T> DefList<T>
     }
 
 
+    pub fn len(&self) -> usize
+    {
+        self.defs.len()
+    }
+
+
     pub fn get(&self, item_ref: util::ItemRef<T>) -> &T
     {
         &self.defs[item_ref.0]

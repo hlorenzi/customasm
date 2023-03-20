@@ -5,6 +5,7 @@ use crate::*;
 pub struct Symbol
 {
     pub item_ref: util::ItemRef<Self>,
+    pub value_guess: Option<expr::Value>,
     pub value: expr::Value,
 }
 
@@ -24,6 +25,7 @@ pub fn resolve(
 
             let symbol = Symbol {
                 item_ref,
+                value_guess: None,
                 value: expr::Value::Unknown,
             };
 
