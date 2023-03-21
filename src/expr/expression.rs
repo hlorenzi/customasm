@@ -21,7 +21,7 @@ pub enum Expr
 pub enum Value
 {
 	Unknown,
-	FailedConstraint,
+	FailedConstraint(diagn::Message),
 	Void,
 	Integer(util::BigInt),
 	String(ValueString),
@@ -110,7 +110,7 @@ impl Value
 		match self
 		{
 			Value::Unknown => true,
-			Value::FailedConstraint => true,
+			Value::FailedConstraint(_) => true,
 			_ => false,
 		}
 	}
@@ -203,6 +203,33 @@ impl Value
 		{
 			Some(_) => Ok(&bigint),
 			None =>
+			{
+				report.error_span(
+					"expected integer with definite size",
+					span);
+
+				Err(())
+			}
+		}
+	}
+
+
+	pub fn expect_error_or_sized_bigint(
+		self,
+		report: &mut diagn::Report,
+		span: &diagn::Span)
+		-> Result<expr::Value, ()>
+	{
+		match self
+		{
+			expr::Value::Unknown |
+			expr::Value::FailedConstraint(_) =>
+				Ok(self),
+
+			expr::Value::Integer(ref bigint) if bigint.size.is_some() =>
+				Ok(self),
+
+			_ =>
 			{
 				report.error_span(
 					"expected integer with definite size",

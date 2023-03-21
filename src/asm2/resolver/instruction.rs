@@ -10,70 +10,65 @@ pub fn resolve_instruction(
     -> Result<asm2::ResolutionState, ()>
 {
     // Update the instruction's address if available
-    if let Some(addr) = ctx.bank_data.cur_address
+    if let Some(addr) = ctx.bank_data.cur_position
     {
         let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
         
-        if instr.address_from_bank_start.is_none()
+        if instr.position_within_bank.is_none()
         {
-            instr.address_from_bank_start = Some(addr);
+            instr.position_within_bank = Some(addr);
         }
     }
 
 
-    // Attempt to resolve the instruction's encoding
-    // if it's still Unknown
     let instr = defs.instructions.get(ast_instr.item_ref.unwrap());
     
-    if let None = instr.chosen_encoding
+    // Skip this instruction if already resolved
+    if let Some(_) = instr.encoding
     {
-        let (maybe_size, is_guess, maybe_encoding) = resolve_encoding(
-            report,
-            ast_instr,
-            decls,
-            defs,
-            ctx)?;
+        return Ok(asm2::ResolutionState::Resolved);
+    }
 
-        if let Some(encoding) = maybe_encoding
+
+    let (is_guess, maybe_encoding) = resolve_encoding(
+        report,
+        ast_instr,
+        decls,
+        defs,
+        ctx)?;
+
+    if let Some(encoding) = maybe_encoding
+    {
+        let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
+        
+        // In the final iteration, the current guess should be
+        // stable with respect to the previously guessed value
+        if ctx.is_last_iteration && is_guess
         {
-            let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
+            if Some(&encoding) != instr.encoding_guess.as_ref()
+            {
+                dbg!(&instr);
+                report.error_span(
+                    "instruction encoding did not converge",
+                    &ast_instr.span);
+            }
+        }
+
+        
+        if ctx.is_last_iteration || !is_guess
+        {
             instr.encoding_size = Some(encoding.size.unwrap());
-            instr.chosen_encoding = Some(encoding);
+            instr.encoding = Some(encoding);
         }
-        else if let Some(size) = maybe_size
+        else
         {
-            let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
-            if is_guess
-            {
-                instr.encoding_size_guess = Some(size);
-            }
-            else
-            {
-                instr.encoding_size = Some(size);
-            }
+            instr.encoding_size_guess = Some(encoding.size.unwrap());
+            instr.encoding_guess = Some(encoding);
         }
     }
 
 
-    // Check for resolution
-    let instr = defs.instructions.get(ast_instr.item_ref.unwrap());
-
-    if instr.encoding_size.is_none() ||
-        instr.chosen_encoding.is_none()
-    {
-        if ctx.is_final_iteration
-        {
-            report.error_span(
-                "instruction encoding did not converge",
-                &ast_instr.span);
-        }
-
-        Ok(asm2::ResolutionState::Unresolved)
-    }
-    else
-    {
-        Ok(asm2::ResolutionState::Resolved)
-    }
+    Ok(asm2::ResolutionState::Resolved)
 }
 
 
@@ -83,245 +78,102 @@ fn resolve_encoding(
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
     ctx: &asm2::ResolverContext)
-    -> Result<(Option<usize>, bool, Option<util::BigInt>), ()>
+    -> Result<(bool, Option<util::BigInt>), ()>
 {
-    let instr = defs.instructions.get(ast_instr.item_ref.unwrap());
-    let mut candidate_reports = vec![None; instr.matches.len()];
-
     // Try to resolve every match
-    for index in 0..instr.matches.len()
-    {
-        let instr = defs.instructions.get(ast_instr.item_ref.unwrap());
-        let mtch = &instr.matches[index];
-        let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
-        let rule = &ruledef.get_rule(mtch.rule_ref);
-        let ruledef_name = &decls.ruledefs.get(mtch.ruledef_ref).name;
-
-
-        // Skip this match if already resolved
-        if let asm2::InstructionMatchResolution::Resolved(_) = &mtch.resolved
-        {
-            continue;
-        }
-        else if let asm2::InstructionMatchResolution::FailedConstraint = &mtch.resolved
-        {
-            continue;
-        }
-
-
-        let value = {
-            let mut candidate_report = diagn::Report::new();
-
-            candidate_report.push_parent(
-                "failed to resolve instruction",
-                &ast_instr.span);
-            
-            candidate_report.push_parent_short_note(
-                format!(
-                    "within `{}`, rule {}",
-                    ruledef_name,
-                    mtch.rule_ref.0),
-                &rule.pattern_span);
-
-            let maybe_value = resolve_instruction_match(
-                &mut candidate_report,
-                &mtch,
-                decls,
-                defs,
-                ctx,
-                false);
-
-            candidate_report.pop_parent();
-            candidate_report.pop_parent();
-
-            if candidate_report.has_errors()
-            {
-                match maybe_value
-                {
-                    Ok(expr::Value::FailedConstraint) => {}
-                    _ => {},//candidate_report.transfer_to(report),
-                }
-            }
-
-            candidate_reports[index] = Some(candidate_report);
-            maybe_value?
-        };
-
-
-        if let expr::Value::Unknown = value
-        {
-            let mut guess_report = diagn::Report::new();
-
-            let maybe_guess = resolve_instruction_match(
-                &mut guess_report,
-                &mtch,
-                decls,
-                defs,
-                ctx,
-                true);
-
-            println!("{:#?}", defs);
-            println!("instruction match #{}, guess = {:?}", index, maybe_guess);
-
-            let guess = {
-                match maybe_guess
-                {
-                    Err(()) => continue,
-                    Ok(guess) => guess,
-                }
-            };
-
-            let guess_bigint = {
-                match guess
-                {
-                    expr::Value::Integer(bigint) if bigint.size.is_some() =>
-                        bigint,
-                    _ => continue,
-                }
-            };
-
-            let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
-            
-            instr.matches[index].encoding_size_guess =
-                Some(guess_bigint.size.unwrap());
-
-            continue;
-        }
-
-
-        if let expr::Value::FailedConstraint = value
-        {
-            let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
-            
-            instr.matches[index].resolved =
-                asm2::InstructionMatchResolution::FailedConstraint;
-
-            println!("FailedConstraint");
-            continue;
-        }
-
-            
-        let bigint = {
-            report.push_parent(
-                "failed to resolve instruction",
-                &ast_instr.span);
-            
-            report.push_parent_short_note(
-                format!(
-                    "within `{}`, rule {}",
-                    ruledef_name,
-                    mtch.rule_ref.0),
-                &rule.pattern_span);
-
-            let maybe_bigint = value.expect_sized_bigint(
-                report,
-                &rule.expr.returned_value_span());
-
-            report.pop_parent();
-            report.pop_parent();
-
-            maybe_bigint?
-        };
-
-
-        let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
-        
-        instr.matches[index].resolved =
-            asm2::InstructionMatchResolution::Resolved(bigint.clone());
-    }
+    resolve_instruction_matches(
+        report,
+        ast_instr,
+        decls,
+        defs,
+        ctx)?;
 
 
     let instr = defs.instructions.get(ast_instr.item_ref.unwrap());
 
-    // Stop if any matches are still Unknown,
-    // but try to estimate the encoding size if every match
-    // outputs the same size
-    if instr.matches.len() != 0 &&
-        instr.matches.iter().any(|m| matches!(
-            m.resolved,
-            asm2::InstructionMatchResolution::Unresolved))
-    {
-        let encoding_sizes = instr.matches
-            .iter()
-            .map(|m| m.encoding_size);
-
-        let mut instr_size = None;
-
-        for size in encoding_sizes
-        {
-            if let Some(size) = size
-            {
-                if let Some(prev_size) = instr_size
-                {
-                    if size != prev_size
-                    {
-                        instr_size = None;
-                        break;
-                    }
-                }
-                
-                instr_size = Some(size);
-            }
-        }
-
-        if let Some(instr_size) = instr_size
-        {
-            return Ok((Some(instr_size), false, None));
-        }
-
-
-        let encoding_size_guess = instr.matches
-            .iter()
-            .map(|m| m.encoding_size_guess)
-            .filter(|g| g.is_some())
-            .map(|g| g.unwrap())
-            .min();
-
-        if let Some(guess) = encoding_size_guess
-        {
-            return Ok((Some(guess), true, None));
-        }
-
-        return Ok((None, false, None));
-    }
-
-
-    // Retain only encodings which aren't FailedConstraint
-    let encodings_within_constraints = instr.matches
+    let has_no_guess = instr.matches
         .iter()
-        .enumerate()
-        .filter(|m| match m.1.resolved {
-            asm2::InstructionMatchResolution::Resolved(_) => true,
-            _ => false,
-        })
-        .map(|m| match m.1.resolved {
-            asm2::InstructionMatchResolution::Resolved(ref r) => (m.0, r),
-            _ => unreachable!(),
+        .all(|m| m.encoding.is_resolved_or_failed());
+
+    // Use definite encodings if available,
+    // or fallback to the encoding guesses
+    let encodings = instr.matches
+        .iter()
+        .map(|m|
+        {
+            if m.encoding.is_resolved_or_failed()
+                { &m.encoding }
+            else if m.encoding_guess.is_resolved_or_failed()
+                { &m.encoding_guess }
+            else
+                { &asm2::InstructionMatchResolution::Unresolved }
         })
         .collect::<Vec<_>>();
+    
+
+    // Retain only encodings which aren't FailedConstraint
+    let encodings_within_constraints = encodings
+        .iter()
+        .enumerate()
+        .filter(|m| m.1.is_resolved())
+        .map(|m| (m.0, m.1.unwrap_resolved()))
+        .collect::<Vec<_>>();
+
+    
+    // Print FailedConstraint error messages
+    // if no match succeeded
+    if encodings_within_constraints.len() == 0
+    {
+        if ctx.is_last_iteration
+        {
+            let mut msgs = Vec::new();
+
+            for mtch in &instr.matches
+            {
+                let encoding = {
+                    if mtch.encoding.is_resolved_or_failed()
+                        { &mtch.encoding }
+                    else if mtch.encoding_guess.is_resolved_or_failed()
+                        { &mtch.encoding_guess }
+                    else
+                        { &asm2::InstructionMatchResolution::Unresolved }
+                };
+
+                if let asm2::InstructionMatchResolution::FailedConstraint(ref msg) = encoding
+                {
+                    msgs.push(msg.clone());
+                }
+            }
+            
+            report.message(
+                diagn::Message::fuse_topmost(msgs));
+        }
+
+        return Ok((false, None));
+    }
 
 
     // Only retain the smallest encodings
-    let smallest_encoding = encodings_within_constraints
+    let smallest_size = encodings_within_constraints
         .iter()
         .min_by_key(|e| e.1.size.unwrap())
         .unwrap()
         .1.size
         .unwrap();
 
-    let encodings = encodings_within_constraints
+    let smallest_encodings = encodings_within_constraints
         .iter()
-        .copied()
-        .filter(|e| e.1.size.unwrap() == smallest_encoding)
+        .filter(|e| e.1.size.unwrap() == smallest_size)
         .collect::<Vec<_>>();
     
 
     // Expect only a single remaining encoding
-    if encodings.len() > 1
+    if smallest_encodings.len() > 1 &&
+        (ctx.is_last_iteration || has_no_guess)
     {
         let mut candidate_notes = Vec::new();
 
-        for encoding in encodings
+        for encoding in smallest_encodings
         {
             candidate_notes.push(build_recursive_candidate_note(
                 0,
@@ -342,11 +194,132 @@ fn resolve_encoding(
     }
 
 
-    let chosen_encoding = encodings[0].1.clone();
-    Ok((
-        Some(chosen_encoding.size.unwrap()),
-        false,
-        Some(chosen_encoding)))
+    let chosen_encoding = smallest_encodings[0].1.clone();
+
+    return Ok((
+        !has_no_guess,
+        Some(chosen_encoding)));
+}
+
+
+fn resolve_instruction_matches(
+    report: &mut diagn::Report,
+    ast_instr: &asm2::AstInstruction,
+    decls: &asm2::ItemDecls,
+    defs: &mut asm2::ItemDefs,
+    ctx: &asm2::ResolverContext)
+    -> Result<(), ()>
+{
+    let instr = defs.instructions.get(ast_instr.item_ref.unwrap());
+
+    // Try to resolve every match
+    for index in 0..instr.matches.len()
+    {
+        let instr = defs.instructions.get(ast_instr.item_ref.unwrap());
+        let mtch = &instr.matches[index];
+        let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
+        let rule = &ruledef.get_rule(mtch.rule_ref);
+
+
+        // Skip this match if already resolved
+        if let asm2::InstructionMatchResolution::Resolved(_) = &mtch.encoding
+        {
+            continue;
+        }
+        else if let asm2::InstructionMatchResolution::FailedConstraint(_) = &mtch.encoding
+        {
+            continue;
+        }
+
+
+        if ctx.is_first_iteration
+        {
+            let value_definite = {
+                report.push_parent(
+                    "failed to resolve instruction",
+                    &ast_instr.span);
+                
+                let maybe_value = resolve_instruction_match(
+                    report,
+                    &mtch,
+                    decls,
+                    defs,
+                    ctx,
+                    false);
+
+                let maybe_value = maybe_value
+                    .and_then(|v| v.expect_error_or_sized_bigint(
+                        report,
+                        &rule.expr.returned_value_span()));
+        
+                report.pop_parent();
+                report.pop_parent();
+
+                maybe_value?
+            };
+
+
+            if let expr::Value::Integer(bigint) = value_definite
+            {
+                let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
+
+                instr.matches[index].encoding =
+                    asm2::InstructionMatchResolution::Resolved(bigint);
+
+                continue;
+            }
+            else if let expr::Value::FailedConstraint(msg) = value_definite
+            {
+                let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
+
+                instr.matches[index].encoding =
+                    asm2::InstructionMatchResolution::FailedConstraint(msg);
+
+                continue;
+            }
+        }
+
+
+        let maybe_guess = resolve_instruction_match(
+            report,
+            &mtch,
+            decls,
+            defs,
+            ctx,
+            true);
+
+        let maybe_guess = maybe_guess
+            .and_then(|v| v.expect_error_or_sized_bigint(
+                report,
+                &rule.expr.returned_value_span()));
+            
+        let guess = {
+            match maybe_guess
+            {
+                Ok(guess) => guess,
+                Err(()) => continue,
+            }
+        };
+
+
+        let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
+
+        if let expr::Value::Integer(guess_bigint) = guess
+        {
+            instr.matches[index].encoding_size_guess =
+                guess_bigint.size.unwrap();
+
+            instr.matches[index].encoding_guess =
+                asm2::InstructionMatchResolution::Resolved(guess_bigint);
+        }
+        else if let expr::Value::FailedConstraint(guess_msg) = guess
+        {
+            instr.matches[index].encoding_guess =
+                asm2::InstructionMatchResolution::FailedConstraint(guess_msg);
+        }
+    }
+
+    Ok(())
 }
 
 
@@ -401,6 +374,40 @@ fn build_recursive_candidate_note(
 
 
 fn resolve_instruction_match(
+    report: &mut diagn::Report,
+    mtch: &asm2::InstructionMatch,
+    decls: &asm2::ItemDecls,
+    defs: &asm2::ItemDefs,
+    ctx: &asm2::ResolverContext,
+    can_guess: bool)
+    -> Result<expr::Value, ()>
+{
+    let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
+    let rule = &ruledef.get_rule(mtch.rule_ref);
+    let ruledef_name = &decls.ruledefs.get(mtch.ruledef_ref).name;
+
+    report.push_parent_short_note(
+        format!(
+            "within `{}`, rule {}",
+            ruledef_name,
+            mtch.rule_ref.0),
+        &rule.pattern_span);
+
+    let maybe_value = resolve_instruction_match_inner(
+        report,
+        &mtch,
+        decls,
+        defs,
+        ctx,
+        can_guess);
+
+    report.pop_parent();
+
+    maybe_value
+}
+
+
+fn resolve_instruction_match_inner(
     report: &mut diagn::Report,
     mtch: &asm2::InstructionMatch,
     decls: &asm2::ItemDecls,
@@ -552,14 +559,15 @@ fn check_argument_for_integer_type(
 {
     if check_fn(&bigint)
     {
-        report.error_span(
+        let msg = diagn::Message::error_span(
             format!(
                 "argument out of range for type `{}{}`",
                 typename_prefix,
                 size),
             span);
         
-        Ok(expr::Value::FailedConstraint)
+        Ok(expr::Value::FailedConstraint(
+            report.wrap_in_parents(msg)))
     }
     else
     {

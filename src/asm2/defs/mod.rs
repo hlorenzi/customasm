@@ -85,7 +85,7 @@ impl<T> DefList<T>
 }
 
 
-pub fn resolve(
+pub fn define(
     report: &mut diagn::Report,
     ast: &mut asm2::parser::AstTopLevel,
     decls: &mut asm2::decls::ItemDecls)
@@ -101,10 +101,10 @@ pub fn resolve(
 
     let guard = report.get_error_guard();
 
-    bankdef::resolve(report, ast, decls, &mut defs)?;
-    ruledef::resolve(report, ast, decls, &mut defs)?;
-    symbol::resolve(report, ast, decls, &mut defs)?;
-    instruction::resolve(report, ast, decls, &mut defs)?;
+    bankdef::define(report, ast, decls, &mut defs)?;
+    ruledef::define(report, ast, decls, &mut defs)?;
+    symbol::define(report, ast, decls, &mut defs)?;
+    instruction::define(report, ast, decls, &mut defs)?;
 
     report.stop_at_errors(guard)?;
 

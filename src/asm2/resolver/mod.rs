@@ -65,6 +65,7 @@ pub fn resolve_iteratively(
             ast,
             decls,
             defs,
+            i == 0,
             i + 1 == max_iterations)?;
 
         if let asm2::ResolutionState::Resolved = resolution_state
@@ -73,7 +74,7 @@ pub fn resolve_iteratively(
         }
     }
 
-    Ok(asm2::ResolutionState::Unresolved)
+    Err(())
 }
 
 
@@ -82,6 +83,7 @@ pub fn resolve_once(
     ast: &asm2::AstTopLevel,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
+    is_first_iteration: bool,
     is_final_iteration: bool)
     -> Result<asm2::ResolutionState, ()>
 {
@@ -90,6 +92,7 @@ pub fn resolve_once(
     let mut iter = ResolveIterator::new(
         ast,
         defs,
+        is_first_iteration,
         is_final_iteration);
 
     while let Some(ctx) = iter.next(decls, defs)

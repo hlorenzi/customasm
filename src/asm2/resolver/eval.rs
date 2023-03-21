@@ -42,17 +42,11 @@ pub fn eval(
             }
             else
             {
-                println!("symbol `{:?}` guess = {:?}", info.hierarchy, symbol.value_guess);
-
-                match symbol.value_guess
-                {
-                    Some(ref guess) => guess.clone(),
-                    None => expr::Value::make_integer(0),
-                }
+                symbol.value_guess.clone()
             }
         };
 
-        if ctx.is_final_iteration
+        if ctx.is_last_iteration
         {
             if let expr::Value::Unknown = value
             {
@@ -93,15 +87,15 @@ pub fn get_current_address(
     let bankdef = &defs.bankdefs.get(ctx.bank_ref);
     let addr_unit = bankdef.addr_unit;
 
-    let cur_address = {
-        match ctx.bank_data.cur_address
+    let cur_position = {
+        match ctx.bank_data.cur_position
         {
-            Some(cur_address) => cur_address,
+            Some(p) => p,
             None =>
             {
                 if can_guess
                 {
-                    if let Some(guess) = ctx.bank_data.cur_address_guess
+                    if let Some(guess) = ctx.bank_data.cur_position_guess
                         { guess }
                     else
                         { 0 }
@@ -114,7 +108,7 @@ pub fn get_current_address(
         }
     };
     
-    let excess_bits = cur_address % addr_unit;
+    let excess_bits = cur_position % addr_unit;
     if excess_bits != 0 && !can_guess
     {
         let bits_short = addr_unit - excess_bits;
@@ -136,7 +130,7 @@ pub fn get_current_address(
     }
         
     let addr = expr::Value::make_integer(
-        &util::BigInt::from(cur_address / addr_unit) +
+        &util::BigInt::from(cur_position / addr_unit) +
             &bankdef.addr_start);
     
     Ok(addr)

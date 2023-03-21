@@ -47,11 +47,12 @@ pub fn eval_builtin_assert(
     }
     else
     {
-        info.report.error_span(
+        let msg = diagn::Message::error_span(
             "assertion failed",
             info.span);
         
-        Ok(expr::Value::FailedConstraint)
+        Ok(expr::Value::FailedConstraint(
+            info.report.wrap_in_parents(msg)))
     }
 }
 

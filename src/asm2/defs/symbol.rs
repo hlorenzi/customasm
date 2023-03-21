@@ -5,12 +5,12 @@ use crate::*;
 pub struct Symbol
 {
     pub item_ref: util::ItemRef<Self>,
-    pub value_guess: Option<expr::Value>,
     pub value: expr::Value,
+    pub value_guess: expr::Value,
 }
 
 
-pub fn resolve(
+pub fn define(
     report: &mut diagn::Report,
     ast: &asm2::AstTopLevel,
     decls: &mut asm2::ItemDecls,
@@ -25,8 +25,8 @@ pub fn resolve(
 
             let symbol = Symbol {
                 item_ref,
-                value_guess: None,
                 value: expr::Value::Unknown,
+                value_guess: expr::Value::make_integer(0),
             };
 
             defs.symbols.define(item_ref, symbol);

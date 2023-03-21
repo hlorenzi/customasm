@@ -19,8 +19,9 @@ pub struct InstructionMatch
     pub args: Vec<InstructionArgument>,
     pub exact_part_count: usize,
     pub encoding_size: Option<usize>,
-    pub encoding_size_guess: Option<usize>,
-    pub resolved: InstructionMatchResolution,
+    pub encoding_size_guess: usize,
+    pub encoding: InstructionMatchResolution,
+    pub encoding_guess: InstructionMatchResolution,
 }
 
 
@@ -28,8 +29,44 @@ pub struct InstructionMatch
 pub enum InstructionMatchResolution
 {
     Unresolved,
-    FailedConstraint,
+    FailedConstraint(diagn::Message),
     Resolved(util::BigInt),
+}
+
+
+impl InstructionMatchResolution
+{
+    pub fn is_resolved(&self) -> bool
+    {
+        match self
+        {
+            InstructionMatchResolution::Resolved(_) => true,
+            InstructionMatchResolution::FailedConstraint(_) => false,
+            InstructionMatchResolution::Unresolved => false,
+        }
+    }
+
+
+    pub fn is_resolved_or_failed(&self) -> bool
+    {
+        match self
+        {
+            InstructionMatchResolution::Resolved(_) => true,
+            InstructionMatchResolution::FailedConstraint(_) => true,
+            InstructionMatchResolution::Unresolved => false,
+        }
+    }
+
+
+    pub fn unwrap_resolved(&self) -> &util::BigInt
+    {
+        match self
+        {
+            InstructionMatchResolution::Resolved(ref bigint) => bigint,
+            InstructionMatchResolution::FailedConstraint(_) => panic!(),
+            InstructionMatchResolution::Unresolved => panic!(),
+        }
+    }
 }
 
 
@@ -170,9 +207,7 @@ pub fn match_instr(
         }
 
         mtch.encoding_size = rule.expr.get_static_size(&info);
-        mtch.encoding_size_guess = mtch.encoding_size;
-
-        println!("static_size = {:?}", rule.expr.get_static_size(&info));
+        mtch.encoding_size_guess = mtch.encoding_size.unwrap_or(0);
     }
 
 
@@ -207,8 +242,10 @@ fn match_with_ruledef<'tokens>(
                 args: Vec::new(),
                 exact_part_count: 0,
                 encoding_size: None,
-                encoding_size_guess: None,
-                resolved: InstructionMatchResolution::Unresolved,
+                encoding_size_guess: 0,
+                encoding: InstructionMatchResolution::Unresolved,
+                encoding_guess: InstructionMatchResolution::Resolved(
+                    util::BigInt::new(0, Some(0))),
             });
             
         matches.extend(rule_matches);

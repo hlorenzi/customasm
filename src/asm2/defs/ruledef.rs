@@ -55,7 +55,7 @@ pub enum RuleParameterType
 }
 
 
-pub fn resolve(
+pub fn define(
     report: &mut diagn::Report,
     ast: &asm2::AstTopLevel,
     decls: &mut asm2::ItemDecls,

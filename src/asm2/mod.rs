@@ -77,32 +77,18 @@ fn test_new_asm() -> Result<(), ()>
     fileserver.add("main.asm", r#"
         #include "include.asm"
 
-        ;res = w + ww + yy
-        ;x = 0
-        ;.a = 0x111
-        ;.b = 0x222
-        ;.c = 0x333
-        ;.d = .a + .b + .c
-        ;.e = x.a + x.b + x.c + y.e
-        ;y = 1
-        ;.a = 0x1000
-        ;.b = 0x2000
-        ;.c = 0x3000
-        ;.d = .a + .b + .c
-        ;.e = y.a + y.b + y.c
-        ;z = 2
-        ;w = x + y + z
-        ;ww = x.a + x.b + x.c
-        ;yy = y.a + y.b + y.c
-        ;zz = loop + loop.inner + loop.inner.inner
-
         loop:
             ;hlt
             ;jmp 0x55
-            ;jmp 0x6666
+            jmp 0x6666
             jmp end
 
+            ld 0x80
+            ld x
+            hlt
+
         end = $
+        x = 0x80
     "#);
 
     fileserver.add("include.asm", r#"
@@ -116,6 +102,15 @@ fn test_new_asm() -> Result<(), ()>
             jmp {addr: u16} => {
                 assert(addr >= 0x100)
                 0xaa03 @ addr
+            }
+
+            ld {x: u8} => {
+                assert(x >= 0x80)
+                0xcc01 @ x
+            }
+            ld {x: u1} => {
+                assert(x >= 0xc0)
+                0xcc02 @ x
             }
         }
     "#);
@@ -137,7 +132,7 @@ fn test_new_asm() -> Result<(), ()>
             &mut report,
             &mut ast)?;
             
-        let mut defs = defs::resolve(
+        let mut defs = defs::define(
             &mut report,
             &mut ast,
             &mut decls)?;
@@ -162,8 +157,9 @@ fn test_new_asm() -> Result<(), ()>
             
         //println!("{:#?}", ast);
         //println!("{:#?}", decls);
-        println!("{:#?}", defs);
-
+        //println!("{:#?}", defs.instructions);
+        //println!("{:#?}", defs.symbols);
+        
         Ok(())
     };
 

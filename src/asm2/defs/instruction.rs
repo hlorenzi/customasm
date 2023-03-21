@@ -6,14 +6,15 @@ pub struct Instruction
 {
     pub item_ref: util::ItemRef<Self>,
     pub matches: asm2::InstructionMatches,
-    pub chosen_encoding: Option<util::BigInt>,
-    pub address_from_bank_start: Option<usize>,
+    pub position_within_bank: Option<usize>,
+    pub encoding: Option<util::BigInt>,
+    pub encoding_guess: Option<util::BigInt>,
     pub encoding_size: Option<usize>,
     pub encoding_size_guess: Option<usize>,
 }
 
 
-pub fn resolve(
+pub fn define(
     report: &mut diagn::Report,
     ast: &mut asm2::AstTopLevel,
     decls: &mut asm2::ItemDecls,
@@ -29,8 +30,9 @@ pub fn resolve(
             let instr = Instruction {
                 item_ref,
                 matches: asm2::InstructionMatches::new(),
-                chosen_encoding: None,
-                address_from_bank_start: None,
+                position_within_bank: None,
+                encoding: None,
+                encoding_guess: None,
                 encoding_size: None,
                 encoding_size_guess: None,
             };

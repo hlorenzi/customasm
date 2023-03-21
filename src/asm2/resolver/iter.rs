@@ -5,7 +5,8 @@ pub struct ResolveIterator<'ast, 'decls>
 {
     ast: &'ast asm2::AstTopLevel,
     index: usize,
-    is_final_iteration: bool,
+    is_first_iteration: bool,
+    is_last_iteration: bool,
     symbol_ctx: &'decls util::SymbolContext,
     bank_ref: util::ItemRef<asm2::Bankdef>,
     bank_data: Vec<BankData>,
@@ -15,15 +16,16 @@ pub struct ResolveIterator<'ast, 'decls>
 #[derive(Copy, Clone, Debug)]
 pub struct BankData
 {
-    pub cur_address: Option<usize>,
-    pub cur_address_guess: Option<usize>,
+    pub cur_position: Option<usize>,
+    pub cur_position_guess: Option<usize>,
 }
 
 
 pub struct ResolverContext<'ast, 'decls>
 {
     pub node: &'ast asm2::AstAny,
-    pub is_final_iteration: bool,
+    pub is_first_iteration: bool,
+    pub is_last_iteration: bool,
     pub symbol_ctx: &'decls util::SymbolContext,
     pub bank_ref: util::ItemRef<asm2::Bankdef>,
     pub bank_data: BankData,
@@ -35,12 +37,13 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
     pub fn new<'defs>(
         ast: &'ast asm2::AstTopLevel,
         defs: &'defs asm2::ItemDefs,
-        is_final_iteration: bool)
+        is_first_iteration: bool,
+        is_last_iteration: bool)
         -> ResolveIterator<'ast, 'decls>
     {
         let bank_datum = BankData {
-            cur_address: Some(0),
-            cur_address_guess: Some(0),
+            cur_position: Some(0),
+            cur_position_guess: Some(0),
         };
     
         let bank_data = vec![bank_datum; defs.bankdefs.len()];
@@ -51,7 +54,8 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
         ResolveIterator {
             ast,
             index: 0,
-            is_final_iteration,
+            is_first_iteration,
+            is_last_iteration,
             symbol_ctx: &GLOBAL_SYMBOL_CTX,
             bank_ref: util::ItemRef::new(0),
             bank_data,
@@ -98,7 +102,8 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
         Some(ResolverContext {
             node: ast_any,
-            is_final_iteration: self.is_final_iteration,
+            is_first_iteration: self.is_first_iteration,
+            is_last_iteration: self.is_last_iteration,
             symbol_ctx: self.symbol_ctx,
             bank_ref: self.bank_ref,
             bank_data: self.bank_data[self.bank_ref.0],
@@ -125,18 +130,18 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
                 let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
 
-                // Advance the current bank's address
-                if let Some(ref mut addr) = cur_bank_data.cur_address
+                // Advance the current bank's position
+                if let Some(ref mut addr) = cur_bank_data.cur_position
                 {
                     match instr.encoding_size
                     {
                         Some(size) => *addr += size,
-                        None => cur_bank_data.cur_address = None,
+                        None => cur_bank_data.cur_position = None,
                     }
                 }
 
-                // Advance the current bank's address guess
-                if let Some(ref mut addr) = cur_bank_data.cur_address_guess
+                // Advance the current bank's position guess
+                if let Some(ref mut addr) = cur_bank_data.cur_position_guess
                 {
                     match instr.encoding_size
                     {

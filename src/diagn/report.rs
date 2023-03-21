@@ -24,7 +24,7 @@ pub struct Report
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Message
 {
 	pub descr: String,
@@ -35,7 +35,7 @@ pub struct Message
 }
 
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum MessageKind
 {
 	Error,
@@ -175,6 +175,22 @@ impl Message
 
 		count
 	}
+
+
+	pub fn fuse_topmost(msgs: Vec<Message>) -> Message
+	{
+		let mut topmost = Message {
+			inner: Vec::new(),
+			..msgs[0].clone()
+		};
+
+		for msg in msgs
+		{
+			topmost.inner.extend(msg.inner);
+		}
+
+		topmost
+	}
 }
 
 
@@ -199,7 +215,7 @@ impl Report
 	}
 	
 	
-	fn message(&mut self, mut msg: Message)
+	pub fn wrap_in_parents(&self, mut msg: Message) -> Message
 	{
 		for parent in self.parents.iter().rev()
 		{
@@ -212,7 +228,13 @@ impl Report
 			};
 		}
 		
-		self.messages.push(msg);
+		msg
+	}
+	
+	
+	pub fn message(&mut self, msg: Message)
+	{
+		self.messages.push(self.wrap_in_parents(msg));
 	}
 	
 	

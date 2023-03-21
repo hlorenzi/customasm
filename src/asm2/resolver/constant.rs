@@ -45,6 +45,7 @@ pub fn resolve_constants_once(
     let mut iter = asm2::ResolveIterator::new(
         ast,
         defs,
+        true,
         false);
 
     while let Some(ctx) = iter.next(decls, defs)
@@ -88,50 +89,75 @@ pub fn resolve_constant(
     {
         let symbol = defs.symbols.get(item_ref);
 
+
+        // Skip this symbol if already resolved
         if !symbol.value.is_unknown()
         {
             return Ok(asm2::ResolutionState::Resolved);
         }
 
 
-        let value = asm2::resolver::eval(
-            report,
-            decls,
-            defs,
-            ctx,
-            &mut expr::EvalContext2::new(),
-            false,
-            &ast_const.expr)?;
-
-        if value.is_unknown()
+        // In the first iteration,
+        // attempt to resolve value without guessing
+        if ctx.is_first_iteration
         {
-            if ctx.is_final_iteration
-            {
-                report.error_span(
-                    "constant value did not converge",
-                    &ast_symbol.decl_span);
-            }
-
-            let value_guess = asm2::resolver::eval(
+            let value = asm2::resolver::eval(
                 report,
                 decls,
                 defs,
                 ctx,
                 &mut expr::EvalContext2::new(),
-                true,
+                false,
                 &ast_const.expr)?;
 
-            let symbol = defs.symbols.get_mut(item_ref);
-            symbol.value_guess = Some(value_guess);
+
+            // Store value if successfully resolved
+            if !value.is_unknown()
+            {
+                let symbol = defs.symbols.get_mut(item_ref);
+                symbol.value = value;
+        
+                return Ok(asm2::ResolutionState::Resolved);
+            }
+        }
+
+        
+        // If could not resolve with definite values,
+        // attempt to resolve with guessing
+        let value_guess = asm2::resolver::eval(
+            report,
+            decls,
+            defs,
+            ctx,
+            &mut expr::EvalContext2::new(),
+            true,
+            &ast_const.expr)?;
+
+
+        // In the final iteration, the current guess should be
+        // stable with respect to the previously guessed value
+        if ctx.is_last_iteration
+        {
+            if value_guess != symbol.value_guess
+            {
+                report.error_span(
+                    "constant value did not converge",
+                    &ast_symbol.decl_span);
+            }
             
-            return Ok(asm2::ResolutionState::Unresolved);
+            // Store the guess as the definite value
+            let symbol = defs.symbols.get_mut(item_ref);
+            symbol.value = value_guess;
+
+            return Ok(asm2::ResolutionState::Resolved);
         }
 
 
+        // Store the guess
         let symbol = defs.symbols.get_mut(item_ref);
-        symbol.value = value;
-
-        Ok(asm2::ResolutionState::Resolved)
+        symbol.value_guess = value_guess;
+        
+        Ok(asm2::ResolutionState::Unresolved)
     }
     else
     {
