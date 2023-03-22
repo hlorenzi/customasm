@@ -56,7 +56,7 @@ pub fn resolve_iteratively(
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
     max_iterations: usize)
-    -> Result<ResolutionState, ()>
+    -> Result<usize, ()>
 {
     for i in 0..max_iterations
     {
@@ -70,7 +70,7 @@ pub fn resolve_iteratively(
 
         if let asm2::ResolutionState::Resolved = resolution_state
         {
-            return Ok(asm2::ResolutionState::Resolved);
+            return Ok(i + 1);
         }
     }
 
@@ -87,6 +87,7 @@ pub fn resolve_once(
     is_final_iteration: bool)
     -> Result<asm2::ResolutionState, ()>
 {
+    println!("=== resolve_once ===");
     let mut resolution_state = asm2::ResolutionState::Resolved;
 
     let mut iter = ResolveIterator::new(

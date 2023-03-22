@@ -35,31 +35,7 @@ pub fn eval(
 
         let symbol = defs.symbols.get(symbol_ref);
 
-        let value = {
-            if !can_guess || !symbol.value.is_unknown()
-            {
-                symbol.value.clone()
-            }
-            else
-            {
-                symbol.value_guess.clone()
-            }
-        };
-
-        if ctx.is_last_iteration
-        {
-            if let expr::Value::Unknown = value
-            {
-                info.report.error_span(
-                    format!(
-                        "value of `{}` did not converge",
-                        decls.symbols.get(symbol_ref).name),
-                    info.span);
-
-                return Err(());
-            }
-        }
-
+        let value = symbol.value.clone();
         Ok(value)
     };
 
@@ -87,26 +63,7 @@ pub fn get_current_address(
     let bankdef = &defs.bankdefs.get(ctx.bank_ref);
     let addr_unit = bankdef.addr_unit;
 
-    let cur_position = {
-        match ctx.bank_data.cur_position
-        {
-            Some(p) => p,
-            None =>
-            {
-                if can_guess
-                {
-                    if let Some(guess) = ctx.bank_data.cur_position_guess
-                        { guess }
-                    else
-                        { 0 }
-                }
-                else
-                {
-                    return Ok(expr::Value::Unknown);
-                }
-            }
-        }
-    };
+    let cur_position = ctx.bank_data.cur_position;
     
     let excess_bits = cur_position % addr_unit;
     if excess_bits != 0 && !can_guess

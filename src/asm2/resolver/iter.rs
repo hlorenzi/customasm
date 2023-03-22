@@ -16,8 +16,7 @@ pub struct ResolveIterator<'ast, 'decls>
 #[derive(Copy, Clone, Debug)]
 pub struct BankData
 {
-    pub cur_position: Option<usize>,
-    pub cur_position_guess: Option<usize>,
+    pub cur_position: usize,
 }
 
 
@@ -42,8 +41,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
         -> ResolveIterator<'ast, 'decls>
     {
         let bank_datum = BankData {
-            cur_position: Some(0),
-            cur_position_guess: Some(0),
+            cur_position: 0,
         };
     
         let bank_data = vec![bank_datum; defs.bankdefs.len()];
@@ -131,30 +129,10 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
 
                 // Advance the current bank's position
-                if let Some(ref mut addr) = cur_bank_data.cur_position
+                match instr.encoding_size
                 {
-                    match instr.encoding_size
-                    {
-                        Some(size) => *addr += size,
-                        None => cur_bank_data.cur_position = None,
-                    }
-                }
-
-                // Advance the current bank's position guess
-                if let Some(ref mut addr) = cur_bank_data.cur_position_guess
-                {
-                    match instr.encoding_size
-                    {
-                        Some(size) => *addr += size,
-                        None =>
-                        {
-                            match instr.encoding_size_guess
-                            {
-                                Some(size) => *addr += size,
-                                None => {}
-                            }
-                        }
-                    }
+                    Some(size) => cur_bank_data.cur_position += size,
+                    None => cur_bank_data.cur_position += 0,
                 }
             }
 

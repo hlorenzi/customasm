@@ -261,7 +261,14 @@ impl std::fmt::Debug for BigInt
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-        f.write_str(&format!("{:#x}", self.bigint))
+        f.write_str(&format!("{:#x}", self.bigint))?;
+
+        if let Some(size) = self.size
+        {
+            f.write_str(&format!("`{}", size))?;
+        }
+
+        Ok(())
     }
 }
 

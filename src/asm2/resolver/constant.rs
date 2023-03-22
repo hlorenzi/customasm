@@ -90,41 +90,7 @@ pub fn resolve_constant(
         let symbol = defs.symbols.get(item_ref);
 
 
-        // Skip this symbol if already resolved
-        if !symbol.value.is_unknown()
-        {
-            return Ok(asm2::ResolutionState::Resolved);
-        }
-
-
-        // In the first iteration,
-        // attempt to resolve value without guessing
-        if ctx.is_first_iteration
-        {
-            let value = asm2::resolver::eval(
-                report,
-                decls,
-                defs,
-                ctx,
-                &mut expr::EvalContext2::new(),
-                false,
-                &ast_const.expr)?;
-
-
-            // Store value if successfully resolved
-            if !value.is_unknown()
-            {
-                let symbol = defs.symbols.get_mut(item_ref);
-                symbol.value = value;
-        
-                return Ok(asm2::ResolutionState::Resolved);
-            }
-        }
-
-        
-        // If could not resolve with definite values,
-        // attempt to resolve with guessing
-        let value_guess = asm2::resolver::eval(
+        let value = asm2::resolver::eval(
             report,
             decls,
             defs,
@@ -134,30 +100,31 @@ pub fn resolve_constant(
             &ast_const.expr)?;
 
 
-        // In the final iteration, the current guess should be
-        // stable with respect to the previously guessed value
-        if ctx.is_last_iteration
+        // Store value if successfully resolved
+        let prev_value = symbol.value.clone();
+
+        let symbol = defs.symbols.get_mut(item_ref);
+        symbol.value = value;
+
+
+        if symbol.value != prev_value
         {
-            if value_guess != symbol.value_guess
+            // On the final iteration, unstable guesses become errors
+            if ctx.is_last_iteration
             {
                 report.error_span(
                     "constant value did not converge",
                     &ast_symbol.decl_span);
             }
-            
-            // Store the guess as the definite value
-            let symbol = defs.symbols.get_mut(item_ref);
-            symbol.value = value_guess;
 
-            return Ok(asm2::ResolutionState::Resolved);
+            println!("const: {} = {:?}",
+                ast_symbol.name,
+                symbol.value);
+            return Ok(asm2::ResolutionState::Unresolved);
         }
 
-
-        // Store the guess
-        let symbol = defs.symbols.get_mut(item_ref);
-        symbol.value_guess = value_guess;
         
-        Ok(asm2::ResolutionState::Unresolved)
+        return Ok(asm2::ResolutionState::Resolved);
     }
     else
     {

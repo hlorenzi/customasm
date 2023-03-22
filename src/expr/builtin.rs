@@ -14,6 +14,26 @@ pub fn resolve_builtin(
 }
 
 
+pub fn get_static_size_builtin(
+    name: &str,
+    info: &expr::StaticSizeInfo,
+    args: &Vec<expr::Expr>)
+    -> Option<usize>
+{
+    let get_static_size_fn = {
+        match name.as_ref()
+        {
+            "le" => get_static_size_builtin_le,
+            _ => return None,
+        }
+    };
+
+    get_static_size_fn(
+        info,
+        args)
+}
+
+
 pub fn eval_builtin(
     info: &mut expr::EvalFunctionInfo2)
     -> Result<expr::Value, ()>
@@ -79,4 +99,20 @@ pub fn eval_builtin_le(
     }
 
     Ok(expr::Value::make_integer(bigint.convert_le()))
+}
+
+
+pub fn get_static_size_builtin_le(
+    info: &expr::StaticSizeInfo,
+    args: &Vec<expr::Expr>)
+    -> Option<usize>
+{
+    if args.len() == 1
+    {
+        args[0].get_static_size(info)
+    }
+    else
+    {
+        None
+    }
 }

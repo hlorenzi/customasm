@@ -6,7 +6,6 @@ pub struct Symbol
 {
     pub item_ref: util::ItemRef<Self>,
     pub value: expr::Value,
-    pub value_guess: expr::Value,
 }
 
 
@@ -26,7 +25,6 @@ pub fn define(
             let symbol = Symbol {
                 item_ref,
                 value: expr::Value::Unknown,
-                value_guess: expr::Value::make_integer(0),
             };
 
             defs.symbols.define(item_ref, symbol);

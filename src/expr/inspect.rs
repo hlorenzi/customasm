@@ -77,6 +77,31 @@ impl expr::Expr
 			
 			expr::Expr::Block(_, ref exprs) =>
 				exprs.last()?.get_static_size(info),
+
+			expr::Expr::Call(_, func, args) =>
+			{
+				if let expr::Expr::Literal(
+					_,
+					expr::Value::BuiltInFunction(ref builtin_name)) = *func.as_ref()
+				{
+					expr::get_static_size_builtin(builtin_name, info, &args)
+				}
+				else if let expr::Expr::Variable(_, 0, ref names) = *func.as_ref()
+				{
+					if names.len() == 1
+					{
+						expr::get_static_size_builtin(&names[0], info, &args)
+					}
+					else
+					{
+						None
+					}
+				}
+				else
+				{
+					None
+				}
+			}
 			
 			_ => None
 		}

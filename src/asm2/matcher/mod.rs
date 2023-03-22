@@ -18,10 +18,8 @@ pub struct InstructionMatch
     pub rule_ref: util::ItemRef<asm2::Rule>,
     pub args: Vec<InstructionArgument>,
     pub exact_part_count: usize,
-    pub encoding_size: Option<usize>,
-    pub encoding_size_guess: usize,
+    pub encoding_size: usize,
     pub encoding: InstructionMatchResolution,
-    pub encoding_guess: InstructionMatchResolution,
 }
 
 
@@ -111,6 +109,8 @@ pub fn match_all(
                 report.error_span(
                     "no match found for instruction",
                     &ast_instr.span);
+
+                continue;
             }
 
 
@@ -118,6 +118,18 @@ pub fn match_all(
                 ast_instr.item_ref.unwrap());
             
             instr.matches = matches;
+
+            // Statically calculate the encoding size
+            // with a pessimistic guess
+            let largest_encoding = instr.matches
+                .iter()
+                .max_by_key(|m| m.encoding_size)
+                .unwrap();
+
+            instr.encoding_size = Some(largest_encoding.encoding_size);
+            println!("static size for {} = {:?}",
+                ast_instr.tokens.iter().map(|t| t.text()).collect::<Vec<_>>().join(""),
+                instr.encoding_size);
         }
     }
 
@@ -186,32 +198,59 @@ pub fn match_instr(
     // whenever possible.
     for mtch in &mut matches
     {
-        let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
-        let rule = &ruledef.get_rule(mtch.rule_ref);
-    
-        let mut info = expr::StaticSizeInfo::new();
-        for param in &rule.parameters
-        {
-            match param.typ
-            {
-                asm2::RuleParameterType::Integer(size) |
-                asm2::RuleParameterType::Unsigned(size) |
-                asm2::RuleParameterType::Signed(size) =>
-                {
-                    info.locals.insert(param.name.clone(), size);
-                }
-
-                asm2::RuleParameterType::Unspecified => {}
-                asm2::RuleParameterType::RuledefRef(_) => {}
-            }
-        }
-
-        mtch.encoding_size = rule.expr.get_static_size(&info);
-        mtch.encoding_size_guess = mtch.encoding_size.unwrap_or(0);
+        mtch.encoding_size = get_match_static_size(defs, &mtch)
+            .unwrap_or(0);
     }
 
 
     matches
+}
+
+
+fn get_match_static_size(
+    defs: &asm2::ItemDefs,
+    mtch: &asm2::InstructionMatch)
+    -> Option<usize>
+{
+    let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
+    let rule = &ruledef.get_rule(mtch.rule_ref);
+
+    let mut info = expr::StaticSizeInfo::new();
+    
+    for i in 0..rule.parameters.len()
+    {
+        let param = &rule.parameters[i];
+        let arg = &mtch.args[i];
+
+        match param.typ
+        {
+            asm2::RuleParameterType::Unspecified => {}
+
+            asm2::RuleParameterType::Integer(size) |
+            asm2::RuleParameterType::Unsigned(size) |
+            asm2::RuleParameterType::Signed(size) =>
+            {
+                info.locals.insert(param.name.clone(), size);
+            }
+
+            asm2::RuleParameterType::RuledefRef(_) =>
+            {
+                if let asm2::InstructionArgumentKind::Nested(ref nested_match) = arg.kind
+                {
+                    let maybe_nested_size = get_match_static_size(
+                        defs,
+                        nested_match);
+                    
+                    if let Some(nested_size) = maybe_nested_size
+                    {
+                        info.locals.insert(param.name.clone(), nested_size);
+                    }
+                }
+            }
+        }
+    }
+
+    rule.expr.get_static_size(&info)
 }
 
 
@@ -241,11 +280,8 @@ fn match_with_ruledef<'tokens>(
                 rule_ref,
                 args: Vec::new(),
                 exact_part_count: 0,
-                encoding_size: None,
-                encoding_size_guess: 0,
+                encoding_size: 0,
                 encoding: InstructionMatchResolution::Unresolved,
-                encoding_guess: InstructionMatchResolution::Resolved(
-                    util::BigInt::new(0, Some(0))),
             });
             
         matches.extend(rule_matches);

@@ -24,7 +24,7 @@ mod builtin;
 pub use self::builtin::{
     resolve_builtin,
     eval_builtin,
-    eval_builtin_le,
+    get_static_size_builtin,
 };
 
 

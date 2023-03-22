@@ -8,9 +8,7 @@ pub struct Instruction
     pub matches: asm2::InstructionMatches,
     pub position_within_bank: Option<usize>,
     pub encoding: Option<util::BigInt>,
-    pub encoding_guess: Option<util::BigInt>,
     pub encoding_size: Option<usize>,
-    pub encoding_size_guess: Option<usize>,
 }
 
 
@@ -32,9 +30,7 @@ pub fn define(
                 matches: asm2::InstructionMatches::new(),
                 position_within_bank: None,
                 encoding: None,
-                encoding_guess: None,
                 encoding_size: None,
-                encoding_size_guess: None,
             };
             
             defs.instructions.define(item_ref, instr);

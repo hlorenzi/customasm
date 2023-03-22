@@ -78,17 +78,12 @@ fn test_new_asm() -> Result<(), ()>
         #include "include.asm"
 
         loop:
-            ;hlt
-            ;jmp 0x55
             jmp 0x6666
             jmp end
-
-            ld 0x80
-            ld x
-            hlt
+            lda 0x100 ; !!should error!!
 
         end = $
-        x = 0x80
+        endLen = $ - end
     "#);
 
     fileserver.add("include.asm", r#"
@@ -108,10 +103,12 @@ fn test_new_asm() -> Result<(), ()>
                 assert(x >= 0x80)
                 0xcc01 @ x
             }
-            ld {x: u1} => {
+            ld {x: u8} => {
                 assert(x >= 0xc0)
                 0xcc02 @ x
             }
+
+            lda {x: u8} => 0xaa @ x
         }
     "#);
 
@@ -148,17 +145,18 @@ fn test_new_asm() -> Result<(), ()>
             &ast,
             &mut defs)?;
     
-        resolver::resolve_iteratively(
+        let iters = resolver::resolve_iteratively(
             &mut report,
             &ast,
             &decls,
             &mut defs,
-            3)?;
+            10)?;
             
         //println!("{:#?}", ast);
         //println!("{:#?}", decls);
         //println!("{:#?}", defs.instructions);
         //println!("{:#?}", defs.symbols);
+        println!("resolved in {} iterations", iters);
         
         Ok(())
     };
