@@ -20,14 +20,14 @@ pub struct BankData
 }
 
 
-pub struct ResolverContext<'ast, 'decls>
+pub struct ResolverContext<'iter, 'ast, 'decls>
 {
     pub node: &'ast asm2::AstAny,
     pub is_first_iteration: bool,
     pub is_last_iteration: bool,
     pub symbol_ctx: &'decls util::SymbolContext,
     pub bank_ref: util::ItemRef<asm2::Bankdef>,
-    pub bank_data: BankData,
+    pub bank_data: &'iter BankData,
 }
 
 
@@ -61,11 +61,11 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
     }
 
 
-    pub fn next(
-        &mut self,
+    pub fn next<'iter>(
+        &'iter mut self,
         decls: &'decls asm2::ItemDecls,
         defs: &asm2::ItemDefs)
-        -> Option<ResolverContext<'ast, 'decls>>
+        -> Option<ResolverContext<'iter, 'ast, 'decls>>
     {
         if self.index >= self.ast.nodes.len()
         {
@@ -104,7 +104,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
             is_last_iteration: self.is_last_iteration,
             symbol_ctx: self.symbol_ctx,
             bank_ref: self.bank_ref,
-            bank_data: self.bank_data[self.bank_ref.0],
+            bank_data: &self.bank_data[self.bank_ref.0],
         })
     }
 
@@ -129,10 +129,31 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
 
                 // Advance the current bank's position
-                match instr.encoding_size
+                cur_bank_data.cur_position += {
+                    match instr.encoding.size
+                    {
+                        Some(size) => size,
+                        None => 0,
+                    }
+                };
+            }
+
+            asm2::AstAny::DirectiveData(ast_data) =>
+            {
+                for item_ref in &ast_data.item_refs
                 {
-                    Some(size) => cur_bank_data.cur_position += size,
-                    None => cur_bank_data.cur_position += 0,
+                    let data_elem = defs.data_elems.get(*item_ref);
+
+                    let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+
+                    // Advance the current bank's position
+                    cur_bank_data.cur_position += {
+                        match data_elem.encoding.size
+                        {
+                            Some(size) => size,
+                            None => 0,
+                        }
+                    };
                 }
             }
 

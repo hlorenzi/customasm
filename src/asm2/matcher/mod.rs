@@ -93,8 +93,6 @@ pub fn match_all(
     defs: &mut asm2::ItemDefs)
     -> Result<(), ()>
 {
-    let error_guard = report.get_error_guard();
-
     for any_node in &ast.nodes
     {
         if let asm2::AstAny::Instruction(ast_instr) = any_node
@@ -126,14 +124,17 @@ pub fn match_all(
                 .max_by_key(|m| m.encoding_size)
                 .unwrap();
 
-            instr.encoding_size = Some(largest_encoding.encoding_size);
+            instr.encoding = util::BigInt::new(
+                0,
+                Some(largest_encoding.encoding_size));
+
             println!("static size for {} = {:?}",
                 ast_instr.tokens.iter().map(|t| t.text()).collect::<Vec<_>>().join(""),
-                instr.encoding_size);
+                instr.encoding.size.unwrap());
         }
     }
 
-    report.stop_at_errors(error_guard)
+    report.stop_at_errors()
 }
 
 

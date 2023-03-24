@@ -7,6 +7,8 @@ pub struct AstDirectiveData
     pub header_span: diagn::Span,
     pub elem_size: Option<usize>,
     pub elems: Vec<expr::Expr>,
+
+    pub item_refs: Vec<util::ItemRef<asm2::DataElement>>,
 }
 
 
@@ -40,5 +42,7 @@ pub fn parse(
         header_span,
         elem_size,
         elems,
+
+        item_refs: Vec::new(),
     })
 }

@@ -48,6 +48,7 @@ pub use defs::{
     RulePatternPart,
     Symbol,
     Instruction,
+    DataElement,
 };
 
 pub mod matcher;
@@ -161,7 +162,12 @@ fn test_new_asm() -> Result<(), ()>
         Ok(())
     };
 
-    drop(run());
+    match run()
+    {
+        Ok(()) => {},
+        Err(()) => assert!(report.has_errors()),
+    }
+    
     report.print_all(&mut std::io::stderr(), &fileserver);
     Ok(())
 }

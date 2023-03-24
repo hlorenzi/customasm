@@ -87,9 +87,6 @@ pub fn resolve_constant(
 
     if let asm2::AstSymbolKind::Constant(ref ast_const) = ast_symbol.kind
     {
-        let symbol = defs.symbols.get(item_ref);
-
-
         let value = asm2::resolver::eval(
             report,
             decls,
@@ -100,10 +97,8 @@ pub fn resolve_constant(
             &ast_const.expr)?;
 
 
-        // Store value if successfully resolved
-        let prev_value = symbol.value.clone();
-
         let symbol = defs.symbols.get_mut(item_ref);
+        let prev_value = symbol.value.clone();
         symbol.value = value;
 
 

@@ -13,9 +13,6 @@ pub fn resolve_label(
 
     if let asm2::AstSymbolKind::Label = ast_symbol.kind
     {
-        let symbol = defs.symbols.get(item_ref);
-
-
         let value = asm2::resolver::get_current_address(
             report,
             &ast_symbol.decl_span,
@@ -24,9 +21,8 @@ pub fn resolve_label(
             true)?;
                 
 
-        let prev_value = symbol.value.clone();
-
         let symbol = defs.symbols.get_mut(item_ref);
+        let prev_value = symbol.value.clone();
         symbol.value = value;
 
 

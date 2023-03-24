@@ -26,6 +26,11 @@ pub use instruction::{
     Instruction,
 };
 
+mod data_block;
+pub use data_block::{
+    DataElement,
+};
+
 
 #[derive(Debug)]
 pub struct ItemDefs
@@ -34,6 +39,7 @@ pub struct ItemDefs
     pub ruledefs: DefList<Ruledef>,
     pub symbols: DefList<Symbol>,
     pub instructions: DefList<Instruction>,
+    pub data_elems: DefList<DataElement>,
 }
 
 
@@ -96,17 +102,17 @@ pub fn define(
         ruledefs: DefList::new(),
         symbols: DefList::new(),
         instructions: DefList::new(),
+        data_elems: DefList::new(),
     };
 
-
-    let guard = report.get_error_guard();
 
     bankdef::define(report, ast, decls, &mut defs)?;
     ruledef::define(report, ast, decls, &mut defs)?;
     symbol::define(report, ast, decls, &mut defs)?;
     instruction::define(report, ast, decls, &mut defs)?;
+    data_block::define(report, ast, decls, &mut defs)?;
 
-    report.stop_at_errors(guard)?;
+    report.stop_at_errors()?;
 
 
     Ok(defs)

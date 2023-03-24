@@ -28,14 +28,12 @@ pub fn collect(
     };
 
 
-    let guard = report.get_error_guard();
-
     bankdef::collect(report, ast, &mut collections)?;
     bank::collect(report, ast, &mut collections)?;
     ruledef::collect(report, ast, &mut collections)?;
     symbol::collect(report, ast, &mut collections)?;
 
-    report.stop_at_errors(guard)?;
+    report.stop_at_errors()?;
 
 
     Ok(collections)

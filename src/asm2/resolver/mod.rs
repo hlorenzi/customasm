@@ -24,6 +24,11 @@ pub use instruction::{
     resolve_instruction,
 };
 
+mod data_block;
+pub use data_block::{
+    resolve_data_block,
+};
+
 mod eval;
 pub use eval::{
     eval,
@@ -60,17 +65,24 @@ pub fn resolve_iteratively(
 {
     for i in 0..max_iterations
     {
+        let is_first_iteration = i == 0;
+        let is_last_iteration = i + 1 == max_iterations;
+
         let resolution_state = resolve_once(
             report,
             ast,
             decls,
             defs,
-            i == 0,
-            i + 1 == max_iterations)?;
+            is_first_iteration,
+            is_last_iteration)?;
 
         if let asm2::ResolutionState::Resolved = resolution_state
         {
             return Ok(i + 1);
+        }
+        else if is_last_iteration
+        {
+            return Err(());
         }
     }
 
@@ -84,7 +96,7 @@ pub fn resolve_once(
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
     is_first_iteration: bool,
-    is_final_iteration: bool)
+    is_last_iteration: bool)
     -> Result<asm2::ResolutionState, ()>
 {
     println!("=== resolve_once ===");
@@ -94,7 +106,7 @@ pub fn resolve_once(
         ast,
         defs,
         is_first_iteration,
-        is_final_iteration);
+        is_last_iteration);
 
     while let Some(ctx) = iter.next(decls, defs)
     {
@@ -128,6 +140,17 @@ pub fn resolve_once(
                 resolve_instruction(
                     report,
                     ast_instr,
+                    decls,
+                    defs,
+                    &ctx)?);
+        }
+        
+        else if let asm2::AstAny::DirectiveData(ast_data) = ctx.node
+        {
+            resolution_state.merge(
+                resolve_data_block(
+                    report,
+                    ast_data,
                     decls,
                     defs,
                     &ctx)?);

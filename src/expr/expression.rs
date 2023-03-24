@@ -149,6 +149,18 @@ impl Value
 	}
 
 
+	pub fn coallesce_to_integer(self) -> expr::Value
+	{
+		match self
+		{
+			Value::String(ref s) =>
+				expr::Value::Integer(s.to_bigint()),
+
+			_ => self,
+		}
+	}
+
+
 	pub fn expect_bigint(
 		&self,
 		report: &mut diagn::Report,
@@ -157,7 +169,8 @@ impl Value
 	{
 		match self
 		{
-			Value::Integer(ref bigint) => Ok(bigint),
+			Value::Integer(bigint) => Ok(bigint),
+
 			_ =>
 			{
 				report.error_span(
@@ -214,20 +227,48 @@ impl Value
 	}
 
 
+	pub fn expect_error_or_bigint(
+		self,
+		report: &mut diagn::Report,
+		span: &diagn::Span)
+		-> Result<expr::Value, ()>
+	{
+		match self.coallesce_to_integer()
+		{
+			value @ expr::Value::Unknown |
+			value @ expr::Value::FailedConstraint(_) =>
+				Ok(value),
+
+			value @ expr::Value::Integer(_) =>
+				Ok(value),
+
+			_ =>
+			{
+				report.error_span(
+					"expected integer",
+					span);
+
+				Err(())
+			}
+		}
+	}
+
+
 	pub fn expect_error_or_sized_bigint(
 		self,
 		report: &mut diagn::Report,
 		span: &diagn::Span)
 		-> Result<expr::Value, ()>
 	{
-		match self
+		match self.coallesce_to_integer()
 		{
-			expr::Value::Unknown |
-			expr::Value::FailedConstraint(_) =>
-				Ok(self),
+			value @ expr::Value::Unknown |
+			value @ expr::Value::FailedConstraint(_) =>
+				Ok(value),
 
-			expr::Value::Integer(ref bigint) if bigint.size.is_some() =>
-				Ok(self),
+			expr::Value::Integer(bigint)
+				if bigint.size.is_some() =>
+				Ok(expr::Value::Integer(bigint)),
 
 			_ =>
 			{

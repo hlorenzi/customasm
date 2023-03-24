@@ -19,27 +19,28 @@ pub fn resolve_instruction(
 
     let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
 
-    let prev_encoding = instr.encoding.clone();
+
+    // Check for stable resolution
+    let is_stable =
+        Some(&instr.encoding) == maybe_encoding.as_ref();
+
+
+    // Update the instruction's address
+    instr.position_within_bank = ctx.bank_data.cur_position;
     
-    if let Some(encoding) = maybe_encoding
+
+    // Update the instruction's encoding if available
+    if let Some(ref encoding) = maybe_encoding
     {
-        instr.encoding_size = Some(encoding.size.unwrap());
-        instr.encoding = Some(encoding);
+        instr.encoding = encoding.clone();
     }
 
-    // Update the instruction's address if available
-    if instr.position_within_bank.is_none()
-    {
-        instr.position_within_bank = Some(ctx.bank_data.cur_position);
-    }
-
-
-    if instr.encoding.is_none() ||
-        prev_encoding != instr.encoding
+    
+    if !is_stable
     {
         // On the final iteration, unstable guesses become errors.
         // If encoding is Some, an inner error has already been reported.
-        if ctx.is_last_iteration && instr.encoding.is_some()
+        if ctx.is_last_iteration && !maybe_encoding.is_some()
         {
             report.error_span(
                 "instruction encoding did not converge",
@@ -51,7 +52,7 @@ pub fn resolve_instruction(
             instr.encoding);
         return Ok(asm2::ResolutionState::Unresolved);
     }
-    
+
 
     Ok(asm2::ResolutionState::Resolved)
 }
@@ -105,20 +106,17 @@ fn resolve_encoding(
             
             report.message(
                 diagn::Message::fuse_topmost(msgs));
-                
-            return Ok(None);
         }
 
-        return Ok(None);//Some(util::BigInt::new(0, Some(instr.encoding_size.unwrap_or(0)))));
+        return Ok(None);
     }
 
 
     // Only retain the smallest encodings
     let smallest_size = encodings_resolved
         .iter()
-        .min_by_key(|e| e.1.size.unwrap())
-        .unwrap()
-        .1.size
+        .map(|e| e.1.size.unwrap())
+        .min()
         .unwrap();
 
     let smallest_encodings = encodings_resolved
@@ -128,13 +126,14 @@ fn resolve_encoding(
     
 
     // Expect only a single remaining encoding
-    if smallest_encodings.len() > 1 && ctx.is_last_iteration
+    // on the last iteration
+    if ctx.is_last_iteration && smallest_encodings.len() > 1
     {
-        let mut candidate_notes = Vec::new();
+        let mut notes = Vec::new();
 
         for encoding in smallest_encodings
         {
-            candidate_notes.push(build_recursive_candidate_note(
+            notes.push(build_recursive_candidate_note(
                 0,
                 &instr.matches[encoding.0],
                 decls,
@@ -145,7 +144,7 @@ fn resolve_encoding(
             "multiple matches with the same encoding size",
             &ast_instr.span);
 
-        report.push_multiple(candidate_notes);
+        report.push_multiple(notes);
 
         report.pop_parent();
 
@@ -457,10 +456,10 @@ fn check_argument_for_integer_type(
     size: usize,
     typename_prefix: &'static str,
     mut bigint: util::BigInt,
-    check_fn: impl Fn(&util::BigInt) -> bool)
+    failure_fn: impl Fn(&util::BigInt) -> bool)
     -> Result<expr::Value, ()>
 {
-    if check_fn(&bigint)
+    if failure_fn(&bigint)
     {
         let msg = diagn::Message::error_span(
             format!(
