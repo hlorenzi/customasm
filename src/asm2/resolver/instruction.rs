@@ -187,8 +187,7 @@ fn resolve_instruction_matches(
                 &mtch,
                 decls,
                 defs,
-                ctx,
-                true);
+                ctx);
 
             let maybe_value = maybe_value
                 .and_then(|v| v.expect_error_or_sized_bigint(
@@ -280,8 +279,7 @@ fn resolve_instruction_match(
     mtch: &asm2::InstructionMatch,
     decls: &asm2::ItemDecls,
     defs: &asm2::ItemDefs,
-    ctx: &asm2::ResolverContext,
-    can_guess: bool)
+    ctx: &asm2::ResolverContext)
     -> Result<expr::Value, ()>
 {
     let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
@@ -300,8 +298,7 @@ fn resolve_instruction_match(
         &mtch,
         decls,
         defs,
-        ctx,
-        can_guess);
+        ctx);
 
     report.pop_parent();
 
@@ -314,8 +311,7 @@ fn resolve_instruction_match_inner(
     mtch: &asm2::InstructionMatch,
     decls: &asm2::ItemDecls,
     defs: &asm2::ItemDefs,
-    ctx: &asm2::ResolverContext,
-    can_guess: bool)
+    ctx: &asm2::ResolverContext)
     -> Result<expr::Value, ()>
 {
     let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
@@ -335,7 +331,6 @@ fn resolve_instruction_match_inner(
                     defs,
                     ctx,
                     &mut expr::EvalContext2::new(),
-                    can_guess,
                     &expr)?;
 
                 if arg_value.should_propagate()
@@ -367,8 +362,7 @@ fn resolve_instruction_match_inner(
                     &nested_match,
                     decls,
                     defs,
-                    ctx,
-                    can_guess)?;
+                    ctx)?;
 
                 let param = &rule.parameters[index];
 
@@ -389,7 +383,6 @@ fn resolve_instruction_match_inner(
         defs,
         ctx,
         &mut eval_ctx,
-        can_guess,
         &rule.expr)
 }
 

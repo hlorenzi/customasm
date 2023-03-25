@@ -31,6 +31,11 @@ pub use data_block::{
     DataElement,
 };
 
+mod res;
+pub use res::{
+    ResDirective,
+};
+
 
 #[derive(Debug)]
 pub struct ItemDefs
@@ -40,6 +45,7 @@ pub struct ItemDefs
     pub symbols: DefList<Symbol>,
     pub instructions: DefList<Instruction>,
     pub data_elems: DefList<DataElement>,
+    pub res_directives: DefList<ResDirective>,
 }
 
 
@@ -103,6 +109,7 @@ pub fn define(
         symbols: DefList::new(),
         instructions: DefList::new(),
         data_elems: DefList::new(),
+        res_directives: DefList::new(),
     };
 
 
@@ -111,6 +118,7 @@ pub fn define(
     symbol::define(report, ast, decls, &mut defs)?;
     instruction::define(report, ast, decls, &mut defs)?;
     data_block::define(report, ast, decls, &mut defs)?;
+    res::define(report, ast, decls, &mut defs)?;
 
     report.stop_at_errors()?;
 

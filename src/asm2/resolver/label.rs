@@ -17,8 +17,7 @@ pub fn resolve_label(
             report,
             &ast_symbol.decl_span,
             defs,
-            ctx,
-            true)?;
+            ctx)?;
                 
 
         let symbol = defs.symbols.get_mut(item_ref);

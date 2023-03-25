@@ -157,7 +157,30 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 }
             }
 
+            asm2::AstAny::DirectiveRes(ast_res) =>
+            {
+                let item_ref = ast_res.item_ref.unwrap();
+                let res = defs.res_directives.get(item_ref);
+
+                let bank = defs.bankdefs.get(self.bank_ref);
+                let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+
+                // Advance the current bank's position
+                cur_bank_data.cur_position +=
+                    res.reserve_size *
+                    bank.addr_unit;
+            }
+
             _ => {}
         }
+    }
+}
+
+
+impl<'iter, 'ast, 'decls> ResolverContext<'iter, 'ast, 'decls>
+{
+    pub fn can_guess(&self) -> bool
+    {
+        !self.is_last_iteration
     }
 }

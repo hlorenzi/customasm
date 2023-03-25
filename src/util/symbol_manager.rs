@@ -196,15 +196,29 @@ impl<T> SymbolManager<T>
                     .collect::<Vec<String>>();
                 
                 report.error_span(
-                    format!("unknown {} `{}{}`",
+                    format!("unknown {} `{}`",
                         self.report_as,
-                        ".".repeat(hierarchy_level),
-                        hierarchy_string.join(".")),
+                        self.get_displayable_name(
+                            hierarchy_level,
+                            &hierarchy_string)),
                     span);
 
                 Err(())
             }
         }
+    }
+
+
+    pub fn get_displayable_name<S>(
+        &self,
+        hierarchy_level: usize,
+        hierarchy: &[S])
+        -> String
+        where S: std::borrow::Borrow<str>
+    {
+        format!("{}{}",
+            ".".repeat(hierarchy_level),
+            hierarchy.join("."))
     }
 
 

@@ -47,7 +47,6 @@ pub fn resolve_data_block_element(
         defs,
         ctx,
         &mut expr::EvalContext2::new(),
-        true,
         expr);
 
     report.pop_parent();

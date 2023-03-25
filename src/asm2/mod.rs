@@ -49,6 +49,7 @@ pub use defs::{
     Symbol,
     Instruction,
     DataElement,
+    ResDirective,
 };
 
 pub mod matcher;

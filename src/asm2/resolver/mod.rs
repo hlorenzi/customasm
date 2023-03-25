@@ -29,9 +29,15 @@ pub use data_block::{
     resolve_data_block,
 };
 
+mod res;
+pub use res::{
+    resolve_res,
+};
+
 mod eval;
 pub use eval::{
     eval,
+    eval_simple,
     get_current_address,
 };
 
@@ -63,10 +69,14 @@ pub fn resolve_iteratively(
     max_iterations: usize)
     -> Result<usize, ()>
 {
-    for i in 0..max_iterations
+    let mut iter_count = 0;
+
+    while iter_count < max_iterations
     {
-        let is_first_iteration = i == 0;
-        let is_last_iteration = i + 1 == max_iterations;
+        iter_count += 1;
+
+        let is_first_iteration = iter_count == 1;
+        let is_last_iteration = iter_count == max_iterations;
 
         let resolution_state = resolve_once(
             report,
@@ -78,7 +88,12 @@ pub fn resolve_iteratively(
 
         if let asm2::ResolutionState::Resolved = resolution_state
         {
-            return Ok(i + 1);
+            if is_last_iteration
+            {
+                return Ok(iter_count);
+            }
+            
+            break;
         }
         else if is_last_iteration
         {
@@ -86,7 +101,24 @@ pub fn resolve_iteratively(
         }
     }
 
-    Err(())
+    // Attempt another resolve pass
+    // as if it were the last iteration
+    let resolution_state = resolve_once(
+        report,
+        ast,
+        decls,
+        defs,
+        false,
+        true)?;
+
+    if let asm2::ResolutionState::Resolved = resolution_state
+    {
+        Ok(iter_count)
+    }
+    else
+    {
+        Err(())
+    }
 }
 
 
@@ -99,7 +131,10 @@ pub fn resolve_once(
     is_last_iteration: bool)
     -> Result<asm2::ResolutionState, ()>
 {
-    println!("=== resolve_once ===");
+    println!(
+        "=== resolve_once {}===",
+        if is_last_iteration { "(final) " } else { "" });
+
     let mut resolution_state = asm2::ResolutionState::Resolved;
 
     let mut iter = ResolveIterator::new(
@@ -151,6 +186,17 @@ pub fn resolve_once(
                 resolve_data_block(
                     report,
                     ast_data,
+                    decls,
+                    defs,
+                    &ctx)?);
+        }
+        
+        else if let asm2::AstAny::DirectiveRes(ast_res) = ctx.node
+        {
+            resolution_state.merge(
+                resolve_res(
+                    report,
+                    ast_res,
                     decls,
                     defs,
                     &ctx)?);

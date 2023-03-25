@@ -93,7 +93,6 @@ pub fn resolve_constant(
             defs,
             ctx,
             &mut expr::EvalContext2::new(),
-            true,
             &ast_const.expr)?;
 
 
