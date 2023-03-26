@@ -45,7 +45,7 @@ pub fn extract_expectations(orig_filename: &str, contents: &str) -> Result<TestE
                 let value = syntax::excerpt_as_bigint(None, value_str, &diagn::Span::new_dummy()).unwrap();
                 
                 let index = expectations.output.len();
-                expectations.output.write_bigint(index, value);
+                expectations.output.write_bigint(index, &value);
             }
         }
         else if line.find("; error:").is_some() || line.find("; note:").is_some()

@@ -7,7 +7,7 @@ pub fn collect(
     decls: &mut asm2::ItemDecls)
     -> Result<(), ()>
 {
-    let initial_item_ref = decls.banks.declare(
+    let initial_item_ref = decls.bankdefs.declare(
         report,
         &diagn::Span::new_dummy(),
         &util::SymbolContext::new_global(),
@@ -21,7 +21,7 @@ pub fn collect(
     {
         if let asm2::AstAny::DirectiveBankdef(ref mut node) = any_node
         {
-            let item_ref = decls.banks.declare(
+            let item_ref = decls.bankdefs.declare(
                 report,
                 &node.name_span,
                 &util::SymbolContext::new_global(),

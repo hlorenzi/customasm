@@ -11,7 +11,7 @@ pub fn collect(
     {
         if let asm2::AstAny::DirectiveBank(ref mut node) = any_node
         {
-            let item_ref = decls.banks.get_by_name_global(
+            let item_ref = decls.bankdefs.get_by_name_global(
                 report,
                 &node.name_span,
                 &node.name)?;

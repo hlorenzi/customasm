@@ -14,13 +14,18 @@ pub fn eval(
     {
         if info.hierarchy_level == 0
         {
-            if info.hierarchy == &["$"]
+            match info.hierarchy[0].as_ref()
             {
-                return get_current_address(
-                    info.report,
-                    info.span,
-                    defs,
-                    ctx);
+                "$" | "pc" =>
+                {
+                    return Ok(expr::Value::Integer(ctx.eval_address(
+                        info.report,
+                        info.span,
+                        defs,
+                        ctx.can_guess())?));
+                }
+
+                _ => {}
             }
         }
 
@@ -85,13 +90,18 @@ pub fn eval_simple(
     {
         if info.hierarchy_level == 0
         {
-            if info.hierarchy == &["$"]
+            match info.hierarchy[0].as_ref()
             {
-                info.report.error_span(
-                    "cannot use `$` in this context",
-                    info.span);
-        
-                return Err(());
+                "$" | "pc" =>
+                {
+                    info.report.error_span(
+                        "cannot get address in this context",
+                        info.span);
+            
+                    return Err(());
+                }
+
+                _ => {}
             }
         }
 
@@ -157,46 +167,4 @@ pub fn eval_simple(
 
         _ => Ok(result)
     }
-}
-	
-	
-pub fn get_current_address(
-    report: &mut diagn::Report,
-    span: &diagn::Span,
-    defs: &asm2::ItemDefs,
-    ctx: &asm2::ResolverContext)
-    -> Result<expr::Value, ()>
-{
-    let bankdef = &defs.bankdefs.get(ctx.bank_ref);
-    let addr_unit = bankdef.addr_unit;
-
-    let cur_position = ctx.bank_data.cur_position;
-    
-    // FIXME: force non-guess on last iteration
-    let excess_bits = cur_position % addr_unit;
-    if excess_bits != 0 && !ctx.can_guess()
-    {
-        let bits_short = addr_unit - excess_bits;
-
-        let plural = {
-            if bits_short > 1
-                { "bits" }
-            else
-                { "bit" }
-        };
-
-        report.error_span(
-            format!(
-                "position is not aligned to an address ({} {} to next)",
-                bits_short, plural),
-            span);
-
-        return Err(());
-    }
-        
-    let addr = expr::Value::make_integer(
-        &util::BigInt::from(cur_position / addr_unit) +
-            &bankdef.addr_start);
-    
-    Ok(addr)
 }

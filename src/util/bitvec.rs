@@ -40,7 +40,7 @@ impl BitVec
 	}
 	
 	
-	pub fn write_bigint(&mut self, index: usize, bigint: util::BigInt)
+	pub fn write_bigint(&mut self, index: usize, bigint: &util::BigInt)
 	{
         for i in 0..bigint.size.unwrap()
         {

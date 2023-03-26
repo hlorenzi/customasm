@@ -25,10 +25,6 @@ pub fn resolve_instruction(
         Some(&instr.encoding) == maybe_encoding.as_ref();
 
 
-    // Update the instruction's address
-    instr.position_within_bank = ctx.bank_data.cur_position;
-    
-
     // Update the instruction's encoding if available
     if let Some(ref encoding) = maybe_encoding
     {

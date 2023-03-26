@@ -50,7 +50,7 @@ pub fn resolve_constants_once(
 
     while let Some(ctx) = iter.next(decls, defs)
     {
-        if let asm2::AstAny::Symbol(ast_symbol) = ctx.node
+        if let asm2::ResolverNode::Symbol(ast_symbol) = ctx.node
         {
             if let asm2::AstSymbolKind::Constant(_) = ast_symbol.kind
             {
@@ -67,8 +67,6 @@ pub fn resolve_constants_once(
                 }
             }
         }
-
-        iter.update_after_node(decls, defs);
     }
 
     Ok(resolved_count)

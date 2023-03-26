@@ -603,7 +603,7 @@ impl State
 				}
 			}
 			
-			bitvec.write_bigint(invoc.ctx.bit_offset, bigint);
+			bitvec.write_bigint(invoc.ctx.bit_offset, &bigint);
 			bitvec.mark_span(
 				Some(invoc.ctx.bit_offset),
 				size,

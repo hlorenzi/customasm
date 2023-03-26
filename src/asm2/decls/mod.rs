@@ -10,7 +10,7 @@ mod symbol;
 #[derive(Debug)]
 pub struct ItemDecls
 {
-    pub banks: util::SymbolManager<asm2::Bankdef>,
+    pub bankdefs: util::SymbolManager<asm2::Bankdef>,
     pub ruledefs: util::SymbolManager<asm2::Ruledef>,
     pub symbols: util::SymbolManager<asm2::Symbol>,
 }
@@ -22,7 +22,7 @@ pub fn collect(
     -> Result<ItemDecls, ()>
 {
     let mut collections = ItemDecls {
-        banks: util::SymbolManager::new("bank"),
+        bankdefs: util::SymbolManager::new("bank"),
         ruledefs: util::SymbolManager::new("ruledef"),
         symbols: util::SymbolManager::new("symbol"),
     };

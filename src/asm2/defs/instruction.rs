@@ -6,7 +6,6 @@ pub struct Instruction
 {
     pub item_ref: util::ItemRef<Self>,
     pub matches: asm2::InstructionMatches,
-    pub position_within_bank: usize,
     pub encoding: util::BigInt,
 }
 
@@ -27,7 +26,6 @@ pub fn define(
             let instr = Instruction {
                 item_ref,
                 matches: asm2::InstructionMatches::new(),
-                position_within_bank: 0,
                 encoding: util::BigInt::new(0, Some(0)),
             };
             

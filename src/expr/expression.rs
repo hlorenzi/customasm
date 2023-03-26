@@ -161,6 +161,18 @@ impl Value
 	}
 
 
+	pub fn unwrap_bigint(
+		&self)
+		-> &util::BigInt
+	{
+		match self
+		{
+			Value::Integer(bigint) => bigint,
+			_ => panic!(),
+		}
+	}
+
+
 	pub fn expect_bigint(
 		&self,
 		report: &mut diagn::Report,

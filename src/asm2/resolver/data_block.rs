@@ -1,32 +1,7 @@
 use crate::*;
 
 
-pub fn resolve_data_block(
-    report: &mut diagn::Report,
-    ast_data: &asm2::AstDirectiveData,
-    decls: &asm2::ItemDecls,
-    defs: &mut asm2::ItemDefs,
-    ctx: &asm2::ResolverContext)
-    -> Result<asm2::ResolutionState, ()>
-{
-    let mut resolution_state = asm2::ResolutionState::Resolved;
-
-    for i in 0..ast_data.item_refs.len()
-    {
-        resolution_state.merge(resolve_data_block_element(
-            report,
-            ast_data,
-            i,
-            decls,
-            defs,
-            ctx)?);
-    }
-
-    Ok(resolution_state)
-}
-
-
-pub fn resolve_data_block_element(
+pub fn resolve_data_element(
     report: &mut diagn::Report,
     ast_data: &asm2::AstDirectiveData,
     elem_index: usize,

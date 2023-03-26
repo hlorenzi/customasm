@@ -13,16 +13,16 @@ pub fn resolve_label(
 
     if let asm2::AstSymbolKind::Label = ast_symbol.kind
     {
-        let value = asm2::resolver::get_current_address(
+        let value = ctx.eval_address(
             report,
             &ast_symbol.decl_span,
             defs,
-            ctx)?;
+            ctx.can_guess())?;
                 
 
         let symbol = defs.symbols.get_mut(item_ref);
         let prev_value = symbol.value.clone();
-        symbol.value = value;
+        symbol.value = expr::Value::Integer(value);
 
 
         if symbol.value != prev_value

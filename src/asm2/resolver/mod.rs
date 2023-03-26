@@ -1,10 +1,11 @@
-use crate::*;
+use crate::{*, asm2::resolver::data_block::resolve_data_element};
 
 
 mod iter;
 pub use iter::{
     ResolveIterator,
     ResolverContext,
+    ResolverNode,
 };
 
 mod constant;
@@ -15,30 +16,14 @@ pub use constant::{
 };
 
 mod label;
-pub use label::{
-    resolve_label,
-};
-
 mod instruction;
-pub use instruction::{
-    resolve_instruction,
-};
-
 mod data_block;
-pub use data_block::{
-    resolve_data_block,
-};
-
 mod res;
-pub use res::{
-    resolve_res,
-};
 
 mod eval;
 pub use eval::{
     eval,
     eval_simple,
-    get_current_address,
 };
 
 
@@ -145,7 +130,7 @@ pub fn resolve_once(
 
     while let Some(ctx) = iter.next(decls, defs)
     {
-        if let asm2::AstAny::Symbol(ast_symbol) = ctx.node
+        if let asm2::ResolverNode::Symbol(ast_symbol) = ctx.node
         {
             if let asm2::AstSymbolKind::Constant(_) = ast_symbol.kind
             {
@@ -160,7 +145,7 @@ pub fn resolve_once(
             else
             {
                 resolution_state.merge(
-                    resolve_label(
+                    label::resolve_label(
                         report,
                         ast_symbol,
                         decls,
@@ -169,10 +154,10 @@ pub fn resolve_once(
             }
         }
         
-        else if let asm2::AstAny::Instruction(ast_instr) = ctx.node
+        else if let asm2::ResolverNode::Instruction(ast_instr) = ctx.node
         {
             resolution_state.merge(
-                resolve_instruction(
+                instruction::resolve_instruction(
                     report,
                     ast_instr,
                     decls,
@@ -180,29 +165,28 @@ pub fn resolve_once(
                     &ctx)?);
         }
         
-        else if let asm2::AstAny::DirectiveData(ast_data) = ctx.node
+        else if let asm2::ResolverNode::DataElement(ast_data, elem_index) = ctx.node
         {
             resolution_state.merge(
-                resolve_data_block(
+                data_block::resolve_data_element(
                     report,
                     ast_data,
+                    elem_index,
                     decls,
                     defs,
                     &ctx)?);
         }
         
-        else if let asm2::AstAny::DirectiveRes(ast_res) = ctx.node
+        else if let asm2::ResolverNode::Res(ast_res) = ctx.node
         {
             resolution_state.merge(
-                resolve_res(
+                res::resolve_res(
                     report,
                     ast_res,
                     decls,
                     defs,
                     &ctx)?);
         }
-
-        iter.update_after_node(decls, defs);
     }
 
     Ok(resolution_state)

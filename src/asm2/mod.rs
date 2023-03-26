@@ -66,7 +66,10 @@ pub use resolver::{
     ResolutionState,
     ResolveIterator,
     ResolverContext,
+    ResolverNode,
 };
+
+pub mod output;
 
 
 #[test]
@@ -119,7 +122,7 @@ fn test_new_asm() -> Result<(), ()>
     let mut fileserver = util::FileServerReal::new();
     let root_file = "examples/nes/main.asm";
 
-    let mut run = || -> Result<(), ()>
+    let mut run = ||
     {
         let mut ast = parser::parse_and_resolve_includes(
             &mut report,
@@ -153,6 +156,17 @@ fn test_new_asm() -> Result<(), ()>
             &decls,
             &mut defs,
             10)?;
+    
+        output::check_bank_overlap(
+            &mut report,
+            &decls,
+            &mut defs)?;
+
+        let output = output::build_output(
+            &mut report,
+            &ast,
+            &decls,
+            &defs)?;
             
         //println!("{:#?}", ast);
         //println!("{:#?}", decls);
@@ -160,13 +174,23 @@ fn test_new_asm() -> Result<(), ()>
         //println!("{:#?}", defs.symbols);
         println!("resolved in {} iterations", iters);
         
-        Ok(())
+        Ok(output)
     };
 
     match run()
     {
-        Ok(()) => {},
-        Err(()) => assert!(report.has_errors()),
+        Ok(output) =>
+        {
+            println!(
+                "{}",
+                output.format_annotated(
+                    &mut fileserver,
+                    4,
+                    2));
+        }
+        
+        Err(()) =>
+            assert!(report.has_errors()),
     }
     
     report.print_all(&mut std::io::stderr(), &fileserver);
