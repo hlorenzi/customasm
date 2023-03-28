@@ -33,4 +33,4 @@ sha2 = "0.10.5"
 
 # TODO: remove vergen
 [build-dependencies]
-vergen = "7.5.1"
+vergen = "8.0.0"
