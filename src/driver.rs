@@ -372,7 +372,7 @@ fn print_usage(opts: &getopts::Options) {
 }
 
 fn print_version() {
-    let mut version = env!("VERGEN_GIT_SEMVER_LIGHTWEIGHT").to_string();
+    let mut version = env!("VERGEN_GIT_BRANCH").to_string();
     if version == "UNKNOWN" {
         version = format!("v{}", env!("CARGO_PKG_VERSION"));
     }

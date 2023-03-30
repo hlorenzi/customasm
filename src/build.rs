@@ -1,14 +1,14 @@
 extern crate vergen;
 
-use vergen::{vergen, Config, SemverKind, TimestampKind};
+use vergen::EmitBuilder;
 
 fn main() {
-    let mut config = Config::default();
-    *config.git_mut().semver_kind_mut() = SemverKind::Lightweight;
-    *config.git_mut().commit_timestamp_kind_mut() = TimestampKind::DateOnly;
-    *config.cargo_mut().target_triple_mut() = true;
-
-    vergen(config).expect("Unable to generate the cargo keys!");
+    EmitBuilder::builder()
+        .all_build()
+        .all_cargo()
+        .all_git()
+        .emit()
+        .expect("Unable to generate the cargo keys!");
 
     generate_tests();
 }
