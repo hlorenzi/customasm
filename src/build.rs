@@ -1,24 +1,19 @@
 extern crate vergen;
 
+use vergen::EmitBuilder;
 
-use vergen::{Config, vergen, TimestampKind, SemverKind};
-
-
-fn main()
-{
-    let mut config = Config::default();
-    *config.git_mut().semver_kind_mut() = SemverKind::Lightweight;
-    *config.git_mut().commit_timestamp_kind_mut() = TimestampKind::DateOnly;
-    *config.cargo_mut().target_triple_mut() = true;
-    
-    vergen(config).expect("Unable to generate the cargo keys!");
+fn main() {
+    EmitBuilder::builder()
+        .all_build()
+        .all_cargo()
+        .all_git()
+        .emit()
+        .expect("Unable to generate the cargo keys!");
 
     generate_tests();
 }
 
-
-fn generate_tests()
-{
+fn generate_tests() {
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let destination = std::path::Path::new(&out_dir).join("test.rs");
     println!("{:?}", destination);
@@ -27,35 +22,37 @@ fn generate_tests()
     generate_tests_from_folder(
         &mut f,
         &std::env::current_dir().unwrap().join("tests"),
-        &String::new());
+        &String::new(),
+    );
 }
 
-
-fn generate_tests_from_folder(f: &mut dyn std::io::Write, folder: &std::path::Path, test_name: &String)
-{
-    for entry in std::fs::read_dir(folder).unwrap()
-    {
+fn generate_tests_from_folder(
+    f: &mut dyn std::io::Write,
+    folder: &std::path::Path,
+    test_name: &String,
+) {
+    for entry in std::fs::read_dir(folder).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
         let file_stem = path.file_stem().unwrap().to_string_lossy();
         println!("cargo:rerun-if-changed={}", path.to_string_lossy());
 
-        if path.is_file()
-        {
+        if path.is_file() {
             let mut new_test_name = test_name.clone();
             new_test_name.push_str(&file_stem);
-            
-            write!(f,
+
+            write!(
+                f,
                 "#[test]
                 fn {}()
                 {{
                     test_file({:?});
                 }}",
                 new_test_name.replace(".", "_"),
-                path).unwrap();
-        }
-        else
-        {
+                path
+            )
+            .unwrap();
+        } else {
             let mut new_test_name = test_name.clone();
             new_test_name.push_str(&file_stem);
             new_test_name.push_str("_");

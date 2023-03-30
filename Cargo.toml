@@ -31,6 +31,5 @@ num-integer = { version = "0.1.45", default_features = false }
 [dev-dependencies]
 sha2 = "0.10.5"
 
-# TODO: remove vergen
 [build-dependencies]
-vergen = "7.5.1"
+vergen = { version="8.0.0", features=[ "build", "git", "gitcl", "cargo" ] }

@@ -40,19 +40,22 @@ impl util::BitVec {
     }
 
     pub fn format_coe(&self, wordsize: usize) -> String {
-        "memory_initialization_radix=2;\nmemory_initialization_vector=\n".to_owned() + &self.format_str(1)
-            .chars()
-            .enumerate()
-            .flat_map(|(i, c)| {
-                if i != 0 && i % wordsize == 0 {
-                    vec![',', '\n']
-                } else {
-                    vec![]
-                }
-                .into_iter()
-                .chain(std::iter::once(c))
-            })
-            .collect::<String>() + ";"
+        "memory_initialization_radix=2;\nmemory_initialization_vector=\n".to_owned()
+            + &self
+                .format_str(1)
+                .chars()
+                .enumerate()
+                .flat_map(|(i, c)| {
+                    if i != 0 && i % wordsize == 0 {
+                        vec![',', '\n']
+                    } else {
+                        vec![]
+                    }
+                    .into_iter()
+                    .chain(std::iter::once(c))
+                })
+                .collect::<String>()
+            + ";"
     }
 
     pub fn format_hexstr(&self) -> String {
@@ -234,7 +237,7 @@ impl util::BitVec {
 
         let addr_max_width = format!("{:x}", byte_num - 1).len();
 
-        let word_length = (wordsize + data_radix-1) / data_radix;
+        let word_length = (wordsize + data_radix - 1) / data_radix;
         let fmt_word: _ = match data_radix {
             1 => |word: usize| format!("{:b}", word),
             2 => |word: usize| format!("{:o}", word),
