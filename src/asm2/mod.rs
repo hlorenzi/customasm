@@ -50,6 +50,8 @@ pub use defs::{
     Instruction,
     DataElement,
     ResDirective,
+    AlignDirective,
+    AddrDirective,
 };
 
 pub mod matcher;
@@ -70,6 +72,105 @@ pub use resolver::{
 };
 
 pub mod output;
+
+
+pub struct AssemblyResult
+{
+    pub error: bool,
+    pub ast: Option<asm2::AstTopLevel>,
+    pub decls: Option<asm2::ItemDecls>,
+    pub defs: Option<asm2::ItemDefs>,
+    pub output: Option<util::BitVec>,
+    pub iterations_taken: Option<usize>,
+}
+
+
+pub struct AssemblyOptions
+{
+    pub debug_iterations: bool,
+}
+
+
+pub fn assemble<S>(
+    report: &mut diagn::Report,
+    opts: &AssemblyOptions,
+    fileserver: &mut dyn util::FileServer,
+    root_filenames: &[S])
+    -> AssemblyResult
+    where S: std::borrow::Borrow<str>
+{
+    let mut assembly = AssemblyResult {
+        error: false,
+        ast: None,
+        decls: None,
+        defs: None,
+        output: None,
+        iterations_taken: None,
+    };
+
+    let mut run = || -> Result<(), ()>
+    {
+        assembly.ast = Some(parser::parse_many_and_resolve_includes(
+            report,
+            fileserver,
+            root_filenames)?);
+
+        assembly.decls = Some(decls::collect(
+            report,
+            assembly.ast.as_mut().unwrap())?);
+            
+        assembly.defs = Some(defs::define(
+            report,
+            assembly.ast.as_mut().unwrap(),
+            assembly.decls.as_mut().unwrap())?);
+            
+        resolver::resolve_constants(
+            report,
+            opts,
+            assembly.ast.as_ref().unwrap(),
+            assembly.decls.as_ref().unwrap(),
+            assembly.defs.as_mut().unwrap())?;
+
+        matcher::match_all(
+            report,
+            opts,
+            assembly.ast.as_ref().unwrap(),
+            assembly.defs.as_mut().unwrap())?;
+
+        assembly.iterations_taken = Some(resolver::resolve_iteratively(
+            report,
+            opts,
+            assembly.ast.as_ref().unwrap(),
+            assembly.decls.as_ref().unwrap(),
+            assembly.defs.as_mut().unwrap(),
+            10)?);
+
+        output::check_bank_overlap(
+            report,
+            assembly.decls.as_ref().unwrap(),
+            assembly.defs.as_mut().unwrap())?;
+
+        assembly.output = Some(output::build_output(
+            report,
+            assembly.ast.as_ref().unwrap(),
+            assembly.decls.as_ref().unwrap(),
+            assembly.defs.as_ref().unwrap())?);
+
+        Ok(())
+    };
+    
+    match run()
+    {
+        Ok(()) => {}
+        Err(()) =>
+        {
+            assembly.error = true;
+            assert!(report.has_errors());
+        }
+    }
+
+    assembly
+}
 
 
 #[test]
@@ -122,75 +223,29 @@ fn test_new_asm() -> Result<(), ()>
     let mut fileserver = util::FileServerReal::new();
     let root_file = "examples/nes/main.asm";
 
-    let mut run = ||
-    {
-        let mut ast = parser::parse_and_resolve_includes(
-            &mut report,
-            &fileserver,
-            root_file,
-            &mut Vec::new())?;
-
-        let mut decls = decls::collect(
-            &mut report,
-            &mut ast)?;
-            
-        let mut defs = defs::define(
-            &mut report,
-            &mut ast,
-            &mut decls)?;
-            
-        resolver::resolve_constants(
-            &mut report,
-            &ast,
-            &decls,
-            &mut defs)?;
-
-        matcher::match_all(
-            &mut report,
-            &ast,
-            &mut defs)?;
-    
-        let iters = resolver::resolve_iteratively(
-            &mut report,
-            &ast,
-            &decls,
-            &mut defs,
-            10)?;
-    
-        output::check_bank_overlap(
-            &mut report,
-            &decls,
-            &mut defs)?;
-
-        let output = output::build_output(
-            &mut report,
-            &ast,
-            &decls,
-            &defs)?;
-            
-        //println!("{:#?}", ast);
-        //println!("{:#?}", decls);
-        //println!("{:#?}", defs.instructions);
-        //println!("{:#?}", defs.symbols);
-        println!("resolved in {} iterations", iters);
-        
-        Ok(output)
+    let opts = AssemblyOptions {
+        debug_iterations: true,
     };
 
-    match run()
+    let result = assemble(
+        &mut report,
+        &opts,
+        &mut fileserver,
+        &[root_file]);
+
+    if let Some(iters) = result.iterations_taken
     {
-        Ok(output) =>
-        {
-            println!(
-                "{}",
-                output.format_annotated(
-                    &mut fileserver,
-                    4,
-                    2));
-        }
-        
-        Err(()) =>
-            assert!(report.has_errors()),
+        println!("resolved in {} iterations", iters);
+    }
+
+    if let Some(output) = result.output
+    {
+        println!(
+            "{}",
+            output.format_annotated(
+                &mut fileserver,
+                4,
+                2));
     }
     
     report.print_all(&mut std::io::stderr(), &fileserver);

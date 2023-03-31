@@ -6,6 +6,8 @@ pub struct AstDirectiveAddr
 {
     pub header_span: diagn::Span,
     pub expr: expr::Expr,
+
+    pub item_ref: Option<util::ItemRef<asm2::AddrDirective>>,
 }
 
 
@@ -22,5 +24,7 @@ pub fn parse(
     Ok(AstDirectiveAddr {
         header_span,
         expr,
+
+        item_ref: None,
     })
 }

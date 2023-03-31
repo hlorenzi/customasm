@@ -11,9 +11,9 @@ pub struct Instruction
 
 
 pub fn define(
-    report: &mut diagn::Report,
+    _report: &mut diagn::Report,
     ast: &mut asm2::AstTopLevel,
-    decls: &mut asm2::ItemDecls,
+    _decls: &mut asm2::ItemDecls,
     defs: &mut asm2::ItemDefs)
     -> Result<(), ()>
 {

@@ -205,8 +205,7 @@ impl expr::Expr
 				provider)?
 			.expect_usize(
 				report,
-				&self.span(),
-				None)
+				&self.span())
 	}
 
 

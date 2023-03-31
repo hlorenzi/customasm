@@ -3,8 +3,9 @@ use crate::*;
 
 pub fn resolve_label(
     report: &mut diagn::Report,
+    opts: &asm2::AssemblyOptions,
     ast_symbol: &asm2::AstSymbol,
-    decls: &asm2::ItemDecls,
+    _decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
     ctx: &asm2::ResolverContext)
     -> Result<asm2::ResolutionState, ()>
@@ -35,9 +36,13 @@ pub fn resolve_label(
                     &ast_symbol.decl_span);
             }
             
-            println!("label: {} = {:?}",
-                ast_symbol.name,
-                symbol.value);
+            if opts.debug_iterations
+            {
+                println!("label: {} = {:?}",
+                    ast_symbol.name,
+                    symbol.value);
+            }
+            
             return Ok(asm2::ResolutionState::Unresolved);
         }
 

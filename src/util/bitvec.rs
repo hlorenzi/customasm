@@ -49,6 +49,52 @@ impl BitVec
     }
 	
 	
+	pub fn write_bigint_checked(
+        &mut self,
+        report: &mut diagn::Report,
+        span: &diagn::Span,
+        offset: usize,
+        addr: util::BigInt,
+        bigint: &util::BigInt)
+        -> Result<(), ()>
+	{
+        let size = bigint.size.unwrap();
+
+        // TODO: Speed up this quadratic algorithm
+        for other in &self.spans
+        {
+            if let Some(other_offset) = other.offset
+            {
+                if offset < other_offset + other.size &&
+                    offset + size >= other_offset
+                {
+                    report.push_parent(
+                        "output overlap",
+                        span);
+
+                    report.note_span(
+                        "overlaps with:",
+                        &other.span);
+
+                    report.pop_parent();
+
+                    return Err(());
+                }
+            }
+        }
+
+        self.write_bigint(offset, bigint);
+
+        self.mark_span(
+            Some(offset),
+            size,
+            addr,
+            span.clone());
+
+        Ok(())
+    }
+	
+	
 	pub fn write_bitvec(&mut self, index: usize, bitvec: &util::BitVec)
 	{
         for i in 0..bitvec.len()

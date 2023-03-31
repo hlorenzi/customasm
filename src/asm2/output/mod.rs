@@ -116,15 +116,12 @@ pub fn build_output(
             let pos = ctx.get_output_position(defs).unwrap();
             let addr = ctx.get_address(defs, true).unwrap();
 
-			bitvec.write_bigint(
+			bitvec.write_bigint_checked(
+                report,
+				&ast_instr.span,
                 pos,
-                &instr.encoding);
-
-			bitvec.mark_span(
-                Some(pos),
-				instr.encoding.size.unwrap(),
 				addr,
-				ast_instr.span.clone());
+                &instr.encoding)?;
         }
         
         else if let asm2::ResolverNode::DataElement(ast_data, elem_index) = ctx.node
@@ -134,15 +131,12 @@ pub fn build_output(
             let pos = ctx.get_output_position(defs).unwrap();
             let addr = ctx.get_address(defs, true).unwrap();
 
-            bitvec.write_bigint(
+            bitvec.write_bigint_checked(
+                report,
+                ast_data.elems[elem_index].span(),
                 pos,
-                &elem.encoding);
-
-            bitvec.mark_span(
-                Some(pos),
-                elem.encoding.size.unwrap(),
                 addr,
-                ast_data.elems[elem_index].span().clone());
+                &elem.encoding)?;
         }
     }
 

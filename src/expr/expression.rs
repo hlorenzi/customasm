@@ -315,8 +315,7 @@ impl Value
 	pub fn expect_usize(
 		&self,
 		report: &mut diagn::Report,
-		span: &diagn::Span,
-		on_error: Option<usize>)
+		span: &diagn::Span)
 		-> Result<usize, ()>
 	{
 		match self
@@ -328,36 +327,62 @@ impl Value
 					Some(value) => Ok(value),
 					None =>
 					{
-						if let Some(value) = on_error
-						{
-							Ok(value)
-						}
-						else
-						{
-							report.error_span(
-								"value out of supported range",
-								span);
+						report.error_span(
+							"value out of supported range",
+							span);
 
-							Err(())
-						}
+						Err(())
 					}
 				}
 			}
 
 			_ =>
 			{
-				if let Some(value) = on_error
-				{
-					Ok(value)
-				}
-				else
-				{
-					report.error_span(
-						"expected integer",
-						span);
+				report.error_span(
+					"expected integer",
+					span);
 
-					Err(())
+				Err(())
+			}
+		}
+	}
+
+
+	pub fn expect_error_or_usize(
+		self,
+		report: &mut diagn::Report,
+		span: &diagn::Span)
+		-> Result<expr::Value, ()>
+	{
+		match &self
+		{
+			expr::Value::Unknown |
+			expr::Value::FailedConstraint(_) =>
+				Ok(self),
+
+			Value::Integer(ref bigint) =>
+			{
+				match bigint.checked_to_usize()
+				{
+					Some(_) => Ok(self),
+					None =>
+					{
+						report.error_span(
+							"value out of supported range",
+							span);
+
+						Err(())
+					}
 				}
+			}
+
+			_ =>
+			{
+				report.error_span(
+					"expected integer",
+					span);
+
+				Err(())
 			}
 		}
 	}

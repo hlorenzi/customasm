@@ -8,6 +8,7 @@ use crate::*;
 /// no new constants.
 pub fn resolve_constants(
     report: &mut diagn::Report,
+    opts: &asm2::AssemblyOptions,
     ast: &asm2::AstTopLevel,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs)
@@ -19,6 +20,7 @@ pub fn resolve_constants(
     {
         let resolved_count = resolve_constants_once(
             report,
+            opts,
             ast,
             decls,
             defs)?;
@@ -35,6 +37,7 @@ pub fn resolve_constants(
 
 pub fn resolve_constants_once(
     report: &mut diagn::Report,
+    opts: &asm2::AssemblyOptions,
     ast: &asm2::AstTopLevel,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs)
@@ -56,6 +59,7 @@ pub fn resolve_constants_once(
             {
                 let resolution_state = resolve_constant(
                     report,
+                    opts,
                     ast_symbol,
                     decls,
                     defs,
@@ -75,6 +79,7 @@ pub fn resolve_constants_once(
 
 pub fn resolve_constant(
     report: &mut diagn::Report,
+    opts: &asm2::AssemblyOptions,
     ast_symbol: &asm2::AstSymbol,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
@@ -109,9 +114,13 @@ pub fn resolve_constant(
                     &ast_symbol.decl_span);
             }
 
-            println!("const: {} = {:?}",
-                ast_symbol.name,
-                symbol.value);
+            if opts.debug_iterations
+            {
+                println!("const: {} = {:?}",
+                    ast_symbol.name,
+                    symbol.value);
+            }
+
             return Ok(asm2::ResolutionState::Unresolved);
         }
 

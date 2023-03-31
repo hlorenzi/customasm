@@ -51,7 +51,20 @@ fn generate_tests_from_folder(f: &mut dyn std::io::Write, folder: &std::path::Pa
                 fn {}()
                 {{
                     test_file({:?});
-                }}",
+                }}
+                
+                ",
+                new_test_name.replace(".", "_"),
+                path).unwrap();
+                
+            write!(f,
+                "#[test]
+                fn new_asm_{}()
+                {{
+                    test_file2({:?});
+                }}
+                
+                ",
                 new_test_name.replace(".", "_"),
                 path).unwrap();
         }

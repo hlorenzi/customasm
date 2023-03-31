@@ -90,15 +90,50 @@ pub struct AstTopLevel
 }
 
 
-pub fn parse_and_resolve_includes(
+pub fn parse_many_and_resolve_includes<S>(
     report: &mut diagn::Report,
     fileserver: &dyn util::FileServer,
-    root_filename: &str,
+    root_filenames: &[S])
+    -> Result<AstTopLevel, ()>
+    where S: std::borrow::Borrow<str>
+{
+    let mut result = AstTopLevel {
+        nodes: Vec::new(),
+    };
+
+    for file in root_filenames
+    {
+        let ast = parse_and_resolve_includes(
+            report,
+            fileserver,
+            file.borrow(),
+            &mut Vec::new())?;
+
+        result.nodes.extend(ast.nodes);
+    }
+
+    Ok(result)
+}
+
+
+pub fn parse_and_resolve_includes<S>(
+    report: &mut diagn::Report,
+    fileserver: &dyn util::FileServer,
+    root_filename: S,
     seen_filenames: &mut Vec<String>)
     -> Result<AstTopLevel, ()>
+    where S: std::borrow::Borrow<str>
 {
-    let chars = fileserver.get_chars(diagn::RcReport::new(), root_filename, None)?;
-    let tokens = syntax::tokenize(diagn::RcReport::new(), root_filename, &chars)?;
+    let chars = fileserver.get_chars(
+        diagn::RcReport::new(),
+        root_filename.borrow(),
+        None)?;
+
+    let tokens = syntax::tokenize(
+        diagn::RcReport::new(),
+        root_filename.borrow(),
+        &chars)?;
+
     let mut root_ast = parse(report, &tokens)?;
 
     for node_index in (0..root_ast.nodes.len()).rev()
@@ -109,7 +144,7 @@ pub fn parse_and_resolve_includes(
         {
             let included_filename = util::filename_navigate(
                 diagn::RcReport::new(),
-                root_filename,
+                root_filename.borrow(),
                 &dir_include.filename,
                 &dir_include.filename_span)?;
 
@@ -129,7 +164,7 @@ pub fn parse_and_resolve_includes(
             let inner_ast = parse_and_resolve_includes(
                 report,
                 fileserver,
-                &included_filename,
+                included_filename.as_ref(),
                 seen_filenames)?;
 
             // Replace the `#include` node with

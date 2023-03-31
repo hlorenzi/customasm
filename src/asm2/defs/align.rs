@@ -2,10 +2,10 @@ use crate::*;
 
 
 #[derive(Debug)]
-pub struct ResDirective
+pub struct AlignDirective
 {
     pub item_ref: util::ItemRef<Self>,
-    pub reserve_size: usize,
+    pub align_size: usize,
 }
 
 
@@ -18,18 +18,18 @@ pub fn define(
 {
     for any_node in &mut ast.nodes
     {
-        if let asm2::AstAny::DirectiveRes(ref mut ast_res) = any_node
+        if let asm2::AstAny::DirectiveAlign(ref mut ast_align) = any_node
         {
-            let item_ref = defs.res_directives.next_item_ref();
+            let item_ref = defs.align_directives.next_item_ref();
 
-            let res = ResDirective {
+            let res = AlignDirective {
                 item_ref,
-                reserve_size: 0,
+                align_size: 0,
             };
             
-            defs.res_directives.define(item_ref, res);
+            defs.align_directives.define(item_ref, res);
                 
-            ast_res.item_ref = Some(item_ref);
+            ast_align.item_ref = Some(item_ref);
         }
     }
 

@@ -2,10 +2,10 @@ use crate::*;
 
 
 #[derive(Debug)]
-pub struct ResDirective
+pub struct AddrDirective
 {
     pub item_ref: util::ItemRef<Self>,
-    pub reserve_size: usize,
+    pub address: util::BigInt,
 }
 
 
@@ -18,18 +18,18 @@ pub fn define(
 {
     for any_node in &mut ast.nodes
     {
-        if let asm2::AstAny::DirectiveRes(ref mut ast_res) = any_node
+        if let asm2::AstAny::DirectiveAddr(ref mut ast_addr) = any_node
         {
-            let item_ref = defs.res_directives.next_item_ref();
+            let item_ref = defs.addr_directives.next_item_ref();
 
-            let res = ResDirective {
+            let res = AddrDirective {
                 item_ref,
-                reserve_size: 0,
+                address: util::BigInt::new(0, None),
             };
             
-            defs.res_directives.define(item_ref, res);
+            defs.addr_directives.define(item_ref, res);
                 
-            ast_res.item_ref = Some(item_ref);
+            ast_addr.item_ref = Some(item_ref);
         }
     }
 

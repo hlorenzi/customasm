@@ -17,7 +17,7 @@ pub struct Bankdef
 pub fn define(
     report: &mut diagn::Report,
     ast: &asm2::AstTopLevel,
-    decls: &mut asm2::ItemDecls,
+    _decls: &mut asm2::ItemDecls,
     defs: &mut asm2::ItemDefs)
     -> Result<(), ()>
 {

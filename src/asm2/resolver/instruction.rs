@@ -3,6 +3,7 @@ use crate::*;
 
 pub fn resolve_instruction(
     report: &mut diagn::Report,
+    opts: &asm2::AssemblyOptions,
     ast_instr: &asm2::AstInstruction,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
@@ -35,17 +36,21 @@ pub fn resolve_instruction(
     if !is_stable
     {
         // On the final iteration, unstable guesses become errors.
-        // If encoding is Some, an inner error has already been reported.
-        if ctx.is_last_iteration && !maybe_encoding.is_some()
+        // If encoding is None, an inner error has already been reported.
+        if ctx.is_last_iteration && maybe_encoding.is_some()
         {
             report.error_span(
                 "instruction encoding did not converge",
                 &ast_instr.span);
         }
         
-        println!("instr: {} = {:?}",
-            ast_instr.tokens.iter().map(|t| t.text()).collect::<Vec<_>>().join(""),
-            instr.encoding);
+        if opts.debug_iterations
+        {
+            println!("instr: {} = {:?}",
+                ast_instr.tokens.iter().map(|t| t.text()).collect::<Vec<_>>().join(""),
+                instr.encoding);
+        }
+        
         return Ok(asm2::ResolutionState::Unresolved);
     }
 

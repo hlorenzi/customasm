@@ -1,16 +1,16 @@
 use crate::*;
 
 
-pub fn resolve_res(
+pub fn resolve_align(
     report: &mut diagn::Report,
     opts: &asm2::AssemblyOptions,
-    ast_res: &asm2::AstDirectiveRes,
+    ast_align: &asm2::AstDirectiveAlign,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
     ctx: &asm2::ResolverContext)
     -> Result<asm2::ResolutionState, ()>
 {
-    let item_ref = ast_res.item_ref.unwrap();
+    let item_ref = ast_align.item_ref.unwrap();
 
     let value = asm2::resolver::eval(
         report,
@@ -18,45 +18,58 @@ pub fn resolve_res(
         defs,
         ctx,
         &mut expr::EvalContext2::new(),
-        &ast_res.expr)?;
+        &ast_align.expr)?;
 
     let value = value.expect_error_or_usize(
         report,
-        &ast_res.expr.span())?;
+        &ast_align.expr.span())?;
 
     let value = {
         match value
         {
             expr::Value::Integer(bigint) =>
                 bigint.checked_to_usize().unwrap(),
-                
+
             _ => 0,
         }
     };
 
-    let res = defs.res_directives.get_mut(item_ref);
-    let prev_value = res.reserve_size.clone();
-    res.reserve_size = value;
+    let align = defs.align_directives.get_mut(item_ref);
+    let prev_value = align.align_size.clone();
+    align.align_size = value;
 
 
-    if res.reserve_size != prev_value
+    if align.align_size != prev_value
     {
         // On the final iteration, unstable guesses become errors
         if ctx.is_last_iteration
         {
             report.error_span(
-                "reserve size did not converge",
-                &ast_res.expr.span());
+                "alignment size did not converge",
+                &ast_align.expr.span());
         }
 
         if opts.debug_iterations
         {
-            println!("  res: {:?}", res.reserve_size);
+            println!("align: {:?}", align.align_size);
         }
         
         return Ok(asm2::ResolutionState::Unresolved);
     }
 
     
+    if ctx.is_last_iteration
+    {
+        if align.align_size == 0
+        {
+            report.error_span(
+                "invalid alignment size",
+                &ast_align.expr.span());
+
+            return Err(());
+        }
+    }
+
+
     Ok(asm2::ResolutionState::Resolved)
 }

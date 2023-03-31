@@ -6,6 +6,8 @@ pub struct AstDirectiveAlign
 {
     pub header_span: diagn::Span,
     pub expr: expr::Expr,
+
+    pub item_ref: Option<util::ItemRef<asm2::AlignDirective>>,
 }
 
 
@@ -22,5 +24,7 @@ pub fn parse(
     Ok(AstDirectiveAlign {
         header_span,
         expr,
+
+        item_ref: None,
     })
 }

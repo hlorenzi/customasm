@@ -36,6 +36,16 @@ pub use res::{
     ResDirective,
 };
 
+mod align;
+pub use align::{
+    AlignDirective,
+};
+
+mod addr;
+pub use addr::{
+    AddrDirective,
+};
+
 
 #[derive(Debug)]
 pub struct ItemDefs
@@ -46,6 +56,8 @@ pub struct ItemDefs
     pub instructions: DefList<Instruction>,
     pub data_elems: DefList<DataElement>,
     pub res_directives: DefList<ResDirective>,
+    pub align_directives: DefList<AlignDirective>,
+    pub addr_directives: DefList<AddrDirective>,
 }
 
 
@@ -110,6 +122,8 @@ pub fn define(
         instructions: DefList::new(),
         data_elems: DefList::new(),
         res_directives: DefList::new(),
+        align_directives: DefList::new(),
+        addr_directives: DefList::new(),
     };
 
 
@@ -119,6 +133,8 @@ pub fn define(
     instruction::define(report, ast, decls, &mut defs)?;
     data_block::define(report, ast, decls, &mut defs)?;
     res::define(report, ast, decls, &mut defs)?;
+    align::define(report, ast, decls, &mut defs)?;
+    addr::define(report, ast, decls, &mut defs)?;
 
     report.stop_at_errors()?;
 

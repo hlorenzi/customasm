@@ -89,6 +89,7 @@ pub enum InstructionArgumentKind
 /// AST nodes themselves.
 pub fn match_all(
     report: &mut diagn::Report,
+    opts: &asm2::AssemblyOptions,
     ast: &asm2::AstTopLevel,
     defs: &mut asm2::ItemDefs)
     -> Result<(), ()>
@@ -128,9 +129,12 @@ pub fn match_all(
                 0,
                 Some(largest_encoding.encoding_size));
 
-            println!("static size for {} = {:?}",
-                ast_instr.tokens.iter().map(|t| t.text()).collect::<Vec<_>>().join(""),
-                instr.encoding.size.unwrap());
+            if opts.debug_iterations
+            {
+                println!(" size: {} = {:?}",
+                    ast_instr.tokens.iter().map(|t| t.text()).collect::<Vec<_>>().join(""),
+                    instr.encoding.size.unwrap());
+            }
         }
     }
 

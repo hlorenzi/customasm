@@ -40,6 +40,8 @@ pub enum ResolverNode<'ast>
     Instruction(&'ast asm2::AstInstruction),
     DataElement(&'ast asm2::AstDirectiveData, usize),
     Res(&'ast asm2::AstDirectiveRes),
+    Align(&'ast asm2::AstDirectiveAlign),
+    Addr(&'ast asm2::AstDirectiveAddr),
 }
 
 
@@ -93,7 +95,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
         defs: &asm2::ItemDefs)
         -> Option<ResolverContext<'iter, 'ast, 'decls>>
     {
-        self.advance_address(decls, defs);
+        self.advance_address(defs);
 
         if self.index >= self.ast.nodes.len()
         {
@@ -155,6 +157,24 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                     ResolverNode::DataElement(ast_data, elem_index)
                 }
 
+                asm2::AstAny::DirectiveRes(ast_res) =>
+                {
+                    self.index += 1;
+                    ResolverNode::Res(ast_res)
+                }
+
+                asm2::AstAny::DirectiveAlign(ast_align) =>
+                {
+                    self.index += 1;
+                    ResolverNode::Align(ast_align)
+                }
+
+                asm2::AstAny::DirectiveAddr(ast_addr) =>
+                {
+                    self.index += 1;
+                    ResolverNode::Addr(ast_addr)
+                }
+
                 _ =>
                 {
                     self.index += 1;
@@ -176,7 +196,6 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
     fn advance_address(
         &mut self,
-        decls: &'decls asm2::ItemDecls,
         defs: &asm2::ItemDefs)
     {
         if self.index_prev.is_none() ||
@@ -235,6 +254,59 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 cur_bank_data.cur_position +=
                     res.reserve_size *
                     bank.addr_unit;
+            }
+
+            asm2::AstAny::DirectiveAlign(ast_align) =>
+            {
+                let item_ref = ast_align.item_ref.unwrap();
+                let align = defs.align_directives.get(item_ref);
+
+                let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+
+                if align.align_size != 0
+                {
+                    let bits_until_aligned = {
+                        let excess_bits =
+                            cur_bank_data.cur_position %
+                            align.align_size;
+                            
+                        if excess_bits != 0
+                        {
+                            align.align_size - excess_bits
+                        }
+                        else
+                        {
+                            0
+                        }
+                    };
+
+                    cur_bank_data.cur_position += bits_until_aligned;
+                }
+            }
+
+            asm2::AstAny::DirectiveAddr(ast_addr) =>
+            {
+                let item_ref = ast_addr.item_ref.unwrap();
+                let addr = defs.addr_directives.get(item_ref);
+
+                let bank = defs.bankdefs.get(self.bank_ref);
+                let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+
+                let new_position = {
+                    if addr.address >= bank.addr_start
+                    {
+                        (&addr.address - &bank.addr_start)
+                            .checked_to_usize()
+                            .unwrap()
+                            * bank.addr_unit
+                    }
+                    else
+                    {
+                        0
+                    }
+                };
+
+                cur_bank_data.cur_position = new_position;
             }
 
             _ => {}

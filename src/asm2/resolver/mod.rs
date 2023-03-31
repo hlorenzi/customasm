@@ -1,4 +1,4 @@
-use crate::{*, asm2::resolver::data_block::resolve_data_element};
+use crate::*;
 
 
 mod iter;
@@ -19,6 +19,8 @@ mod label;
 mod instruction;
 mod data_block;
 mod res;
+mod align;
+mod addr;
 
 mod eval;
 pub use eval::{
@@ -48,6 +50,7 @@ impl ResolutionState
 
 pub fn resolve_iteratively(
     report: &mut diagn::Report,
+    opts: &asm2::AssemblyOptions,
     ast: &asm2::AstTopLevel,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
@@ -65,9 +68,11 @@ pub fn resolve_iteratively(
 
         let resolution_state = resolve_once(
             report,
+            opts,
             ast,
             decls,
             defs,
+            iter_count,
             is_first_iteration,
             is_last_iteration)?;
 
@@ -90,9 +95,11 @@ pub fn resolve_iteratively(
     // as if it were the last iteration
     let resolution_state = resolve_once(
         report,
+        opts,
         ast,
         decls,
         defs,
+        iter_count + 1,
         false,
         true)?;
 
@@ -109,16 +116,22 @@ pub fn resolve_iteratively(
 
 pub fn resolve_once(
     report: &mut diagn::Report,
+    opts: &asm2::AssemblyOptions,
     ast: &asm2::AstTopLevel,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
+    iteration_index: usize,
     is_first_iteration: bool,
     is_last_iteration: bool)
     -> Result<asm2::ResolutionState, ()>
 {
-    println!(
-        "=== resolve_once {}===",
-        if is_last_iteration { "(final) " } else { "" });
+    if opts.debug_iterations
+    {
+        println!(
+            "[===== iteration #{} {}=====]",
+            iteration_index,
+            if is_last_iteration { "(final) " } else { "" });
+    }
 
     let mut resolution_state = asm2::ResolutionState::Resolved;
 
@@ -137,6 +150,7 @@ pub fn resolve_once(
                 resolution_state.merge(
                     resolve_constant(
                         report,
+                        opts,
                         ast_symbol,
                         decls,
                         defs,
@@ -147,6 +161,7 @@ pub fn resolve_once(
                 resolution_state.merge(
                     label::resolve_label(
                         report,
+                        opts,
                         ast_symbol,
                         decls,
                         defs,
@@ -159,6 +174,7 @@ pub fn resolve_once(
             resolution_state.merge(
                 instruction::resolve_instruction(
                     report,
+                    opts,
                     ast_instr,
                     decls,
                     defs,
@@ -170,6 +186,7 @@ pub fn resolve_once(
             resolution_state.merge(
                 data_block::resolve_data_element(
                     report,
+                    opts,
                     ast_data,
                     elem_index,
                     decls,
@@ -182,7 +199,32 @@ pub fn resolve_once(
             resolution_state.merge(
                 res::resolve_res(
                     report,
+                    opts,
                     ast_res,
+                    decls,
+                    defs,
+                    &ctx)?);
+        }
+        
+        else if let asm2::ResolverNode::Align(ast_align) = ctx.node
+        {
+            resolution_state.merge(
+                align::resolve_align(
+                    report,
+                    opts,
+                    ast_align,
+                    decls,
+                    defs,
+                    &ctx)?);
+        }
+        
+        else if let asm2::ResolverNode::Addr(ast_addr) = ctx.node
+        {
+            resolution_state.merge(
+                addr::resolve_addr(
+                    report,
+                    opts,
+                    ast_addr,
                     decls,
                     defs,
                     &ctx)?);

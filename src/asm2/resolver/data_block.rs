@@ -3,6 +3,7 @@ use crate::*;
 
 pub fn resolve_data_element(
     report: &mut diagn::Report,
+    opts: &asm2::AssemblyOptions,
     ast_data: &asm2::AstDirectiveData,
     elem_index: usize,
     decls: &asm2::ItemDecls,
@@ -111,7 +112,11 @@ pub fn resolve_data_element(
                 expr.span());
         }
         
-        println!(" data: {:?}", data_elem.encoding);
+        if opts.debug_iterations
+        {
+            println!(" data: {:?}", data_elem.encoding);
+        }
+        
         return Ok(asm2::ResolutionState::Unresolved);
     }
 

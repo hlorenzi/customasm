@@ -221,3 +221,88 @@ pub fn test_file(filepath: &str)
         panic!("test failed");
     }
 }
+
+
+pub fn test_file2(filepath: &str)
+{
+    let path_prefix = std::path::PathBuf::from(&filepath)
+        .parent().unwrap()
+        .to_path_buf();
+
+	let contents = std::fs::read_to_string(&filepath).unwrap();
+	
+    let stripped_filename = std::path::PathBuf::from(&filepath)
+        .strip_prefix(&path_prefix).unwrap()
+        .to_string_lossy()
+        .into_owned();
+
+	let expectations = extract_expectations(&stripped_filename, &contents).unwrap();
+    if !expectations.has_any
+    {
+        return;
+    }
+
+	let mut fileserver = util::FileServerMock::new();
+    populate_fileserver(&mut fileserver, &path_prefix, "");
+
+	let mut report = diagn::Report::new();
+
+    let opts = asm2::AssemblyOptions {
+        debug_iterations: false,
+    };
+
+    let result = asm2::assemble(
+        &mut report,
+        &opts,
+        &mut fileserver,
+        &[stripped_filename]);
+
+    let output = result.output
+        .unwrap_or_else(|| util::BitVec::new());
+
+	let mut msgs = Vec::<u8>::new();
+	report.print_all(&mut msgs, &fileserver);
+    print!("{}", String::from_utf8(msgs).unwrap());
+    
+    let mut has_msg_mismatch = false;
+    for msg in &expectations.messages
+    {
+        if !report.has_message_at(&fileserver, &msg.file, msg.kind, msg.line, &msg.excerpt)
+        {
+            println!("\n\
+                > test failed -- missing diagnostics message\n\
+                > expected: `{}` at file `{}`, line {}\n",
+                msg.excerpt, msg.file, msg.line + 1);
+
+            has_msg_mismatch = true;
+        }
+    }
+    
+    if has_msg_mismatch
+    {
+        println!("got output: 0x{:x}", &output);
+        panic!("test failed");
+    }
+
+    if expectations.messages.len() != report.len_with_inner()
+    {
+        println!("\n\
+            > test failed -- diagnostics mismatch\n\
+            > expected {} messages, got {}\n",
+            expectations.messages.len(), report.len());
+            
+        println!("got output: 0x{:x}", &output);
+        panic!("test failed");
+    }
+    
+    if format!("{:x}", output) != format!("{:x}", expectations.output)
+    {
+        println!("\n\
+            > test failed -- output mismatch\n\
+            > got:      0x{:x}\n\
+            > expected: 0x{:x}\n",
+            &output, &expectations.output);
+            
+        panic!("test failed");
+    }
+}
