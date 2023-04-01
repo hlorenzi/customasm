@@ -32,13 +32,19 @@ fn generate_tests()
 }
 
 
-fn generate_tests_from_folder(f: &mut dyn std::io::Write, folder: &std::path::Path, test_name: &String)
+fn generate_tests_from_folder(
+    f: &mut dyn std::io::Write,
+    folder: &std::path::Path,
+    test_name: &String)
 {
     for entry in std::fs::read_dir(folder).unwrap()
     {
         let entry = entry.unwrap();
         let path = entry.path();
-        let file_stem = path.file_stem().unwrap().to_string_lossy();
+        let file_stem = path.file_stem()
+            .unwrap()
+            .to_string_lossy();
+
         println!("cargo:rerun-if-changed={}", path.to_string_lossy());
 
         if path.is_file()
@@ -74,7 +80,10 @@ fn generate_tests_from_folder(f: &mut dyn std::io::Write, folder: &std::path::Pa
             new_test_name.push_str(&file_stem);
             new_test_name.push_str("_");
 
-            generate_tests_from_folder(f, &path, &new_test_name);
+            generate_tests_from_folder(
+                f,
+                &path,
+                &new_test_name);
         }
     }
 }

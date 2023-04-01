@@ -6,7 +6,7 @@ pub struct Bankdef
 {
     pub item_ref: util::ItemRef<Self>,
     pub addr_unit: usize,
-    pub label_align: usize,
+    pub label_align: Option<usize>,
 	pub addr_start: util::BigInt,
     pub size: Option<usize>,
 	pub output_offset: Option<usize>,
@@ -26,7 +26,7 @@ pub fn define(
     let initial_bankdef = Bankdef {
         item_ref: initial_item_ref,
         addr_unit: 8,
-        label_align: 0,
+        label_align: None,
         addr_start: util::BigInt::new(0, None),
         size: None,
         output_offset: Some(0),
@@ -57,8 +57,8 @@ pub fn define(
             
             let label_align = match &node.label_align
             {
-                None => 0,
-                Some(expr) => expr.eval_usize(report, &mut provider)?,
+                None => None,
+                Some(expr) => Some(expr.eval_usize(report, &mut provider)?),
             };
             
             let addr_start = match &node.addr_start

@@ -1,1 +1,0 @@
-#d8 2 > 1 ; error: wrong type

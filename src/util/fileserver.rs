@@ -1,3 +1,4 @@
+use crate::*;
 use crate::diagn::{Span, RcReport};
 use crate::util::CharCounter;
 use std::collections::HashMap;
@@ -14,11 +15,39 @@ pub trait FileServer
 	fn get_bytes(&self, report: RcReport, filename: &str, span: Option<&Span>) -> Result<Vec<u8>, ()>;
 	
 	
+	fn get_bytes2(
+		&self,
+		report: &mut diagn::Report,
+		span: Option<&Span>,
+		filename: &str)
+		-> Result<Vec<u8>, ()>;
+
+
 	fn get_chars(&self, report: RcReport, filename: &str, span: Option<&Span>) -> Result<Vec<char>, ()>
 	{
 		let bytes = self.get_bytes(report, filename, span)?;
 		
 		Ok(String::from_utf8_lossy(&bytes).chars().collect())
+	}
+	
+	
+	fn get_chars2(
+		&self,
+		report: &mut diagn::Report,
+		span: Option<&diagn::Span>,
+		filename: &str)
+		-> Result<Vec<char>, ()>
+	{
+		let bytes = self.get_bytes2(
+			report,
+			span,
+			filename)?;
+
+		let string = String::from_utf8_lossy(&bytes)
+			.chars()
+			.collect();
+		
+		Ok(string)
 	}
 	
 	
@@ -94,6 +123,32 @@ impl FileServer for FileServerMock
 			Some(bytes) => Ok(bytes.clone())
 		}
 	}
+
+
+	fn get_bytes2(
+		&self,
+		report: &mut diagn::Report,
+		span: Option<&diagn::Span>,
+		filename: &str)
+		-> Result<Vec<u8>, ()>
+	{
+		match self.files.get(filename)
+		{
+			Some(bytes) => Ok(bytes.clone()),
+
+			None =>
+			{
+				report_error(
+					report,
+					span,
+					format!(
+						"file not found: `{}`",
+						filename));
+
+				return Err(());
+			}
+		}
+	}
 	
 	
 	fn write_bytes(&mut self, _report: RcReport, filename: &str, data: &Vec<u8>, _span: Option<&Span>) -> Result<(), ()>
@@ -132,6 +187,66 @@ impl FileServer for FileServerReal
 			Err(err) => Err(error(report, format!("could not read file `{}`: {}", filename, err), span))
 		}
 	}
+
+
+	fn get_bytes2(
+		&self,
+		report: &mut diagn::Report,
+		span: Option<&diagn::Span>,
+		filename: &str)
+		-> Result<Vec<u8>, ()>
+	{
+		let filename_path = &Path::new(filename);
+		
+		if !filename_path.exists()
+		{
+			report_error(
+				report,
+				span,
+				format!(
+					"file not found: `{}`",
+					filename));
+			
+			return Err(());
+		}
+		
+		let mut file = {
+			match File::open(filename_path)
+			{
+				Ok(file) => file,
+				Err(err) =>
+				{
+					report_error(
+						report,
+						span,
+						format!(
+							"could not open file `{}`: {}",
+							filename,
+							err));
+					
+					return Err(());
+				}
+			}
+		};
+
+		let mut vec = Vec::new();
+		match file.read_to_end(&mut vec)
+		{
+			Ok(_) => Ok(vec),
+			Err(err) =>
+			{
+				report_error(
+					report,
+					span,
+					format!(
+						"could not read file `{}`: {}",
+						filename,
+						err));
+				
+				return Err(());
+			}
+		}
+	}
 	
 	
 	fn write_bytes(&mut self, report: RcReport, filename: &str, data: &Vec<u8>, span: Option<&Span>) -> Result<(), ()>
@@ -160,4 +275,21 @@ where S: Into<String>
 		{ report.error_span(descr, span); }
 	else
 		{ report.error(descr); }
+}
+
+
+fn report_error<S>(
+	report: &mut diagn::Report,
+	span: Option<&diagn::Span>,
+	descr: S)
+	where S: Into<String>
+{
+	if let Some(span) = span
+	{
+		report.error_span(descr, span);
+	}
+	else
+	{
+		report.error(descr);
+	}
 }

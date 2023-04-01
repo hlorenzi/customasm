@@ -133,6 +133,20 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
                     self.symbol_ctx = &decl.ctx;
 
+                    // Honor `labelalign`
+                    let bankdef = defs.bankdefs.get(self.bank_ref);
+                    if let Some(label_align) = bankdef.label_align
+                    {
+                        if decl.depth == 0
+                        {
+                            let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+
+                            cur_bank_data.cur_position += bits_until_alignment(
+                                cur_bank_data.cur_position,
+                                label_align);
+                        }
+                    }
+
                     self.index += 1;
                     ResolverNode::Symbol(ast_symbol)
                 }
@@ -260,25 +274,9 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
                 let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
 
-                if align.align_size != 0
-                {
-                    let bits_until_aligned = {
-                        let excess_bits =
-                            cur_bank_data.cur_position %
-                            align.align_size;
-                            
-                        if excess_bits != 0
-                        {
-                            align.align_size - excess_bits
-                        }
-                        else
-                        {
-                            0
-                        }
-                    };
-
-                    cur_bank_data.cur_position += bits_until_aligned;
-                }
+                cur_bank_data.cur_position += bits_until_alignment(
+                    cur_bank_data.cur_position,
+                    align.align_size);
             }
 
             asm2::AstAny::DirectiveAddr(ast_addr) =>
@@ -308,6 +306,29 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
             _ => {}
         }
+    }
+}
+
+
+fn bits_until_alignment(
+    position: usize,
+    alignment: usize)
+    -> usize
+{
+    if alignment == 0
+    {
+        return 0;
+    }
+
+    let excess_bits = position % alignment;
+        
+    if excess_bits != 0
+    {
+        alignment - excess_bits
+    }
+    else
+    {
+        0
     }
 }
 

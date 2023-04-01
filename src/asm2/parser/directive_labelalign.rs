@@ -11,16 +11,21 @@ pub struct AstDirectiveLabelAlign
 
 pub fn parse(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker,
+    _walker: &mut syntax::TokenWalker,
     header_span: diagn::Span)
     -> Result<AstDirectiveLabelAlign, ()>
 {
-    let expr = expr::parse(report, walker)?;
+    report.error_span(
+        "standalone `#labelalign` is deprecated; use it inside a `#bankdef`",
+        &header_span);
+    
+    Err(())
+    /*let expr = expr::parse(report, walker)?;
 
     walker.expect_linebreak(report)?;
 
     Ok(AstDirectiveLabelAlign {
         header_span,
         expr,
-    })
+    })*/
 }

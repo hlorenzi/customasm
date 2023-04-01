@@ -3,4 +3,4 @@
     test => 1 > 2
 }
 
-test ; error: wrong type
+test ; error: failed / error:_:3: expected integer

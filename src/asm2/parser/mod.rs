@@ -124,10 +124,10 @@ pub fn parse_and_resolve_includes<S>(
     -> Result<AstTopLevel, ()>
     where S: std::borrow::Borrow<str>
 {
-    let chars = fileserver.get_chars(
-        diagn::RcReport::new(),
-        root_filename.borrow(),
-        None)?;
+    let chars = fileserver.get_chars2(
+        report,
+        None,
+        root_filename.borrow())?;
 
     let tokens = syntax::tokenize(
         diagn::RcReport::new(),

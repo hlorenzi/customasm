@@ -1,1 +1,0 @@
-#d 10 ; error: infer size

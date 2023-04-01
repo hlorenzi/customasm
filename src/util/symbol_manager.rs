@@ -16,6 +16,7 @@ pub struct SymbolDecl<T>
 {
     pub span: diagn::Span,
     pub name: String,
+    pub depth: usize,
     pub ctx: SymbolContext,
     children: std::collections::HashMap<String, util::ItemRef<T>>,
 }
@@ -320,8 +321,9 @@ impl<T> SymbolManager<T>
         };
 
         self.decls.push(SymbolDecl {
-            name: full_name.clone(),
             span: span.clone(),
+            name: full_name.clone(),
+            depth: hierarchy_level,
             ctx: new_ctx.clone(),
             children: std::collections::HashMap::new(),
         });

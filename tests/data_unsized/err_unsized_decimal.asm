@@ -1,0 +1,1 @@
+#d 10 ; error: definite size

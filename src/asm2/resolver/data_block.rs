@@ -72,14 +72,33 @@ pub fn resolve_data_element(
         if ctx.is_last_iteration &&
             bigint_size > size
         {
-            report.error_span(
-                format!(
-                    "value size (= {}) out of range for directive size (= {})",
-                    bigint_size,
-                    size),
+            report.push_parent(
+                "value out of range for directive",
                 expr.span());
 
+            report.note(
+                format!(
+                    "data directive has size {}, got size {}",
+                    size,
+                    bigint_size));
+
+            report.pop_parent();
+
             return Ok(asm2::ResolutionState::Unresolved);
+        }
+    }
+
+
+    if ctx.is_last_iteration
+    {
+        if ast_data.elem_size.is_none() &&
+            bigint.size.is_none()
+        {
+            report.error_span(
+                "data element has no definite size",
+                expr.span());
+
+            return Err(());
         }
     }
 
