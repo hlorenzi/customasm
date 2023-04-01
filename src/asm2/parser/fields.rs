@@ -46,7 +46,7 @@ pub fn parse(
 
 
         let maybe_expr = {
-            if deprecated_hash ||
+            if (deprecated_hash && !walker.next_is_linebreak()) ||
                 walker.maybe_expect(syntax::TokenKind::Equal).is_some()
             {
                 let expr = expr::parse(report, walker)?;

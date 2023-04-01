@@ -70,12 +70,23 @@ pub fn resolve_addr(
             return Err(());
         }
 
-        else if let Some(size) = bank.addr_size
-        {
-            let maybe_addr_delta =
-                (&addr.address - &bank.addr_start)
-                .checked_to_usize();
+        let addr_size = &addr.address - &bank.addr_start;
 
+        let maybe_addr_delta =
+            (&addr_size * &util::BigInt::new(bank.addr_unit, None))
+            .checked_to_usize();
+
+        if maybe_addr_delta.is_none()
+        {
+            report.error_span(
+                "value is out of supported range",
+                &ast_addr.expr.span());
+
+            return Err(());
+        }
+
+        else if let Some(size) = bank.size
+        {
             if maybe_addr_delta.is_none() ||
                 maybe_addr_delta.unwrap() >= size
             {

@@ -420,7 +420,7 @@ impl Report
 			{ return false; }
 			
 		if msg.span.is_none()
-			{ return false; }
+			{ return true; }
 			
 		let span = msg.span.as_ref().unwrap();
 		

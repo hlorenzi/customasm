@@ -34,9 +34,11 @@ pub fn resolve_res(
         }
     };
 
+    let bank = defs.bankdefs.get(ctx.bank_ref);
     let res = defs.res_directives.get_mut(item_ref);
     let prev_value = res.reserve_size.clone();
-    res.reserve_size = value;
+    // FIXME: Multiplication can overflow
+    res.reserve_size = value * bank.addr_unit;
 
 
     if res.reserve_size != prev_value

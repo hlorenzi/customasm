@@ -1,0 +1,3 @@
+x = 0x25
+#bankdef a_new_bank {}
+; = 0x

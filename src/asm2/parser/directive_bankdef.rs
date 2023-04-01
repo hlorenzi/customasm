@@ -11,6 +11,7 @@ pub struct AstDirectiveBankdef
     pub addr_unit: Option<expr::Expr>,
     pub label_align: Option<expr::Expr>,
 	pub addr_start: Option<expr::Expr>,
+	pub addr_end: Option<expr::Expr>,
 	pub addr_size: Option<expr::Expr>,
 	pub output_offset: Option<expr::Expr>,
 	pub fill: bool,
@@ -45,6 +46,10 @@ pub fn parse(
         report,
         "addr")?;
         
+    let addr_end = fields.extract_as_optional_expr(
+        report,
+        "addr_end")?;
+        
     let addr_size = fields.extract_as_optional_expr(
         report,
         "size")?;
@@ -70,6 +75,7 @@ pub fn parse(
         addr_unit,
         label_align,
         addr_start,
+        addr_end,
         addr_size,
         output_offset,
         fill,

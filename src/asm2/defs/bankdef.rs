@@ -8,7 +8,7 @@ pub struct Bankdef
     pub addr_unit: usize,
     pub label_align: usize,
 	pub addr_start: util::BigInt,
-	pub addr_size: Option<usize>,
+    pub size: Option<usize>,
 	pub output_offset: Option<usize>,
 	pub fill: bool,
 }
@@ -28,7 +28,7 @@ pub fn define(
         addr_unit: 8,
         label_align: 0,
         addr_start: util::BigInt::new(0, None),
-        addr_size: None,
+        size: None,
         output_offset: Some(0),
         fill: false,
     };
@@ -73,6 +73,50 @@ pub fn define(
                 Some(expr) => Some(expr.eval_usize(report, &mut provider)?),
             };
             
+            let addr_end = match &node.addr_end
+            {
+                None => None,
+                Some(expr) => Some(expr.eval_bigint(report, &mut provider)?),
+            };
+
+            let addr_size = {
+                match (addr_size, addr_end)
+                {
+                    (None, None) => None,
+                    (Some(size), None) => Some(size),
+                    (None, Some(end)) =>
+                    {
+                        let maybe_size =
+                            (&end - &addr_start).checked_to_usize();
+                        
+                        match maybe_size
+                        {
+                            Some(size) => Some(size),
+                            None =>
+                            {
+                                report.error_span(
+                                    "value out of supported range",
+                                    node.addr_end.as_ref().unwrap().span());
+        
+                                return Err(());
+                            }
+                        }
+                    }
+                    (Some(_), Some(_)) =>
+                    {
+                        report.error_span(
+                            "both `addr_end` and `size` defined",
+                            &node.header_span);
+
+                        return Err(());
+                    }
+                }
+            };
+
+            // FIXME: Multiplication can overflow
+            let size = addr_size
+                .map(|s| s * addr_unit);
+            
             let output_offset = match &node.output_offset
             {
                 None => None,
@@ -86,7 +130,7 @@ pub fn define(
                 addr_unit,
                 label_align,
                 addr_start,
-                addr_size,
+                size,
                 output_offset,
                 fill,
             };

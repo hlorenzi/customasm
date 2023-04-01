@@ -66,7 +66,7 @@ impl BitVec
             if let Some(other_offset) = other.offset
             {
                 if offset < other_offset + other.size &&
-                    offset + size >= other_offset
+                    offset + size > other_offset
                 {
                     report.push_parent(
                         "output overlap",

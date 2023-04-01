@@ -247,13 +247,10 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let item_ref = ast_res.item_ref.unwrap();
                 let res = defs.res_directives.get(item_ref);
 
-                let bank = defs.bankdefs.get(self.bank_ref);
                 let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
 
                 // Advance the current bank's position
-                cur_bank_data.cur_position +=
-                    res.reserve_size *
-                    bank.addr_unit;
+                cur_bank_data.cur_position += res.reserve_size;
             }
 
             asm2::AstAny::DirectiveAlign(ast_align) =>
@@ -297,7 +294,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                     {
                         (&addr.address - &bank.addr_start)
                             .checked_to_usize()
-                            .unwrap()
+                            .unwrap_or(0)
                             * bank.addr_unit
                     }
                     else

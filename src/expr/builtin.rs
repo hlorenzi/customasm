@@ -89,11 +89,15 @@ pub fn eval_builtin_le(
     
     if bigint.size.unwrap() % 8 != 0
     {
-        info.report.error_span(
-            format!(
-                "argument to `le` must have a size multiple of 8 (got size {})",
-                bigint.size.unwrap()),
-            info.span);
+        info.report.push_parent(
+            "argument to `le` must have a size multiple of 8",
+            info.args[0].span);
+
+        info.report.note(format!(
+            "got size {}",
+            bigint.size.unwrap()));
+
+        info.report.pop_parent();
         
         return Err(());
     }
