@@ -101,11 +101,14 @@ instructions into binary code:
 Usage: customasm [options] <asm-file-1> ... <asm-file-N>
 
 Options:
-    -f, --format FORMAT The format of the output file. Possible formats:
-                        binary, annotated, annotatedbin, binstr, binline,
-                        hexstr, hexline, bindump, hexdump, mif, intelhex,
-                        deccomma, hexcomma, decc, hexc, logisim8, logisim16,
-                        addrspan
+    -d, --disassemble [DISASSEMBLE]
+                        Disassemble
+    -f, --format FORMAT The format of the output (input for disassembly,
+                        compatible modes have a star) file. Possible formats:
+                        binary*, annotated, annotatedbin, binstr*, binline*,
+                        hexstr*, hexline*, bindump, hexdump, mif, intelhex,
+                        deccomma, hexcomma, decc, hexc, binvhdl, hexvhdl,
+                        logisim8, logisim16, addrspan
     -o, --output [FILE] The name of the output file.
         --symbol-format SYMBOL-FORMAT
                         The format of the symbol file. Possible formats:
