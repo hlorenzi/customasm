@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-    - 'v*'
+      - 'v*'
 
 jobs:
   test:
@@ -14,40 +14,40 @@ jobs:
       help: ${{ steps.help.outputs.help }}
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@master
+      - name: Checkout code
+        uses: actions/checkout@master
 
-    - name: Install latest Rust stable
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: nightly
-        override: true
-        target: x86_64-unknown-linux-gnu
+      - name: Install latest Rust stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          target: x86_64-unknown-linux-gnu
 
-    - name: Build
-      uses: actions-rs/cargo@v1
-      with:
-        use-cross: false
-        command: build
-        args: --release --verbose --target=x86_64-unknown-linux-gnu
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: build
+          args: --release --verbose --target=x86_64-unknown-linux-gnu
 
-    - name: Run tests
-      uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: --verbose --no-fail-fast
-      env:
-        CARGO_INCREMENTAL: '0'
-        RUSTFLAGS: '-Zprofile'
+      - name: Run tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --no-fail-fast
+        env:
+          CARGO_INCREMENTAL: '0'
+          RUSTFLAGS: '-Zprofile'
 
-    - name: Get help message
-      id: help
-      run: |
-        out="$(./target/x86_64-unknown-linux-gnu/release/customasm -hq)"
-        out="${out//'%'/'%25'}"
-        out="${out//$'\n'/'%0A'}"
-        out="${out//$'\r'/'%0D'}"
-        echo "::set-output name=help::${out}"
+      - name: Get help message
+        id: help
+        run: |
+          out="$(./target/x86_64-unknown-linux-gnu/release/customasm -hq)"
+          out="${out//'%'/'%25'}"
+          out="${out//$'\n'/'%0A'}"
+          out="${out//$'\r'/'%0D'}"
+          echo "::set-output name=help::${out}"
 
     # - name: Get test coverage
     #   id: coverage
@@ -66,28 +66,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@master
+      - name: Checkout code
+        uses: actions/checkout@master
 
-    - name: Install latest Rust stable
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-        target: x86_64-pc-windows-gnu
+      - name: Install latest Rust stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          target: x86_64-pc-windows-gnu
 
-    - name: Build
-      uses: actions-rs/cargo@v1
-      with:
-        use-cross: true
-        command: build
-        args: --release --verbose --target=x86_64-pc-windows-gnu
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --verbose --target=x86_64-pc-windows-gnu
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: x86_64-pc-windows-gnu.exe
-        path: ./target/x86_64-pc-windows-gnu/release/customasm.exe
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: x86_64-pc-windows-gnu.exe
+          path: ./target/x86_64-pc-windows-gnu/release/customasm.exe
 
   linux_build:
     name: Linux Build
@@ -96,28 +96,28 @@ jobs:
     container: quay.io/pypa/manylinux2014_x86_64
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@master
+      - name: Checkout code
+        uses: actions/checkout@master
 
-    - name: Install latest Rust stable
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-        target: x86_64-unknown-linux-gnu
+      - name: Install latest Rust stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          target: x86_64-unknown-linux-gnu
 
-    - name: Build
-      uses: actions-rs/cargo@v1
-      with:
-        use-cross: false
-        command: build
-        args: --release --verbose --target=x86_64-unknown-linux-gnu
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: false
+          command: build
+          args: --release --verbose --target=x86_64-unknown-linux-gnu
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: x86_64-unknown-linux-gnu
-        path: ./target/x86_64-unknown-linux-gnu/release/customasm
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: x86_64-unknown-linux-gnu
+          path: ./target/x86_64-unknown-linux-gnu/release/customasm
 
   web_build:
     name: GitHub Pages (Web) Build
@@ -125,40 +125,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@master
+      - name: Checkout code
+        uses: actions/checkout@master
 
-    - name: Install latest Rust stable
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-        target: wasm32-unknown-unknown
+      - name: Install latest Rust stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          target: wasm32-unknown-unknown
 
-    - name: Build
-      uses: actions-rs/cargo@v1
-      with:
-        use-cross: true
-        command: build
-        args: --lib --release --verbose --target wasm32-unknown-unknown
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --lib --release --verbose --target wasm32-unknown-unknown
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: wasm32-unknown-unknown.wasm
-        path: ./target/wasm32-unknown-unknown/release/customasm.wasm
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: wasm32-unknown-unknown.wasm
+          path: ./target/wasm32-unknown-unknown/release/customasmlib.wasm
 
-    - name: Copy artifact
-      run: |
-        cp ./target/wasm32-unknown-unknown/release/customasm.wasm ./web
-        mkdir build
-        cp -r ./web ./build/web
+      - name: Copy artifact
+        run: |
+          cp ./target/wasm32-unknown-unknown/release/customasmlib.wasm ./web
+          mkdir build
+          cp -r ./web ./build/web
 
-    - name: Upload pages artifact
-      uses: actions/upload-pages-artifact@v0
-      with:
-        path: ./build
-        retention-days: 1
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v0
+        with:
+          path: ./build
+          retention-days: 1
 
   standalone_web_build:
     name: Standalone Web Build
@@ -166,30 +166,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@master
+      - name: Checkout code
+        uses: actions/checkout@master
 
-    - name: Download Web Build
-      uses: actions/download-artifact@v3
-      with:
-        name: wasm32-unknown-unknown.wasm
-        path: ./web
+      - name: Download Web Build
+        uses: actions/download-artifact@v3
+        with:
+          name: wasm32-unknown-unknown.wasm
+          path: ./web
 
-    - name: Setup node
-      uses: actions/setup-node@v3
-      with:
-        node-version: 16
-    - name: Install node modules
-      run: npm i node-html-parser minify
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Install node modules
+        run: npm i node-html-parser minify
 
-    - name: Collect files
-      run: node ./htmlCollector.js ./web/index.html ./web/customasm.html
+      - name: Collect files
+        run: node ./htmlCollector.js ./web/index.html ./web/customasm.html
 
-    - name: Upload artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: any-unknown-any-web.html
-        path: ./web/customasm.html
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: any-unknown-any-web.html
+          path: ./web/customasm.html
 
   deploy:
     name: Deploy to GitHub Pages
@@ -224,59 +224,59 @@ jobs:
       url: ${{ steps.create_release.outputs.html_url }}
 
     steps:
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@latest
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: ${{ github.ref }}
-        # body: |
-        #   New release!
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          # body: |
+          #   New release!
 
-        #   [![Coverage Status](https://coveralls.io/repos/github/JosephAbbey/customasm/badge.svg?branch=${{ github.ref }})](https://coveralls.io/github/JosephAbbey/customasm?branch=${{ github.ref }})
+          #   [![Coverage Status](https://coveralls.io/repos/github/JosephAbbey/customasm/badge.svg?branch=${{ github.ref }})](https://coveralls.io/github/JosephAbbey/customasm?branch=${{ github.ref }})
 
-        #   - Try on the web: ${{ needs.deploy.outputs.page_url }}
+          #   - Try on the web: ${{ needs.deploy.outputs.page_url }}
 
-        #   ```
-        #   ${{ needs.test.outputs.help }}
-        #   ```
-        body: |
-          New release!
+          #   ```
+          #   ${{ needs.test.outputs.help }}
+          #   ```
+          body: |
+            New release!
 
-          - Try on the web: ${{ needs.deploy.outputs.page_url }}web
+            - Try on the web: ${{ needs.deploy.outputs.page_url }}web
 
-          ```
-          ${{ needs.test.outputs.help }}
-          ```
-        draft: false
-        prerelease: false
+            ```
+            ${{ needs.test.outputs.help }}
+            ```
+          draft: false
+          prerelease: false
 
-    - name: Download Windows Build
-      uses: actions/download-artifact@v3
-      with:
-        name: x86_64-pc-windows-gnu.exe
+      - name: Download Windows Build
+        uses: actions/download-artifact@v3
+        with:
+          name: x86_64-pc-windows-gnu.exe
 
-    - name: Download Linux Build
-      uses: actions/download-artifact@v3
-      with:
-        name: x86_64-unknown-linux-gnu
+      - name: Download Linux Build
+        uses: actions/download-artifact@v3
+        with:
+          name: x86_64-unknown-linux-gnu
 
-    - name: Download Standalone Web Build
-      uses: actions/download-artifact@v3
-      with:
-        name: any-unknown-any-web.html
+      - name: Download Standalone Web Build
+        uses: actions/download-artifact@v3
+        with:
+          name: any-unknown-any-web.html
 
-    - name: Prepare Release asset
-      run: zip -r customasm.zip .
+      - name: Prepare Release asset
+        run: zip -r customasm.zip .
 
-    - name: Upload Release asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./customasm.zip
-        asset_name: customasm.zip
-        asset_content_type: application/zip
+      - name: Upload Release asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./customasm.zip
+          asset_name: customasm.zip
+          asset_content_type: application/zip

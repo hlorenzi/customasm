@@ -12,8 +12,8 @@ function main()
 	window.onkeydown = onKeyDown
 	window.onbeforeunload = onBeforeUnload
 	
-	//? COLLECTION FROM "./customasm.wasm" AS (BUFFER) WITH 'WASM' [
-	fetch('./customasm.wasm').then((r) => r.arrayBuffer())
+	//? COLLECTION FROM "./customasmlib.wasm" AS (BUFFER) WITH 'WASM' [
+	fetch('./customasmlib.wasm').then((r) => r.arrayBuffer())
 	//? ]
 		.then(r => WebAssembly.instantiate(r))
 		.then(wasm =>
