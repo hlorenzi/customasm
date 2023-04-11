@@ -8,6 +8,12 @@ pub struct Assembler {
     pub state: State,
 }
 
+pub struct Disassembler {
+    pub rulesets: Vec<asm::Ruleset>,
+    pub active_rulesets: Vec<RulesetRef>,
+    pub binary: util::BitVec,
+}
+
 pub struct State {
     pub is_first_pass: bool,
     pub banks: Vec<asm::Bank>,
@@ -53,6 +59,173 @@ pub struct AssemblyOutput {
     pub binary: util::BitVec,
     pub state: State,
     pub iterations: usize,
+}
+
+pub struct DisassemblyOutput {
+    pub assembly: String,
+}
+
+impl Disassembler {
+    pub fn new(
+        rulesets: Vec<asm::Ruleset>,
+        active_rulesets: Vec<asm::RulesetRef>,
+        binary: util::BitVec,
+    ) -> Disassembler {
+        Disassembler {
+            rulesets,
+            active_rulesets,
+            binary,
+        }
+    }
+
+    pub fn disassemble(self, report: diagn::RcReport) -> Result<DisassemblyOutput, ()> {
+        report.warning("Disassembly is not stable, there may be issues and many features have not yet been implemented.");
+
+        // dbg!("{:#?}", self.rulesets);
+        // dbg!("{:#?}", self.active_rulesets);
+        let mut assembly = "disassembled:\n".to_string();
+        let binary = self.binary.bits;
+        let mut g_index = 0usize;
+
+        while g_index < binary.len() {
+            'outer: {
+                for rs in self.active_rulesets.clone() {
+                    for rule in self.rulesets[rs.index].rules.clone() {
+                        fn check(
+                            report: diagn::RcReport,
+                            rule: &asm::Rule,
+                            index: &mut usize,
+                            parameters: &mut Vec<String>,
+                            binary: &[bool],
+                            production: &Box<expr::Expr>,
+                        ) -> bool {
+                            match &**production {
+                                expr::Expr::Literal(_, expr::Value::Integer(value)) => {
+                                    for i in (0usize..value.size.expect("")).rev() {
+                                        if value.get_bit(i) != binary[*index] {
+                                            return false;
+                                        }
+                                        *index += 1;
+                                    }
+                                    true
+                                }
+                                expr::Expr::Literal(_, _) => {
+                                    report.error("TODO: Unsupported binary pattern.");
+                                    false
+                                }
+                                expr::Expr::Variable(_, hierarchy_level, ref hierarchy) => {
+                                    if *hierarchy_level == 0 && hierarchy.len() == 1 {
+                                        let p = rule
+                                            .parameters
+                                            .iter()
+                                            .position(|p| p.name == hierarchy[0])
+                                            .expect("");
+                                        match rule.parameters[p].typ {
+                                            asm::PatternParameterType::Integer(size)
+                                            | asm::PatternParameterType::Signed(size)
+                                            | asm::PatternParameterType::Unsigned(size) => {
+                                                let mut b = util::BitVec::new();
+                                                for i in 0..size {
+                                                    b.write(i, binary[*index]);
+                                                    *index += 1;
+                                                }
+                                                parameters[p] =
+                                                    "0x".to_string() + &b.format_hexstr();
+                                                true
+                                            }
+                                            asm::PatternParameterType::Ruleset(_) => {
+                                                report.error("TODO: Unsupported binary pattern.");
+                                                false
+                                            }
+                                            asm::PatternParameterType::Unspecified => {
+                                                report.error(
+                                                    "Unimplemented: Unsupported binary pattern.",
+                                                );
+                                                false
+                                            }
+                                        }
+                                    } else {
+                                        report.error("Unimplemented: Unsupported binary pattern.");
+                                        false
+                                    }
+                                }
+                                expr::Expr::UnaryOp(_, _, _, _) => {
+                                    report.error("TODO: Unsupported binary pattern.");
+                                    false
+                                }
+                                expr::Expr::BinaryOp(
+                                    _,
+                                    _,
+                                    expr::BinaryOp::Concat,
+                                    ref lhs,
+                                    ref rhs,
+                                ) => {
+                                    check(report.clone(), rule, index, parameters, binary, lhs)
+                                        && check(report, rule, index, parameters, binary, rhs)
+                                }
+                                expr::Expr::BinaryOp(_, _, _, _, _) => {
+                                    report.error("TODO: Unsupported binary pattern.");
+                                    false
+                                }
+                                expr::Expr::TernaryOp(_, _, _, _) => {
+                                    report.error("TODO: Unsupported binary pattern.");
+                                    false
+                                }
+                                expr::Expr::BitSlice(_, _, _, _, ref inner) => {
+                                    check(report, rule, index, parameters, binary, inner)
+                                }
+                                expr::Expr::SoftSlice(_, _, _, _, ref inner) => {
+                                    check(report, rule, index, parameters, binary, inner)
+                                }
+                                expr::Expr::Block(_, _) => {
+                                    report.error("TODO: Unsupported binary pattern.");
+                                    false
+                                }
+                                expr::Expr::Call(_, _, _) => {
+                                    report.error("TODO: Unsupported binary pattern.");
+                                    false
+                                }
+                                expr::Expr::Asm(_, _) => {
+                                    report.error("TODO: Unsupported binary pattern.");
+                                    false
+                                }
+                            }
+                        }
+                        let mut index = g_index;
+                        let mut parameters: Vec<String> =
+                            vec!["".to_string(); rule.parameters.len()];
+                        if check(
+                            report.clone(),
+                            &rule,
+                            &mut index,
+                            &mut parameters,
+                            &binary,
+                            &Box::new(rule.production.clone()),
+                        ) {
+                            // dbg!("{} {:?}", i, parameters);
+                            let mut instruction = String::new();
+                            for i in &rule.pattern {
+                                match i {
+                                    asm::PatternPart::Gap => instruction.push(' '),
+                                    asm::PatternPart::Exact(c) => instruction.push(*c),
+                                    asm::PatternPart::Parameter(p) => {
+                                        instruction += &parameters[*p]
+                                    }
+                                }
+                            }
+                            assembly += "    ";
+                            assembly += &instruction;
+                            assembly += "\n";
+                            g_index = index;
+                            break 'outer;
+                        }
+                    }
+                }
+                report.error("cannot disassemble instruction");
+            }
+        }
+        Ok(DisassemblyOutput { assembly })
+    }
 }
 
 impl Assembler {

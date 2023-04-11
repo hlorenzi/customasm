@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Rule {
     pub span: diagn::Span,
     pub pattern: Vec<PatternPart>,
@@ -8,13 +8,14 @@ pub struct Rule {
     pub production: expr::Expr,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PatternPart {
+    Gap,
     Exact(char),
     Parameter(usize),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PatternParameter {
     pub name: String,
     pub typ: PatternParameterType,
@@ -37,6 +38,10 @@ impl Rule {
             parameters: Vec::new(),
             production: expr::Expr::new_dummy(),
         }
+    }
+
+    pub fn pattern_add_gap(&mut self) {
+        self.pattern.push(PatternPart::Gap);
     }
 
     pub fn pattern_add_exact(&mut self, token: &syntax::Token) {

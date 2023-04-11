@@ -3,5 +3,18 @@
     "activityBar.background": "#093523",
     "titleBar.activeBackground": "#0D4A31",
     "titleBar.activeForeground": "#F3FDF9"
-  }
+  },
+  "cSpell.words": [
+    "aprox",
+    "bankdata",
+    "bitvec",
+    "customasmlib",
+    "elem",
+    "hlorenzi",
+    "invoc",
+    "labelalign",
+    "noemit",
+    "Ruleset",
+    "rulesets"
+  ]
 }

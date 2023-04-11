@@ -68,6 +68,10 @@ impl TokenKind {
         self == TokenKind::Whitespace || self == TokenKind::Comment || self == TokenKind::LineBreak
     }
 
+    pub fn ignorable_ws(self) -> bool {
+        self == TokenKind::Comment || self == TokenKind::LineBreak
+    }
+
     pub fn is_allowed_pattern_token(self) -> bool {
         self == TokenKind::Identifier
             || self == TokenKind::Number

@@ -286,6 +286,20 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn skip_ignorable_ws(&mut self) {
+        while self.index < self.tokens.len() && self.tokens[self.index].kind.ignorable_ws() {
+            if self.tokens[self.index].kind == TokenKind::LineBreak {
+                self.read_linebreak = true;
+            }
+
+            /*if self.tokens[self.index].kind == TokenKind::Comment &&
+            self.tokens[self.index].excerpt.as_ref().unwrap().chars().any(|c| c == '\n')
+            { self.read_linebreak = true; }*/
+
+            self.index += 1;
+        }
+    }
+
     pub fn advance(&mut self) -> Token {
         if self.is_at_partial() {
             panic!("at partial");
@@ -301,6 +315,24 @@ impl<'a> Parser<'a> {
 
         self.read_linebreak = false;
         self.skip_ignorable();
+        token
+    }
+
+    pub fn advance_ws(&mut self) -> Token {
+        if self.is_at_partial() {
+            panic!("at partial");
+        }
+
+        self.index_prev = self.index;
+
+        let token = self.tokens[self.index].clone();
+
+        if self.index < self.tokens.len() {
+            self.index += 1;
+        }
+
+        self.read_linebreak = false;
+        self.skip_ignorable_ws();
         token
     }
 
@@ -374,6 +406,24 @@ impl<'a> Parser<'a> {
             nth -= 1;
             index += 1;
             while index < self.tokens.len() && self.tokens[index].kind.ignorable() {
+                index += 1;
+            }
+        }
+
+        if index >= self.tokens.len() {
+            return false;
+        }
+
+        self.tokens[index].kind == kind
+    }
+
+    pub fn next_is_ws(&self, mut nth: usize, kind: TokenKind) -> bool {
+        let mut index = self.index;
+
+        while nth > 0 && index < self.tokens.len() {
+            nth -= 1;
+            index += 1;
+            while index < self.tokens.len() && self.tokens[index].kind.ignorable_ws() {
                 index += 1;
             }
         }

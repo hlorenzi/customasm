@@ -25,6 +25,7 @@ pub use self::rule::PatternPart;
 pub use self::rule::Rule;
 pub use self::ruleset::Ruleset;
 pub use self::state::Assembler;
+pub use self::state::Disassembler;
 pub use self::state::BankRef;
 pub use self::state::Context;
 pub use self::state::RuleRef;

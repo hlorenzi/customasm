@@ -2,7 +2,10 @@
 name = "customasm"
 version = "0.13.0"
 edition = "2021"
-authors = ["hlorenzi <https://hlorenzi.com>", "josephabbey <https://joseph.abbey1.org.uk>"]
+authors = [
+  "hlorenzi <https://hlorenzi.com>",
+  "josephabbey <https://joseph.abbey1.org.uk>",
+]
 description = "An assembler for custom, user-defined instruction sets!"
 homepage = "https://github.com/hlorenzi/customasm"
 repository = "https://github.com/hlorenzi/customasm"
@@ -15,7 +18,7 @@ build = "src/build.rs"
 
 [lib]
 crate-type = ["lib", "cdylib"]
-name = "customasm"
+name = "customasmlib"
 path = "src/lib.rs"
 
 [[bin]]
@@ -32,4 +35,4 @@ num-integer = { version = "0.1.45", default_features = false }
 sha2 = "0.10.5"
 
 [build-dependencies]
-vergen = { version="8.0.0", features=[ "build", "git", "gitcl", "cargo" ] }
+vergen = { version = "8.0.0", features = ["build", "git", "gitcl", "cargo"] }

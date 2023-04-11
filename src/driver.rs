@@ -1,5 +1,13 @@
-use crate::*;
+use crate::{asm::Disassembler, *};
 use getopts;
+
+enum InputFormat {
+    Binary,
+    BinStr,
+    BinLine,
+    HexStr,
+    HexLine,
+}
 
 enum OutputFormat {
     Binary,
@@ -76,6 +84,154 @@ fn drive_inner(
     let quiet = matches.opt_present("q");
     let out_stdout = matches.opt_present("p");
 
+    let max_iterations = match matches.opt_str("t") {
+        None => 10,
+        Some(t) => match t.parse::<usize>() {
+            Ok(t) => t,
+            Err(_) => {
+                report.error("invalid number of iterations");
+                return Err(true);
+            }
+        },
+    };
+
+    if matches.free.len() < 1 {
+        report.error("no input files");
+        return Err(true);
+    }
+
+    let main_asm_file = matches.free[0].clone();
+
+    let output_symbol_requested = matches.opt_present("s");
+    let output_requested = matches.opt_present("o");
+
+    let output_symbol_file = matches.opt_str("s");
+    let output_file = match matches.opt_str("o") {
+        Some(f) => Some(f),
+        None => {
+            if output_symbol_requested || output_symbol_file.is_some() {
+                None
+            } else {
+                match get_default_output_filename(
+                    report.clone(),
+                    &main_asm_file,
+                    matches.opt_present("d"),
+                ) {
+                    Ok(f) => Some(f),
+                    Err(_) => None,
+                }
+            }
+        }
+    };
+
+    if !quiet {
+        print_version();
+    }
+
+    let mut assembler = asm::Assembler::new();
+    for filename in matches.free.clone() {
+        if !quiet {
+            println!("assembling `{}`...", filename);
+        }
+
+        assembler.register_file(filename);
+    }
+
+    let output = assembler
+        .assemble(report.clone(), fileserver, max_iterations)
+        .map_err(|_| false)?;
+
+    match matches.opt_str("d") {
+        None => {}
+        Some(f) => {
+            let in_format = match matches.opt_str("f").as_ref().map(|s| s.as_ref()) {
+                Some("binary") => InputFormat::Binary,
+                Some("binstr") => InputFormat::BinStr,
+                Some("binline") => InputFormat::BinLine,
+                Some("hexstr") => InputFormat::HexStr,
+                Some("hexline") => InputFormat::HexLine,
+
+                None => InputFormat::Binary,
+
+                Some(_) => {
+                    report.error("invalid input format");
+                    return Err(true);
+                }
+            };
+
+            let out = Disassembler::new(
+                output.state.rulesets,
+                output.state.active_rulesets,
+                match in_format {
+                    InputFormat::Binary => util::BitVec::parse_binary(
+                        fileserver
+                            .get_bytes(report.clone(), &f, None)
+                            .map_err(|_| false)?,
+                    ),
+                    InputFormat::BinStr => util::BitVec::parse_binstr(String::from_iter(
+                        fileserver
+                            .get_chars(report.clone(), &f, None)
+                            .map_err(|_| false)?,
+                    )),
+                    InputFormat::BinLine => util::BitVec::parse_binline(String::from_iter(
+                        fileserver
+                            .get_chars(report.clone(), &f, None)
+                            .map_err(|_| false)?,
+                    )),
+                    InputFormat::HexStr => util::BitVec::parse_hexstr(String::from_iter(
+                        fileserver
+                            .get_chars(report.clone(), &f, None)
+                            .map_err(|_| false)?,
+                    )),
+                    InputFormat::HexLine => util::BitVec::parse_hexline(String::from_iter(
+                        fileserver
+                            .get_chars(report.clone(), &f, None)
+                            .map_err(|_| false)?,
+                    )),
+                },
+            )
+            .disassemble(report.clone())
+            .map_err(|_| false)?;
+
+            if out_stdout {
+                if output_requested || output_file.is_some() {
+                    println!("{}", out.assembly);
+                }
+            } else {
+                let mut any_files_written = false;
+
+                let mut o = "".to_string();
+
+                for f in matches.free.clone() {
+                    o += &format!("#include \"{}\"\n", f.replace("\\", "/"));
+                }
+
+                o += "\n";
+
+                o += &out.assembly;
+
+                if let Some(ref output_file) = output_file {
+                    println!("writing `{}`...", &output_file);
+                    fileserver
+                        .write_bytes(
+                            report.clone(),
+                            &output_file,
+                            &o.into_bytes(),
+                            None,
+                        )
+                        .map_err(|_| false)?;
+                    any_files_written = true;
+                }
+
+                if !any_files_written {
+                    println!("no files written");
+                }
+            }
+
+            return Ok(());
+        }
+    }
+
     let out_format = match matches.opt_str("f").as_ref().map(|s| s.as_ref()) {
         Some("annotated") => OutputFormat::AnnotatedHex,
         Some("annotatedhex") => OutputFormat::AnnotatedHex,
@@ -130,59 +286,6 @@ fn drive_inner(
             return Err(true);
         }
     };
-
-    if matches.free.len() < 1 {
-        report.error("no input files");
-        return Err(true);
-    }
-
-    let main_asm_file = matches.free[0].clone();
-
-    let output_symbol_requested = matches.opt_present("s");
-    let output_requested = matches.opt_present("o");
-
-    let output_symbol_file = matches.opt_str("s");
-    let output_file = match matches.opt_str("o") {
-        Some(f) => Some(f),
-        None => {
-            if output_symbol_requested || output_symbol_file.is_some() {
-                None
-            } else {
-                match get_default_output_filename(report.clone(), &main_asm_file) {
-                    Ok(f) => Some(f),
-                    Err(_) => None,
-                }
-            }
-        }
-    };
-
-    let max_iterations = match matches.opt_str("t") {
-        None => 10,
-        Some(t) => match t.parse::<usize>() {
-            Ok(t) => t,
-            Err(_) => {
-                report.error("invalid number of iterations");
-                return Err(true);
-            }
-        },
-    };
-
-    if !quiet {
-        print_version();
-    }
-
-    let mut assembler = asm::Assembler::new();
-    for filename in matches.free {
-        if !quiet {
-            println!("assembling `{}`...", filename);
-        }
-
-        assembler.register_file(filename);
-    }
-
-    let output = assembler
-        .assemble(report.clone(), fileserver, max_iterations)
-        .map_err(|_| false)?;
 
     let binary = output.binary;
 
@@ -306,7 +409,15 @@ fn drive_inner(
 
 fn make_opts() -> getopts::Options {
     let mut opts = getopts::Options::new();
-    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, binline, hexstr, hexline, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, binvhdl, hexvhdl, logisim8, logisim16, addrspan", "FORMAT");
+    opts.opt(
+        "d",
+        "disassemble",
+        "Disassemble",
+        "DISASSEMBLE",
+        getopts::HasArg::Maybe,
+        getopts::Occur::Optional,
+    );
+    opts.optopt("f", "format", "The format of the output (input for disassembly, compatible modes have a star) file. Possible formats: binary*, annotated, annotatedbin, binstr*, binline*, hexstr*, hexline*, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decc, hexc, binvhdl, hexvhdl, logisim8, logisim16, addrspan", "FORMAT");
     opts.opt(
         "o",
         "output",
@@ -394,11 +505,12 @@ fn print_version() {
 fn get_default_output_filename(
     report: diagn::RcReport,
     input_filename: &str,
+    disassembly: bool,
 ) -> Result<String, ()> {
     use std::path::PathBuf;
 
     let mut output_filename = PathBuf::from(input_filename);
-    output_filename.set_extension("bin");
+    output_filename.set_extension(if disassembly { "asm" } else { "bin" });
 
     let output_filename = output_filename
         .to_string_lossy()

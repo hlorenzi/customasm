@@ -217,6 +217,10 @@ pub fn match_rule<'a>(
     }
 
     for (index, part) in rule.pattern.iter().enumerate() {
+        if let asm::PatternPart::Gap = part {
+            continue;
+        }
+
         parsing_branches.retain(|b| !b.dead);
         if parsing_branches.len() == 0 {
             break;
@@ -226,6 +230,8 @@ pub fn match_rule<'a>(
 
         for (branch_index, branch) in parsing_branches.iter_mut().enumerate() {
             match part {
+                asm::PatternPart::Gap => {}
+
                 asm::PatternPart::Exact(c) => {
                     if DEBUG {
                         println!("- branch {}, try match exact `{}`", branch_index, c);

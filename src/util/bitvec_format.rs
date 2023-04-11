@@ -19,8 +19,25 @@ impl util::BitVec {
         result
     }
 
+    pub fn parse_binary(bytes: Vec<u8>) -> Self {
+        let mut result = Self::new();
+        let mut index = 0;
+        for byte in bytes {
+            let mut n = util::BigInt::from(byte);
+            n.size = Some(8);
+            result.write_bigint(index, n);
+            index += 8;
+        }
+
+        result
+    }
+
     pub fn format_binstr(&self) -> String {
         self.format_str(1)
+    }
+
+    pub fn parse_binstr(string: String) -> Self {
+        Self::parse_str(string, 1)
     }
 
     pub fn format_binline(&self, wordsize: usize) -> String {
@@ -37,6 +54,10 @@ impl util::BitVec {
                 .chain(std::iter::once(c))
             })
             .collect::<String>()
+    }
+
+    pub fn parse_binline(string: String) -> Self {
+        Self::parse_str(string.replace("\n", ""), 1)
     }
 
     pub fn format_coe(&self, wordsize: usize) -> String {
@@ -62,6 +83,10 @@ impl util::BitVec {
         self.format_str(4)
     }
 
+    pub fn parse_hexstr(string: String) -> Self {
+        Self::parse_str(string, 4)
+    }
+
     pub fn format_hexline(&self, wordsize: usize) -> String {
         self.format_str(4)
             .chars()
@@ -76,6 +101,10 @@ impl util::BitVec {
                 .chain(std::iter::once(c))
             })
             .collect::<String>()
+    }
+
+    pub fn parse_hexline(string: String) -> Self {
+        Self::parse_str(string.replace("\n", ""), 4)
     }
 
     pub fn format_str(&self, bits_per_digit: usize) -> String {
@@ -97,6 +126,23 @@ impl util::BitVec {
             };
 
             result.push(c);
+        }
+
+        result
+    }
+
+    pub fn parse_str(string: String, bits_per_digit: usize) -> Self {
+        let mut result = Self::new();
+        let mut index = 0;
+        for c in string.as_bytes() {
+            let byte = c - '0' as u8;
+
+            let digit = if byte < 10 { byte } else { c - 'a' as u8 + 10 };
+
+            let mut n = util::BigInt::from(digit);
+            n.size = Some(bits_per_digit);
+            result.write_bigint(index, n);
+            index += bits_per_digit;
         }
 
         result

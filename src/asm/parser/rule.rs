@@ -7,11 +7,14 @@ pub fn parse_rule(
     let mut rule = asm::Rule::new();
     let mut empty_pattern = false;
 
-    while !state.parser.next_is(0, syntax::TokenKind::HeavyArrowRight) {
-        let tk = state.parser.advance();
+    while !state
+        .parser
+        .next_is_ws(0, syntax::TokenKind::HeavyArrowRight)
+    {
+        let tk = state.parser.advance_ws();
         rule.span = rule.span.join(&tk.span);
 
-        if empty_pattern {
+        if empty_pattern && tk.kind != syntax::TokenKind::Whitespace {
             state
                 .report
                 .error_span("invalid pattern after empty specifier", &tk.span);
@@ -24,7 +27,7 @@ pub fn parse_rule(
                 && !is_not_subruledef
                 && state.parser.next_is(0, syntax::TokenKind::BraceClose)
             {
-                state.parser.advance();
+                state.parser.advance_ws();
                 empty_pattern = true;
             } else {
                 let tk_param_name = state.parser.expect(syntax::TokenKind::Identifier)?;
@@ -47,6 +50,8 @@ pub fn parse_rule(
                     typ: param_type,
                 });
             }
+        } else if tk.kind == syntax::TokenKind::Whitespace {
+            rule.pattern_add_gap();
         } else if tk.kind.is_allowed_pattern_token() {
             rule.pattern_add_exact(&tk);
         } else {
@@ -62,6 +67,10 @@ pub fn parse_rule(
             .report
             .error_span("expected pattern", &tk_heavy_arrow.span.before());
         return Err(());
+    }
+
+    if let Some(asm::PatternPart::Gap) = rule.pattern.last() {
+        rule.pattern.pop();
     }
 
     rule.production = expr::Expr::parse(&mut state.parser)?;
