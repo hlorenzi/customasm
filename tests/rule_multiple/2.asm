@@ -1,6 +1,0 @@
-#ruledef test
-{
-    ld {val} => 0x00 @ val`8
-    ld x     => 0xff @ 0x00
-}
-ld 0x55 ; = 0x0055

@@ -129,8 +129,8 @@ pub fn parse_and_resolve_includes<S>(
         None,
         root_filename.borrow())?;
 
-    let tokens = syntax::tokenize(
-        diagn::RcReport::new(),
+    let tokens = syntax::tokenize2(
+        report,
         root_filename.borrow(),
         &chars)?;
 

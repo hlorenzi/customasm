@@ -14,6 +14,4 @@
 }
 
 add x
-add y
-; error:_:17: failed to resolve
-; error:_:11: assertion
+add y ; error: failed / note:_:9: within / error:_:11: assertion

@@ -1,4 +1,5 @@
 /target/
 /pkg/
 /.pkgtemp/
+/.vscode/
 /Cargo.lock

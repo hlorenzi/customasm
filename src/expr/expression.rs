@@ -149,14 +149,17 @@ impl Value
 	}
 
 
-	pub fn coallesce_to_integer(self) -> expr::Value
+	pub fn coallesce_to_integer<'a>(
+		&'a self)
+		-> std::borrow::Cow<'a, expr::Value>
 	{
 		match self
 		{
 			Value::String(ref s) =>
-				expr::Value::Integer(s.to_bigint()),
+				std::borrow::Cow::Owned(
+					expr::Value::Integer(s.to_bigint())),
 
-			_ => self,
+			_ => std::borrow::Cow::Borrowed(self),
 		}
 	}
 
@@ -245,14 +248,14 @@ impl Value
 		span: &diagn::Span)
 		-> Result<expr::Value, ()>
 	{
-		match self.coallesce_to_integer()
+		match self.coallesce_to_integer().as_ref()
 		{
 			value @ expr::Value::Unknown |
 			value @ expr::Value::FailedConstraint(_) =>
-				Ok(value),
+				Ok(value.to_owned()),
 
 			value @ expr::Value::Integer(_) =>
-				Ok(value),
+				Ok(value.to_owned()),
 
 			_ =>
 			{
@@ -272,15 +275,15 @@ impl Value
 		span: &diagn::Span)
 		-> Result<expr::Value, ()>
 	{
-		match self.coallesce_to_integer()
+		match self.coallesce_to_integer().as_ref()
 		{
 			value @ expr::Value::Unknown |
 			value @ expr::Value::FailedConstraint(_) =>
-				Ok(value),
+				Ok(value.to_owned()),
 
 			expr::Value::Integer(bigint)
 				if bigint.size.is_some() =>
-				Ok(expr::Value::Integer(bigint)),
+				Ok(expr::Value::Integer(bigint.to_owned())),
 
 			_ =>
 			{

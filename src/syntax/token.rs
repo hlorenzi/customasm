@@ -66,7 +66,7 @@ pub enum TokenKind
 
 impl TokenKind
 {
-	fn needs_excerpt(self) -> bool
+	pub fn needs_excerpt(self) -> bool
 	{
 		self == TokenKind::Identifier ||
 		self == TokenKind::Number ||

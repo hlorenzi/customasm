@@ -1,6 +1,7 @@
 /target/
 /pkg/
 /.pkgtemp/
+/.vscode/
 /Cargo.lock
 /test.asm
 

@@ -395,7 +395,10 @@ pub fn check_and_constrain_argument(
     typ: asm2::RuleParameterType)
     -> Result<expr::Value, ()>
 {
-    let bigint = value.expect_bigint(report, span)?.clone();
+    let bigint = value
+        .coallesce_to_integer()
+        .expect_bigint(report, span)?
+        .to_owned();
 
     match typ
     {
@@ -404,7 +407,7 @@ pub fn check_and_constrain_argument(
             
         asm2::RuleParameterType::Unsigned(size) =>
         {
-            check_argument_for_integer_type(
+            check_and_constrain_value_for_integer_type(
                 report,
                 span,
                 size,
@@ -416,7 +419,7 @@ pub fn check_and_constrain_argument(
 
         asm2::RuleParameterType::Signed(size) =>
         {
-            check_argument_for_integer_type(
+            check_and_constrain_value_for_integer_type(
                 report,
                 span,
                 size,
@@ -429,7 +432,7 @@ pub fn check_and_constrain_argument(
 
         asm2::RuleParameterType::Integer(size) =>
         {
-            check_argument_for_integer_type(
+            check_and_constrain_value_for_integer_type(
                 report,
                 span,
                 size,
@@ -444,16 +447,16 @@ pub fn check_and_constrain_argument(
 }
 
 
-fn check_argument_for_integer_type(
+fn check_and_constrain_value_for_integer_type(
     report: &mut diagn::Report,
     span: &diagn::Span,
     size: usize,
     typename_prefix: &'static str,
     mut bigint: util::BigInt,
-    failure_fn: impl Fn(&util::BigInt) -> bool)
+    failure_check: impl Fn(&util::BigInt) -> bool)
     -> Result<expr::Value, ()>
 {
-    if failure_fn(&bigint)
+    if failure_check(&bigint)
     {
         let msg = diagn::Message::error_span(
             format!(

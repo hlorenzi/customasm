@@ -5,6 +5,7 @@ use crate::*;
 pub struct Ruledef
 {
     pub item_ref: util::ItemRef<Self>,
+    pub is_subruledef: bool,
     pub rules: Vec<Rule>,
 }
 
@@ -82,6 +83,7 @@ pub fn define(
 
             let ruledef = Ruledef {
                 item_ref,
+                is_subruledef: node.is_subruledef,
                 rules,
             };
 

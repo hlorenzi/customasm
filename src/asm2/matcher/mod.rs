@@ -154,6 +154,12 @@ pub fn match_instr(
     for i in 0..defs.ruledefs.defs.len()
     {
         let ruledef_ref = util::ItemRef::<asm2::Ruledef>::new(i);
+        let ruledef = defs.ruledefs.get(ruledef_ref);
+
+        if ruledef.is_subruledef
+        {
+            continue;
+        }
 
         let mut walker = syntax::TokenWalker::new(tokens);
 
@@ -221,7 +227,7 @@ fn get_match_static_size(
     let rule = &ruledef.get_rule(mtch.rule_ref);
 
     let mut info = expr::StaticSizeInfo::new();
-    
+
     for i in 0..rule.parameters.len()
     {
         let param = &rule.parameters[i];
@@ -395,7 +401,10 @@ fn match_with_expr<'tokens>(
     {
         match walker.maybe_expect_partial_usize()
         {
-            None => vec![],
+            None =>
+            {
+                return vec![];
+            }
             Some(value) =>
             {
                 let expr = expr::Value::make_integer(value)
@@ -405,8 +414,6 @@ fn match_with_expr<'tokens>(
                     kind: InstructionArgumentKind::Expr(expr),
                     tokens: Vec::new(),
                 });
-
-                vec![(match_so_far.clone(), walker.clone())]
             }
         }
     }
@@ -436,15 +443,15 @@ fn match_with_expr<'tokens>(
                 token_start,
                 token_end),
         });
-
-        match_with_rule(
-            defs,
-            rule,
-            walker,
-            needs_consume_all_tokens,
-            at_pattern_part + 1,
-            match_so_far)
     }
+
+    match_with_rule(
+        defs,
+        rule,
+        walker,
+        needs_consume_all_tokens,
+        at_pattern_part + 1,
+        match_so_far)
 }
 
 
