@@ -10,6 +10,7 @@
     "bitvec",
     "customasmlib",
     "elem",
+    "gitoxide",
     "hlorenzi",
     "invoc",
     "labelalign",
