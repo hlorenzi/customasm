@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BitVec {
     pub bits: Vec<bool>,
     pub spans: Vec<BitVecSpan>,

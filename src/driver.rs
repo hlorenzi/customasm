@@ -114,7 +114,10 @@ fn drive_inner(
             } else {
                 match get_default_output_filename(
                     report.clone(),
-                    &main_asm_file,
+                    &match matches.opt_str("d") {
+                        Some(n) => n,
+                        None => main_asm_file,
+                    },
                     matches.opt_present("d"),
                 ) {
                     Ok(f) => Some(f),
@@ -166,29 +169,41 @@ fn drive_inner(
                     InputFormat::Binary => util::BitVec::parse_binary(
                         fileserver
                             .get_bytes(report.clone(), &f, None)
-                            .map_err(|_| false)?,
-                    ),
+                            .map_err(|_| false)?
+                    ,output.state.cur_wordsize),
                     InputFormat::BinStr => util::BitVec::parse_binstr(String::from_iter(
                         fileserver
                             .get_chars(report.clone(), &f, None)
-                            .map_err(|_| false)?,
-                    )),
+                            .map_err(|_| false)?
+                    ),output.state.cur_wordsize),
                     InputFormat::BinLine => util::BitVec::parse_binline(String::from_iter(
                         fileserver
                             .get_chars(report.clone(), &f, None)
-                            .map_err(|_| false)?,
-                    )),
+                            .map_err(|_| false)?
+                    ),output.state.cur_wordsize),
                     InputFormat::HexStr => util::BitVec::parse_hexstr(String::from_iter(
                         fileserver
                             .get_chars(report.clone(), &f, None)
-                            .map_err(|_| false)?,
-                    )),
+                            .map_err(|_| false)?
+                    ),output.state.cur_wordsize),
                     InputFormat::HexLine => util::BitVec::parse_hexline(String::from_iter(
                         fileserver
                             .get_chars(report.clone(), &f, None)
-                            .map_err(|_| false)?,
-                    )),
+                            .map_err(|_| false)?
+                    ),output.state.cur_wordsize),
                 },
+                match matches.opt_str("n").as_ref().map(|s| s.as_ref()) {
+                    Some("hex") => asm::NumberFormat::Hex,
+                    Some("bin") => asm::NumberFormat::Bin,
+                    Some("dec") => asm::NumberFormat::Dec,
+
+                    None => asm::NumberFormat::Hex,
+
+                    Some(_) => {
+                        report.error("invalid number format");
+                        return Err(true);
+                    }
+                }
             )
             .disassemble(report.clone())
             .map_err(|_| false)?;
@@ -213,12 +228,7 @@ fn drive_inner(
                 if let Some(ref output_file) = output_file {
                     println!("writing `{}`...", &output_file);
                     fileserver
-                        .write_bytes(
-                            report.clone(),
-                            &output_file,
-                            &o.into_bytes(),
-                            None,
-                        )
+                        .write_bytes(report.clone(), &output_file, &o.into_bytes(), None)
                         .map_err(|_| false)?;
                     any_files_written = true;
                 }
@@ -413,7 +423,15 @@ fn make_opts() -> getopts::Options {
         "d",
         "disassemble",
         "Disassemble",
-        "DISASSEMBLE",
+        "FILE",
+        getopts::HasArg::Maybe,
+        getopts::Occur::Optional,
+    );
+    opts.opt(
+        "n",
+        "number-format",
+        "The format of numbers in the disassembly output. Possible formats: hex, bin, dec",
+        "FILE",
         getopts::HasArg::Maybe,
         getopts::Occur::Optional,
     );
@@ -483,11 +501,6 @@ fn print_usage(opts: &getopts::Options) {
 }
 
 fn print_version() {
-    let mut version = env!("VERGEN_GIT_BRANCH").to_string();
-    if version == "UNKNOWN" {
-        version = format!("v{}", env!("CARGO_PKG_VERSION"));
-    }
-
     let mut date = format!("{}, ", env!("VERGEN_GIT_COMMIT_DATE"));
     if date == "UNKNOWN, " {
         date = "".to_string();
@@ -496,7 +509,7 @@ fn print_version() {
     println!(
         "{} {} ({}{})",
         env!("CARGO_PKG_NAME"),
-        version,
+        env!("VERGEN_GIT_DESCRIBE"),
         date,
         env!("VERGEN_CARGO_TARGET_TRIPLE")
     );

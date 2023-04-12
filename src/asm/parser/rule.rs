@@ -27,7 +27,7 @@ pub fn parse_rule(
                 && !is_not_subruledef
                 && state.parser.next_is(0, syntax::TokenKind::BraceClose)
             {
-                state.parser.advance_ws();
+                state.parser.advance();
                 empty_pattern = true;
             } else {
                 let tk_param_name = state.parser.expect(syntax::TokenKind::Identifier)?;
@@ -42,7 +42,7 @@ pub fn parse_rule(
                         asm::PatternParameterType::Unspecified
                     };
 
-                let brace_close_tk = state.parser.expect(syntax::TokenKind::BraceClose)?;
+                let brace_close_tk = state.parser.expect_ws(syntax::TokenKind::BraceClose)?;
                 rule.span = rule.span.join(&brace_close_tk.span);
 
                 rule.pattern_add_parameter(asm::PatternParameter {

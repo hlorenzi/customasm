@@ -443,8 +443,30 @@ impl<'a> Parser<'a> {
         }
     }
 
+    pub fn maybe_expect_ws(&mut self, kind: TokenKind) -> Option<Token> {
+        if self.next_is(0, kind) {
+            Some(self.advance_ws())
+        } else {
+            None
+        }
+    }
+
     pub fn expect(&mut self, kind: TokenKind) -> Result<Token, ()> {
         match self.maybe_expect(kind) {
+            Some(token) => Ok(token),
+            None => {
+                let descr = format!("expected {}", kind.printable());
+                let span = self.tokens[self.index_prev].span.after();
+                if let Some(ref report) = self.report {
+                    report.error_span(descr, &span);
+                }
+                Err(())
+            }
+        }
+    }
+
+    pub fn expect_ws(&mut self, kind: TokenKind) -> Result<Token, ()> {
+        match self.maybe_expect_ws(kind) {
             Some(token) => Ok(token),
             None => {
                 let descr = format!("expected {}", kind.printable());

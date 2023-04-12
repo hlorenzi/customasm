@@ -19,14 +19,18 @@ impl util::BitVec {
         result
     }
 
-    pub fn parse_binary(bytes: Vec<u8>) -> Self {
+    pub fn parse_binary(bytes: Vec<u8>, wordsize: usize) -> Self {
         let mut result = Self::new();
         let mut index = 0;
-        for byte in bytes {
+        for byte in bytes.clone() {
             let mut n = util::BigInt::from(byte);
             n.size = Some(8);
             result.write_bigint(index, n);
             index += 8;
+        }
+
+        for _ in 0..(bytes.len() * 8 % wordsize) {
+            result.bits.pop();
         }
 
         result
@@ -36,8 +40,8 @@ impl util::BitVec {
         self.format_str(1)
     }
 
-    pub fn parse_binstr(string: String) -> Self {
-        Self::parse_str(string, 1)
+    pub fn parse_binstr(string: String, wordsize: usize) -> Self {
+        Self::parse_str(string, 1, wordsize)
     }
 
     pub fn format_binline(&self, wordsize: usize) -> String {
@@ -56,8 +60,8 @@ impl util::BitVec {
             .collect::<String>()
     }
 
-    pub fn parse_binline(string: String) -> Self {
-        Self::parse_str(string.replace("\n", ""), 1)
+    pub fn parse_binline(string: String, wordsize: usize) -> Self {
+        Self::parse_str(string.replace("\n", ""), 1, wordsize)
     }
 
     pub fn format_coe(&self, wordsize: usize) -> String {
@@ -83,28 +87,33 @@ impl util::BitVec {
         self.format_str(4)
     }
 
-    pub fn parse_hexstr(string: String) -> Self {
-        Self::parse_str(string, 4)
+    pub fn parse_hexstr(string: String, wordsize: usize) -> Self {
+        Self::parse_str(string, 4, wordsize)
     }
 
     pub fn format_hexline(&self, wordsize: usize) -> String {
-        self.format_str(4)
-            .chars()
-            .enumerate()
-            .flat_map(|(i, c)| {
-                if i != 0 && i % (wordsize / 4) == 0 {
-                    Some('\n')
-                } else {
-                    None
-                }
-                .into_iter()
-                .chain(std::iter::once(c))
+        self.bits
+            .chunks(wordsize)
+            .map(|bits| {
+                (Self {
+                    bits: bits.to_vec(),
+                    spans: vec![],
+                })
+                .format_hexstr()
             })
-            .collect::<String>()
+            .reduce(|acc, e| acc + "\n" + &e)
+            .unwrap_or("".to_string())
     }
 
-    pub fn parse_hexline(string: String) -> Self {
-        Self::parse_str(string.replace("\n", ""), 4)
+    pub fn parse_hexline(string: String, wordsize: usize) -> Self {
+        string
+            .split("\n")
+            .map(|s| Self::parse_hexstr(s.to_string(), wordsize))
+            .fold(&mut Self::new(), |acc, e| {
+                acc.write_bitvec(acc.len(), &e);
+                acc
+            })
+            .clone()
     }
 
     pub fn format_str(&self, bits_per_digit: usize) -> String {
@@ -131,7 +140,7 @@ impl util::BitVec {
         result
     }
 
-    pub fn parse_str(string: String, bits_per_digit: usize) -> Self {
+    pub fn parse_str(string: String, bits_per_digit: usize, wordsize: usize) -> Self {
         let mut result = Self::new();
         let mut index = 0;
         for c in string.as_bytes() {
@@ -143,6 +152,10 @@ impl util::BitVec {
             n.size = Some(bits_per_digit);
             result.write_bigint(index, n);
             index += bits_per_digit;
+        }
+
+        for _ in 0..(result.bits.len() * bits_per_digit % wordsize) {
+            result.bits.pop();
         }
 
         result
