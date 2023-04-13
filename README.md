@@ -101,8 +101,11 @@ instructions into binary code:
 Usage: customasm [options] <asm-file-1> ... <asm-file-N>
 
 Options:
-    -d, --disassemble [DISASSEMBLE]
+    -d, --disassemble [FILE]
                         Disassemble
+    -n, --number-format [FILE]
+                        The format of numbers in the disassembly output.
+                        Possible formats: hex, bin, dec
     -f, --format FORMAT The format of the output (input for disassembly,
                         compatible modes have a star) file. Possible formats:
                         binary*, annotated, annotatedbin, binstr*, binline*,
