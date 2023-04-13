@@ -217,10 +217,6 @@ pub fn match_rule<'a>(
     }
 
     for (index, part) in rule.pattern.iter().enumerate() {
-        if let asm::PatternPart::Gap = part {
-            continue;
-        }
-
         parsing_branches.retain(|b| !b.dead);
         if parsing_branches.len() == 0 {
             break;
@@ -230,7 +226,15 @@ pub fn match_rule<'a>(
 
         for (branch_index, branch) in parsing_branches.iter_mut().enumerate() {
             match part {
-                asm::PatternPart::Gap => {}
+                asm::PatternPart::Gap => {
+                    if DEBUG {
+                        println!(
+                            "- branch {}, skipped gap. parser at `{}`",
+                            branch_index,
+                            fileserver.get_excerpt(&branch.parser.get_next_spans(100))
+                        );
+                    }
+                }
 
                 asm::PatternPart::Exact(c) => {
                     if DEBUG {
@@ -281,7 +285,10 @@ pub fn match_rule<'a>(
                                 let mut expr_parser = branch.parser.clone();
                                 let mut expr_using_slice = false;
 
-                                let next_part = rule.pattern.get(index + 1);
+                                let mut next_part = rule.pattern.get(index + 1);
+                                if let Some(asm::PatternPart::Gap) = next_part {
+                                    next_part = rule.pattern.get(index + 2)
+                                }
 
                                 if let Some(asm::PatternPart::Exact(next_part_char)) = next_part {
                                     if let Some(slice_parser) =
@@ -334,7 +341,10 @@ pub fn match_rule<'a>(
                             let mut subparser_using_slice = false;
                             let mut subparser_offset = 0;
 
-                            let next_part = rule.pattern.get(index + 1);
+                            let mut next_part = rule.pattern.get(index + 1);
+                            if let Some(asm::PatternPart::Gap) = next_part {
+                                next_part = rule.pattern.get(index + 2)
+                            }
 
                             if let Some(asm::PatternPart::Exact(next_part_char)) = next_part {
                                 if let Some(slice_parser) =
@@ -427,7 +437,7 @@ pub fn match_rule<'a>(
     }
 
     if DEBUG {
-        println!("  end try match rule");
+        println!("< end try match rule");
     }
 
     let mut candidates = Vec::new();
