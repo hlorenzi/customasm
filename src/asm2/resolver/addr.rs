@@ -4,6 +4,7 @@ use crate::*;
 pub fn resolve_addr(
     report: &mut diagn::Report,
     opts: &asm2::AssemblyOptions,
+    fileserver: &dyn util::FileServer,
     ast_addr: &asm2::AstDirectiveAddr,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
@@ -14,6 +15,7 @@ pub fn resolve_addr(
 
     let value = asm2::resolver::eval(
         report,
+        fileserver,
         decls,
         defs,
         ctx,

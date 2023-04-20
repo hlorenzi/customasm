@@ -329,7 +329,7 @@ impl expr::Expr
 
 				match func
 				{
-					expr::Value::BuiltInFunction(_) |
+					expr::Value::ExprBuiltInFunction(_) |
 					expr::Value::Function(_) =>
 					{
 						let mut args = Vec::new();

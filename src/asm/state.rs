@@ -1066,7 +1066,7 @@ impl State
 				"utf32le" |
 				"ascii" =>
 				{
-					return Ok(expr::Value::BuiltInFunction(info.hierarchy[0].clone()));
+					return Ok(expr::Value::ExprBuiltInFunction(info.hierarchy[0].clone()));
 				}
 
 				_ => {}
@@ -1230,7 +1230,7 @@ impl State
 	{
 		match info.func
 		{
-			expr::Value::BuiltInFunction(ref name) =>
+			expr::Value::ExprBuiltInFunction(ref name) =>
 			{
 				match name.as_ref()
 				{

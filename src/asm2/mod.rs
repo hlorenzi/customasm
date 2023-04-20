@@ -127,6 +127,7 @@ pub fn assemble<S>(
         resolver::resolve_constants(
             report,
             opts,
+            fileserver,
             assembly.ast.as_ref().unwrap(),
             assembly.decls.as_ref().unwrap(),
             assembly.defs.as_mut().unwrap())?;
@@ -140,6 +141,7 @@ pub fn assemble<S>(
         assembly.iterations_taken = Some(resolver::resolve_iteratively(
             report,
             opts,
+            fileserver,
             assembly.ast.as_ref().unwrap(),
             assembly.decls.as_ref().unwrap(),
             assembly.defs.as_mut().unwrap(),

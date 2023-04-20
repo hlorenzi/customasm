@@ -18,6 +18,10 @@ pub use self::fileserver::FileServerMock;
 pub use self::fileserver::FileServerReal;
 pub use self::filename::filename_validate;
 pub use self::filename::filename_navigate;
+pub use self::filename::{
+    filename_validate2,
+    filename_navigate2,
+};
 pub use self::windows_console::enable_windows_ansi_support;
 pub use self::symbol_manager::*;
 pub use self::item_ref::*;

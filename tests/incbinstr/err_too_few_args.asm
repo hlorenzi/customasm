@@ -1,0 +1,1 @@
+#d incbinstr() ; error: failed / error: expected 1 argument

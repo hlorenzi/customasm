@@ -82,7 +82,7 @@ impl expr::Expr
 			{
 				if let expr::Expr::Literal(
 					_,
-					expr::Value::BuiltInFunction(ref builtin_name)) = *func.as_ref()
+					expr::Value::ExprBuiltInFunction(ref builtin_name)) = *func.as_ref()
 				{
 					expr::get_static_size_builtin(builtin_name, info, &args)
 				}

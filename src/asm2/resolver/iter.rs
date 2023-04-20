@@ -33,6 +33,7 @@ pub struct BankData
 }
 
 
+#[derive(Clone)]
 pub enum ResolverNode<'ast>
 {
     None,
@@ -45,11 +46,13 @@ pub enum ResolverNode<'ast>
 }
 
 
+#[derive(Clone)]
 pub struct ResolverContext<'iter, 'ast, 'decls>
 {
     pub node: ResolverNode<'ast>,
     pub is_first_iteration: bool,
     pub is_last_iteration: bool,
+    pub filename_ctx: Option<&'ast str>,
     pub symbol_ctx: &'decls util::SymbolContext,
     pub bank_ref: util::ItemRef<asm2::Bankdef>,
     pub bank_data: &'iter BankData,
@@ -107,100 +110,111 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
         let ast_any = &self.ast.nodes[self.index];
 
-        let node = {
-            match ast_any
+        let node: ResolverNode;
+        let filename_ctx: Option<&str>;
+
+        match ast_any
+        {
+            asm2::AstAny::DirectiveBank(ast_bank) =>
             {
-                asm2::AstAny::DirectiveBank(ast_bank) =>
-                {
-                    self.bank_ref = ast_bank.item_ref.unwrap();
+                self.bank_ref = ast_bank.item_ref.unwrap();
 
-                    self.index += 1;
-                    ResolverNode::None
-                }
-
-                asm2::AstAny::DirectiveBankdef(ast_bankdef) =>
-                {
-                    self.bank_ref = ast_bankdef.item_ref.unwrap();
-
-                    self.index += 1;
-                    ResolverNode::None
-                }
-
-                asm2::AstAny::Symbol(ast_symbol) =>
-                {
-                    let item_ref = ast_symbol.item_ref.unwrap();
-                    let decl = decls.symbols.get(item_ref);
-
-                    self.symbol_ctx = &decl.ctx;
-
-                    // Honor `labelalign`
-                    let bankdef = defs.bankdefs.get(self.bank_ref);
-                    if let Some(label_align) = bankdef.label_align
-                    {
-                        if decl.depth == 0
-                        {
-                            let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
-
-                            cur_bank_data.cur_position += bits_until_alignment(
-                                cur_bank_data.cur_position,
-                                label_align);
-                        }
-                    }
-
-                    self.index += 1;
-                    ResolverNode::Symbol(ast_symbol)
-                }
-
-                asm2::AstAny::Instruction(ast_instr) =>
-                {
-                    self.index += 1;
-                    ResolverNode::Instruction(ast_instr)
-                }
-
-                asm2::AstAny::DirectiveData(ast_data) =>
-                {
-                    let elem_index = self.subindex;
-
-                    self.subindex += 1;
-                    if self.subindex >= ast_data.item_refs.len()
-                    {
-                        self.index += 1;
-                        self.subindex = 0;
-                    }
-
-                    ResolverNode::DataElement(ast_data, elem_index)
-                }
-
-                asm2::AstAny::DirectiveRes(ast_res) =>
-                {
-                    self.index += 1;
-                    ResolverNode::Res(ast_res)
-                }
-
-                asm2::AstAny::DirectiveAlign(ast_align) =>
-                {
-                    self.index += 1;
-                    ResolverNode::Align(ast_align)
-                }
-
-                asm2::AstAny::DirectiveAddr(ast_addr) =>
-                {
-                    self.index += 1;
-                    ResolverNode::Addr(ast_addr)
-                }
-
-                _ =>
-                {
-                    self.index += 1;
-                    ResolverNode::None
-                }
+                self.index += 1;
+                node = ResolverNode::None;
+                filename_ctx = Some(&ast_bank.header_span.file);
             }
-        };
+
+            asm2::AstAny::DirectiveBankdef(ast_bankdef) =>
+            {
+                self.bank_ref = ast_bankdef.item_ref.unwrap();
+
+                self.index += 1;
+                node = ResolverNode::None;
+                filename_ctx = Some(&ast_bankdef.header_span.file);
+            }
+
+            asm2::AstAny::Symbol(ast_symbol) =>
+            {
+                let item_ref = ast_symbol.item_ref.unwrap();
+                let decl = decls.symbols.get(item_ref);
+
+                self.symbol_ctx = &decl.ctx;
+
+                // Honor `labelalign`
+                let bankdef = defs.bankdefs.get(self.bank_ref);
+                if let Some(label_align) = bankdef.label_align
+                {
+                    if decl.depth == 0
+                    {
+                        let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+
+                        cur_bank_data.cur_position += bits_until_alignment(
+                            cur_bank_data.cur_position,
+                            label_align);
+                    }
+                }
+
+                self.index += 1;
+                node = ResolverNode::Symbol(ast_symbol);
+                filename_ctx = Some(&ast_symbol.decl_span.file);
+            }
+
+            asm2::AstAny::Instruction(ast_instr) =>
+            {
+                self.index += 1;
+                node = ResolverNode::Instruction(ast_instr);
+                filename_ctx = Some(&ast_instr.span.file);
+            }
+
+            asm2::AstAny::DirectiveData(ast_data) =>
+            {
+                let elem_index = self.subindex;
+
+                self.subindex += 1;
+                if self.subindex >= ast_data.item_refs.len()
+                {
+                    self.index += 1;
+                    self.subindex = 0;
+                }
+
+                node = ResolverNode::DataElement(ast_data, elem_index);
+                filename_ctx = Some(&ast_data.header_span.file);
+            }
+
+            asm2::AstAny::DirectiveRes(ast_res) =>
+            {
+                self.index += 1;
+                node = ResolverNode::Res(ast_res);
+                filename_ctx = Some(&ast_res.header_span.file);
+            }
+
+            asm2::AstAny::DirectiveAlign(ast_align) =>
+            {
+                self.index += 1;
+                node = ResolverNode::Align(ast_align);
+                filename_ctx = Some(&ast_align.header_span.file);
+            }
+
+            asm2::AstAny::DirectiveAddr(ast_addr) =>
+            {
+                self.index += 1;
+                node = ResolverNode::Addr(ast_addr);
+                filename_ctx = Some(&ast_addr.header_span.file);
+            }
+
+            _ =>
+            {
+                self.index += 1;
+                node = ResolverNode::None;
+                filename_ctx = None;
+            }
+        }
 
         Some(ResolverContext {
             node,
             is_first_iteration: self.is_first_iteration,
             is_last_iteration: self.is_last_iteration,
+            filename_ctx,
             symbol_ctx: self.symbol_ctx,
             bank_ref: self.bank_ref,
             bank_data: &self.bank_data[self.bank_ref.0],

@@ -142,8 +142,8 @@ pub fn parse_and_resolve_includes<S>(
 
         if let AstAny::DirectiveInclude(dir_include) = node
         {
-            let included_filename = util::filename_navigate(
-                diagn::RcReport::new(),
+            let included_filename = util::filename_navigate2(
+                report,
                 root_filename.borrow(),
                 &dir_include.filename,
                 &dir_include.filename_span)?;

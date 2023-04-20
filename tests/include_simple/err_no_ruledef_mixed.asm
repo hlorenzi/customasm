@@ -1,6 +1,6 @@
 halt ; error: no match
-#include "code.asm"
+#include "code1.asm"
 halt ; error: no match
-; error: code.asm:1: no match
-; error: code.asm:2: no match
-; error: code.asm:3: no match
+; error: code1.asm:1: no match
+; error: code1.asm:2: no match
+; error: code1.asm:3: no match

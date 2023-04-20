@@ -299,7 +299,7 @@ impl expr::Expr
 				{
 					if let Some(_) = resolve_builtin(&hierarchy[0])
 					{
-						return Ok(expr::Value::BuiltInFunction(
+						return Ok(expr::Value::ExprBuiltInFunction(
 							hierarchy[0].clone()));
 					}
 
@@ -534,8 +534,7 @@ impl expr::Expr
 					});
 				}
 
-				let mut info = EvalFunctionInfo2
-				{
+				let mut info = EvalFunctionInfo2 {
 					report,
 					func,
 					args,
@@ -544,8 +543,11 @@ impl expr::Expr
 
 				match info.func
 				{
-					expr::Value::BuiltInFunction(_) =>
+					expr::Value::ExprBuiltInFunction(_) =>
 						expr::eval_builtin(&mut info),
+
+					expr::Value::AsmBuiltInFunction(_) =>
+						(provider.eval_fn)(&mut info),
 
 					expr::Value::Function(_) =>
 						(provider.eval_fn)(&mut info),

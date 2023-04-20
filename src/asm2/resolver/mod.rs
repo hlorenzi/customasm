@@ -51,6 +51,7 @@ impl ResolutionState
 pub fn resolve_iteratively(
     report: &mut diagn::Report,
     opts: &asm2::AssemblyOptions,
+    fileserver: &dyn util::FileServer,
     ast: &asm2::AstTopLevel,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
@@ -69,6 +70,7 @@ pub fn resolve_iteratively(
         let resolution_state = resolve_once(
             report,
             opts,
+            fileserver,
             ast,
             decls,
             defs,
@@ -96,6 +98,7 @@ pub fn resolve_iteratively(
     let resolution_state = resolve_once(
         report,
         opts,
+        fileserver,
         ast,
         decls,
         defs,
@@ -117,6 +120,7 @@ pub fn resolve_iteratively(
 pub fn resolve_once(
     report: &mut diagn::Report,
     opts: &asm2::AssemblyOptions,
+    fileserver: &dyn util::FileServer,
     ast: &asm2::AstTopLevel,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
@@ -151,6 +155,7 @@ pub fn resolve_once(
                     resolve_constant(
                         report,
                         opts,
+                        fileserver,
                         ast_symbol,
                         decls,
                         defs,
@@ -175,6 +180,7 @@ pub fn resolve_once(
                 instruction::resolve_instruction(
                     report,
                     opts,
+                    fileserver,
                     ast_instr,
                     decls,
                     defs,
@@ -187,6 +193,7 @@ pub fn resolve_once(
                 data_block::resolve_data_element(
                     report,
                     opts,
+                    fileserver,
                     ast_data,
                     elem_index,
                     decls,
@@ -200,6 +207,7 @@ pub fn resolve_once(
                 res::resolve_res(
                     report,
                     opts,
+                    fileserver,
                     ast_res,
                     decls,
                     defs,
@@ -212,6 +220,7 @@ pub fn resolve_once(
                 align::resolve_align(
                     report,
                     opts,
+                    fileserver,
                     ast_align,
                     decls,
                     defs,
@@ -224,6 +233,7 @@ pub fn resolve_once(
                 addr::resolve_addr(
                     report,
                     opts,
+                    fileserver,
                     ast_addr,
                     decls,
                     defs,

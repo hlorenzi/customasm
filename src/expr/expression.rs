@@ -26,7 +26,8 @@ pub enum Value
 	Integer(util::BigInt),
 	String(ValueString),
 	Bool(bool),
-	BuiltInFunction(String),
+	ExprBuiltInFunction(String),
+	AsmBuiltInFunction(String),
 	Function(usize),
 }
 
@@ -440,6 +441,27 @@ impl Value
 			{
 				report.error_span(
 					"expected boolean",
+					span);
+
+				Err(())
+			}
+		}
+	}
+
+
+	pub fn expect_string(
+		&self,
+		report: &mut diagn::Report,
+		span: &diagn::Span)
+		-> Result<&ValueString, ()>
+	{
+		match self
+		{
+			expr::Value::String(value) => Ok(value),
+			_ =>
+			{
+				report.error_span(
+					"expected string",
 					span);
 
 				Err(())

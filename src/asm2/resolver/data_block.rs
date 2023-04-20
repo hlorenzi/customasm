@@ -4,6 +4,7 @@ use crate::*;
 pub fn resolve_data_element(
     report: &mut diagn::Report,
     opts: &asm2::AssemblyOptions,
+    fileserver: &dyn util::FileServer,
     ast_data: &asm2::AstDirectiveData,
     elem_index: usize,
     decls: &asm2::ItemDecls,
@@ -19,6 +20,7 @@ pub fn resolve_data_element(
     
     let maybe_encoding = asm2::resolver::eval(
         report,
+        fileserver,
         decls,
         defs,
         ctx,

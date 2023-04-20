@@ -1,1 +1,0 @@
-#d incbinstr() ; error: wrong

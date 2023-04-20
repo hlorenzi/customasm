@@ -1,4 +1,4 @@
-#include "code.asm"
-; error: code.asm:1: no match
-; error: code.asm:2: no match
-; error: code.asm:3: no match
+#include "code1.asm"
+; error: code1.asm:1: no match
+; error: code1.asm:2: no match
+; error: code1.asm:3: no match

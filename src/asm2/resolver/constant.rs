@@ -9,6 +9,7 @@ use crate::*;
 pub fn resolve_constants(
     report: &mut diagn::Report,
     opts: &asm2::AssemblyOptions,
+    fileserver: &dyn util::FileServer,
     ast: &asm2::AstTopLevel,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs)
@@ -21,6 +22,7 @@ pub fn resolve_constants(
         let resolved_count = resolve_constants_once(
             report,
             opts,
+            fileserver,
             ast,
             decls,
             defs)?;
@@ -38,6 +40,7 @@ pub fn resolve_constants(
 pub fn resolve_constants_once(
     report: &mut diagn::Report,
     opts: &asm2::AssemblyOptions,
+    fileserver: &dyn util::FileServer,
     ast: &asm2::AstTopLevel,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs)
@@ -60,6 +63,7 @@ pub fn resolve_constants_once(
                 let resolution_state = resolve_constant(
                     report,
                     opts,
+                    fileserver,
                     ast_symbol,
                     decls,
                     defs,
@@ -80,6 +84,7 @@ pub fn resolve_constants_once(
 pub fn resolve_constant(
     report: &mut diagn::Report,
     opts: &asm2::AssemblyOptions,
+    fileserver: &dyn util::FileServer,
     ast_symbol: &asm2::AstSymbol,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
@@ -92,6 +97,7 @@ pub fn resolve_constant(
     {
         let value = asm2::resolver::eval(
             report,
+            fileserver,
             decls,
             defs,
             ctx,

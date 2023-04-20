@@ -41,7 +41,7 @@ pub fn eval_builtin(
     let builtin_name = {
         match info.func
         {
-            expr::Value::BuiltInFunction(ref name) => name,
+            expr::Value::ExprBuiltInFunction(ref name) => name,
             _ => unreachable!(),
         }
     };

@@ -4,6 +4,7 @@ use crate::*;
 pub fn resolve_instruction(
     report: &mut diagn::Report,
     opts: &asm2::AssemblyOptions,
+    fileserver: &dyn util::FileServer,
     ast_instr: &asm2::AstInstruction,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
@@ -12,6 +13,7 @@ pub fn resolve_instruction(
 {
     let maybe_encoding = resolve_encoding(
         report,
+        fileserver,
         ast_instr,
         decls,
         defs,
@@ -61,6 +63,7 @@ pub fn resolve_instruction(
 
 fn resolve_encoding(
     report: &mut diagn::Report,
+    fileserver: &dyn util::FileServer,
     ast_instr: &asm2::AstInstruction,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
@@ -70,6 +73,7 @@ fn resolve_encoding(
     // Try to resolve every match
     resolve_instruction_matches(
         report,
+        fileserver,
         ast_instr,
         decls,
         defs,
@@ -161,6 +165,7 @@ fn resolve_encoding(
 
 fn resolve_instruction_matches(
     report: &mut diagn::Report,
+    fileserver: &dyn util::FileServer,
     ast_instr: &asm2::AstInstruction,
     decls: &asm2::ItemDecls,
     defs: &mut asm2::ItemDefs,
@@ -186,6 +191,7 @@ fn resolve_instruction_matches(
             let maybe_value = resolve_instruction_match(
                 report,
                 &mtch,
+                fileserver,
                 decls,
                 defs,
                 ctx);
@@ -278,6 +284,7 @@ fn build_recursive_candidate_note(
 fn resolve_instruction_match(
     report: &mut diagn::Report,
     mtch: &asm2::InstructionMatch,
+    fileserver: &dyn util::FileServer,
     decls: &asm2::ItemDecls,
     defs: &asm2::ItemDefs,
     ctx: &asm2::ResolverContext)
@@ -297,6 +304,7 @@ fn resolve_instruction_match(
     let maybe_value = resolve_instruction_match_inner(
         report,
         &mtch,
+        fileserver,
         decls,
         defs,
         ctx);
@@ -310,6 +318,7 @@ fn resolve_instruction_match(
 fn resolve_instruction_match_inner(
     report: &mut diagn::Report,
     mtch: &asm2::InstructionMatch,
+    fileserver: &dyn util::FileServer,
     decls: &asm2::ItemDecls,
     defs: &asm2::ItemDefs,
     ctx: &asm2::ResolverContext)
@@ -328,6 +337,7 @@ fn resolve_instruction_match_inner(
             {
                 let arg_value = asm2::resolver::eval(
                     report,
+                    fileserver,
                     decls,
                     defs,
                     ctx,
@@ -361,6 +371,7 @@ fn resolve_instruction_match_inner(
                 let arg_value = resolve_instruction_match(
                     report,
                     &nested_match,
+                    fileserver,
                     decls,
                     defs,
                     ctx)?;
@@ -378,11 +389,15 @@ fn resolve_instruction_match_inner(
         }
     }
 
+    let mut rule_ctx = (*ctx).clone();
+    rule_ctx.filename_ctx = Some(&rule.expr.span().file);
+
     asm2::resolver::eval(
         report,
+        fileserver,
         decls,
         defs,
-        ctx,
+        &rule_ctx,
         &mut eval_ctx,
         &rule.expr)
 }
@@ -403,7 +418,7 @@ pub fn check_and_constrain_argument(
     match typ
     {
         asm2::RuleParameterType::Unspecified =>
-            Ok(expr::Value::make_integer(bigint)),
+            Ok(value),
             
         asm2::RuleParameterType::Unsigned(size) =>
         {
