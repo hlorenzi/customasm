@@ -101,13 +101,16 @@ pub fn parse_many_and_resolve_includes<S>(
         nodes: Vec::new(),
     };
 
+    let mut once_filenames = std::collections::HashSet::new();
+
     for file in root_filenames
     {
         let ast = parse_and_resolve_includes(
             report,
             fileserver,
             file.borrow(),
-            &mut Vec::new())?;
+            &mut Vec::new(),
+            &mut once_filenames)?;
 
         result.nodes.extend(ast.nodes);
     }
@@ -120,10 +123,18 @@ pub fn parse_and_resolve_includes<S>(
     report: &mut diagn::Report,
     fileserver: &dyn util::FileServer,
     root_filename: S,
-    seen_filenames: &mut Vec<String>)
+    seen_filenames: &mut Vec<String>,
+    once_filenames: &mut std::collections::HashSet<String>)
     -> Result<AstTopLevel, ()>
     where S: std::borrow::Borrow<str>
 {
+    if once_filenames.contains(root_filename.borrow())
+    {
+        return Ok(AstTopLevel {
+            nodes: Vec::new(),
+        });
+    }
+
     let chars = fileserver.get_chars2(
         report,
         None,
@@ -135,6 +146,12 @@ pub fn parse_and_resolve_includes<S>(
         &chars)?;
 
     let mut root_ast = parse(report, &tokens)?;
+
+    // Check presence of an #once directive
+    if root_ast.nodes.iter().any(|n| matches!(n, AstAny::DirectiveOnce(_)))
+    {
+        once_filenames.insert(root_filename.borrow().to_owned());
+    }
 
     for node_index in (0..root_ast.nodes.len()).rev()
     {
@@ -165,7 +182,8 @@ pub fn parse_and_resolve_includes<S>(
                 report,
                 fileserver,
                 included_filename.as_ref(),
-                seen_filenames)?;
+                seen_filenames,
+                once_filenames)?;
 
             // Replace the `#include` node with
             // the actual included file's AST
