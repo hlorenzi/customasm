@@ -1,0 +1,1 @@
+#d utf8("abc" @ "def") ; error: failed / error: expected string

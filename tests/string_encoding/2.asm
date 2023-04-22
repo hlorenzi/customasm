@@ -1,1 +1,0 @@
-#d utf8(0x1234) ; error: expected string

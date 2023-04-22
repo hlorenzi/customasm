@@ -9,6 +9,12 @@ pub fn resolve_builtin_fn(
     {
         "assert" => Some(eval_builtin_assert),
         "le" => Some(eval_builtin_le),
+        "ascii" => Some(eval_builtin_ascii),
+        "utf8" => Some(eval_builtin_utf8),
+        "utf16be" => Some(eval_builtin_utf16be),
+        "utf16le" => Some(eval_builtin_utf16le),
+        "utf32be" => Some(eval_builtin_utf32be),
+        "utf32le" => Some(eval_builtin_utf32le),
         _ => None,
     }
 }
@@ -119,4 +125,69 @@ pub fn get_static_size_builtin_le(
     {
         None
     }
+}
+
+
+pub fn eval_builtin_string_encoding(
+    encoding: &str,
+    info: &mut expr::EvalFunctionInfo2)
+    -> Result<expr::Value, ()>
+{
+    info.ensure_arg_number(1)?;
+
+    let s = info.args[0].value.expect_string(
+        info.report,
+        info.args[0].span)?;
+
+    Ok(expr::Value::make_string(
+        &s.utf8_contents,
+        encoding))
+}
+
+
+pub fn eval_builtin_ascii(
+    info: &mut expr::EvalFunctionInfo2)
+    -> Result<expr::Value, ()>
+{
+    eval_builtin_string_encoding("ascii", info)
+}
+
+
+pub fn eval_builtin_utf8(
+    info: &mut expr::EvalFunctionInfo2)
+    -> Result<expr::Value, ()>
+{
+    eval_builtin_string_encoding("utf8", info)
+}
+
+
+pub fn eval_builtin_utf16be(
+    info: &mut expr::EvalFunctionInfo2)
+    -> Result<expr::Value, ()>
+{
+    eval_builtin_string_encoding("utf16be", info)
+}
+
+
+pub fn eval_builtin_utf16le(
+    info: &mut expr::EvalFunctionInfo2)
+    -> Result<expr::Value, ()>
+{
+    eval_builtin_string_encoding("utf16le", info)
+}
+
+
+pub fn eval_builtin_utf32be(
+    info: &mut expr::EvalFunctionInfo2)
+    -> Result<expr::Value, ()>
+{
+    eval_builtin_string_encoding("utf32be", info)
+}
+
+
+pub fn eval_builtin_utf32le(
+    info: &mut expr::EvalFunctionInfo2)
+    -> Result<expr::Value, ()>
+{
+    eval_builtin_string_encoding("utf32le", info)
 }
