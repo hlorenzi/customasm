@@ -236,7 +236,12 @@ pub fn test_file2(filepath: &str)
         .to_string_lossy()
         .into_owned();
 
-	let expectations = extract_expectations(&stripped_filename, &contents).unwrap();
+	let expectations =
+        extract_expectations(
+            &stripped_filename,
+            &contents)
+        .unwrap();
+
     if !expectations.has_any
     {
         return;

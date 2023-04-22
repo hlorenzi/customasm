@@ -1,7 +1,6 @@
-; from forward-referenced ruledef
 #ruledef
 {
-    test {x} => asm { emit x }
+    test {x} => asm { emit {x} }
 }
 
 test 0x12 ; = 0x12

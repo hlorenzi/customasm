@@ -266,3 +266,29 @@ fn parse_line(
             instruction::parse(report, walker)?)))
     }
 }
+
+
+impl AstAny
+{
+    pub fn span(&self) -> &diagn::Span
+    {
+        match self
+        {
+            AstAny::DirectiveAddr(node) => &node.header_span,
+            AstAny::DirectiveAlign(node) => &node.header_span,
+            AstAny::DirectiveBank(node) => &node.header_span,
+            AstAny::DirectiveBankdef(node) => &node.header_span,
+            AstAny::DirectiveBits(node) => &node.header_span,
+            AstAny::DirectiveData(node) => &node.header_span,
+            AstAny::DirectiveFn(node) => &node.header_span,
+            AstAny::DirectiveInclude(node) => &node.header_span,
+            AstAny::DirectiveLabelAlign(node) => &node.header_span,
+            AstAny::DirectiveNoEmit(node) => &node.header_span,
+            AstAny::DirectiveOnce(node) => &node.header_span,
+            AstAny::DirectiveRes(node) => &node.header_span,
+            AstAny::DirectiveRuledef(node) => &node.header_span,
+            AstAny::Instruction(node) => &node.span,
+            AstAny::Symbol(node) => &node.decl_span,
+        }
+    }
+}

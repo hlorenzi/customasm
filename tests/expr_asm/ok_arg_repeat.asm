@@ -1,13 +1,11 @@
-; multi-line
 #ruledef
 {
     emit {x: i8} => 0x11 @ x
     load {x: i8} => 0x22 @ x
-    test {x} => asm
-    {
-        emit x
+    test {x} => asm {
+        emit {x}
         emit 0xff
-        load x
+        load {x}
     }
 }
 

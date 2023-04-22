@@ -1,4 +1,4 @@
-#ruledef reg
+#subruledef reg
 {
     a => 0xaa
     b => 0xbb
@@ -11,7 +11,4 @@
 }
 
 
-emit a ; = 0xaa
-emit b ; = 0xbb
-test a ; = 0xaa
-test b ; = 0xbb
+test c ; error: no match

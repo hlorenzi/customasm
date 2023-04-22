@@ -6,6 +6,7 @@ pub use iter::{
     ResolveIterator,
     ResolverContext,
     ResolverNode,
+    BankData,
 };
 
 mod constant;
@@ -26,6 +27,17 @@ mod eval;
 pub use eval::{
     eval,
     eval_simple,
+};
+
+mod eval_asm;
+pub use eval_asm::{
+    eval_asm,
+};
+
+mod eval_builtin_fn;
+pub use eval_builtin_fn::{
+    resolve_builtin_fn,
+    eval_builtin_fn,
 };
 
 

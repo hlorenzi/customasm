@@ -103,12 +103,11 @@ pub fn match_all(
                 &ast_instr.tokens);
 
             
-            if matches.len() == 0
+            if let Err(()) = error_on_no_matches(
+                report,
+                &ast_instr.span,
+                &matches)
             {
-                report.error_span(
-                    "no match found for instruction",
-                    &ast_instr.span);
-
                 continue;
             }
 
@@ -132,13 +131,37 @@ pub fn match_all(
             if opts.debug_iterations
             {
                 println!(" size: {} = {:?}",
-                    ast_instr.tokens.iter().map(|t| t.text()).collect::<Vec<_>>().join(""),
+                    ast_instr.tokens.iter()
+                        .map(|t| t.text())
+                        .collect::<Vec<_>>()
+                        .join(""),
                     instr.encoding.size.unwrap());
             }
         }
     }
 
     report.stop_at_errors()
+}
+
+
+pub fn error_on_no_matches(
+    report: &mut diagn::Report,
+    span: &diagn::Span,
+    matches: &InstructionMatches)
+    -> Result<(), ()>
+{
+    if matches.len() == 0
+    {
+        report.error_span(
+            "no match found for instruction",
+            span);
+
+        Err(())
+    }
+    else
+    {
+        Ok(())
+    }
 }
 
 

@@ -1,8 +1,7 @@
-; simple
 #ruledef
 {
     emit {x: i8} => x
-    test {x} => asm { emit x }
+    test {x} => asm { emit {x} }
 }
 
 emit 0x12     ; = 0x12

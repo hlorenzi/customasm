@@ -72,7 +72,7 @@ pub fn eval_builtin_assert(
             info.span);
         
         Ok(expr::Value::FailedConstraint(
-            info.report.wrap_in_parents(msg)))
+            info.report.wrap_in_parents_capped(msg)))
     }
 }
 

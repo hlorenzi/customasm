@@ -11,16 +11,25 @@ pub fn resolve_instruction(
     ctx: &asm2::ResolverContext)
     -> Result<asm2::ResolutionState, ()>
 {
+    let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
+
+    // Extract matches to satisfy the borrow checker
+    let mut matches = std::mem::replace(
+        &mut instr.matches,
+        asm2::InstructionMatches::new());
+        
     let maybe_encoding = resolve_encoding(
         report,
+        &ast_instr.span,
         fileserver,
-        ast_instr,
+        &mut matches,
         decls,
         defs,
         ctx)?;
 
-
+    // Reassign matches to satisfy the borrow checker
     let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
+    instr.matches = matches;
 
 
     // Check for stable resolution
@@ -49,7 +58,10 @@ pub fn resolve_instruction(
         if opts.debug_iterations
         {
             println!("instr: {} = {:?}",
-                ast_instr.tokens.iter().map(|t| t.text()).collect::<Vec<_>>().join(""),
+                ast_instr.tokens.iter()
+                    .map(|t| t.text())
+                    .collect::<Vec<_>>()
+                    .join(""),
                 instr.encoding);
         }
         
@@ -61,29 +73,39 @@ pub fn resolve_instruction(
 }
 
 
-fn resolve_encoding(
+pub fn resolve_encoding(
     report: &mut diagn::Report,
+    instr_span: &diagn::Span,
     fileserver: &dyn util::FileServer,
-    ast_instr: &asm2::AstInstruction,
+    matches: &mut asm2::InstructionMatches,
     decls: &asm2::ItemDecls,
-    defs: &mut asm2::ItemDefs,
+    defs: &asm2::ItemDefs,
     ctx: &asm2::ResolverContext)
     -> Result<Option<util::BigInt>, ()>
 {
+    report.push_parent_cap();
+
+    report.push_parent(
+        "failed to resolve instruction",
+        instr_span);
+    
     // Try to resolve every match
-    resolve_instruction_matches(
+    let resolved = resolve_instruction_matches(
         report,
         fileserver,
-        ast_instr,
+        matches,
         decls,
         defs,
-        ctx)?;
+        ctx);
+
+    report.pop_parent();
+    report.pop_parent_cap();
+    resolved?;
 
 
-    let instr = defs.instructions.get(ast_instr.item_ref.unwrap());
-
-    // Retain only encodings which are Resolved
-    let encodings_resolved = instr.matches
+    // Retain only encodings which are Resolved,
+    // and keep their original indices
+    let encodings_resolved = matches
         .iter()
         .enumerate()
         .filter(|m| m.1.encoding.is_resolved())
@@ -99,7 +121,7 @@ fn resolve_encoding(
         {
             let mut msgs = Vec::new();
 
-            for mtch in &instr.matches
+            for mtch in matches
             {
                 let encoding = &mtch.encoding;
 
@@ -140,14 +162,14 @@ fn resolve_encoding(
         {
             notes.push(build_recursive_candidate_note(
                 0,
-                &instr.matches[encoding.0],
+                &matches[encoding.0],
                 decls,
                 defs));
         }
 
         report.push_parent(
             "multiple matches with the same encoding size",
-            &ast_instr.span);
+            instr_span);
 
         report.push_multiple(notes);
 
@@ -166,63 +188,44 @@ fn resolve_encoding(
 fn resolve_instruction_matches(
     report: &mut diagn::Report,
     fileserver: &dyn util::FileServer,
-    ast_instr: &asm2::AstInstruction,
+    matches: &mut asm2::InstructionMatches,
     decls: &asm2::ItemDecls,
-    defs: &mut asm2::ItemDefs,
+    defs: &asm2::ItemDefs,
     ctx: &asm2::ResolverContext)
     -> Result<(), ()>
 {
-    let instr = defs.instructions.get(ast_instr.item_ref.unwrap());
-
-    // Try to resolve every match
-    for index in 0..instr.matches.len()
+    for index in 0..matches.len()
     {
-        let instr = defs.instructions.get(ast_instr.item_ref.unwrap());
-        let mtch = &instr.matches[index];
+        let mtch = &matches[index];
         let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
         let rule = &ruledef.get_rule(mtch.rule_ref);
 
+        let value = resolve_instruction_match(
+            report,
+            &mtch,
+            fileserver,
+            decls,
+            defs,
+            ctx)?;
 
-        let value_definite = {
-            report.push_parent(
-                "failed to resolve instruction",
-                &ast_instr.span);
-            
-            let maybe_value = resolve_instruction_match(
-                report,
-                &mtch,
-                fileserver,
-                decls,
-                defs,
-                ctx);
+        let value_definite = value.expect_error_or_sized_bigint(
+            report,
+            &rule.expr.returned_value_span())?;
 
-            let maybe_value = maybe_value
-                .and_then(|v| v.expect_error_or_sized_bigint(
-                    report,
-                    &rule.expr.returned_value_span()));
-    
-            report.pop_parent();
-            report.pop_parent();
-
-            maybe_value?
-        };
-
-
-        let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
 
         if let expr::Value::Integer(bigint) = value_definite
         {
-            instr.matches[index].encoding =
+            matches[index].encoding =
                 asm2::InstructionMatchResolution::Resolved(bigint);
         }
         else if let expr::Value::FailedConstraint(msg) = value_definite
         {
-            instr.matches[index].encoding =
+            matches[index].encoding =
                 asm2::InstructionMatchResolution::FailedConstraint(msg);
         }
         else
         {
-            instr.matches[index].encoding =
+            matches[index].encoding =
                 asm2::InstructionMatchResolution::Unresolved;
         }
     }

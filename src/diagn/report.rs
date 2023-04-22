@@ -20,7 +20,8 @@ const C_BOLD:     &'static str = "\u{001b}[1m";
 pub struct Report
 {
 	messages: Vec<Message>,
-	parents: Vec<Message>
+	parents: Vec<Message>,
+	parent_cap: Vec<usize>,
 }
 
 
@@ -198,7 +199,8 @@ impl Report
 		Report
 		{
 			messages: Vec::new(),
-			parents: Vec::new()
+			parents: Vec::new(),
+			parent_cap: Vec::new(),
 		}
 	}
 
@@ -212,7 +214,32 @@ impl Report
 	}
 	
 	
-	pub fn wrap_in_parents(&self, mut msg: Message) -> Message
+	pub fn wrap_in_parents_capped(
+		&self,
+		mut msg: Message)
+		-> Message
+	{
+		let cap_at = self.parent_cap.last().copied().unwrap_or(0);
+
+		for parent in self.parents[cap_at..].iter().rev()
+		{
+			msg = Message {
+				descr: parent.descr.clone(),
+				kind: parent.kind,
+				span: parent.span.clone(),
+				short_excerpt: parent.short_excerpt,
+				inner: vec![msg],
+			};
+		}
+		
+		msg
+	}
+	
+	
+	pub fn wrap_in_parents(
+		&self,
+		mut msg: Message)
+		-> Message
 	{
 		for parent in self.parents.iter().rev()
 		{
@@ -237,7 +264,9 @@ impl Report
 	
 	pub fn push_multiple(&mut self, mut msgs: Vec<Message>)
 	{
-		for parent in self.parents.iter().rev()
+		let range = self.parent_cap.last().copied().unwrap_or(0);
+
+		for parent in self.parents[range..].iter().rev()
 		{
 			let msg = Message {
 				descr: parent.descr.clone(),
@@ -336,7 +365,19 @@ impl Report
 	
 	pub fn pop_parent(&mut self)
 	{
-		self.parents.pop();
+		self.parents.pop().unwrap();
+	}
+	
+	
+	pub fn push_parent_cap(&mut self)
+	{
+		self.parent_cap.push(self.parents.len());
+	}
+	
+	
+	pub fn pop_parent_cap(&mut self)
+	{
+		self.parent_cap.pop().unwrap();
 	}
 	
 	

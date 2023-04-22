@@ -112,7 +112,8 @@ fn parse_rule(
     walker.acknowledge_whitespace();
 
 
-    while !walker.next_is(0, syntax::TokenKind::HeavyArrowRight)
+    while !walker.is_over() &&
+        !walker.next_is(0, syntax::TokenKind::HeavyArrowRight)
     {
         let tk = walker.advance();
         pattern_span = pattern_span.join(&tk.span);

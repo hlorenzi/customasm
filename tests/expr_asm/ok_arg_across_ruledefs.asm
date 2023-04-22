@@ -1,7 +1,6 @@
-; from different ruledef blocks
 #ruledef
 {
-    test {x} => asm { emit x }
+    test {x} => asm { emit {x} }
 }
 
 #ruledef
