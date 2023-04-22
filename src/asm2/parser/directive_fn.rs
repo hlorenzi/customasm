@@ -9,6 +9,8 @@ pub struct AstDirectiveFn
     pub name: String,
     pub params: Vec<AstFnParameter>,
     pub body: expr::Expr,
+
+    pub item_ref: Option<util::ItemRef<asm2::Symbol>>,
 }
 
 
@@ -56,5 +58,7 @@ pub fn parse(
         name,
         params,
         body,
+
+        item_ref: None,
     })
 }

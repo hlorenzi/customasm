@@ -5,7 +5,7 @@ pub struct EvalContext2
 {
 	locals: std::collections::HashMap<String, expr::Value>,
 	token_substs: std::collections::HashMap<String, Vec<syntax::Token>>,
-	pub eval_asm_depth: usize,
+	recursion_depth: usize,
 }
 
 
@@ -20,8 +20,36 @@ impl EvalContext2
 		{
 			locals: std::collections::HashMap::new(),
 			token_substs: std::collections::HashMap::new(),
-			eval_asm_depth: 0,
+			recursion_depth: 0,
 		}
+	}
+
+
+	pub fn new_deepened(from: &EvalContext2) -> EvalContext2
+	{
+		let mut new_ctx = EvalContext2::new();
+		new_ctx.recursion_depth = from.recursion_depth + 1;
+		new_ctx
+	}
+
+
+	pub fn check_recursion_depth_limit(
+		&self,
+		report: &mut diagn::Report,
+		span: &diagn::Span)
+		-> Result<(), ()>
+	{
+		if self.recursion_depth >= 25
+		{
+			report.message_with_parents_dedup(
+				diagn::Message::error_span(
+					"recursion depth limit reached",
+					span));
+	
+			return Err(());
+		}
+
+		Ok(())
 	}
 	
 	
@@ -88,8 +116,7 @@ impl EvalContext2
 		&self)
 		-> EvalContext2
 	{
-		let mut new_ctx = EvalContext2::new();
-		new_ctx.eval_asm_depth = self.eval_asm_depth;
+		let mut new_ctx = EvalContext2::new_deepened(self);
 		
 		for entry in &self.locals
 		{
@@ -145,6 +172,7 @@ pub struct EvalFunctionInfo2<'a>
 	pub func: expr::Value,
 	pub args: Vec<EvalFunctionArgument<'a>>,
 	pub span: &'a diagn::Span,
+	pub eval_ctx: &'a mut EvalContext2,
 }
 
 
@@ -617,6 +645,7 @@ impl expr::Expr
 					func,
 					args,
 					span,
+					eval_ctx: ctx,
 				};
 
 				match info.func

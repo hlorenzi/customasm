@@ -338,8 +338,8 @@ fn resolve_instruction_match_inner(
     let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
     let rule = &ruledef.get_rule(mtch.rule_ref);
 
-    let mut eval_ctx = expr::EvalContext2::new();
-    eval_ctx.eval_asm_depth = arg_eval_ctx.eval_asm_depth;
+    let mut eval_ctx = expr::EvalContext2::new_deepened(
+        &arg_eval_ctx);
 
     for (index, arg) in mtch.args.iter().enumerate()
     {

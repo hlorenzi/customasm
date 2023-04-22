@@ -24,7 +24,7 @@ pub fn resolve_builtin_fn(
 }
 
 
-pub fn eval_builtin_fn(
+pub fn eval_fn(
     fileserver: &dyn util::FileServer,
     decls: &asm2::ItemDecls,
     defs: &asm2::ItemDefs,
@@ -42,6 +42,55 @@ pub fn eval_builtin_fn(
             defs,
             ctx,
             info)
+    }
+    else if let expr::Value::Function(fn_index) = info.func
+    {
+        info.eval_ctx.check_recursion_depth_limit(
+            info.report,
+            info.span)?;
+        
+        let fn_ref = util::ItemRef::<asm2::Function>::new(fn_index);
+        let function = defs.functions.get(fn_ref);
+        let symbol_decl = decls.symbols.get(function.item_ref);
+        
+        let mut args_ctx = expr::EvalContext2::new_deepened(
+            &info.eval_ctx);
+
+        info.ensure_arg_number(function.params.len())?;
+
+        for param_index in 0..function.params.len()
+        {
+            let param = &function.params[param_index];
+            let arg = &info.args[param_index];
+            
+            args_ctx.set_local(
+                param.name.clone(),
+                arg.value.clone());
+        }
+
+        info.report.push_parent(
+            "failed to resolve function call",
+            info.span);
+
+        info.report.push_parent_short_note(
+            format!(
+                "within function `{}`",
+                symbol_decl.name),
+            &symbol_decl.span);
+
+        let maybe_result = asm2::resolver::eval(
+            info.report,
+            fileserver,
+            decls,
+            defs,
+            ctx,
+            &mut args_ctx,
+            &function.body);
+
+        info.report.pop_parent();
+        info.report.pop_parent();
+
+        maybe_result
     }
     else
     {

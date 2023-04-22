@@ -9,15 +9,9 @@ pub fn eval_asm(
     info: &mut expr::EvalAsmInfo2)
     -> Result<expr::Value, ()>
 {
-    if info.eval_ctx.eval_asm_depth >= 10
-    {
-        info.report.message_with_parents_dedup(
-            diagn::Message::error_span(
-                "recursion depth limit reached in `asm` block",
-                info.span));
-
-        return Err(());
-    }
+    info.eval_ctx.check_recursion_depth_limit(
+        info.report,
+        info.span)?;
 
 
     // Keep the current position to advance
@@ -68,8 +62,6 @@ pub fn eval_asm(
             // Try to resolve the encoding
             let mut new_eval_ctx = info.eval_ctx
                 .hygienize_locals_for_asm_subst();
-
-            new_eval_ctx.eval_asm_depth += 1;
 
             let maybe_encoding = asm2::resolver::instruction::resolve_encoding(
                 info.report,

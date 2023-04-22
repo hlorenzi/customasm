@@ -47,6 +47,8 @@ pub use defs::{
     RulePattern,
     RulePatternPart,
     Symbol,
+    Function,
+    FunctionParameter,
     Instruction,
     DataElement,
     ResDirective,

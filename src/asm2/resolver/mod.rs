@@ -34,10 +34,10 @@ pub use eval_asm::{
     eval_asm,
 };
 
-mod eval_builtin_fn;
-pub use eval_builtin_fn::{
+mod eval_fn;
+pub use eval_fn::{
     resolve_builtin_fn,
-    eval_builtin_fn,
+    eval_fn,
 };
 
 

@@ -21,6 +21,12 @@ pub use symbol::{
     Symbol,
 };
 
+mod function;
+pub use function::{
+    Function,
+    FunctionParameter,
+};
+
 mod instruction;
 pub use instruction::{
     Instruction,
@@ -53,6 +59,7 @@ pub struct ItemDefs
     pub bankdefs: DefList<Bankdef>,
     pub ruledefs: DefList<Ruledef>,
     pub symbols: DefList<Symbol>,
+    pub functions: DefList<Function>,
     pub instructions: DefList<Instruction>,
     pub data_elems: DefList<DataElement>,
     pub res_directives: DefList<ResDirective>,
@@ -119,6 +126,7 @@ pub fn define(
         bankdefs: DefList::new(),
         ruledefs: DefList::new(),
         symbols: DefList::new(),
+        functions: DefList::new(),
         instructions: DefList::new(),
         data_elems: DefList::new(),
         res_directives: DefList::new(),
@@ -130,6 +138,7 @@ pub fn define(
     bankdef::define(report, ast, decls, &mut defs)?;
     ruledef::define(report, ast, decls, &mut defs)?;
     symbol::define(report, ast, decls, &mut defs)?;
+    function::define(report, ast, decls, &mut defs)?;
     instruction::define(report, ast, decls, &mut defs)?;
     data_block::define(report, ast, decls, &mut defs)?;
     res::define(report, ast, decls, &mut defs)?;

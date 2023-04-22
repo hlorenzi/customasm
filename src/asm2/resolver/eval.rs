@@ -67,7 +67,7 @@ pub fn eval(
 
     let mut eval_fn = |info: &mut expr::EvalFunctionInfo2|
     {
-        asm2::resolver::eval_builtin_fn(
+        asm2::resolver::eval_fn(
             fileserver,
             decls,
             defs,

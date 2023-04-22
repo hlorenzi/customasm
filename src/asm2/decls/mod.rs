@@ -5,6 +5,7 @@ mod bank;
 mod bankdef;
 mod ruledef;
 mod symbol;
+mod function;
 
 
 #[derive(Debug)]
@@ -32,9 +33,9 @@ pub fn collect(
     bank::collect(report, ast, &mut collections)?;
     ruledef::collect(report, ast, &mut collections)?;
     symbol::collect(report, ast, &mut collections)?;
+    function::collect(report, ast, &mut collections)?;
 
     report.stop_at_errors()?;
-
 
     Ok(collections)
 }

@@ -28,7 +28,7 @@ pub enum Value
 	Bool(bool),
 	ExprBuiltInFunction(String),
 	AsmBuiltInFunction(String),
-	Function(usize),
+	Function(usize /*util::ItemRef<asm2::Function>*/),
 }
 
 

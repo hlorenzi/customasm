@@ -1,3 +1,4 @@
+#[derive(Eq, PartialEq)]
 pub struct ItemRef<T>(
     pub(crate) usize,
     std::marker::PhantomData<*const T>);
