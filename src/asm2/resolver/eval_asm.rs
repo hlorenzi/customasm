@@ -9,6 +9,17 @@ pub fn eval_asm(
     info: &mut expr::EvalAsmInfo2)
     -> Result<expr::Value, ()>
 {
+    if info.eval_ctx.eval_asm_depth >= 10
+    {
+        info.report.message_with_parents_dedup(
+            diagn::Message::error_span(
+                "recursion depth limit reached in `asm` block",
+                info.span));
+
+        return Err(());
+    }
+
+
     // Keep the current position to advance
     // between instructions
     let mut cur_position = ctx.bank_data.cur_position;
@@ -55,6 +66,11 @@ pub fn eval_asm(
 
 
             // Try to resolve the encoding
+            let mut new_eval_ctx = info.eval_ctx
+                .hygienize_locals_for_asm_subst();
+
+            new_eval_ctx.eval_asm_depth += 1;
+
             let maybe_encoding = asm2::resolver::instruction::resolve_encoding(
                 info.report,
                 &ast_instr.span,
@@ -62,7 +78,8 @@ pub fn eval_asm(
                 &mut matches,
                 decls,
                 defs,
-                &mut inner_ctx)?;
+                &mut inner_ctx,
+                &mut new_eval_ctx)?;
 
 
             // Add the encoding to the result value
@@ -165,7 +182,7 @@ fn perform_substitutions<'tokens>(
         }
         
         let token_subst = {
-            match info.args.get_token_sub(subst.name)
+            match info.eval_ctx.get_token_subst(subst.name)
             {
                 Some(t) => t,
                 None =>
@@ -181,7 +198,7 @@ fn perform_substitutions<'tokens>(
             }
         };
 
-        for token in token_subst
+        for token in token_subst.iter()
         {
             let mut new_token = token.clone();
             new_token.span = subst.span.clone();

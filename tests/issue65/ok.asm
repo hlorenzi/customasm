@@ -1,4 +1,9 @@
-#bits 16
+#bankdef a
+{
+    bits = 16
+    outp = 0
+}
+
 #d16 5
 #d16 7
 #addr 6

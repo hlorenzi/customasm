@@ -7,7 +7,7 @@ pub struct Token
 {
 	pub span: Span,
 	pub kind: TokenKind,
-	pub excerpt: Option<String>
+	pub excerpt: Option<String>,
 }
 
 
@@ -243,7 +243,7 @@ where S: Into<String>
 	
 	while index < src.len()
 	{
-		// Decide what are the next token's kind and length.
+		// Decide what the next token's kind and length are.
 		let (kind, length) =
 			check_for_whitespace(&src[index..]).unwrap_or_else(||
 			check_for_comment   (&src[index..]).unwrap_or_else(||
@@ -253,13 +253,22 @@ where S: Into<String>
 			check_for_string    (&src[index..]).unwrap_or_else(||
 			(TokenKind::Error, 1)))))));
 		
-		let span = Span::new(filename.clone(), index, index + length);
+		let span = Span::new(
+			filename.clone(),
+			index,
+			index + length);
 		
 		// Get the source excerpt for variable tokens (e.g. identifiers).
-		let excerpt = match kind.needs_excerpt()
-		{
-			true => Some(src[index..].iter().cloned().take(length).collect()),
-			false => None
+		let excerpt = {
+			match kind.needs_excerpt()
+			{
+				false => None,
+				true => Some(
+					src[index..].iter()
+						.cloned()
+						.take(length)
+						.collect()),
+			}
 		};
 		
 		// Report unexpected characters.
@@ -270,11 +279,10 @@ where S: Into<String>
 		}
 		
 		// Add to the token list.
-		let token = Token
-		{
-			span: span,
-			kind: kind,
-			excerpt: excerpt
+		let token = Token {
+			span,
+			kind,
+			excerpt,
 		};
 		
 		tokens.push(token);

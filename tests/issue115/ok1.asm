@@ -1,16 +1,18 @@
-#bits 4
+#bankdef a
+{
+    bits = 4
+    outp = 0
+}
 
 #ruledef
 {
     jmp {addr: u4} => addr
 
-    asmjmp {addr: u4} => asm
-    {
-        jmp addr
+    asmjmp {addr: u4} => asm {
+        jmp {addr}
     }
 
-    op => asm
-    {
+    op => asm {
         jmp $
         asmjmp $
         jmp $

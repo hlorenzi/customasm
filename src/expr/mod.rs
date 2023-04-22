@@ -20,11 +20,11 @@ pub use self::eval2::{
     dummy_eval_asm,
 };
 
-mod builtin;
-pub use self::builtin::{
-    resolve_builtin,
-    eval_builtin,
-    get_static_size_builtin,
+mod builtin_fn;
+pub use self::builtin_fn::{
+    resolve_builtin_fn,
+    eval_builtin_fn,
+    get_static_size_builtin_fn,
 };
 
 

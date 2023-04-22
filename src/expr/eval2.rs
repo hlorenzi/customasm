@@ -1,12 +1,15 @@
-use crate::{*, expr::resolve_builtin};
-use std::collections::HashMap;
+use crate::*;
 
 
 pub struct EvalContext2
 {
-	locals: HashMap<String, expr::Value>,
-	token_subs: HashMap<String, Vec<syntax::Token>>,
+	locals: std::collections::HashMap<String, expr::Value>,
+	token_substs: std::collections::HashMap<String, Vec<syntax::Token>>,
+	pub eval_asm_depth: usize,
 }
+
+
+static ASM_HYGIENIZE_PREFIX: &'static str = ":";
 
 
 impl EvalContext2
@@ -15,39 +18,114 @@ impl EvalContext2
 	{
 		EvalContext2
 		{
-			locals: HashMap::new(),
-			token_subs: HashMap::new(),
+			locals: std::collections::HashMap::new(),
+			token_substs: std::collections::HashMap::new(),
+			eval_asm_depth: 0,
 		}
 	}
 	
 	
-	pub fn set_local<S>(&mut self, name: S, value: expr::Value)
-	where S: Into<String>
+	pub fn set_local<S>(
+		&mut self,
+		name: S,
+		value: expr::Value)
+		where S: Into<String>
 	{
 		self.locals.insert(name.into(), value);
 	}
 	
 	
-	pub fn get_local(&self, name: &str) -> Result<expr::Value, ()>
+	pub fn get_local(
+		&self,
+		name: &str)
+		-> Result<expr::Value, ()>
 	{
 		match self.locals.get(name)
 		{
 			Some(value) => Ok(value.clone()),
-			None => Err(())
+			None => Err(()),
 		}
 	}
 	
 	
-	pub fn set_token_sub<S>(&mut self, name: S, tokens: Vec<syntax::Token>)
-	where S: Into<String>
+	pub fn set_token_subst<S>(
+		&mut self,
+		name: S,
+		tokens: Vec<syntax::Token>)
+		where S: Into<String>
 	{
-		self.token_subs.insert(name.into(), tokens);
+		self.token_substs.insert(name.into(), tokens);
 	}
 	
 	
-	pub fn get_token_sub<'a>(&'a self, name: &str) -> Option<&'a Vec<syntax::Token>>
+	pub fn get_token_subst<'a>(
+		&'a self,
+		name: &str)
+		-> Option<std::borrow::Cow<'a, Vec<syntax::Token>>>
 	{
-		self.token_subs.get(name)
+		if let Some(t) = self.token_substs.get(name)
+		{
+			return Some(std::borrow::Cow::Borrowed(t));
+		}
+
+		if let Some(_) = self.locals.get(name)
+		{
+			return Some(std::borrow::Cow::Owned(
+				vec![syntax::Token {
+					span: diagn::Span::new_dummy(),
+					kind: syntax::TokenKind::Identifier,
+					excerpt: Some(
+						EvalContext2::hygienize_name_for_asm_subst(name)),
+				}]
+			));
+		}
+
+		None
+	}
+
+
+	pub fn hygienize_locals_for_asm_subst(
+		&self)
+		-> EvalContext2
+	{
+		let mut new_ctx = EvalContext2::new();
+		new_ctx.eval_asm_depth = self.eval_asm_depth;
+		
+		for entry in &self.locals
+		{
+			if entry.0.starts_with(ASM_HYGIENIZE_PREFIX)
+			{
+				continue;
+			}
+
+			new_ctx.locals.insert(
+				EvalContext2::hygienize_name_for_asm_subst(&entry.0),
+				entry.1.clone());
+		}
+		
+		for entry in &self.token_substs
+		{
+			if entry.0.starts_with(ASM_HYGIENIZE_PREFIX)
+			{
+				continue;
+			}
+			
+			new_ctx.token_substs.insert(
+				EvalContext2::hygienize_name_for_asm_subst(&entry.0),
+				entry.1.clone());
+		}
+
+		new_ctx
+	}
+
+
+	pub fn hygienize_name_for_asm_subst(
+		name: &str)
+		-> String
+	{
+		format!("{}{}",
+			ASM_HYGIENIZE_PREFIX,
+			name)
 	}
 }
 
@@ -116,7 +194,7 @@ pub struct EvalAsmInfo2<'a>
 	pub report: &'a mut diagn::Report,
 	pub tokens: &'a [syntax::Token],
 	pub span: &'a diagn::Span,
-	pub args: &'a mut EvalContext2,
+	pub eval_ctx: &'a mut EvalContext2,
 }
 
 
@@ -297,7 +375,7 @@ impl expr::Expr
 
 				if hierarchy_level == 0 && hierarchy.len() == 1
 				{
-					if let Some(_) = resolve_builtin(&hierarchy[0])
+					if let Some(_) = expr::resolve_builtin_fn(&hierarchy[0])
 					{
 						return Ok(expr::Value::ExprBuiltInFunction(
 							hierarchy[0].clone()));
@@ -544,7 +622,7 @@ impl expr::Expr
 				match info.func
 				{
 					expr::Value::ExprBuiltInFunction(_) =>
-						expr::eval_builtin(&mut info),
+						expr::eval_builtin_fn(&mut info),
 
 					expr::Value::AsmBuiltInFunction(_) =>
 						(provider.eval_fn)(&mut info),
@@ -562,12 +640,11 @@ impl expr::Expr
 			
 			&expr::Expr::Asm(ref span, ref tokens) =>
 			{
-				let mut info = EvalAsmInfo2
-				{
+				let mut info = EvalAsmInfo2 {
 					report,
 					tokens,
 					span,
-					args: ctx,
+					eval_ctx: ctx,
 				};
 
                 (provider.eval_asm)(&mut info)

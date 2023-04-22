@@ -1,7 +1,7 @@
 use crate::*;
 
 
-pub fn resolve_builtin(
+pub fn resolve_builtin_fn(
     name: &str)
     -> Option<fn(&mut expr::EvalFunctionInfo2) -> Result<expr::Value, ()>>
 {
@@ -14,7 +14,7 @@ pub fn resolve_builtin(
 }
 
 
-pub fn get_static_size_builtin(
+pub fn get_static_size_builtin_fn(
     name: &str,
     info: &expr::StaticSizeInfo,
     args: &Vec<expr::Expr>)
@@ -34,7 +34,7 @@ pub fn get_static_size_builtin(
 }
 
 
-pub fn eval_builtin(
+pub fn eval_builtin_fn(
     info: &mut expr::EvalFunctionInfo2)
     -> Result<expr::Value, ()>
 {
@@ -46,7 +46,7 @@ pub fn eval_builtin(
         }
     };
 
-    let builtin_fn = resolve_builtin(builtin_name).unwrap();
+    let builtin_fn = resolve_builtin_fn(builtin_name).unwrap();
     builtin_fn(info)
 }
 

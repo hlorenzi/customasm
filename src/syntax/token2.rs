@@ -15,7 +15,7 @@ pub fn tokenize2<S>(
 	
 	while index < src.len()
 	{
-		// Decide what are the next token's kind and length.
+		// Decide what the next token's kind and length are.
 		let (kind, length) =
 			check_for_whitespace(&src[index..]).unwrap_or_else(||
 			check_for_comment   (&src[index..]).unwrap_or_else(||
@@ -54,9 +54,9 @@ pub fn tokenize2<S>(
 		
 		// Add to the token list.
 		let token = Token {
-			span: span,
-			kind: kind,
-			excerpt: excerpt
+			span,
+			kind,
+			excerpt,
 		};
 		
 		tokens.push(token);

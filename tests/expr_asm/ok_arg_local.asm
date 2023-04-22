@@ -7,4 +7,4 @@
     }
 }
 
-test 2 ; error: failed / note:_:4: within / error:_:6: unknown
+test 2 ; = 0x12

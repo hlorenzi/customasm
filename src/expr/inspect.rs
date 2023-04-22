@@ -84,13 +84,13 @@ impl expr::Expr
 					_,
 					expr::Value::ExprBuiltInFunction(ref builtin_name)) = *func.as_ref()
 				{
-					expr::get_static_size_builtin(builtin_name, info, &args)
+					expr::get_static_size_builtin_fn(builtin_name, info, &args)
 				}
 				else if let expr::Expr::Variable(_, 0, ref names) = *func.as_ref()
 				{
 					if names.len() == 1
 					{
-						expr::get_static_size_builtin(&names[0], info, &args)
+						expr::get_static_size_builtin_fn(&names[0], info, &args)
 					}
 					else
 					{

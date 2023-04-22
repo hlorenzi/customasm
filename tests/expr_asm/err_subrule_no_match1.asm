@@ -6,7 +6,7 @@
 
 #ruledef
 {
-    emit {r: reg} => r`8
+    emit {r: reg} => r
     test {r: reg} => asm { emit {r} }
 }
 

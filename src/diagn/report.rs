@@ -256,9 +256,57 @@ impl Report
 	}
 	
 	
+	pub fn wrap_in_parents_dedup(
+		&self,
+		mut msg: Message)
+		-> Message
+	{
+		let mut seen_msgs = std::collections::HashSet::new();
+		
+		let mut filtered_parents = Vec::new();
+		for parent in self.parents.iter()
+		{
+			let msg_key = format!(
+				"{}_{:?}",
+				parent.descr,
+				parent.span);
+
+			if seen_msgs.contains(&msg_key)
+			{
+				continue;
+			}
+			
+			seen_msgs.insert(msg_key);
+
+			filtered_parents.push(parent);
+		}
+
+		for parent in filtered_parents.iter().rev()
+		{
+			msg = Message {
+				descr: parent.descr.clone(),
+				kind: parent.kind,
+				span: parent.span.clone(),
+				short_excerpt: parent.short_excerpt,
+				inner: vec![msg],
+			};
+		}
+		
+		msg
+	}
+	
+	
 	pub fn message(&mut self, msg: Message)
 	{
 		self.messages.push(self.wrap_in_parents(msg));
+	}
+	
+	
+	pub fn message_with_parents_dedup(
+		&mut self,
+		msg: Message)
+	{
+		self.messages.push(self.wrap_in_parents_dedup(msg));
 	}
 	
 	

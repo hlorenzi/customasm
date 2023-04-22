@@ -25,7 +25,8 @@ pub fn resolve_instruction(
         &mut matches,
         decls,
         defs,
-        ctx)?;
+        ctx,
+        &mut expr::EvalContext2::new())?;
 
     // Reassign matches to satisfy the borrow checker
     let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
@@ -80,7 +81,8 @@ pub fn resolve_encoding(
     matches: &mut asm2::InstructionMatches,
     decls: &asm2::ItemDecls,
     defs: &asm2::ItemDefs,
-    ctx: &asm2::ResolverContext)
+    ctx: &asm2::ResolverContext,
+    arg_eval_ctx: &mut expr::EvalContext2)
     -> Result<Option<util::BigInt>, ()>
 {
     report.push_parent_cap();
@@ -96,7 +98,8 @@ pub fn resolve_encoding(
         matches,
         decls,
         defs,
-        ctx);
+        ctx,
+        arg_eval_ctx);
 
     report.pop_parent();
     report.pop_parent_cap();
@@ -191,7 +194,8 @@ fn resolve_instruction_matches(
     matches: &mut asm2::InstructionMatches,
     decls: &asm2::ItemDecls,
     defs: &asm2::ItemDefs,
-    ctx: &asm2::ResolverContext)
+    ctx: &asm2::ResolverContext,
+    arg_eval_ctx: &mut expr::EvalContext2)
     -> Result<(), ()>
 {
     for index in 0..matches.len()
@@ -206,7 +210,8 @@ fn resolve_instruction_matches(
             fileserver,
             decls,
             defs,
-            ctx)?;
+            ctx,
+            arg_eval_ctx)?;
 
         let value_definite = value.expect_error_or_sized_bigint(
             report,
@@ -290,7 +295,8 @@ fn resolve_instruction_match(
     fileserver: &dyn util::FileServer,
     decls: &asm2::ItemDecls,
     defs: &asm2::ItemDefs,
-    ctx: &asm2::ResolverContext)
+    ctx: &asm2::ResolverContext,
+    arg_eval_ctx: &mut expr::EvalContext2)
     -> Result<expr::Value, ()>
 {
     let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
@@ -310,7 +316,8 @@ fn resolve_instruction_match(
         fileserver,
         decls,
         defs,
-        ctx);
+        ctx,
+        arg_eval_ctx);
 
     report.pop_parent();
 
@@ -324,13 +331,15 @@ fn resolve_instruction_match_inner(
     fileserver: &dyn util::FileServer,
     decls: &asm2::ItemDecls,
     defs: &asm2::ItemDefs,
-    ctx: &asm2::ResolverContext)
+    ctx: &asm2::ResolverContext,
+    arg_eval_ctx: &mut expr::EvalContext2)
     -> Result<expr::Value, ()>
 {
     let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
     let rule = &ruledef.get_rule(mtch.rule_ref);
 
     let mut eval_ctx = expr::EvalContext2::new();
+    eval_ctx.eval_asm_depth = arg_eval_ctx.eval_asm_depth;
 
     for (index, arg) in mtch.args.iter().enumerate()
     {
@@ -344,7 +353,7 @@ fn resolve_instruction_match_inner(
                     decls,
                     defs,
                     ctx,
-                    &mut expr::EvalContext2::new(),
+                    arg_eval_ctx,
                     &expr)?;
 
                 if arg_value.should_propagate()
@@ -364,7 +373,7 @@ fn resolve_instruction_match_inner(
                     &param.name,
                     constrained_arg_value);
                 
-                eval_ctx.set_token_sub(
+                eval_ctx.set_token_subst(
                     &param.name,
                     arg.tokens.clone());
             }
@@ -377,7 +386,8 @@ fn resolve_instruction_match_inner(
                     fileserver,
                     decls,
                     defs,
-                    ctx)?;
+                    ctx,
+                    arg_eval_ctx)?;
 
                 let param = &rule.parameters[index];
 
@@ -385,7 +395,7 @@ fn resolve_instruction_match_inner(
                     &param.name,
                     arg_value);
                 
-                eval_ctx.set_token_sub(
+                eval_ctx.set_token_subst(
                     &param.name,
                     arg.tokens.clone());
             }
