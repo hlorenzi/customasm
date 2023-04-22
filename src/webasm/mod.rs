@@ -1,60 +1,67 @@
 use crate::*;
-use std::mem;
-use std::ptr;
 
 
 #[no_mangle]
-pub unsafe extern fn wasm_assemble(format: u32, src: *mut String) -> *mut String
+pub unsafe extern fn wasm_assemble(
+	format: u32,
+	src: *mut String)
+	-> *mut String
 {
-	let src = mem::transmute::<_, &String>(src);
-	
+	let virtual_filename = "asm";
+
+	let src = std::mem::transmute::<_, &String>(src);
+			
+	let mut report = diagn::Report::new();
+
 	let mut fileserver = util::FileServerMock::new();
-	fileserver.add("asm", src.clone());
+	fileserver.add(virtual_filename, src.clone());
+
+	let opts = asm::AssemblyOptions::new();
+
+	let assembly = asm::assemble(
+		&mut report,
+		&opts,
+		&mut fileserver,
+		&[virtual_filename]);
 	
-	let assemble = |report: diagn::RcReport, fileserver: &util::FileServerMock, filename: &str| -> Result<String, ()>
-	{
-		let mut asm = asm::Assembler::new();
-		asm.register_file(filename);
-		let output = asm.assemble(report.clone(), fileserver, 10)?;
-		
-		let binary = output.binary;
+	let output = {
+		match assembly.output
+		{
+			Some(o) => o,
+			None =>
+			{
+				let mut err = Vec::<u8>::new();
+				report.print_all(&mut err, &fileserver);
+				return wasm_string_new_with(
+					String::from_utf8(err).unwrap());
+			}
+		}
+	};
+	
+	let formatted = {
 		match format
 		{
-			 0 => Ok(binary.format_annotated_hex(fileserver)),
-			 1 => Ok(binary.format_annotated_bin(fileserver)),
-			 
-			 2 => Ok(binary.format_hexdump ()),
-			 3 => Ok(binary.format_bindump ()),
-			 4 => Ok(binary.format_hexstr  ()),
-			 5 => Ok(binary.format_binstr  ()),
-			 6 => Ok(binary.format_mif     ()),
-			 7 => Ok(binary.format_intelhex()),
-			 8 => Ok(binary.format_separator(10, ", ")),
-			 9 => Ok(binary.format_separator(16, ", ")),
-			10 => Ok(binary.format_separator(10, " ")),
-			11 => Ok(binary.format_separator(16, " ")),
-			12 => Ok(binary.format_c_array (10)),
-			13 => Ok(binary.format_c_array (16)),
-			14 => Ok(binary.format_logisim (8)),
-			15 => Ok(binary.format_logisim (16)),
+			0 => output.format_annotated_hex(&fileserver),
+			1 => output.format_annotated_bin(&fileserver),
+			2 => output.format_hexdump(),
+			3 => output.format_bindump(),
+			4 => output.format_hexstr(),
+			5 => output.format_binstr(),
+			6 => output.format_mif(),
+			7 => output.format_intelhex(),
+			8 => output.format_separator(10, ", "),
+			9 => output.format_separator(16, ", "),
+			10 => output.format_separator(10, " "),
+			11 => output.format_separator(16, " "),
+			12 => output.format_c_array(10),
+			13 => output.format_c_array(16),
+			14 => output.format_logisim(8),
+			15 => output.format_logisim(16),
 			_ => unreachable!()
 		}
 	};
-		
-	let report = diagn::RcReport::new();
-	
-	let output = match assemble(report.clone(), &fileserver, "asm")
-	{
-		Ok(output) => output,
-		Err(_) =>
-		{
-			let mut err = Vec::<u8>::new();
-			report.print_all(&mut err, &fileserver);
-			String::from_utf8(err).unwrap()
-		}
-	};
-	
-	wasm_string_new_with(output)
+
+	wasm_string_new_with(formatted)
 }
 
 
@@ -70,7 +77,9 @@ pub unsafe extern fn wasm_string_new(len: u32) -> *mut String
 {
 	let mut s = Box::new(String::new());
 	for _ in 0..len
-		{ s.push_str("\0"); }
+	{
+		s.push_str("\0");
+	}
 	
 	Box::into_raw(s)
 }
@@ -95,20 +104,26 @@ pub unsafe extern fn wasm_string_drop(s: *mut String)
 #[no_mangle]
 pub unsafe extern fn wasm_string_get_len(s: *mut String) -> u32
 {
-	mem::transmute::<_, &mut String>(s).len() as u32
+	std::mem::transmute::<_, &mut String>(s).len() as u32
 }
 
 
 #[no_mangle]
 pub unsafe extern fn wasm_string_get_byte(s: *mut String, index: u32) -> u8
 {
-	ptr::read(mem::transmute::<_, &mut String>(s).as_ptr().offset(index as isize))
+	std::ptr::read(
+		std::mem::transmute::<_, &mut String>(s)
+			.as_ptr()
+			.offset(index as isize))
 }
 
 
 #[no_mangle]
 pub unsafe extern fn wasm_string_set_byte(s: *mut String, index: u32, value: u8)
 {
-	let bytes = mem::transmute::<_, &mut String>(s).as_ptr();
-	ptr::write(mem::transmute::<_, *mut u8>(bytes).offset(index as isize), value)
+	let bytes = std::mem::transmute::<_, &mut String>(s).as_ptr();
+	std::ptr::write(
+		std::mem::transmute::<_, *mut u8>(bytes)
+			.offset(index as isize),
+		value)
 }

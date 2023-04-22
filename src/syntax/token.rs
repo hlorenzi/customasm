@@ -1,11 +1,10 @@
-use crate::diagn::{Span, RcReport};
-use std::rc::Rc;
+use crate::*;
 
 
 #[derive(Debug, Clone)]
 pub struct Token
 {
-	pub span: Span,
+	pub span: diagn::Span,
 	pub kind: TokenKind,
 	pub excerpt: Option<String>,
 }
@@ -233,13 +232,16 @@ impl Token
 }
 
 
-pub fn tokenize<S>(report: RcReport, src_filename: S, src: &[char]) -> Result<Vec<Token>, ()>
-where S: Into<String>
+pub fn tokenize<S>(
+    report: &mut diagn::Report,
+    src_filename: S,
+    src: &[char])
+    -> Result<Vec<Token>, ()>
+    where S: Into<String>
 {
-	let filename = Rc::new(src_filename.into());
+	let filename = std::rc::Rc::new(src_filename.into());
 	let mut tokens = Vec::new();
 	let mut index = 0;
-	let mut had_error = false;
 	
 	while index < src.len()
 	{
@@ -253,29 +255,31 @@ where S: Into<String>
 			check_for_string    (&src[index..]).unwrap_or_else(||
 			(TokenKind::Error, 1)))))));
 		
-		let span = Span::new(
-			filename.clone(),
-			index,
-			index + length);
+		let span = diagn::Span::new(
+            filename.clone(),
+            index,
+            index + length);
 		
 		// Get the source excerpt for variable tokens (e.g. identifiers).
 		let excerpt = {
-			match kind.needs_excerpt()
-			{
-				false => None,
-				true => Some(
-					src[index..].iter()
-						.cloned()
-						.take(length)
-						.collect()),
-			}
-		};
+            match kind.needs_excerpt()
+            {
+                false => None,
+                true => Some(src[index..]
+                    .iter()
+                    .take(length)
+                    .collect()),
+            }
+        };
 		
 		// Report unexpected characters.
 		if kind == TokenKind::Error
 		{
-			report.error_span("unexpected character", &span);
-			had_error = true;
+			report.error_span(
+                "unexpected character",
+                &span);
+
+			return Err(());
 		}
 		
 		// Add to the token list.
@@ -290,9 +294,6 @@ where S: Into<String>
 		index += length;
 	}
 
-	if had_error
-		{ return Err(()); }
-	
 	Ok(tokens)
 }
 

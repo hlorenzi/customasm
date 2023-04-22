@@ -4,19 +4,30 @@ use sha2::*;
 
 fn test_example(filename: &str, hash: &[u8])
 {
+	let mut report = diagn::Report::new();
     let mut fileserver = util::FileServerReal::new();
-	let report = diagn::RcReport::new();
-	let mut assembler = asm::Assembler::new();
-    assembler.register_file(filename);
+
+    let opts = asm::AssemblyOptions::new();
     
-    let output = assembler.assemble(report.clone(), &mut fileserver, 2);
-    report.print_all(&mut std::io::stdout(), &fileserver);
+	let assembly = asm::assemble(
+        &mut report,
+        &opts,
+        &mut fileserver,
+        &[filename]);
+
+    report.print_all(
+        &mut std::io::stdout(),
+        &fileserver);
+
+    let output = assembly.output.unwrap();
 
     let mut output_hasher = sha2::Sha256::new();
-    output_hasher.update(output.as_ref().unwrap().binary.format_binary());
+    output_hasher.update(output.format_binary());
     let output_hash = output_hasher.finalize();
 
-    println!("{}", output.as_ref().unwrap().binary.format_annotated_hex(&fileserver));
+    println!(
+        "{}",
+        output.format_annotated_hex(&fileserver));
     
     assert_eq!(output_hash[..], *hash);
 }

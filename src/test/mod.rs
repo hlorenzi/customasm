@@ -15,8 +15,12 @@ pub enum ExpectedResult<T>
 }
 
 
-pub fn expect_result<T>(report: diagn::RcReport, fileserver: &dyn util::FileServer, got: Option<T>, expected: ExpectedResult<T>)
-where T: std::fmt::Debug + PartialEq
+pub fn expect_result<T>(
+	report: &mut diagn::Report,
+	fileserver: &dyn util::FileServer,
+	got: Option<T>,
+	expected: ExpectedResult<T>)
+	where T: std::fmt::Debug + PartialEq
 {
 	util::enable_windows_ansi_support();
 	

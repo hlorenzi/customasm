@@ -1,28 +1,43 @@
 use crate::*;
 
 
-pub struct ExpressionParser<'a, 'parser: 'a>
+pub fn parse(
+    report: &mut diagn::Report,
+    walker: &mut syntax::TokenWalker)
+    -> Result<expr::Expr, ()>
 {
-	parser: &'a mut syntax::Parser<'parser>,
+    ExpressionParser::new(report, walker)
+        .parse_expr()
 }
 
 
-impl expr::Expr
+pub fn parse_optional(
+    walker: &mut syntax::TokenWalker)
+    -> Option<expr::Expr>
 {
-	pub fn parse(parser: &mut syntax::Parser) -> Result<expr::Expr, ()>
-	{
-		ExpressionParser::new(parser).parse_expr()
-	}
+    let mut dummy_report = diagn::Report::new();
+	parse(&mut dummy_report, walker).ok()
 }
 
 
-impl<'a, 'parser> ExpressionParser<'a, 'parser>
+struct ExpressionParser<'a, 'tokens: 'a>
 {
-	pub fn new(parser: &'a mut syntax::Parser<'parser>) -> ExpressionParser<'a, 'parser>
+    report: &'a mut diagn::Report,
+	walker: &'a mut syntax::TokenWalker<'tokens>,
+}
+
+
+impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
+{
+	pub fn new(
+        report: &'a mut diagn::Report,
+        walker: &'a mut syntax::TokenWalker<'tokens>)
+        -> ExpressionParser<'a, 'tokens>
 	{
 		ExpressionParser
 		{
-			parser,
+            report,
+			walker,
 		}
 	}
 	
@@ -34,20 +49,20 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	
 	
 	fn parse_unary_ops<F>(&mut self, ops: &[(syntax::TokenKind, expr::UnaryOp)], parse_inner: F) -> Result<expr::Expr, ()>
-	where F: Fn(&mut ExpressionParser<'a, 'parser>) -> Result<expr::Expr, ()>
+	where F: Fn(&mut ExpressionParser<'a, 'tokens>) -> Result<expr::Expr, ()>
 	{
 		for op in ops
 		{
-			let tk = match self.parser.maybe_expect(op.0)
+			let tk_span = match self.walker.maybe_expect(op.0)
 			{
-				Some(tk) => tk,
+				Some(tk) => tk.span.clone(),
 				None => continue
 			};
 				
 			let inner = self.parse_unary_ops(ops, parse_inner)?;
-			let span = tk.span.join(&inner.span());
+			let span = tk_span.join(&inner.span());
 			
-			return Ok(expr::Expr::UnaryOp(span, tk.span.clone(), op.1, Box::new(inner)));
+			return Ok(expr::Expr::UnaryOp(span, tk_span, op.1, Box::new(inner)));
 		}
 		
 		parse_inner(self)
@@ -55,22 +70,22 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	
 
 	fn parse_binary_ops<F>(&mut self, ops: &[(syntax::TokenKind, expr::BinaryOp)], parse_inner: F) -> Result<expr::Expr, ()>
-	where F: Fn(&mut ExpressionParser<'a, 'parser>) -> Result<expr::Expr, ()>
+	where F: Fn(&mut ExpressionParser<'a, 'tokens>) -> Result<expr::Expr, ()>
 	{
 		let mut lhs = parse_inner(self)?;
 		
 		loop
 		{
-			if self.parser.next_is_linebreak()
+			if self.walker.next_is_linebreak()
 				{ break; }
 
 			let mut op_match = None;
 			
 			for op in ops
 			{
-				if let Some(tk) = self.parser.maybe_expect(op.0)
+				if let Some(tk) = self.walker.maybe_expect(op.0)
 				{
-					op_match = Some((tk, op.1));
+					op_match = Some((tk.span.clone(), op.1));
 					break;
 				}
 			}
@@ -80,7 +95,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 				let rhs = parse_inner(self)?;
 				let span = lhs.span().join(&rhs.span());
 				
-				lhs = expr::Expr::BinaryOp(span, op_match.0.span.clone(), op_match.1, Box::new(lhs), Box::new(rhs));
+				lhs = expr::Expr::BinaryOp(span, op_match.0, op_match.1, Box::new(lhs), Box::new(rhs));
 			}
 			else
 				{ break; }
@@ -91,7 +106,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	
 
 	fn parse_right_associative_binary_ops<F>(&mut self, ops: &[(syntax::TokenKind, expr::BinaryOp)], parse_inner: F) -> Result<expr::Expr, ()>
-	where F: Fn(&mut ExpressionParser<'a, 'parser>) -> Result<expr::Expr, ()>
+	where F: Fn(&mut ExpressionParser<'a, 'tokens>) -> Result<expr::Expr, ()>
 	{
 		let mut lhs = parse_inner(self)?;
 		
@@ -99,9 +114,9 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 		
 		for op in ops
 		{
-			if let Some(tk) = self.parser.maybe_expect(op.0)
+			if let Some(tk) = self.walker.maybe_expect(op.0)
 			{
-				op_match = Some((tk, op.1));
+				op_match = Some((tk.span.clone(), op.1));
 				break;
 			}
 		}
@@ -111,7 +126,7 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 			let rhs = self.parse_expr()?;
 			let span = lhs.span().join(&rhs.span());
 			
-			lhs = expr::Expr::BinaryOp(span, op_match.0.span.clone(), op_match.1, Box::new(lhs), Box::new(rhs));
+			lhs = expr::Expr::BinaryOp(span, op_match.0, op_match.1, Box::new(lhs), Box::new(rhs));
 		}
 		
 		Ok(lhs)
@@ -122,13 +137,13 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	{
 		let cond = self.parse_assignment()?;
 		
-		if self.parser.maybe_expect(syntax::TokenKind::Question).is_some()
+		if self.walker.maybe_expect(syntax::TokenKind::Question).is_some()
 		{
 			let true_branch = self.parse_expr()?;
 			
 			let false_branch =
 			{
-				if self.parser.maybe_expect(syntax::TokenKind::Colon).is_some()
+				if self.walker.maybe_expect(syntax::TokenKind::Colon).is_some()
 					{ self.parse_expr()? }
 				else
 					{ expr::Expr::Block(true_branch.span().clone(), Vec::new()) }
@@ -264,32 +279,46 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	{
 		let inner = self.parse_size()?;
 		
-		if self.parser.next_is_linebreak()
+		if self.walker.next_is_linebreak()
 			{ return Ok(inner); }
 
-		let tk_open = match self.parser.maybe_expect(syntax::TokenKind::BracketOpen)
+		let tk_open = match self.walker.maybe_expect(syntax::TokenKind::BracketOpen)
 		{
 			Some(tk) => tk,
 			None => return Ok(inner)
 		};
 			
-		let tk_leftmost = self.parser.expect(syntax::TokenKind::Number)?;
-		self.parser.expect(syntax::TokenKind::Colon)?;
-		let tk_rightmost = self.parser.expect(syntax::TokenKind::Number)?;
-		let tk_close = self.parser.expect(syntax::TokenKind::BracketClose)?;
+		let leftmost = {
+		    let tk_leftmost = self.walker.expect(self.report, syntax::TokenKind::Number)?;
+            syntax::excerpt_as_usize(
+				self.report,
+				&tk_leftmost.span,
+				tk_leftmost.excerpt.as_ref().unwrap())?
+        };
+
+        self.walker.expect(self.report, syntax::TokenKind::Colon)?;
 		
-		let leftmost  = syntax::excerpt_as_usize(self.parser.report.clone(), tk_leftmost. excerpt.as_ref().unwrap(), &tk_leftmost .span)?;
-		let rightmost = syntax::excerpt_as_usize(self.parser.report.clone(), tk_rightmost.excerpt.as_ref().unwrap(), &tk_rightmost.span)?;
+		let rightmost = {
+            let tk_rightmost = self.walker.expect(self.report, syntax::TokenKind::Number)?;
+            syntax::excerpt_as_usize(
+				self.report,
+				&tk_rightmost.span,
+				tk_rightmost.excerpt.as_ref().unwrap())?
+        };
+
+        let tk_close_span = self.walker.expect(self.report, syntax::TokenKind::BracketClose)?
+            .span.clone();
 		
-		let slice_span = tk_open.span.join(&tk_close.span);
-		let span = inner.span().join(&tk_close.span);
+		
+		let slice_span = tk_open.span.join(&tk_close_span);
+		let span = inner.span().join(&tk_close_span);
 		
 		if leftmost < rightmost
 		{
-			if let Some(ref report) = self.parser.report
-			{
-				report.error_span("invalid bit slice range", &slice_span);
-			}
+			self.report.error_span(
+                "invalid bit slice range",
+                &slice_span);
+            
 			return Err(());
 		}
 			
@@ -301,23 +330,23 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	{
 		let inner = self.parse_unary()?;
 		
-		if self.parser.next_is_linebreak()
+		if self.walker.next_is_linebreak()
 			{ return Ok(inner); }
 		
-		let tk_grave = match self.parser.maybe_expect(syntax::TokenKind::Grave)
+		let tk_grave_span = match self.walker.maybe_expect(syntax::TokenKind::Grave)
 		{
-			Some(tk) => tk,
+			Some(tk) => tk.span.clone(),
 			None => return Ok(inner)
 		};
 
-		let tk_size = self.parser.expect(syntax::TokenKind::Number)?;
+		let tk_size = self.walker.expect(self.report, syntax::TokenKind::Number)?;
 		let size = syntax::excerpt_as_usize(
-			self.parser.report.clone(),
-			tk_size.excerpt.as_ref().unwrap(),
-			&tk_size.span)?;
+			self.report,
+			&tk_size.span,
+			tk_size.excerpt.as_ref().unwrap())?;
 
 		let span = inner.span().join(&tk_size.span);
-		let size_span = tk_grave.span.join(&tk_size.span);
+		let size_span = tk_grave_span.join(&tk_size.span);
 
 		Ok(expr::Expr::BitSlice(span, size_span, size, 0, Box::new(inner)))
 	}
@@ -338,24 +367,24 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	{
 		let leaf = self.parse_leaf()?;
 		
-		if self.parser.next_is_linebreak()
+		if self.walker.next_is_linebreak()
 			{ return Ok(leaf); }
 			
-		if self.parser.maybe_expect(syntax::TokenKind::ParenOpen).is_none()
+		if self.walker.maybe_expect(syntax::TokenKind::ParenOpen).is_none()
 			{ return Ok(leaf); }
 			
 		let mut args = Vec::new();
-		while !self.parser.next_is(0, syntax::TokenKind::ParenClose)
+		while !self.walker.next_is(0, syntax::TokenKind::ParenClose)
 		{
 			args.push(self.parse_expr()?);
 			
-			if self.parser.next_is(0, syntax::TokenKind::ParenClose)
+			if self.walker.next_is(0, syntax::TokenKind::ParenClose)
 				{ break; }
 				
-			self.parser.expect(syntax::TokenKind::Comma)?;
+			self.walker.expect(self.report, syntax::TokenKind::Comma)?;
 		}
 		
-		let tk_close = self.parser.expect(syntax::TokenKind::ParenClose)?;
+		let tk_close = self.walker.expect(self.report, syntax::TokenKind::ParenClose)?;
 		
 		Ok(expr::Expr::Call(leaf.span().join(&tk_close.span), Box::new(leaf), args))
 	}
@@ -363,34 +392,35 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	
 	fn parse_leaf(&mut self) -> Result<expr::Expr, ()>
 	{
-		if self.parser.next_is(0, syntax::TokenKind::BraceOpen)
+		if self.walker.next_is(0, syntax::TokenKind::BraceOpen)
 			{ self.parse_block() }
 	
-		else if self.parser.next_is(0, syntax::TokenKind::ParenOpen)
+		else if self.walker.next_is(0, syntax::TokenKind::ParenOpen)
 			{ self.parse_parenthesized() }
 	
-		else if self.parser.next_is(0, syntax::TokenKind::Identifier)
+		else if self.walker.next_is(0, syntax::TokenKind::Identifier)
 			{ self.parse_variable() }
 			
-		else if self.parser.next_is(0, syntax::TokenKind::Dot)
+		else if self.walker.next_is(0, syntax::TokenKind::Dot)
 			{ self.parse_variable() }
 			
-		else if self.parser.next_is(0, syntax::TokenKind::Number)
+		else if self.walker.next_is(0, syntax::TokenKind::Number)
 			{ self.parse_number() }
 			
-		else if self.parser.next_is(0, syntax::TokenKind::String)
+		else if self.walker.next_is(0, syntax::TokenKind::String)
 			{ self.parse_string() }
 	
-		else if self.parser.next_is(0, syntax::TokenKind::KeywordAsm)
+		else if self.walker.next_is(0, syntax::TokenKind::KeywordAsm)
 			{ self.parse_asm() }
 			
 		else
 		{
-			if let Some(ref report) = self.parser.report
-			{
-				let span = self.parser.get_span_after_prev();
-				report.error_span("expected expression", &span);
-			}
+            let span = self.walker.get_span_after_prev();
+
+            self.report.error_span(
+                "expected expression",
+                &span);
+            
 			Err(())
 		}
 	}
@@ -398,33 +428,34 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	
 	fn parse_block(&mut self) -> Result<expr::Expr, ()>
 	{
-		let tk_open = self.parser.expect(syntax::TokenKind::BraceOpen)?;
+		let tk_open_span = self.walker.expect(self.report, syntax::TokenKind::BraceOpen)?
+            .span.clone();
 		
 		let mut exprs = Vec::new();
-		while !self.parser.next_is(0, syntax::TokenKind::BraceClose)
+		while !self.walker.next_is(0, syntax::TokenKind::BraceClose)
 		{
 			exprs.push(self.parse_expr()?);
 			
-			if self.parser.maybe_expect_linebreak().is_some()
+			if self.walker.maybe_expect_linebreak().is_some()
 				{ continue; }
 				
-			if self.parser.next_is(0, syntax::TokenKind::BraceClose)
+			if self.walker.next_is(0, syntax::TokenKind::BraceClose)
 				{ break; }
 				
-			self.parser.expect(syntax::TokenKind::Comma)?;
+			self.walker.expect(self.report, syntax::TokenKind::Comma)?;
 		}
 		
-		let tk_close = self.parser.expect(syntax::TokenKind::BraceClose)?;
+		let tk_close = self.walker.expect(self.report, syntax::TokenKind::BraceClose)?;
 		
-		Ok(expr::Expr::Block(tk_open.span.join(&tk_close.span), exprs))
+		Ok(expr::Expr::Block(tk_open_span.join(&tk_close.span), exprs))
 	}
 	
 	
 	fn parse_parenthesized(&mut self) -> Result<expr::Expr, ()>
 	{
-		self.parser.expect(syntax::TokenKind::ParenOpen)?;
+		self.walker.expect(self.report, syntax::TokenKind::ParenOpen)?;
 		let expr = self.parse_expr()?;
-		self.parser.expect(syntax::TokenKind::ParenClose)?;
+		self.walker.expect(self.report, syntax::TokenKind::ParenClose)?;
 		Ok(expr)
 	}
 	
@@ -433,23 +464,46 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	{
 		let mut span = diagn::Span::new_dummy();
 		let mut hierarchy_level = 0;
+
+		self.walker.clear_linebreak();
 		
-		while let Some(tk_dot) = self.parser.maybe_expect(syntax::TokenKind::Dot)
+		loop
 		{
-			hierarchy_level += 1;
-			span = span.join(&tk_dot.span);
+			if self.walker.next_is_linebreak()
+			{
+				break;
+			}
+
+			if let Some(tk_dot) = self.walker.maybe_expect(syntax::TokenKind::Dot)
+			{
+				hierarchy_level += 1;
+				span = span.join(&tk_dot.span);
+				continue;
+			}
+
+			break;
 		}
 
 		let mut hierarchy = Vec::new();
 
 		loop
 		{
-			let tk_name = self.parser.expect(syntax::TokenKind::Identifier)?;
+			if self.walker.next_is_linebreak()
+			{
+				break;
+			}
+			
+			let tk_name = self.walker.expect(self.report, syntax::TokenKind::Identifier)?;
 			let name = tk_name.excerpt.clone().unwrap();
 			hierarchy.push(name);
 			span = span.join(&tk_name.span);
 
-			if self.parser.maybe_expect(syntax::TokenKind::Dot).is_none()
+			if self.walker.next_is_linebreak()
+			{
+				break;
+			}
+			
+			if self.walker.maybe_expect(syntax::TokenKind::Dot).is_none()
 			{
 				break;
 			}
@@ -461,14 +515,16 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	
 	fn parse_number(&mut self) -> Result<expr::Expr, ()>
 	{
-		let tk_number = self.parser.expect(syntax::TokenKind::Number)?;
+		let tk_number = self.walker.expect(self.report, syntax::TokenKind::Number)?;
 		let number = tk_number.excerpt.clone().unwrap();
 		
-		let bigint = syntax::excerpt_as_bigint(self.parser.report.clone(), &number, &tk_number.span)?;
+		let bigint = syntax::excerpt_as_bigint(
+			self.report,
+			&tk_number.span,
+			&number)?;
 		
-		let span = tk_number.span;
 		let expr = expr::Expr::Literal(
-			span.clone(),
+			tk_number.span.clone(),
 			expr::Value::Integer(bigint));
 
 		Ok(expr)
@@ -477,16 +533,16 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	
 	fn parse_string(&mut self) -> Result<expr::Expr, ()>
 	{
-		let tk_str = self.parser.expect(syntax::TokenKind::String)?;
+		let tk_str = self.walker.expect(self.report, syntax::TokenKind::String)?;
 
 		let string = syntax::excerpt_as_string_contents(
-			self.parser.report.clone().unwrap_or(diagn::RcReport::new()),
-			tk_str.excerpt.as_ref().unwrap(),
-			&tk_str.span)?;
+			self.report,
+			&tk_str.span,
+			tk_str.excerpt.as_ref().unwrap())?;
 		
 		let expr = expr::Expr::Literal(
 			tk_str.span.clone(),
-			expr::Value::String(expr::ValueString
+			expr::Value::String(expr::ExprString
 			{
 				utf8_contents: string,
 				encoding: "utf8".to_string(),
@@ -498,15 +554,17 @@ impl<'a, 'parser> ExpressionParser<'a, 'parser>
 	
 	fn parse_asm(&mut self) -> Result<expr::Expr, ()>
 	{
-		let tk_asm = self.parser.expect(syntax::TokenKind::KeywordAsm)?;
-		self.parser.expect(syntax::TokenKind::BraceOpen)?;
+		let tk_asm_span = self.walker.expect(self.report, syntax::TokenKind::KeywordAsm)?
+            .span.clone();
+    
+		self.walker.expect(self.report, syntax::TokenKind::BraceOpen)?;
 
-		let contents = self.parser.slice_until_token_over_nested_braces(syntax::TokenKind::BraceClose);
+		let contents = self.walker.cutoff_at_token_over_nested_braces(syntax::TokenKind::BraceClose);
 
-		let tk_brace_close = self.parser.expect(syntax::TokenKind::BraceClose)?;
+		let tk_brace_close = self.walker.expect(self.report, syntax::TokenKind::BraceClose)?;
 
 		let expr = expr::Expr::Asm(
-			tk_asm.span.clone().join(&tk_brace_close.span),
+			tk_asm_span.join(&tk_brace_close.span),
 			contents.get_cloned_tokens());
 
 		Ok(expr)

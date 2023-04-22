@@ -1,12 +1,15 @@
 use crate::*;
-use std::collections::HashMap;
 
 
 pub struct EvalContext
 {
-	locals: HashMap<String, expr::Value>,
-	token_subs: HashMap<String, Vec<syntax::Token>>,
+	locals: std::collections::HashMap<String, expr::Value>,
+	token_substs: std::collections::HashMap<String, Vec<syntax::Token>>,
+	recursion_depth: usize,
 }
+
+
+static ASM_HYGIENIZE_PREFIX: &'static str = ":";
 
 
 impl EvalContext
@@ -15,46 +18,148 @@ impl EvalContext
 	{
 		EvalContext
 		{
-			locals: HashMap::new(),
-			token_subs: HashMap::new(),
+			locals: std::collections::HashMap::new(),
+			token_substs: std::collections::HashMap::new(),
+			recursion_depth: 0,
 		}
+	}
+
+
+	pub fn new_deepened(from: &EvalContext) -> EvalContext
+	{
+		let mut new_ctx = EvalContext::new();
+		new_ctx.recursion_depth = from.recursion_depth + 1;
+		new_ctx
+	}
+
+
+	pub fn check_recursion_depth_limit(
+		&self,
+		report: &mut diagn::Report,
+		span: &diagn::Span)
+		-> Result<(), ()>
+	{
+		if self.recursion_depth >= 25
+		{
+			report.message_with_parents_dedup(
+				diagn::Message::error_span(
+					"recursion depth limit reached",
+					span));
+	
+			return Err(());
+		}
+
+		Ok(())
 	}
 	
 	
-	pub fn set_local<S>(&mut self, name: S, value: expr::Value)
-	where S: Into<String>
+	pub fn set_local<S>(
+		&mut self,
+		name: S,
+		value: expr::Value)
+		where S: Into<String>
 	{
 		self.locals.insert(name.into(), value);
 	}
 	
 	
-	pub fn get_local(&self, name: &str) -> Result<expr::Value, ()>
+	pub fn get_local(
+		&self,
+		name: &str)
+		-> Result<expr::Value, ()>
 	{
 		match self.locals.get(name)
 		{
 			Some(value) => Ok(value.clone()),
-			None => Err(())
+			None => Err(()),
 		}
 	}
 	
 	
-	pub fn set_token_sub<S>(&mut self, name: S, tokens: Vec<syntax::Token>)
-	where S: Into<String>
+	pub fn set_token_subst<S>(
+		&mut self,
+		name: S,
+		tokens: Vec<syntax::Token>)
+		where S: Into<String>
 	{
-		self.token_subs.insert(name.into(), tokens);
+		self.token_substs.insert(name.into(), tokens);
 	}
 	
 	
-	pub fn get_token_sub<'a>(&'a self, name: &str) -> Option<&'a Vec<syntax::Token>>
+	pub fn get_token_subst<'a>(
+		&'a self,
+		name: &str)
+		-> Option<std::borrow::Cow<'a, Vec<syntax::Token>>>
 	{
-		self.token_subs.get(name)
+		if let Some(t) = self.token_substs.get(name)
+		{
+			return Some(std::borrow::Cow::Borrowed(t));
+		}
+
+		if let Some(_) = self.locals.get(name)
+		{
+			return Some(std::borrow::Cow::Owned(
+				vec![syntax::Token {
+					span: diagn::Span::new_dummy(),
+					kind: syntax::TokenKind::Identifier,
+					excerpt: Some(
+						EvalContext::hygienize_name_for_asm_subst(name)),
+				}]
+			));
+		}
+
+		None
+	}
+
+
+	pub fn hygienize_locals_for_asm_subst(
+		&self)
+		-> EvalContext
+	{
+		let mut new_ctx = EvalContext::new_deepened(self);
+		
+		for entry in &self.locals
+		{
+			if entry.0.starts_with(ASM_HYGIENIZE_PREFIX)
+			{
+				continue;
+			}
+
+			new_ctx.locals.insert(
+				EvalContext::hygienize_name_for_asm_subst(&entry.0),
+				entry.1.clone());
+		}
+		
+		for entry in &self.token_substs
+		{
+			if entry.0.starts_with(ASM_HYGIENIZE_PREFIX)
+			{
+				continue;
+			}
+			
+			new_ctx.token_substs.insert(
+				EvalContext::hygienize_name_for_asm_subst(&entry.0),
+				entry.1.clone());
+		}
+
+		new_ctx
+	}
+
+
+	pub fn hygienize_name_for_asm_subst(
+		name: &str)
+		-> String
+	{
+		format!("{}{}",
+			ASM_HYGIENIZE_PREFIX,
+			name)
 	}
 }
 
 
 pub struct EvalVariableInfo<'a>
 {
-	pub report: diagn::RcReport,
+	pub report: &'a mut diagn::Report,
 	pub hierarchy_level: usize,
 	pub hierarchy: &'a Vec<String>,
 	pub span: &'a diagn::Span,
@@ -63,37 +168,224 @@ pub struct EvalVariableInfo<'a>
 
 pub struct EvalFunctionInfo<'a>
 {
-	pub report: diagn::RcReport,
+	pub report: &'a mut diagn::Report,
 	pub func: expr::Value,
-	pub args: Vec<expr::Value>,
-	pub arg_spans: Vec<&'a diagn::Span>,
+	pub args: Vec<EvalFunctionArgument<'a>>,
+	pub span: &'a diagn::Span,
+	pub eval_ctx: &'a mut EvalContext,
+}
+
+
+impl<'a> EvalFunctionInfo<'a>
+{
+	pub fn ensure_arg_number(
+		&mut self,
+		expected_arg_number: usize)
+		-> Result<(), ()>
+	{
+		if self.args.len() != expected_arg_number
+		{
+			let plural = {
+				if expected_arg_number != 1
+					{ "s" }
+				else
+					{ "" }
+			};
+
+			self.report.error_span(
+				format!(
+					"function expected {} argument{} (but got {})",
+					expected_arg_number,
+					plural,
+					self.args.len()),
+				self.span);
+			
+			Err(())
+		}
+		else
+		{
+			Ok(())
+		}
+	}
+}
+
+
+pub struct EvalFunctionArgument<'a>
+{
+	pub value: expr::Value,
 	pub span: &'a diagn::Span,
 }
 
 
 pub struct EvalAsmInfo<'a>
 {
-	pub report: diagn::RcReport,
+	pub report: &'a mut diagn::Report,
 	pub tokens: &'a [syntax::Token],
 	pub span: &'a diagn::Span,
-	pub args: &'a mut EvalContext,
+	pub eval_ctx: &'a mut EvalContext,
+}
+
+
+pub struct EvalProvider<'f, FVar, FFn, FAsm>
+where
+    FVar: FnMut(&mut EvalVariableInfo) -> Result<expr::Value, ()>,
+    FFn: FnMut(&mut EvalFunctionInfo) -> Result<expr::Value, ()>,
+    FAsm: FnMut(&mut EvalAsmInfo) -> Result<expr::Value, ()>
+{
+    pub eval_var: &'f mut FVar,
+    pub eval_fn: &'f mut FFn,
+    pub eval_asm: &'f mut FAsm,
+}
+
+
+pub fn dummy_eval_var() -> impl Fn(&mut EvalVariableInfo) -> Result<expr::Value, ()>
+{
+    |info| {
+        info.report.error_span(
+            "cannot reference variables in this context",
+            &info.span);
+            
+        Err(())
+    }
+}
+
+
+pub fn dummy_eval_fn() -> impl Fn(&mut EvalFunctionInfo) -> Result<expr::Value, ()>
+{
+    |info| {
+        info.report.error_span(
+            "cannot reference functions in this context",
+            &info.span);
+            
+        Err(())
+    }
+}
+
+
+pub fn dummy_eval_asm() -> impl Fn(&mut EvalAsmInfo) -> Result<expr::Value, ()>
+{
+    |info| {
+        info.report.error_span(
+            "cannot use `asm` blocks in this context",
+            &info.span);
+            
+        Err(())
+    }
+}
+
+
+macro_rules! propagate {
+	($expr: expr) => {
+		{
+			let value: expr::Value = $expr;
+
+			if value.should_propagate()
+			{
+				return Ok(value)
+			}
+			else
+			{
+				value
+			}
+		}
+	};
 }
 
 
 impl expr::Expr
 {
-	pub fn eval<FVar, FFn, FAsm>(
+	pub fn eval_usize<'f, FVar, FFn, FAsm>(
 		&self,
-		report: diagn::RcReport,
-		ctx: &mut EvalContext,
-		eval_var: &FVar,
-		eval_fn: &FFn,
-		eval_asm: &FAsm)
+		report: &mut diagn::Report,
+		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
+		-> Result<usize, ()>
+        where
+            FVar: FnMut(&mut EvalVariableInfo) -> Result<expr::Value, ()>,
+            FFn: FnMut(&mut EvalFunctionInfo) -> Result<expr::Value, ()>,
+            FAsm: FnMut(&mut EvalAsmInfo) -> Result<expr::Value, ()>
+	{
+        self
+			.eval_with_ctx(
+				report,
+				&mut EvalContext::new(),
+				provider)?
+			.expect_usize(
+				report,
+				&self.span())
+	}
+
+
+	pub fn eval_nonzero_usize<'f, FVar, FFn, FAsm>(
+		&self,
+		report: &mut diagn::Report,
+		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
+		-> Result<usize, ()>
+        where
+            FVar: FnMut(&mut EvalVariableInfo) -> Result<expr::Value, ()>,
+            FFn: FnMut(&mut EvalFunctionInfo) -> Result<expr::Value, ()>,
+            FAsm: FnMut(&mut EvalAsmInfo) -> Result<expr::Value, ()>
+	{
+        self
+			.eval_with_ctx(
+				report,
+				&mut EvalContext::new(),
+				provider)?
+			.expect_nonzero_usize(
+				report,
+				&self.span())
+	}
+
+
+	pub fn eval_bigint<'f, FVar, FFn, FAsm>(
+		&self,
+		report: &mut diagn::Report,
+		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
+		-> Result<util::BigInt, ()>
+        where
+            FVar: FnMut(&mut EvalVariableInfo) -> Result<expr::Value, ()>,
+            FFn: FnMut(&mut EvalFunctionInfo) -> Result<expr::Value, ()>,
+            FAsm: FnMut(&mut EvalAsmInfo) -> Result<expr::Value, ()>
+	{
+        let result = self.eval_with_ctx(
+			report,
+			&mut EvalContext::new(),
+			provider)?;
+
+		let bigint = result.expect_bigint(
+			report,
+			&self.span())?;
+
+		Ok(bigint.clone())
+	}
+
+
+	pub fn eval<'f, FVar, FFn, FAsm>(
+		&self,
+		report: &mut diagn::Report,
+		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
 		-> Result<expr::Value, ()>
-	where
-		FVar: Fn(&EvalVariableInfo) -> Result<expr::Value, bool>,
-		FFn: Fn(&EvalFunctionInfo) -> Result<expr::Value, ()>,
-		FAsm: Fn(&mut EvalAsmInfo) -> Result<expr::Value, ()>
+        where
+            FVar: FnMut(&mut EvalVariableInfo) -> Result<expr::Value, ()>,
+            FFn: FnMut(&mut EvalFunctionInfo) -> Result<expr::Value, ()>,
+            FAsm: FnMut(&mut EvalAsmInfo) -> Result<expr::Value, ()>
+	{
+        self.eval_with_ctx(
+            report,
+            &mut EvalContext::new(),
+            provider)
+    }
+
+
+	pub fn eval_with_ctx<'f, FVar, FFn, FAsm>(
+		&self,
+		report: &mut diagn::Report,
+		ctx: &mut EvalContext,
+		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
+		-> Result<expr::Value, ()>
+        where
+            FVar: FnMut(&mut EvalVariableInfo) -> Result<expr::Value, ()>,
+            FFn: FnMut(&mut EvalFunctionInfo) -> Result<expr::Value, ()>,
+            FAsm: FnMut(&mut EvalAsmInfo) -> Result<expr::Value, ()>
 	{
 		match self
 		{
@@ -101,39 +393,35 @@ impl expr::Expr
 			
 			&expr::Expr::Variable(ref span, hierarchy_level, ref hierarchy) =>
 			{
-				if hierarchy_level == 0 && hierarchy.len() == 1
+				let mut info = EvalVariableInfo
 				{
-					match ctx.get_local(&hierarchy[0])
-					{
-						Ok(value) => return Ok(value),
-						Err(()) => {}
-					}
-				}
-
-				let info = EvalVariableInfo
-				{
-					report: report.clone(),
+					report,
 					hierarchy_level,
 					hierarchy,
 					span,
 				};
 
-				match eval_var(&info)
+				if hierarchy_level == 0 && hierarchy.len() == 1
 				{
-					Ok(value) => Ok(value),
-					Err(handled) =>
+					if let Some(_) = expr::resolve_builtin_fn(&hierarchy[0])
 					{
-						if !handled
-							{ report.error_span("unknown variable", &span); }
-							
-						Err(())
+						return Ok(expr::Value::ExprBuiltInFunction(
+							hierarchy[0].clone()));
+					}
+
+					if let Ok(local_value) = ctx.get_local(&hierarchy[0])
+					{
+						return Ok(local_value);
 					}
 				}
+
+				(provider.eval_var)(&mut info)
 			}
 			
 			&expr::Expr::UnaryOp(ref span, _, op, ref inner_expr) =>
 			{
-				match inner_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?
+				match propagate!(
+					inner_expr.eval_with_ctx(report, ctx, provider)?)
 				{
 					expr::Value::Integer(ref x) => match op
 					{
@@ -163,7 +451,8 @@ impl expr::Expr
 						{
 							if hierarchy_level == 0 && hierarchy.len() == 1
 							{
-								let value = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
+								let value = propagate!(
+									rhs_expr.eval_with_ctx(report, ctx, provider)?);
 								ctx.set_local(hierarchy[0].clone(), value);
 								return Ok(expr::Value::Void);
 							}
@@ -177,7 +466,8 @@ impl expr::Expr
 				
 				else if op == expr::BinaryOp::LazyOr || op == expr::BinaryOp::LazyAnd
 				{
-					let lhs = lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
+					let lhs = propagate!(
+						lhs_expr.eval_with_ctx(report, ctx, provider)?);
 					
 					match (op, &lhs)
 					{
@@ -188,7 +478,8 @@ impl expr::Expr
 						_ => return Err(report.error_span("invalid argument type to operator", &lhs_expr.span()))
 					}
 					
-					let rhs = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
+					let rhs = propagate!(
+						rhs_expr.eval_with_ctx(report, ctx, provider)?);
 					
 					match (op, &rhs)
 					{
@@ -202,8 +493,11 @@ impl expr::Expr
 				
 				else
 				{
-					let lhs = lhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
-					let rhs = rhs_expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
+					let lhs = propagate!(
+						lhs_expr.eval_with_ctx(report, ctx, provider)?);
+
+					let rhs = propagate!(
+						rhs_expr.eval_with_ctx(report, ctx, provider)?);
 
 					match (&lhs, &rhs)
 					{
@@ -275,8 +569,8 @@ impl expr::Expr
 									match (lhs.size, rhs.size)
 									{
 										(Some(lhs_width), Some(rhs_width)) => Ok(expr::Value::make_integer(lhs.concat((lhs_width, 0), &rhs, (rhs_width, 0)))),
-										(None, _) => Err(report.error_span("argument to concatenation with unspecified size", &lhs_expr.span())),
-										(_, None) => Err(report.error_span("argument to concatenation with unspecified size", &rhs_expr.span()))
+										(None, _) => Err(report.error_span("argument to concatenation with indefinite size", &lhs_expr.span())),
+										(_, None) => Err(report.error_span("argument to concatenation with indefinite size", &rhs_expr.span()))
 									}
 								}
 
@@ -291,17 +585,20 @@ impl expr::Expr
 			
 			&expr::Expr::TernaryOp(_, ref cond, ref true_branch, ref false_branch) =>
 			{
-				match cond.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?
+				match cond.eval_with_ctx(report, ctx, provider)?
 				{
-					expr::Value::Bool(true)  => true_branch.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm),
-					expr::Value::Bool(false) => false_branch.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm),
+					expr::Value::Bool(true)  => Ok(propagate!(
+						true_branch.eval_with_ctx(report, ctx, provider)?)),
+					expr::Value::Bool(false) => Ok(propagate!(
+						false_branch.eval_with_ctx(report, ctx, provider)?)),
 					_ => Err(report.error_span("invalid condition type", &cond.span()))
 				}
 			}
 			
 			&expr::Expr::BitSlice(ref span, _, left, right, ref inner) =>
 			{
-				match inner.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?.get_bigint()
+				match propagate!(
+					inner.eval_with_ctx(report, ctx, provider)?).get_bigint()
 				{
 					Some(ref x) => Ok(expr::Value::make_integer(x.slice(left, right))),
 					None => Err(report.error_span("invalid argument type to slice", &span))
@@ -310,7 +607,7 @@ impl expr::Expr
 			
 			&expr::Expr::SoftSlice(_, _, _, _, ref inner) =>
 			{
-				inner.eval(report, ctx, eval_var, eval_fn, eval_asm)
+				inner.eval_with_ctx(report, ctx, provider)
 			}
 			
 			&expr::Expr::Block(_, ref exprs) =>
@@ -318,66 +615,68 @@ impl expr::Expr
 				let mut result = expr::Value::Void;
 				
 				for expr in exprs
-					{ result = expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?; }
+				{
+					result = propagate!(
+						expr.eval_with_ctx(report, ctx, provider)?);
+				}
 					
 				Ok(result)
 			}
 			
 			&expr::Expr::Call(ref span, ref target, ref arg_exprs) =>
 			{
-				let func = target.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
+				let func = propagate!(
+					target.eval_with_ctx(report, ctx, provider)?);
 
-				match func
+				let mut args = Vec::with_capacity(arg_exprs.len());
+				for expr in arg_exprs
 				{
-					expr::Value::ExprBuiltInFunction(_) |
-					expr::Value::Function(_) =>
-					{
-						let mut args = Vec::new();
-						let mut arg_spans = Vec::new();
-						for expr in arg_exprs
-						{
-							let arg = expr.eval(report.clone(), ctx, eval_var, eval_fn, eval_asm)?;
-							args.push(arg);
-							arg_spans.push(expr.span());
-						}
-
-						let info = EvalFunctionInfo
-						{
-							report: report.clone(),
-							func,
-							args,
-							arg_spans,
-							span,
-						};
-						
-						match eval_fn(&info)
-						{
-							Ok(value) => Ok(value),
-							Err(()) => Err(())
-						}
-					}
-
-					expr::Value::Unknown => Err(report.error_span("unknown function", &target.span())),
+					let value = propagate!(
+						expr.eval_with_ctx(report, ctx, provider)?);
 					
-					_ => Err(report.error_span("expression is not callable", &target.span()))
+					args.push(EvalFunctionArgument {
+						value,
+						span: expr.span()
+					});
+				}
+
+				let mut info = EvalFunctionInfo {
+					report,
+					func,
+					args,
+					span,
+					eval_ctx: ctx,
+				};
+
+				match info.func
+				{
+					expr::Value::ExprBuiltInFunction(_) =>
+						expr::eval_builtin_fn(&mut info),
+
+					expr::Value::AsmBuiltInFunction(_) =>
+						(provider.eval_fn)(&mut info),
+
+					expr::Value::Function(_) =>
+						(provider.eval_fn)(&mut info),
+
+					expr::Value::Unknown =>
+						Err(report.error_span("unknown function", &target.span())),
+					
+					_ =>
+						Err(report.error_span("expression is not callable", &target.span()))
 				}
 			}
 			
 			&expr::Expr::Asm(ref span, ref tokens) =>
 			{
-				let mut info = EvalAsmInfo
-				{
-					report: report.clone(),
+				let mut info = EvalAsmInfo {
+					report,
 					tokens,
 					span,
-					args: ctx,
+					eval_ctx: ctx,
 				};
 
-				match eval_asm(&mut info)
-				{
-					Ok(value) => Ok(value),
-					Err(_) => Err(())
-				}
+                (provider.eval_asm)(&mut info)
 			}
 		}
 	}

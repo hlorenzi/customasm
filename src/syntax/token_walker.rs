@@ -4,7 +4,7 @@ use crate::*;
 #[derive(Clone)]
 pub struct TokenWalker<'tokens>
 {
-	pub tokens: &'tokens [syntax::Token],
+	tokens: &'tokens [syntax::Token],
 	index: usize,
 	index_prev: usize,
 	read_linebreak: bool,
@@ -12,17 +12,6 @@ pub struct TokenWalker<'tokens>
 	read_whitespace_acknowledged: bool,
 	partial_index: usize,
 	dummy_token: syntax::Token,
-}
-
-
-pub struct TokenWalkerState
-{
-	index: usize,
-	index_prev: usize,
-	read_linebreak: bool,
-	read_whitespace_index: Option<usize>,
-	read_whitespace_acknowledged: bool,
-	partial_index: usize
 }
 
 
@@ -167,28 +156,17 @@ impl<'tokens> TokenWalker<'tokens>
 	}
 
 
-	pub fn clone_slice<'b>(&'b self, start: usize, end: usize) -> TokenWalker<'tokens>
+	pub fn clone_slice<'b>(
+		&'b self,
+		start: usize,
+		end: usize)
+		-> TokenWalker<'tokens>
 	{
 		TokenWalker::new(&self.tokens[start..end])
-		//TokenWalker::new(self.report.clone(), &self.tokens[start..end])
 	}
 
 
-	pub fn slice_until_linebreak<'b>(&'b mut self) -> TokenWalker<'tokens>
-	{
-		let start = self.get_current_token_index();
-		let mut end = start;
-		while !self.is_over() && !self.next_is_linebreak()
-		{
-			self.advance();
-			end = self.get_previous_token_index() + 1;
-		}
-
-		self.clone_slice(start, end)
-	}
-
-
-	pub fn cutoff_at_linebreak_while_respecting_braces<'b>(
+	pub fn cutoff_at_linebreak_over_nested_braces<'b>(
 		&'b mut self)
 		-> TokenWalker<'tokens>
 	{
@@ -224,21 +202,10 @@ impl<'tokens> TokenWalker<'tokens>
 	}
 
 
-	pub fn slice_until_token<'b>(&'b mut self, kind: syntax::TokenKind) -> TokenWalker<'tokens>
-	{
-		let start = self.get_current_token_index();
-		let mut end = start;
-		while !self.is_over() && !self.next_is(0, kind)
-		{
-			self.advance();
-			end = self.get_previous_token_index() + 1;
-		}
-
-		self.clone_slice(start, end)
-	}
-
-
-	pub fn slice_until_token_over_nested_braces<'b>(&'b mut self, kind: syntax::TokenKind) -> TokenWalker<'tokens>
+	pub fn cutoff_at_token_over_nested_braces<'b>(
+		&'b mut self,
+		kind: syntax::TokenKind)
+		-> TokenWalker<'tokens>
 	{
 		let start = self.get_current_token_index();
 		let mut brace_nesting = 0;
@@ -272,28 +239,7 @@ impl<'tokens> TokenWalker<'tokens>
 	}
 
 
-	pub fn slice_until_char<'b>(&'b mut self, c: char) -> Option<TokenWalker<'tokens>>
-	{
-		let start = self.get_current_token_index();
-		let mut end = start;
-		while !self.is_over() && self.next_partial() != c
-		{
-			self.advance_partial();
-			end = self.get_previous_token_index() + 1;
-		}
-
-		if self.is_at_partial()
-		{
-			None
-		}
-		else
-		{
-			Some(self.clone_slice(start, end))
-		}
-	}
-
-
-	pub fn cutoff_at_char_while_respecting_parens<'b>(
+	pub fn cutoff_at_char_over_nested_parens<'b>(
 		&'b mut self,
 		c: char)
 		-> Option<TokenWalker<'tokens>>
@@ -351,38 +297,6 @@ impl<'tokens> TokenWalker<'tokens>
 			new_walker.tokens = &self.tokens[0..end];
 			Some(new_walker)
 		}
-	}
-	
-	
-	pub fn save(&self) -> TokenWalkerState
-	{
-		TokenWalkerState
-		{
-			index: self.index,
-			index_prev: self.index_prev,
-			read_linebreak: self.read_linebreak,
-			read_whitespace_index: self.read_whitespace_index,
-			read_whitespace_acknowledged: self.read_whitespace_acknowledged,
-			partial_index: self.partial_index
-		}
-	}
-	
-	
-	pub fn restore(&mut self, state: TokenWalkerState)
-	{
-		self.restore_with_offset(state, 0);
-	}
-	
-	
-	pub fn restore_with_offset(&mut self, state: TokenWalkerState, offset: usize)
-	{
-		self.index = state.index + offset;
-		self.index_prev = state.index_prev + offset;
-		self.read_linebreak = state.read_linebreak;
-		self.read_whitespace_index = state.read_whitespace_index;
-		self.read_whitespace_acknowledged = state.read_whitespace_acknowledged;
-		self.partial_index = state.partial_index;
-		self.skip_ignorable();
 	}
 
 
@@ -730,9 +644,9 @@ impl<'tokens> TokenWalker<'tokens>
 		let tk = self.expect(report, syntax::TokenKind::Number)?;
 
 		let value = syntax::excerpt_as_usize(
-			None,//report,
-			&tk.excerpt.as_ref().unwrap(),
-			&tk.span)?;
+			report,
+			&tk.span,
+			&tk.excerpt.as_ref().unwrap())?;
 		
 		Ok((tk, value))
 	}

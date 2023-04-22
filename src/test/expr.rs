@@ -6,31 +6,44 @@ use super::{ExpectedResult, expect_result};
 fn test<S>(src: S, expected: ExpectedResult<expr::Value>)
 where S: Into<Vec<u8>>
 {
-	fn compile(report: diagn::RcReport, fileserver: &dyn util::FileServer) -> Result<expr::Value, ()>
+	fn compile(
+		report: &mut diagn::Report,
+		fileserver: &dyn util::FileServer)
+		-> Result<expr::Value, ()>
 	{
-		let chars = fileserver.get_chars(report.clone(), "test", None)?;
-		let tokens = syntax::tokenize(report.clone(), "test", &chars)?;
+		let chars = fileserver.get_chars(report, None, "test")?;
+		let tokens = syntax::tokenize(report, "test", &chars)?;
 		
-		let expr = expr::Expr::parse(
-			&mut syntax::Parser::new(Some(report.clone()), &tokens))?;
+		let mut walker = syntax::TokenWalker::new(&tokens);
+		let expr = expr::parse(report, &mut walker)?;
+
+		let mut eval_provider = expr::EvalProvider {
+			eval_var: &mut expr::dummy_eval_var(),
+			eval_fn: &mut expr::dummy_eval_fn(),
+			eval_asm: &mut expr::dummy_eval_asm(),
+		};
 		
 		let expr_value = expr.eval(
-			report.clone(),
-			&mut expr::EvalContext::new(),
-			&|_| Err(false),
-			&|_| Err(()),
-			&|_| Err(()))?;
+			report,
+			&mut eval_provider)?;
 		
 		Ok(expr_value)
 	}
 	
 	
-	let report = diagn::RcReport::new();
+	let mut report = diagn::Report::new();
 	let mut fileserver = util::FileServerMock::new();
 	fileserver.add("test", src);
 	
-	let result = compile(report.clone(), &fileserver);
-	expect_result(report.clone(), &fileserver, result.ok(), expected);
+	let result = compile(
+		&mut report,
+		&fileserver);
+
+	expect_result(
+		&mut report,
+		&fileserver,
+		result.ok(),
+		expected);
 }
 
 
@@ -67,11 +80,11 @@ fn test_literals()
 #[test]
 fn test_variables()
 {
-	test(" a", Fail(("test", 1, "unknown")));
-	test(".a", Fail(("test", 1, "unknown")));
+	test(" a", Fail(("test", 1, "cannot reference")));
+	test(".a", Fail(("test", 1, "cannot reference")));
 	
-	test("1 +  a + 1", Fail(("test", 1, "unknown")));
-	test("1 + .a + 1", Fail(("test", 1, "unknown")));
+	test("1 +  a + 1", Fail(("test", 1, "cannot reference")));
+	test("1 + .a + 1", Fail(("test", 1, "cannot reference")));
 }
 
 
@@ -275,12 +288,12 @@ fn test_ops_concat()
 	test("0x1 @ 0x8000[19:0]", Pass(expr::Value::make_integer(util::BigInt::new(0x108000, Some(24)))));
 	test("0x1 @ 0x9000[19:0]", Pass(expr::Value::make_integer(util::BigInt::new(0x109000, Some(24)))));
 	
-	test("0   @ 0", Fail(("test", 1, "unspecified size")));
-	test("0`8 @ 0", Fail(("test", 1, "unspecified size")));
-	test("0   @ 0`8", Fail(("test", 1, "unspecified size")));
+	test("0   @ 0", Fail(("test", 1, "indefinite size")));
+	test("0`8 @ 0", Fail(("test", 1, "indefinite size")));
+	test("0   @ 0`8", Fail(("test", 1, "indefinite size")));
 	
-	test("-0x1 @  0x1", Fail(("test", 1, "unspecified size")));
-	test(" 0x1 @ -0x1", Fail(("test", 1, "unspecified size")));
+	test("-0x1 @  0x1", Fail(("test", 1, "indefinite size")));
+	test(" 0x1 @ -0x1", Fail(("test", 1, "indefinite size")));
 }
 
 
@@ -496,7 +509,7 @@ fn test_assignment()
 	test("{ x = 456, y = 123, x < y ? min = x : min = y, min }", Pass(expr::Value::make_integer(util::BigInt::new(123, None))));
 	
 	test("{ x = 123, y = 456, x < y ? min = x,           min }", Pass(expr::Value::make_integer(util::BigInt::new(123, None))));
-	test("{ x = 456, y = 123, x < y ? min = x,           min }", Fail(("test", 1, "unknown")));
+	test("{ x = 456, y = 123, x < y ? min = x,           min }", Fail(("test", 1, "cannot reference")));
 	
 	test("0 = 1",     Fail(("test", 1, "invalid")));
 	test("x + 1 = 2", Fail(("test", 1, "invalid")));

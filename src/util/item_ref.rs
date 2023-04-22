@@ -1,12 +1,12 @@
 #[derive(Eq, PartialEq)]
 pub struct ItemRef<T>(
-    pub(crate) usize,
+    pub usize,
     std::marker::PhantomData<*const T>);
 
 
 impl<T> ItemRef<T>
 {
-    pub(crate) fn new(value: usize) -> Self
+    pub fn new(value: usize) -> Self
     {
         ItemRef(value, std::marker::PhantomData)
     }

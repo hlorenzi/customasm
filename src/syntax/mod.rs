@@ -1,17 +1,19 @@
 mod token;
-mod token2;
+pub use self::token::{
+    Token,
+    TokenKind,
+    tokenize,
+    is_whitespace,
+};
+
 mod token_walker;
-mod parser;
+pub use self::token_walker::{
+    TokenWalker,
+};
+
 mod excerpt;
-
-
-pub use self::token::Token;
-pub use self::token::TokenKind;
-pub use self::token::tokenize;
-pub use self::token::is_whitespace;
-pub use self::token2::tokenize2;
-pub use self::token_walker::TokenWalker;
-pub use self::parser::Parser;
-pub use self::excerpt::excerpt_as_string_contents;
-pub use self::excerpt::excerpt_as_usize;
-pub use self::excerpt::excerpt_as_bigint;
+pub use self::excerpt::{
+    excerpt_as_string_contents,
+    excerpt_as_usize,
+    excerpt_as_bigint,
+};

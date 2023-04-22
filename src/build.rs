@@ -51,8 +51,9 @@ fn generate_tests_from_folder(
         {
             let mut new_test_name = test_name.clone();
             new_test_name.push_str(&file_stem);
-            
-            write!(f,
+
+            write!(
+                f,
                 "#[test]
                 fn {}()
                 {{
@@ -61,18 +62,8 @@ fn generate_tests_from_folder(
                 
                 ",
                 new_test_name.replace(".", "_"),
-                path).unwrap();
-                
-            write!(f,
-                "#[test]
-                fn new_asm_{}()
-                {{
-                    test_file2({:?});
-                }}
-                
-                ",
-                new_test_name.replace(".", "_"),
-                path).unwrap();
+                path)
+                .unwrap();
         }
         else
         {

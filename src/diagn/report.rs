@@ -1,9 +1,4 @@
-use crate::diagn::Span;
-use crate::util::CharCounter;
-use crate::util::FileServer;
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::io::Write;
+use crate::*;
 
 
 const C_DEFAULT:  &'static str = "\u{001b}[0m";
@@ -30,7 +25,7 @@ pub struct Message
 {
 	pub descr: String,
 	pub kind: MessageKind,
-	pub span: Option<Span>,
+	pub span: Option<diagn::Span>,
 	pub short_excerpt: bool,
 	pub inner: Vec<Message>,
 }
@@ -42,19 +37,6 @@ pub enum MessageKind
 	Error,
 	Warning,
 	Note,
-}
-
-
-#[derive(Clone)]
-pub struct RcReport
-{
-	report: Rc<RefCell<Report>>
-}
-
-
-pub struct ReportParentGuard
-{
-	report: RcReport
 }
 
 
@@ -85,7 +67,7 @@ impl Message
 	}
 	
 	
-	pub fn error_span<S>(descr: S, span: &Span) -> Message
+	pub fn error_span<S>(descr: S, span: &diagn::Span) -> Message
 	where S: Into<String>
 	{
 		Message {
@@ -111,7 +93,7 @@ impl Message
 	}
 	
 	
-	pub fn warning_span<S>(descr: S, span: &Span) -> Message
+	pub fn warning_span<S>(descr: S, span: &diagn::Span) -> Message
 	where S: Into<String>
 	{
 		Message {
@@ -137,7 +119,7 @@ impl Message
 	}
 	
 	
-	pub fn note_span<S>(descr: S, span: &Span) -> Message
+	pub fn note_span<S>(descr: S, span: &diagn::Span) -> Message
 	where S: Into<String>
 	{
 		Message {
@@ -150,7 +132,7 @@ impl Message
 	}
 	
 	
-	pub fn short_note_span<S>(descr: S, span: &Span) -> Message
+	pub fn short_note_span<S>(descr: S, span: &diagn::Span) -> Message
 	where S: Into<String>
 	{
 		Message {
@@ -188,6 +170,31 @@ impl Message
 		}
 
 		topmost
+	}
+}
+
+
+impl MessageKind
+{
+	fn get_label(&self) -> &'static str
+	{
+		match self
+		{
+			&MessageKind::Error => "error",
+			&MessageKind::Warning => "warning",
+			&MessageKind::Note => "note",
+		}
+	}
+	
+	
+	fn get_color(&self) -> &'static str
+	{
+		match self
+		{
+			&MessageKind::Error => C_ERROR,
+			&MessageKind::Warning => C_WARNING,
+			&MessageKind::Note => C_NOTE,
+		}
 	}
 }
 
@@ -355,7 +362,7 @@ impl Report
 	}
 	
 	
-	pub fn error_span<S>(&mut self, descr: S, span: &Span)
+	pub fn error_span<S>(&mut self, descr: S, span: &diagn::Span)
 	where S: Into<String>
 	{
 		self.message(Message::error_span(descr, span));
@@ -369,7 +376,7 @@ impl Report
 	}
 	
 	
-	pub fn warning_span<S>(&mut self, descr: S, span: &Span)
+	pub fn warning_span<S>(&mut self, descr: S, span: &diagn::Span)
 	where S: Into<String>
 	{
 		self.message(Message::warning_span(descr, span));
@@ -383,28 +390,28 @@ impl Report
 	}
 	
 	
-	pub fn note_span<S>(&mut self, descr: S, span: &Span)
+	pub fn note_span<S>(&mut self, descr: S, span: &diagn::Span)
 	where S: Into<String>
 	{
 		self.message(Message::note_span(descr, span));
 	}
 	
 	
-	pub fn push_parent<S>(&mut self, descr: S, span: &Span)
+	pub fn push_parent<S>(&mut self, descr: S, span: &diagn::Span)
 	where S: Into<String>
 	{
 		self.parents.push(Message::error_span(descr, span));
 	}
 	
 	
-	pub fn push_parent_note<S>(&mut self, descr: S, span: &Span)
+	pub fn push_parent_note<S>(&mut self, descr: S, span: &diagn::Span)
 	where S: Into<String>
 	{
 		self.parents.push(Message::note_span(descr, span));
 	}
 	
 	
-	pub fn push_parent_short_note<S>(&mut self, descr: S, span: &Span)
+	pub fn push_parent_short_note<S>(&mut self, descr: S, span: &diagn::Span)
 	where S: Into<String>
 	{
 		self.parents.push(Message::short_note_span(descr, span));
@@ -459,7 +466,7 @@ impl Report
 	}
 	
 	
-	pub fn has_message_at(&self, fileserver: &dyn FileServer, filename: &str, kind: MessageKind, line: usize, error_excerpt: &str) -> bool
+	pub fn has_message_at(&self, fileserver: &dyn util::FileServer, filename: &str, kind: MessageKind, line: usize, error_excerpt: &str) -> bool
 	{
 		for msg in &self.messages
 		{
@@ -471,7 +478,7 @@ impl Report
 	}
 	
 	
-	pub fn has_error_at(&self, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	pub fn has_error_at(&self, fileserver: &dyn util::FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
 	{
 		for msg in &self.messages
 		{
@@ -483,7 +490,7 @@ impl Report
 	}
 	
 	
-	pub fn has_first_error_at(&self, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	pub fn has_first_error_at(&self, fileserver: &dyn util::FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
 	{
 		if self.messages.len() == 0
 			{ return false; }
@@ -492,11 +499,25 @@ impl Report
 	}
 	
 	
-	fn msg_has_error_at(&self, msg: &Message, fileserver: &dyn FileServer, filename: &str, kind: MessageKind, line: usize, error_excerpt: &str) -> bool
+	fn msg_has_error_at(
+		&self,
+		msg: &Message,
+		fileserver: &dyn util::FileServer,
+		filename: &str,
+		kind: MessageKind,
+		line: usize,
+		error_excerpt: &str)
+		-> bool
 	{
 		for inner in &msg.inner
 		{
-			if self.msg_has_error_at(&inner, fileserver, filename, kind, line, error_excerpt)
+			if self.msg_has_error_at(
+				&inner,
+				fileserver,
+				filename,
+				kind,
+				line,
+				error_excerpt)
 			{
 				return true;
 			}
@@ -521,8 +542,14 @@ impl Report
 			
 		let location = span.location.unwrap();
 		
-		let chars = fileserver.get_chars(RcReport::new(), &*span.file, None).ok().unwrap();
-		let counter = CharCounter::new(&chars);
+		let chars =
+			fileserver.get_chars(
+				&mut diagn::Report::new(),
+				None,
+				&*span.file)
+			.unwrap();
+
+		let counter = util::CharCounter::new(&chars);
 		
 		let (span_line, _) = counter.get_line_column_at_index(location.0);
 		
@@ -533,7 +560,10 @@ impl Report
 	}
 	
 	
-	pub fn print_all(&self, writer: &mut dyn Write, fileserver: &dyn FileServer)
+	pub fn print_all(
+		&self,
+		writer: &mut dyn std::io::Write,
+		fileserver: &dyn util::FileServer)
 	{
 		for msg in &self.messages
 		{
@@ -543,7 +573,12 @@ impl Report
 	}
 	
 	
-	fn print_msg(&self, writer: &mut dyn Write, fileserver: &dyn FileServer, msg: &Message, indent: usize)
+	fn print_msg(
+		&self,
+		writer: &mut dyn std::io::Write,
+		fileserver: &dyn util::FileServer,
+		msg: &Message,
+		indent: usize)
 	{
 		let kind_label = msg.kind.get_label();
 		let highlight_color = msg.kind.get_color();
@@ -580,7 +615,10 @@ impl Report
 	}
 	
 	
-	fn print_indent(&self, writer: &mut dyn Write, indent: usize)
+	fn print_indent(
+		&self,
+		writer: &mut dyn std::io::Write,
+		indent: usize)
 	{
 		for _ in 0..indent
 			{ write!(writer, " ").unwrap(); }
@@ -589,19 +627,19 @@ impl Report
 
 	fn get_line_info(
 		&self,
-		fileserver: &dyn FileServer,
-		span: &Span,
+		fileserver: &dyn util::FileServer,
+		span: &diagn::Span,
 		msg: &Message)
 		-> LineInfo
 	{
-		let chars = fileserver.get_chars(
-				RcReport::new(),
-				&span.file,
-				None)
-			.ok()
+		let chars =
+			fileserver.get_chars(
+				&mut diagn::Report::new(),
+				None,
+				&span.file)
 			.unwrap();
 			
-		let counter = CharCounter::new(&chars);
+		let counter = util::CharCounter::new(&chars);
 		
 
 		let (start, end) = span.location.unwrap();
@@ -656,8 +694,8 @@ impl Report
 	
 	fn print_msg_src(
 		&self,
-		writer: &mut dyn Write,
-		fileserver: &dyn FileServer,
+		writer: &mut dyn std::io::Write,
+		fileserver: &dyn util::FileServer,
 		msg: &Message,
 		indent: usize)
 		-> usize
@@ -694,8 +732,14 @@ impl Report
 		write!(writer, "{}", C_DEFAULT).unwrap();
 
 		// Print location information.
-		let chars = fileserver.get_chars(RcReport::new(), &span.file, None).ok().unwrap();
-		let counter = CharCounter::new(&chars);
+		let chars =
+			fileserver.get_chars(
+				&mut diagn::Report::new(),
+				None,
+				&span.file)
+			.unwrap();
+
+		let counter = util::CharCounter::new(&chars);
 		
 		write!(writer, "{}", C_LOCATION).unwrap();
 		writeln!(writer, "{}:{}:", line_info.line1 + 1, line_info.col1 + 1).unwrap();
@@ -768,183 +812,5 @@ impl Report
 		write!(writer, "{}", C_DEFAULT).unwrap();
 		
 		line_info.label_width
-	}
-}
-
-
-impl RcReport
-{
-	pub fn new() -> RcReport
-	{
-		RcReport { report: Rc::new(RefCell::new(Report::new())) }
-	}
-
-
-	pub fn transfer_to(&self, other: RcReport)
-	{
-		self.report.borrow_mut().transfer_to(&mut other.report.borrow_mut());
-	}
-
-
-	pub fn into_inner(self) -> Report
-	{
-		Rc::try_unwrap(self.report).ok().unwrap().into_inner()
-	}
-
-
-	pub fn push_multiple(&self, msgs: Vec<Message>)
-	{
-		self.report.borrow_mut().push_multiple(msgs);
-	}
-	
-	
-	pub fn error<S>(&self, descr: S)
-	where S: Into<String>
-	{
-		self.report.borrow_mut().error(descr);
-	}
-	
-	
-	pub fn error_span<S>(&self, descr: S, span: &Span)
-	where S: Into<String>
-	{
-		self.report.borrow_mut().error_span(descr, span);
-	}
-	
-	
-	pub fn warning<S>(&self, descr: S)
-	where S: Into<String>
-	{
-		self.report.borrow_mut().warning(descr);
-	}
-	
-	
-	pub fn warning_span<S>(&self, descr: S, span: &Span)
-	where S: Into<String>
-	{
-		self.report.borrow_mut().warning_span(descr, span);
-	}
-	
-	
-	pub fn note<S>(&self, descr: S)
-	where S: Into<String>
-	{
-		self.report.borrow_mut().note(descr);
-	}
-	
-	
-	pub fn note_span<S>(&self, descr: S, span: &Span)
-	where S: Into<String>
-	{
-		self.report.borrow_mut().note_span(descr, span);
-	}
-	
-	
-	pub fn push_parent<S>(&self, descr: S, span: &Span) -> ReportParentGuard
-	where S: Into<String>
-	{
-		let guard = ReportParentGuard{ report: self.clone() };
-		
-		self.report.borrow_mut().push_parent(descr, span);
-		
-		guard
-	}
-	
-	pub fn push_parent_note<S>(&self, descr: S, span: &Span) -> ReportParentGuard
-	where S: Into<String>
-	{
-		let guard = ReportParentGuard{ report: self.clone() };
-		
-		self.report.borrow_mut().push_parent_note(descr, span);
-		
-		guard
-	}
-
-	
-	fn pop_parent(&self)
-	{
-		self.report.borrow_mut().pop_parent();
-	}
-	
-	
-	pub fn has_messages(&self) -> bool
-	{
-		self.report.borrow_mut().has_messages()
-	}
-	
-	
-	pub fn has_errors(&self) -> bool
-	{
-		self.report.borrow_mut().has_errors()
-	}
-	
-	
-	pub fn len(&self) -> usize
-	{
-		self.report.borrow().len()
-	}
-	
-	
-	pub fn len_with_inner(&self) -> usize
-	{
-		self.report.borrow().len_with_inner()
-	}
-	
-	
-	pub fn has_message_at(&self, fileserver: &dyn FileServer, filename: &str, kind: MessageKind, line: usize, error_excerpt: &str) -> bool
-	{
-		self.report.borrow_mut().has_message_at(fileserver, filename, kind, line, error_excerpt)
-	}
-	
-	
-	pub fn has_error_at(&self, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
-	{
-		self.report.borrow_mut().has_error_at(fileserver, filename, line, error_excerpt)
-	}
-	
-	
-	pub fn has_first_error_at(&self, fileserver: &dyn FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
-	{
-		self.report.borrow_mut().has_first_error_at(fileserver, filename, line, error_excerpt)
-	}
-	
-	
-	pub fn print_all(&self, writer: &mut dyn Write, fileserver: &dyn FileServer)
-	{
-		self.report.borrow_mut().print_all(writer, fileserver);
-	}
-}
-
-
-impl Drop for ReportParentGuard
-{
-	fn drop(&mut self)
-	{
-		self.report.pop_parent();
-	}
-}
-
-
-impl MessageKind
-{
-	fn get_label(&self) -> &'static str
-	{
-		match self
-		{
-			&MessageKind::Error => "error",
-			&MessageKind::Warning => "warning",
-			&MessageKind::Note => "note",
-		}
-	}
-	
-	
-	fn get_color(&self) -> &'static str
-	{
-		match self
-		{
-			&MessageKind::Error => C_ERROR,
-			&MessageKind::Warning => C_WARNING,
-			&MessageKind::Note => C_NOTE,
-		}
 	}
 }

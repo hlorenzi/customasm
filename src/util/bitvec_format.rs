@@ -463,7 +463,12 @@ impl util::BitVec
             if &*span.span.file != prev_filename
             {
                 prev_filename = &*span.span.file;
-                prev_file_chars = fileserver.get_chars(diagn::RcReport::new(), &prev_filename, None).ok().unwrap();
+                prev_file_chars =
+					fileserver.get_chars(
+						&mut diagn::Report::new(),
+						None,
+						&prev_filename)
+					.unwrap();
             }
             
             let span_location = span.span.location.unwrap();
@@ -492,7 +497,13 @@ impl util::BitVec
         
         for span in &sorted_spans
         {
-            let chars = fileserver.get_chars(diagn::RcReport::new(), &span.span.file, None).ok().unwrap();
+            let chars =
+				fileserver.get_chars(
+					&mut diagn::Report::new(),
+					None,
+					&span.span.file)
+				.unwrap();
+		
             let counter = util::CharCounter::new(&chars);
 
             if let Some(offset) = span.offset

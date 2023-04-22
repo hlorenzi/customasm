@@ -1,9 +1,11 @@
 use crate::*;
-use crate::diagn::{Span, RcReport};
-use num_bigint;
 
 
-pub fn excerpt_as_string_contents(report: RcReport, excerpt: &str, span: &Span) -> Result<String, ()>
+pub fn excerpt_as_string_contents(
+	report: &mut diagn::Report,
+	span: &diagn::Span,
+	excerpt: &str)
+	-> Result<String, ()>
 {
 	assert!(excerpt.len() >= 2);
 	
@@ -102,7 +104,11 @@ pub fn excerpt_as_string_contents(report: RcReport, excerpt: &str, span: &Span) 
 
 
 
-pub fn excerpt_as_usize(report: Option<RcReport>, excerpt: &str, span: &Span) -> Result<usize, ()>
+pub fn excerpt_as_usize(
+	report: &mut diagn::Report,
+	span: &diagn::Span,
+	excerpt: &str)
+	-> Result<usize, ()>
 {
 	let chars: Vec<char> = excerpt.chars().collect();
 	assert!(chars.len() >= 1);
@@ -123,10 +129,10 @@ pub fn excerpt_as_usize(report: Option<RcReport>, excerpt: &str, span: &Span) ->
 			Some(d) => d,
 			None => 
 			{
-				if let Some(report) = report
-				{
-					report.error_span("invalid digits", span);
-				}
+				report.error_span(
+					"invalid digits",
+					span);
+				
 				return Err(());
 			}
 		};
@@ -136,10 +142,10 @@ pub fn excerpt_as_usize(report: Option<RcReport>, excerpt: &str, span: &Span) ->
 			Some(v) => v,
 			None =>
 			{
-				if let Some(report) = report
-				{
-					report.error_span("value is too large", span);
-				}
+				report.error_span(
+					"value is too large",
+					span);
+				
 				return Err(());
 			}
 		};
@@ -149,10 +155,10 @@ pub fn excerpt_as_usize(report: Option<RcReport>, excerpt: &str, span: &Span) ->
 			Some(v) => v,
 			None =>
 			{
-				if let Some(report) = report
-				{
-					report.error_span("value is too large", span);
-				}
+				report.error_span(
+					"value is too large",
+					span);
+				
 				return Err(());
 			}
 		};
@@ -162,7 +168,11 @@ pub fn excerpt_as_usize(report: Option<RcReport>, excerpt: &str, span: &Span) ->
 }
 
 
-pub fn excerpt_as_bigint(report: Option<RcReport>, excerpt: &str, span: &Span) -> Result<util::BigInt, ()>
+pub fn excerpt_as_bigint(
+	report: &mut diagn::Report,
+	span: &diagn::Span,
+	excerpt: &str)
+	-> Result<util::BigInt, ()>
 {
 	use num_traits::Zero;
 
@@ -187,10 +197,10 @@ pub fn excerpt_as_bigint(report: Option<RcReport>, excerpt: &str, span: &Span) -
 			Some(d) => d,
 			None => 
 			{
-				if let Some(report) = report
-				{
-					report.error_span("invalid digits", span);
-				}
+				report.error_span(
+					"invalid digits",
+					span);
+				
 				return Err(());
 			}
 		};
@@ -203,10 +213,10 @@ pub fn excerpt_as_bigint(report: Option<RcReport>, excerpt: &str, span: &Span) -
 	
 	if digit_num == 0
 	{
-		if let Some(report) = report
-		{
-			report.error_span("invalid value", span);
-		}
+		report.error_span(
+			"invalid value",
+			span);
+		
 		return Err(());
 	}
 		

@@ -24,7 +24,7 @@ pub enum Value
 	FailedConstraint(diagn::Message),
 	Void,
 	Integer(util::BigInt),
-	String(ValueString),
+	String(ExprString),
 	Bool(bool),
 	ExprBuiltInFunction(String),
 	AsmBuiltInFunction(String),
@@ -33,7 +33,7 @@ pub enum Value
 
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ValueString
+pub struct ExprString
 {
 	pub utf8_contents: String,
 	pub encoding: String,
@@ -131,7 +131,7 @@ impl Value
 
 	pub fn make_string<T: Into<String>, S: Into<String>>(value: T, encoding: S) -> Value
 	{
-		Value::String(ValueString
+		Value::String(ExprString
 		{
 			utf8_contents: value.into(),
 			encoding: encoding.into(),
@@ -453,7 +453,7 @@ impl Value
 		&self,
 		report: &mut diagn::Report,
 		span: &diagn::Span)
-		-> Result<&ValueString, ()>
+		-> Result<&ExprString, ()>
 	{
 		match self
 		{
@@ -471,7 +471,7 @@ impl Value
 }
 
 
-impl ValueString
+impl ExprString
 {
 	pub fn to_bigint(&self) -> util::BigInt
 	{

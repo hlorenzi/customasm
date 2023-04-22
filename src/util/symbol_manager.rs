@@ -5,7 +5,7 @@ use crate::*;
 pub struct SymbolManager<T>
 {
     decls: Vec<SymbolDecl<T>>,
-    globals: std::collections::HashMap<String, util::ItemRef<T>>,
+    pub(super) globals: std::collections::HashMap<String, util::ItemRef<T>>,
     span_refs: std::collections::HashMap<diagn::Span, util::ItemRef<T>>,
     report_as: &'static str,
 }
@@ -16,9 +16,21 @@ pub struct SymbolDecl<T>
 {
     pub span: diagn::Span,
     pub name: String,
+    pub kind: SymbolKind,
     pub depth: usize,
     pub ctx: SymbolContext,
-    children: std::collections::HashMap<String, util::ItemRef<T>>,
+    pub item_ref: util::ItemRef<T>,
+    pub(super) children: std::collections::HashMap<String, util::ItemRef<T>>,
+}
+
+
+#[derive(Copy, Clone, Debug)]
+pub enum SymbolKind
+{
+    Constant,
+    Label,
+    Function,
+    Other,
 }
 
 
@@ -238,7 +250,8 @@ impl<T> SymbolManager<T>
         span: &diagn::Span,
         ctx: &SymbolContext,
         name: String,
-        hierarchy_level: usize)
+        hierarchy_level: usize,
+        kind: SymbolKind)
         -> Result<util::ItemRef<T>, ()>
     {
         // Check skips in nesting level
@@ -323,8 +336,10 @@ impl<T> SymbolManager<T>
         self.decls.push(SymbolDecl {
             span: span.clone(),
             name: full_name.clone(),
+            kind,
             depth: hierarchy_level,
             ctx: new_ctx.clone(),
+            item_ref,
             children: std::collections::HashMap::new(),
         });
 

@@ -3,7 +3,7 @@ use crate::*;
 
 pub fn resolve_builtin_fn(
     name: &str)
-    -> Option<fn(&mut expr::EvalFunctionInfo2) -> Result<expr::Value, ()>>
+    -> Option<fn(&mut expr::EvalFunctionInfo) -> Result<expr::Value, ()>>
 {
     match name.as_ref()
     {
@@ -41,7 +41,7 @@ pub fn get_static_size_builtin_fn(
 
 
 pub fn eval_builtin_fn(
-    info: &mut expr::EvalFunctionInfo2)
+    info: &mut expr::EvalFunctionInfo)
     -> Result<expr::Value, ()>
 {
     let builtin_name = {
@@ -58,7 +58,7 @@ pub fn eval_builtin_fn(
 
 
 pub fn eval_builtin_assert(
-    info: &mut expr::EvalFunctionInfo2)
+    info: &mut expr::EvalFunctionInfo)
     -> Result<expr::Value, ()>
 {
     info.ensure_arg_number(1)?;
@@ -84,7 +84,7 @@ pub fn eval_builtin_assert(
 
 
 pub fn eval_builtin_le(
-    info: &mut expr::EvalFunctionInfo2)
+    info: &mut expr::EvalFunctionInfo)
     -> Result<expr::Value, ()>
 {
     info.ensure_arg_number(1)?;
@@ -130,7 +130,7 @@ pub fn get_static_size_builtin_le(
 
 pub fn eval_builtin_string_encoding(
     encoding: &str,
-    info: &mut expr::EvalFunctionInfo2)
+    info: &mut expr::EvalFunctionInfo)
     -> Result<expr::Value, ()>
 {
     info.ensure_arg_number(1)?;
@@ -146,7 +146,7 @@ pub fn eval_builtin_string_encoding(
 
 
 pub fn eval_builtin_ascii(
-    info: &mut expr::EvalFunctionInfo2)
+    info: &mut expr::EvalFunctionInfo)
     -> Result<expr::Value, ()>
 {
     eval_builtin_string_encoding("ascii", info)
@@ -154,7 +154,7 @@ pub fn eval_builtin_ascii(
 
 
 pub fn eval_builtin_utf8(
-    info: &mut expr::EvalFunctionInfo2)
+    info: &mut expr::EvalFunctionInfo)
     -> Result<expr::Value, ()>
 {
     eval_builtin_string_encoding("utf8", info)
@@ -162,7 +162,7 @@ pub fn eval_builtin_utf8(
 
 
 pub fn eval_builtin_utf16be(
-    info: &mut expr::EvalFunctionInfo2)
+    info: &mut expr::EvalFunctionInfo)
     -> Result<expr::Value, ()>
 {
     eval_builtin_string_encoding("utf16be", info)
@@ -170,7 +170,7 @@ pub fn eval_builtin_utf16be(
 
 
 pub fn eval_builtin_utf16le(
-    info: &mut expr::EvalFunctionInfo2)
+    info: &mut expr::EvalFunctionInfo)
     -> Result<expr::Value, ()>
 {
     eval_builtin_string_encoding("utf16le", info)
@@ -178,7 +178,7 @@ pub fn eval_builtin_utf16le(
 
 
 pub fn eval_builtin_utf32be(
-    info: &mut expr::EvalFunctionInfo2)
+    info: &mut expr::EvalFunctionInfo)
     -> Result<expr::Value, ()>
 {
     eval_builtin_string_encoding("utf32be", info)
@@ -186,7 +186,7 @@ pub fn eval_builtin_utf32be(
 
 
 pub fn eval_builtin_utf32le(
-    info: &mut expr::EvalFunctionInfo2)
+    info: &mut expr::EvalFunctionInfo)
     -> Result<expr::Value, ()>
 {
     eval_builtin_string_encoding("utf32le", info)
