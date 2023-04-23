@@ -72,18 +72,16 @@ impl BigInt
 
     pub fn min_size(&self) -> usize
     {
-        use num_traits::Zero;
-
-        if self.bigint.is_zero()
+        if self.bigint.sign() == num_bigint::Sign::NoSign
             { return 1; }
     
-        if self.bigint < num_bigint::BigInt::zero()
+        if self.bigint < num_bigint::BigInt::from(0)
         {
             let y: num_bigint::BigInt = &self.bigint + 1;
-            y.bits() + 1
+            (y.bits() + 1).try_into().unwrap()
         }
         else
-            { self.bigint.bits() }
+            { self.bigint.bits().try_into().unwrap() }
     }
 
 
@@ -113,15 +111,13 @@ impl BigInt
 
     pub fn checked_to_usize(&self) -> Option<usize>
     {
-        use num_traits::ToPrimitive;
-        self.bigint.to_usize()
+        (&self.bigint).try_into().ok()
     }
 
 
     pub fn checked_to_isize(&self) -> Option<isize>
     {
-        use num_traits::ToPrimitive;
-        self.bigint.to_isize()
+        (&self.bigint).try_into().ok()
     }
 
 
@@ -133,8 +129,7 @@ impl BigInt
 
     pub fn checked_rem(&self, rhs: &BigInt) -> Option<BigInt>
     {
-        use num_traits::Zero;
-        if rhs.bigint == num_bigint::BigInt::zero()
+        if rhs.bigint == num_bigint::BigInt::from(0)
             { None }
         else
             { Some((&self.bigint % &rhs.bigint).into()) }
@@ -161,17 +156,19 @@ impl BigInt
 
     pub fn checked_shl(&self, rhs: &BigInt) -> Option<BigInt>
     {
-        use num_traits::ToPrimitive;
-
-        rhs.bigint.to_usize().map(|rhs| self.shl(rhs).into())
+        (&rhs.bigint)
+            .try_into()
+            .ok()
+            .map(|rhs| self.shl(rhs).into())
     }
     
     
     pub fn checked_shr(&self, rhs: &BigInt) -> Option<BigInt>
     {
-        use num_traits::ToPrimitive;
-
-        rhs.bigint.to_usize().map(|rhs| self.shr(rhs).into())
+        (&rhs.bigint)
+            .try_into()
+            .ok()
+            .map(|rhs| self.shr(rhs).into())
     }
     
     
@@ -190,12 +187,13 @@ impl BigInt
     
     pub fn slice(&self, left: usize, right: usize) -> BigInt
     {
-        use num_traits::Zero;
-        use num_traits::One;
+        let one = num_bigint::BigInt::from(1);
 
-        let mut mask = num_bigint::BigInt::zero();
+        let mut mask = num_bigint::BigInt::from(0);
         for _ in 0..(left - right)
-            { mask = (mask << 1) + num_bigint::BigInt::one(); }
+        {
+            mask = (mask << 1) + &one;
+        }
         
         let shifted_mask = BigInt::new(mask, None).shl(right);
         let mut result = (self & &shifted_mask).shr(right);

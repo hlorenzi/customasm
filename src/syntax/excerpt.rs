@@ -174,8 +174,6 @@ pub fn excerpt_as_bigint(
 	excerpt: &str)
 	-> Result<util::BigInt, ()>
 {
-	use num_traits::Zero;
-
 	let chars: Vec<char> = excerpt.chars().collect();
 	assert!(chars.len() >= 1);
 
@@ -183,7 +181,7 @@ pub fn excerpt_as_bigint(
 	
 	let mut digit_num = 0;
 	
-	let mut value = num_bigint::BigInt::zero();
+	let mut value = num_bigint::BigInt::from(0);
 	while index < chars.len()
 	{
 		let c = chars[index];
