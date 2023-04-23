@@ -1,3 +1,6 @@
+#![feature(test)]
+
+
 pub mod asm;
 pub mod diagn;
 pub mod expr;

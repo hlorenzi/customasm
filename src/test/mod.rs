@@ -6,6 +6,7 @@ mod excerpt;
 mod expr;
 mod file;
 mod lib;
+mod bench;
 
 
 pub enum ExpectedResult<T>
