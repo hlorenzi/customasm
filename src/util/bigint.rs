@@ -8,12 +8,14 @@ pub struct BigInt
 
 impl BigInt
 {
-    pub fn new<T>(bigint: T, size: Option<usize>) -> BigInt
-    where T: Into<num_bigint::BigInt>
+    pub fn new<T>(
+        value: T,
+        size: Option<usize>)
+        -> BigInt
+        where T: Into<num_bigint::BigInt>
     {
-        BigInt
-        {
-            bigint: bigint.into(),
+        BigInt {
+            bigint: value.into(),
             size,
         }
     }
@@ -28,45 +30,22 @@ impl BigInt
     pub fn from_bytes_be(bytes: &[u8]) -> BigInt
     {
         let bigint = num_bigint::BigInt::from_signed_bytes_be(&bytes);
-        BigInt
-        {
+        BigInt {
             bigint,
             size: Some(bytes.len() * 8),
         }
     }
 
 
-    pub fn set_bit(&self, index: usize, value: bool) -> BigInt
+    pub fn set_bit(&mut self, index: usize, value: bool)
     {
-        if value
-        {
-            self | &Into::<BigInt>::into(1).shl(index)
-        }
-        else
-        {
-            self & &!&Into::<BigInt>::into(0).shl(index)
-        }
+        self.bigint.set_bit(index.try_into().unwrap(), value)
     }
 
 
     pub fn get_bit(&self, index: usize) -> bool
     {
-        let bytes = self.bigint.to_signed_bytes_le();
-        
-        let byte_index = index / 8;
-        if byte_index >= bytes.len()
-            { return self.bigint.sign() == num_bigint::Sign::Minus; }
-            
-        let mut byte = bytes[byte_index];
-        
-        let mut bit_index = index % 8;
-        while bit_index > 0
-        {
-            byte >>= 1;
-            bit_index -= 1;
-        }
-        
-        (byte & 0b1) != 0
+        self.bigint.bit(index.try_into().unwrap())
     }
 
 
@@ -147,10 +126,15 @@ impl BigInt
         let lhs_sign = self.bigint.sign();
         let result = &self.bigint >> rhs;
 
-        if lhs_sign == num_bigint::Sign::Minus && result.sign() == num_bigint::Sign::NoSign
-            { BigInt::from(-1) }
+        if lhs_sign == num_bigint::Sign::Minus &&
+            result.sign() == num_bigint::Sign::NoSign
+        {
+            BigInt::from(-1)
+        }
         else
-            { result.into() }
+        {
+            result.into()
+        }
     }
 
 
@@ -172,32 +156,53 @@ impl BigInt
     }
     
     
-    pub fn concat(&self, lhs_slice: (usize, usize), rhs: &BigInt, rhs_slice: (usize, usize)) -> BigInt
+    pub fn slice(
+        &self,
+        left: usize,
+        right: usize)
+        -> BigInt
     {
-        let lhs_size = lhs_slice.0 - lhs_slice.1;
-        let rhs_size = rhs_slice.0 - rhs_slice.1;
-        let lhs = self.slice(lhs_slice.0, lhs_slice.1).shl(rhs_size);
-        let rhs = rhs.slice(rhs_slice.0, rhs_slice.1);
+        let mut result = BigInt::from(0);
 
-        let mut result: BigInt = (&lhs | &rhs).into();
-        result.size = Some(lhs_size + rhs_size);
+        for i in 0..(left - right)
+        {
+            result.set_bit(
+                i,
+                self.get_bit(right + i));
+        }
+
+        result.size = Some(left - right);
         result
     }
     
     
-    pub fn slice(&self, left: usize, right: usize) -> BigInt
+    pub fn concat(
+        &self,
+        lhs_slice: (usize, usize),
+        rhs: &BigInt,
+        rhs_slice: (usize, usize))
+        -> BigInt
     {
-        let one = num_bigint::BigInt::from(1);
+        let lhs_size = lhs_slice.0 - lhs_slice.1;
+        let rhs_size = rhs_slice.0 - rhs_slice.1;
 
-        let mut mask = num_bigint::BigInt::from(0);
-        for _ in 0..(left - right)
+        let mut result = BigInt::from(0);
+
+        for i in 0..(lhs_slice.0 - lhs_slice.1)
         {
-            mask = (mask << 1) + &one;
+            result.set_bit(
+                i + rhs_size,
+                self.get_bit(lhs_slice.1 + i));
         }
-        
-        let shifted_mask = BigInt::new(mask, None).shl(right);
-        let mut result = (self & &shifted_mask).shr(right);
-        result.size = Some(left - right);
+
+        for i in 0..(rhs_slice.0 - rhs_slice.1)
+        {
+            result.set_bit(
+                i,
+                rhs.get_bit(rhs_slice.1 + i));
+        }
+
+        result.size = Some(lhs_size + rhs_size);
         result
     }
 
@@ -212,42 +217,6 @@ impl BigInt
 
         let new_value = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, &be_bytes);
         BigInt::new(new_value, self.size)
-    }
-
-
-    fn combine_bits<F>(&self, rhs: &BigInt, f: F) -> BigInt
-    where F: Fn(u8, u8) -> u8
-    {
-        let mut lhs_bytes = self.bigint.to_signed_bytes_le();
-        let mut lhs_sign = self.bigint.sign();
-        let mut rhs_bytes = rhs.bigint.to_signed_bytes_le();
-        let mut rhs_sign = rhs.bigint.sign();
-        
-        if lhs_sign != num_bigint::Sign::Minus
-            { lhs_bytes.push(0); }
-        
-        if rhs_sign != num_bigint::Sign::Minus
-            { rhs_bytes.push(0); }
-            
-        if rhs_bytes.len() > lhs_bytes.len()
-        {
-            std::mem::swap(&mut lhs_bytes, &mut rhs_bytes);
-            std::mem::swap(&mut lhs_sign, &mut rhs_sign);
-        }
-        
-        for i in 0..lhs_bytes.len()
-        {
-            let rhs_byte = if i < rhs_bytes.len()
-                { rhs_bytes[i] }
-            else if rhs_sign == num_bigint::Sign::Minus
-                { 0xff }
-            else
-                { 0 };
-            
-            lhs_bytes[i] = f(lhs_bytes[i], rhs_byte);
-        }
-        
-        num_bigint::BigInt::from_signed_bytes_le(&lhs_bytes).into()
     }
 }
 
@@ -356,7 +325,7 @@ impl std::ops::BitAnd for &BigInt
 
     fn bitand(self, rhs: &BigInt) -> Self::Output
     {
-        self.combine_bits(rhs, |a, b| a & b).into()
+        (&self.bigint & &rhs.bigint).into()
     }
 }
 
@@ -368,7 +337,7 @@ impl std::ops::BitOr for &BigInt
 
     fn bitor(self, rhs: &BigInt) -> Self::Output
     {
-        self.combine_bits(rhs, |a, b| a | b).into()
+        (&self.bigint | &rhs.bigint).into()
     }
 }
 
@@ -380,7 +349,7 @@ impl std::ops::BitXor for &BigInt
 
     fn bitxor(self, rhs: &BigInt) -> Self::Output
     {
-        self.combine_bits(rhs, |a, b| a ^ b).into()
+        (&self.bigint ^ &rhs.bigint).into()
     }
 }
 

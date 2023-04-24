@@ -113,15 +113,15 @@ fn eval_builtin_incbin(
         info.report,
         info.args[0].span)?;
 
-    let absolute_filename = util::filename_navigate2(
+    let absolute_filename = util::filename_navigate(
         info.report,
-        info.span,
+        info.args[0].span,
         &ctx.filename_ctx.unwrap(),
         &relative_filename.utf8_contents)?;
 
     let bytes = fileserver.get_bytes(
         info.report,
-        Some(&info.span),
+        Some(info.args[0].span),
         &absolute_filename)?;
 
     Ok(expr::Value::make_integer(
@@ -180,15 +180,15 @@ fn eval_builtin_incstr(
         info.report,
         info.args[0].span)?;
 
-    let absolute_filename = util::filename_navigate2(
+    let absolute_filename = util::filename_navigate(
         info.report,
-        info.span,
+        info.args[0].span,
         &ctx.filename_ctx.unwrap(),
         &relative_filename.utf8_contents)?;
 
     let chars = fileserver.get_chars(
         info.report,
-        Some(&info.span),
+        Some(info.args[0].span),
         &absolute_filename)?;
 
     
@@ -198,31 +198,33 @@ fn eval_builtin_incstr(
     {
         if syntax::is_whitespace(c) ||
             c == '_' ||
-            c == '\r' || c == '\n'
+            c == '\r' ||
+            c == '\n'
         {
             continue;
         }
 
-        let digit = match c.to_digit(1 << bits_per_char)
-        {
-            Some(digit) => digit,
-            None =>
+        let digit = {
+            match c.to_digit(1 << bits_per_char)
             {
-                info.report.error_span(
-                    "invalid character in file contents",
-                    &info.span);
-                
-                return Err(());
+                Some(digit) => digit,
+                None =>
+                {
+                    info.report.error_span(
+                        "invalid character in file contents",
+                        &info.span);
+                    
+                    return Err(());
+                }
             }
         };
         
         for i in 0..bits_per_char
         {
             let bit = (digit & (1 << (bits_per_char - 1 - i))) != 0;
-            bitvec.write(bitvec.len(), bit);
+            bitvec.write_bit(bitvec.len(), bit);
         }
     }
 
-    // TODO: Optimize conversion to bigint
-    Ok(expr::Value::make_integer(bitvec.as_bigint()))
+    Ok(expr::Value::make_integer(bitvec.to_bigint()))
 }

@@ -16,6 +16,11 @@ pub use self::bitvec::{
 
 mod bitvec_format;
 
+mod overlap_checker;
+pub use self::overlap_checker::{
+    OverlapChecker,
+};
+
 mod fileserver;
 pub use self::fileserver::{
     FileServer,
@@ -25,8 +30,8 @@ pub use self::fileserver::{
 
 mod filename;
 pub use self::filename::{
-    filename_validate2,
-    filename_navigate2,
+    filename_validate,
+    filename_navigate,
 };
 
 mod windows_console;

@@ -1,12 +1,14 @@
-extern crate customasm;
+use customasm::*;
 
 
 fn main()
 {
 	let args: Vec<String> = std::env::args().collect();
 	
-	let mut fileserver = customasm::util::FileServerReal::new();
+	let mut fileserver = util::FileServerReal::new();
 	
-	if let Err(()) = customasm::driver::drive(&args, &mut fileserver)
-		{ std::process::exit(1); }
+	if let Err(()) = driver::drive(&args, &mut fileserver)
+	{
+		std::process::exit(1);
+	}
 }

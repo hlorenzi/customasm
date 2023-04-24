@@ -30,9 +30,7 @@ pub fn check_bank_overlap(
             let outp1 = bankdef1.output_offset.unwrap();
             let outp2 = bankdef2.output_offset.unwrap();
 
-            // FIXME: multiplication can overflow
             let size1 = bankdef1.size;
-
             let size2 = bankdef2.size;
 
             let overlap = {
@@ -83,11 +81,13 @@ pub fn build_output(
     defs: &asm::ItemDefs)
     -> Result<util::BitVec, ()>
 {
-    let mut bitvec = util::BitVec::new();
+    let mut output = util::BitVec::new();
+
+    let mut overlap_checker = util::OverlapChecker::new();
 
     fill_banks(
         defs,
-        &mut bitvec);
+        &mut output);
 
     let mut iter = asm::ResolveIterator::new(
         ast,
@@ -120,7 +120,7 @@ pub fn build_output(
 
                 let maybe_pos = ctx.get_output_position(defs);
 
-                bitvec.mark_span(
+                output.mark_span(
                     maybe_pos,
                     0,
                     symbol.value.unwrap_bigint().clone(),
@@ -150,12 +150,17 @@ pub fn build_output(
             let addr = ctx.get_address(defs, true).unwrap();
             let pos = ctx.get_output_position(defs).unwrap();
 
-			bitvec.write_bigint_checked(
+            overlap_checker.check_and_insert(
                 report,
-				&ast_instr.span,
+				ast_instr.span.clone(),
+                pos,
+                instr.encoding.size.unwrap())?;
+
+			output.write_bigint_with_span(
+				ast_instr.span.clone(),
                 pos,
 				addr,
-                &instr.encoding)?;
+                &instr.encoding);
         }
         
         else if let asm::ResolverNode::DataElement(ast_data, elem_index) = ctx.node
@@ -181,12 +186,17 @@ pub fn build_output(
             let pos = ctx.get_output_position(defs).unwrap();
             let addr = ctx.get_address(defs, true).unwrap();
 
-            bitvec.write_bigint_checked(
+            overlap_checker.check_and_insert(
                 report,
-                ast_data.elems[elem_index].span(),
+                ast_data.elems[elem_index].span().clone(),
+                pos,
+                elem.encoding.size.unwrap())?;
+
+            output.write_bigint_with_span(
+                ast_data.elems[elem_index].span().clone(),
                 pos,
                 addr,
-                &elem.encoding)?;
+                &elem.encoding);
         }
         
         else if let asm::ResolverNode::Res(ast_res) = ctx.node
@@ -208,16 +218,25 @@ pub fn build_output(
                 &ctx,
                 res.reserve_size,
                 false)?;
+                
+            if let Some(pos) = ctx.get_output_position(defs)
+            {
+                overlap_checker.check_and_insert(
+                    report,
+                    ast_res.header_span.clone(),
+                    pos,
+                    res.reserve_size)?;
+            }
         }
     }
 
-    Ok(bitvec)
+    Ok(output)
 }
 
 
 fn fill_banks(
     defs: &asm::ItemDefs,
-    bitvec: &mut util::BitVec)
+    output: &mut util::BitVec)
 {
     for bankdef in &defs.bankdefs.defs
     {
@@ -226,13 +245,14 @@ fn fill_banks(
             continue;
         }
 
-        if let (Some(size), Some(output)) = (bankdef.size, bankdef.output_offset)
+        if let (Some(size), Some(offset)) =
+            (bankdef.size, bankdef.output_offset)
         {
-            let highest_position = output + size - 1;
+            let highest_position = offset + size - 1;
 
-            if bitvec.len() < highest_position
+            if output.len() < highest_position
             {
-                bitvec.write(highest_position, false);
+                output.write_bit(highest_position, false);
             }
         }
     }
@@ -254,7 +274,7 @@ fn check_bank_usage(
         }
 
         report.error_span(
-            "using the default bank while custom banks are defined",
+            "usage of the default bank while custom banks are defined",
             span);
 
         return Err(());

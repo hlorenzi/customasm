@@ -1,7 +1,7 @@
 use crate::*;
 
 
-pub fn filename_validate2(
+pub fn filename_validate(
 	report: &mut diagn::Report,
 	span: &diagn::Span,
 	filename: &str)
@@ -33,7 +33,7 @@ pub fn filename_validate2(
 }
 
 
-pub fn filename_navigate2(
+pub fn filename_navigate(
 	report: &mut diagn::Report,
 	span: &diagn::Span,
 	current: &str,
@@ -43,7 +43,7 @@ pub fn filename_navigate2(
 	let current = current.replace("\\", "/");
 	let nav = nav.replace("\\", "/");
 
-	filename_validate2(
+	filename_validate(
 		report,
 		span,
 		&nav)?;

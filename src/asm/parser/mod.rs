@@ -189,7 +189,7 @@ pub fn parse_and_resolve_includes<S>(
 
         if let AstAny::DirectiveInclude(dir_include) = node
         {
-            let included_filename = util::filename_navigate2(
+            let included_filename = util::filename_navigate(
                 report,
                 &dir_include.filename_span,
                 root_filename.borrow(),

@@ -158,6 +158,8 @@ fn test_ops_arithmetic()
 #[test]
 fn test_ops_bitmanipulation()
 {
+	test("-1 & -2", Pass(expr::Value::make_integer(util::BigInt::new(-2, None))));
+
 	test("! 0", Pass(expr::Value::make_integer(util::BigInt::new(-1, None))));
 	test("! 1", Pass(expr::Value::make_integer(util::BigInt::new(-2, None))));
 	test("!-1", Pass(expr::Value::make_integer(util::BigInt::new(0, None))));

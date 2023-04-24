@@ -14,7 +14,7 @@ impl util::BitVec
 			for _ in 0..8
 			{
 				byte <<= 1;
-				byte |= if self.read(index) { 1 } else { 0 };
+				byte |= if self.read_bit(index) { 1 } else { 0 };
 				index += 1;
 			}
 			
@@ -48,7 +48,7 @@ impl util::BitVec
 			for _ in 0..bits_per_digit
 			{
 				digit <<= 1;
-				digit |= if self.read(index) { 1 } else { 0 };
+				digit |= if self.read_bit(index) { 1 } else { 0 };
 				index += 1;
 			}
 			
@@ -112,7 +112,7 @@ impl util::BitVec
                     for bit_index in 0..digit_bits
                     {
                         digit <<= 1;
-                        digit |= if self.read(digit_first_bit + bit_index) { 1 } else { 0 };
+                        digit |= if self.read_bit(digit_first_bit + bit_index) { 1 } else { 0 };
                     }
             
                     let c = if digit < 10
@@ -147,7 +147,7 @@ impl util::BitVec
                     for bit_index in 0..byte_bits
                     {
                         byte <<= 1;
-                        byte |= if self.read(byte_first_bit + bit_index) { 1 } else { 0 };
+                        byte |= if self.read_bit(byte_first_bit + bit_index) { 1 } else { 0 };
                     }
                     
                     let c = byte as char;
@@ -195,7 +195,7 @@ impl util::BitVec
 			for _ in 0..8
 			{
 				byte <<= 1;
-				byte |= if self.read(index) { 1 } else { 0 };
+				byte |= if self.read_bit(index) { 1 } else { 0 };
 				index += 1;
 			}
 			
@@ -234,7 +234,7 @@ impl util::BitVec
 				for _ in 0..8
 				{
 					byte <<= 1;
-					byte |= if self.read(index) { 1 } else { 0 };
+					byte |= if self.read_bit(index) { 1 } else { 0 };
 					index += 1;
 				}
 				
@@ -263,7 +263,7 @@ impl util::BitVec
 			for _ in 0..8
 			{
 				byte <<= 1;
-				byte |= if self.read(index) { 1 } else { 0 };
+				byte |= if self.read_bit(index) { 1 } else { 0 };
 				index += 1;
 			}
 			
@@ -305,7 +305,7 @@ impl util::BitVec
 			for _ in 0..8
 			{
 				byte <<= 1;
-				byte |= if self.read(index) { 1 } else { 0 };
+				byte |= if self.read_bit(index) { 1 } else { 0 };
 				index += 1;
 			}
 			
@@ -345,7 +345,7 @@ impl util::BitVec
 			for _ in 0..bits_per_chunk
 			{
 				value <<= 1;
-				value |= if self.read(index) { 1 } else { 0 };
+				value |= if self.read_bit(index) { 1 } else { 0 };
 				index += 1;
 			}
 			
@@ -446,7 +446,7 @@ impl util::BitVec
                 for bit_index in 0..digit_bits
                 {
                     let i = span.offset.unwrap() + digit_index * digit_bits + bit_index;
-                    let bit = self.read(i);
+                    let bit = self.read_bit(i);
 
                     digit <<= 1;
                     digit |= if bit { 1 } else { 0 };

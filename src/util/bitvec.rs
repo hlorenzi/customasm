@@ -4,7 +4,8 @@ use crate::*;
 #[derive(Debug)]
 pub struct BitVec
 {
-    pub bits: Vec<bool>,
+    data: util::BigInt,
+    len: usize,
     pub spans: Vec<BitVecSpan>,
 }
 
@@ -23,150 +24,110 @@ impl BitVec
 {
 	pub fn new() -> BitVec
 	{
-		BitVec
-		{
-            bits: Vec::new(),
+		BitVec {
+            data: util::BigInt::from(0),
+            len: 0,
             spans: Vec::new(),
 		}
 	}
 	
 	
-	pub fn write(&mut self, index: usize, bit: bool)
+	pub fn write_bit(
+        &mut self,
+        index: usize,
+        value: bool)
 	{
-		while self.bits.len() <= index
-			{ self.bits.push(false); }
-			
-		self.bits[index] = bit;
+        self.data.set_bit(index, value);
+
+        if index + 1 > self.len
+        {
+            self.len = index + 1;
+        }
 	}
 	
 	
-	pub fn write_bigint(&mut self, index: usize, bigint: &util::BigInt)
+	pub fn read_bit(&self, index: usize) -> bool
 	{
-        for i in 0..bigint.size.unwrap()
-        {
-            self.write(index + i, bigint.get_bit(bigint.size.unwrap() - 1 - i));
-        }
+        self.data.get_bit(index)
     }
 	
 	
-	pub fn write_bigint_checked(
+	pub fn len(&self) -> usize
+	{
+		self.len
+	}
+	
+	
+	pub fn write_bigint(
         &mut self,
-        report: &mut diagn::Report,
-        span: &diagn::Span,
-        offset: usize,
-        addr: util::BigInt,
+        index: usize,
         bigint: &util::BigInt)
-        -> Result<(), ()>
 	{
         let size = bigint.size.unwrap();
 
-        // TODO: Speed up this quadratic algorithm
-        for other in &self.spans
+        for i in 0..size
         {
-            if let Some(other_offset) = other.offset
-            {
-                if offset < other_offset + other.size &&
-                    offset + size > other_offset
-                {
-                    report.push_parent(
-                        "output overlap",
-                        span);
-
-                    report.note_span(
-                        "overlaps with:",
-                        &other.span);
-
-                    report.pop_parent();
-
-                    return Err(());
-                }
-            }
+            self.data.set_bit(
+                index + i,
+                bigint.get_bit(size - 1 - i));
         }
 
-        self.write_bigint(offset, bigint);
+        if index + size > self.len
+        {
+            self.len = index + size;
+        }
+    }
+	
+	
+	pub fn write_bigint_with_span(
+        &mut self,
+        span: diagn::Span,
+        offset: usize,
+        addr: util::BigInt,
+        bigint: &util::BigInt)
+	{
+        self.write_bigint(
+            offset,
+            bigint);
 
         self.mark_span(
             Some(offset),
-            size,
+            bigint.size.unwrap(),
             addr,
-            span.clone());
-
-        Ok(())
+            span);
     }
 	
 	
-	pub fn write_bitvec(&mut self, index: usize, bitvec: &util::BitVec)
+	pub fn mark_span(
+        &mut self,
+        offset: Option<usize>,
+        size: usize,
+        addr: util::BigInt,
+        span: diagn::Span)
 	{
-        for i in 0..bitvec.len()
-        {
-            self.write(index + i, bitvec.read(i));
-        }
-
-        self.mark_spans_from(index, &bitvec);
-    }
-	
-	
-	pub fn mark_spans_from(&mut self, index: usize, bitvec: &util::BitVec)
-	{
-        for span in &bitvec.spans
-        {
-            let mut new_span = span.clone();
-            if let Some(offset) = new_span.offset
-            {
-                new_span.offset = Some(offset + index);
-            }
-            
-            self.spans.push(new_span);
-        }
-    }
-	
-	
-	pub fn mark_span(&mut self, offset: Option<usize>, size: usize, addr: util::BigInt, span: diagn::Span)
-	{
-        self.spans.push(BitVecSpan
-        {
+        self.spans.push(BitVecSpan {
             offset,
             size,
             addr,
             span,
         });
     }
-	
-	
-	pub fn read(&self, bit_index: usize) -> bool
-	{
-		if bit_index >= self.bits.len()
-			{ false }
-		else
-			{ self.bits[bit_index] }
-    }
     
 
-    pub fn as_bigint(&self) -> util::BigInt
+    pub fn to_bigint(&self) -> util::BigInt
     {
-        let mut bigint: util::BigInt = 0.into();
+        let mut bigint = util::BigInt::from(0);
 
-        for i in 0..self.bits.len()
+        for i in 0..self.len
         {
-            bigint = bigint.set_bit(self.bits.len() - 1 - i, self.bits[i]);
+            bigint.set_bit(
+                self.len - 1 - i,
+                self.read_bit(i));
         }
 
-        bigint.size = Some(self.bits.len());
+        bigint.size = Some(self.len);
         bigint
     }
-	
-	
-	pub fn truncate(&mut self, new_len: usize)
-	{
-		while self.bits.len() > new_len
-			{ self.bits.pop(); }
-	}
-	
-	
-	pub fn len(&self) -> usize
-	{
-		self.bits.len()
-	}
 }
 
 
@@ -177,13 +138,13 @@ impl std::fmt::LowerHex for BitVec
         use std::fmt::Write;
 
         let mut i = 0;
-        while i < self.bits.len()
+        while i < self.len()
         {
             let mut digit = 0;
             for _ in 0..4
             {
                 digit <<= 1;
-                digit |= if self.read(i) { 1 } else { 0 };
+                digit |= if self.read_bit(i) { 1 } else { 0 };
                 i += 1;
             }
             
