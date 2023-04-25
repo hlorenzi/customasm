@@ -12,13 +12,22 @@ pub fn resolve_data_element(
     ctx: &asm::ResolverContext)
     -> Result<asm::ResolutionState, ()>
 {
+    let item_ref = ast_data.item_refs[elem_index];
+    let data_elem = defs.data_elems.get(item_ref);
+
+    if data_elem.resolved
+    {
+        return Ok(asm::ResolutionState::Resolved);
+    }
+
+
     let expr = &ast_data.elems[elem_index];
 
     report.push_parent(
         "failed to resolve data element",
         expr.span());
     
-    let maybe_encoding = asm::resolver::eval(
+    let maybe_value = asm::resolver::eval(
         report,
         fileserver,
         decls,
@@ -30,36 +39,38 @@ pub fn resolve_data_element(
     report.pop_parent();
 
             
-    let bigint = {
-        match maybe_encoding?.expect_error_or_bigint(
+    let maybe_encoding = {
+        match maybe_value?.expect_error_or_bigint(
             report,
             expr.span())?
         {
-            expr::Value::Integer(i) => i,
+            expr::Value::Integer(i) => Some(i),
 
             expr::Value::Unknown =>
             {
-                if ctx.is_last_iteration
+                if ctx.is_last_iteration ||
+                    data_elem.encoding_statically_known
                 {
                     report.error_span(
                         "failed to resolve data element",
                         expr.span());
                     
-                    return Ok(asm::ResolutionState::Unresolved);
+                    return Err(());
                 }
 
-                util::BigInt::new(0, ast_data.elem_size)
+                None
             }
 
             expr::Value::FailedConstraint(msg) =>
             {
-                if ctx.is_last_iteration
+                if ctx.is_last_iteration ||
+                    data_elem.encoding_statically_known
                 {
                     report.message(msg.clone());
-                    return Ok(asm::ResolutionState::Unresolved);
+                    return Err(());
                 }
 
-                util::BigInt::new(0, ast_data.elem_size)
+                None
             }
 
             _ => unreachable!(),
@@ -67,34 +78,37 @@ pub fn resolve_data_element(
     };
 
 
-    if let Some(size) = ast_data.elem_size
+    if ctx.is_last_iteration ||
+        data_elem.encoding_statically_known
     {
-        let bigint_size = bigint.size_or_min_size();
+        let encoding = maybe_encoding.as_ref().unwrap();
 
-        if ctx.is_last_iteration &&
-            bigint_size > size
+        // Check the element size against the directive size
+        if let Some(elem_size) = ast_data.elem_size
         {
-            report.push_parent(
-                "value out of range for directive",
-                expr.span());
+            let encoding_size = encoding.size_or_min_size();
+            
+            if encoding_size > elem_size
+            {
+                report.push_parent(
+                    "value out of range for directive",
+                    expr.span());
 
-            report.note(
-                format!(
-                    "data directive has size {}, got size {}",
-                    size,
-                    bigint_size));
+                report.note(
+                    format!(
+                        "data directive has size {}, got size {}",
+                        elem_size,
+                        encoding_size));
 
-            report.pop_parent();
+                report.pop_parent();
 
-            return Ok(asm::ResolutionState::Unresolved);
+                return Err(());
+            }
         }
-    }
-
-
-    if ctx.is_last_iteration
-    {
+        
+        // Check for definite size
         if ast_data.elem_size.is_none() &&
-            bigint.size.is_none()
+            encoding.size.is_none()
         {
             report.error_span(
                 "data element has no definite size",
@@ -105,25 +119,50 @@ pub fn resolve_data_element(
     }
 
 
-    let bigint = {
-        if let Some(size) = ast_data.elem_size
+    // Apply definite size via slice
+    let maybe_encoding = {
+        maybe_encoding.map(|e|
         {
-            bigint.slice(size, 0)
-        }
-        else
-        {
-            bigint.slice(bigint.size_or_min_size(), 0)
-        }
+            if let Some(elem_size) = ast_data.elem_size
+            {
+                e.slice(elem_size, 0)
+            }
+            else
+            {
+                e.slice(e.size_or_min_size(), 0)
+            }
+        })
     };
 
 
-    let item_ref = ast_data.item_refs[elem_index];
     let data_elem = defs.data_elems.get_mut(item_ref);
     let prev_encoding = data_elem.encoding.clone();
-    data_elem.encoding = bigint;
 
 
-    if data_elem.encoding != prev_encoding
+    if let Some(ref encoding) = maybe_encoding
+    {
+        data_elem.encoding = encoding.clone();
+
+        // Optimize future iterations for the case where it's
+        // statically known that the encoding can be resolved
+        // in the first pass
+        if opts.optimize_statically_known &&
+            ctx.is_first_iteration &&
+            data_elem.encoding_statically_known &&
+            encoding.size.is_some()
+        {
+            if opts.debug_iterations
+            {
+                println!(" data: {:?} [static]", data_elem.encoding);
+            }
+
+            data_elem.resolved = true;
+            return Ok(asm::ResolutionState::Resolved);
+        }
+    }
+
+    
+    if Some(&prev_encoding) != maybe_encoding.as_ref()
     {
         // On the final iteration, unstable guesses become errors
         if ctx.is_last_iteration

@@ -171,6 +171,31 @@ impl<T> SymbolManager<T>
     }
 
 
+    pub fn try_get_by_name<S>(
+        &self,
+        ctx: &SymbolContext,
+        hierarchy_level: usize,
+        hierarchy: &[S])
+        -> Option<util::ItemRef<T>>
+        where S: std::borrow::Borrow<str> + std::fmt::Debug
+    {
+        if hierarchy_level > ctx.hierarchy.len()
+        {
+            None
+        }
+        else
+        {
+            let parent = self.get_parent(
+                None,
+                &ctx.hierarchy[0..hierarchy_level]);
+            
+            self.traverse(
+                parent,
+                hierarchy)
+        }
+    }
+
+
     pub fn get_by_name<S>(
         &self,
         report: &mut diagn::Report,
@@ -181,24 +206,10 @@ impl<T> SymbolManager<T>
         -> Result<util::ItemRef<T>, ()>
         where S: std::borrow::Borrow<str> + std::fmt::Debug
     {
-        let maybe_symbol = {
-            if hierarchy_level > ctx.hierarchy.len()
-            {
-                None
-            }
-            else
-            {
-                let parent = self.get_parent(
-                    None,
-                    &ctx.hierarchy[0..hierarchy_level]);
-                
-                self.traverse(
-                    parent,
-                    hierarchy)
-            }
-        };
-
-        match maybe_symbol
+        match self.try_get_by_name(
+            ctx,
+            hierarchy_level,
+            hierarchy)
         {
             Some(symbol) => Ok(symbol),
             None =>

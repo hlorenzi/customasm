@@ -393,8 +393,7 @@ impl expr::Expr
 			
 			&expr::Expr::Variable(ref span, hierarchy_level, ref hierarchy) =>
 			{
-				let mut info = EvalVariableInfo
-				{
+				let mut info = EvalVariableInfo {
 					report,
 					hierarchy_level,
 					hierarchy,

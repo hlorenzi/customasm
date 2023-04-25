@@ -6,7 +6,9 @@ pub struct DataElement
 {
     pub item_ref: util::ItemRef<Self>,
     pub position_within_bank: Option<usize>,
+    pub encoding_statically_known: bool,
     pub encoding: util::BigInt,
+    pub resolved: bool,
 }
 
 
@@ -30,17 +32,21 @@ pub fn define(
                     {
                         Some(s) => Some(s),
                         None => expr.get_static_size(
-                            &expr::StaticSizeInfo::new()),
+                            &expr::StaticallyKnownProvider::new()),
                     }
                 };
 
+                let statically_known = expr.is_value_statically_known(
+                    &expr::StaticallyKnownProvider::new());
 
                 let data_block = DataElement {
                     item_ref,
                     position_within_bank: None,
+                    encoding_statically_known: statically_known,
                     encoding: util::BigInt::new(
                         0,
                         Some(size.unwrap_or(0))),
+                    resolved: false,
                 };
                 
                 defs.data_elems.define(item_ref, data_block);

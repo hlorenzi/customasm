@@ -109,6 +109,25 @@ pub fn resolve_constant(
         let prev_value = symbol.value.clone();
         symbol.value = value;
 
+        
+        // Optimize future iterations for the case where it's
+        // statically known that the encoding can be resolved
+        // in the first pass
+        if opts.optimize_statically_known &&
+            ctx.is_first_iteration &&
+            symbol.value_statically_known
+        {
+            if opts.debug_iterations
+            {
+                println!("const: {} = {:?} [static]",
+                    ast_symbol.name,
+                    symbol.value);
+            }
+
+            symbol.resolved = true;
+            return Ok(asm::ResolutionState::Resolved);
+        }
+
 
         if symbol.value != prev_value
         {

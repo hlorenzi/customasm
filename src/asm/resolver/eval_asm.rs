@@ -63,7 +63,7 @@ pub fn eval_asm(
             let mut new_eval_ctx = info.eval_ctx
                 .hygienize_locals_for_asm_subst();
 
-            let maybe_encoding = asm::resolver::instruction::resolve_encoding(
+            let maybe_encodings = asm::resolver::instruction::resolve_encoding(
                 info.report,
                 &ast_instr.span,
                 fileserver,
@@ -76,14 +76,16 @@ pub fn eval_asm(
 
             // Add the encoding to the result value
             // and advance the position
-            if let Some(encoding) = maybe_encoding
+            if let Some(encodings) = maybe_encodings
             {
-                cur_position += encoding.size.unwrap();
+                let size = encodings[0].1.size.unwrap();
+
+                cur_position += size;
 
                 result = result.concat(
                     (result.size.unwrap(), 0),
-                    &encoding,
-                    (encoding.size.unwrap(), 0));
+                    &encodings[0].1,
+                    (size, 0));
             }
         }
 

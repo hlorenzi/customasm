@@ -15,7 +15,9 @@ pub use parser::{
 
 mod inspect;
 pub use inspect::{
-    StaticSizeInfo,
+    StaticallyKnownProvider,
+    StaticallyKnownVariableQuery,
+    StaticallyKnownLocal,
 };
 
 mod eval;
@@ -35,4 +37,5 @@ pub use self::builtin_fn::{
     resolve_builtin_fn,
     eval_builtin_fn,
     get_static_size_builtin_fn,
+    get_statically_known_value_builtin_fn,
 };

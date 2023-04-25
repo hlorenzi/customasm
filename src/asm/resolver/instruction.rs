@@ -13,12 +13,17 @@ pub fn resolve_instruction(
 {
     let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
 
+    if instr.resolved
+    {
+        return Ok(asm::ResolutionState::Resolved);
+    }
+
     // Extract matches to satisfy the borrow checker
     let mut matches = std::mem::replace(
         &mut instr.matches,
         asm::InstructionMatches::new());
         
-    let maybe_encoding = resolve_encoding(
+    let maybe_encodings = resolve_encoding(
         report,
         &ast_instr.span,
         fileserver,
@@ -28,6 +33,15 @@ pub fn resolve_instruction(
         ctx,
         &mut expr::EvalContext::new())?;
 
+    let has_any_matches =
+        maybe_encodings.is_some();
+
+    let has_single_match =
+        maybe_encodings.as_ref().map_or(false, |e| e.len() == 1);
+
+    let maybe_chosen_encoding =
+        maybe_encodings.as_ref().map(|e| e[0].1.clone());
+
     // Reassign matches to satisfy the borrow checker
     let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
     instr.matches = matches;
@@ -35,21 +49,43 @@ pub fn resolve_instruction(
 
     // Check for stable resolution
     let is_stable =
-        Some(&instr.encoding) == maybe_encoding.as_ref();
+        Some(&instr.encoding) == maybe_chosen_encoding.as_ref();
 
 
     // Update the instruction's encoding if available
-    if let Some(ref encoding) = maybe_encoding
+    if let Some(encoding) = maybe_chosen_encoding
     {
-        instr.encoding = encoding.clone();
+        instr.encoding = encoding;
+
+        // Optimize future iterations for the case where it's
+        // statically known that the encoding can be resolved
+        // in the first pass
+        if opts.optimize_statically_known &&
+            ctx.is_first_iteration &&
+            instr.encoding_statically_known &&
+            has_single_match
+        {
+            if opts.debug_iterations
+            {
+                println!("instr: {} = {:?} [static]",
+                    ast_instr.tokens.iter()
+                        .map(|t| t.text())
+                        .collect::<Vec<_>>()
+                        .join(""),
+                    instr.encoding);
+            }
+
+            instr.resolved = true;
+            return Ok(asm::ResolutionState::Resolved);
+        }
     }
 
     
     if !is_stable
     {
         // On the final iteration, unstable guesses become errors.
-        // If encoding is None, an inner error has already been reported.
-        if ctx.is_last_iteration && maybe_encoding.is_some()
+        // If encodings came out None, an inner error has already been reported.
+        if ctx.is_last_iteration && has_any_matches
         {
             report.error_span(
                 "instruction encoding did not converge",
@@ -74,16 +110,16 @@ pub fn resolve_instruction(
 }
 
 
-pub fn resolve_encoding(
+pub fn resolve_encoding<'encoding>(
     report: &mut diagn::Report,
     instr_span: &diagn::Span,
     fileserver: &dyn util::FileServer,
-    matches: &mut asm::InstructionMatches,
+    matches: &'encoding mut asm::InstructionMatches,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
     arg_eval_ctx: &mut expr::EvalContext)
-    -> Result<Option<util::BigInt>, ()>
+    -> Result<Option<Vec<(usize, &'encoding util::BigInt)>>, ()>
 {
     report.push_parent_cap();
 
@@ -106,19 +142,14 @@ pub fn resolve_encoding(
     resolved?;
 
 
-    // Retain only encodings which are Resolved,
-    // and keep their original indices
-    let encodings_resolved = matches
-        .iter()
-        .enumerate()
-        .filter(|m| m.1.encoding.is_resolved())
-        .map(|m| (m.0, m.1.encoding.unwrap_resolved()))
-        .collect::<Vec<_>>();
-
-    
     // Print FailedConstraint error messages
     // if no match succeeded
-    if encodings_resolved.len() == 0
+    let num_encodings_resolved = matches
+        .iter()
+        .filter(|m| m.encoding.is_resolved())
+        .count();
+
+    if num_encodings_resolved == 0
     {
         if ctx.is_last_iteration
         {
@@ -142,7 +173,16 @@ pub fn resolve_encoding(
     }
 
 
-    // Only retain the smallest encodings
+    // Retain only encodings which are Resolved,
+    // and keep their original indices
+    let encodings_resolved = matches
+        .iter()
+        .enumerate()
+        .filter(|m| m.1.encoding.is_resolved())
+        .map(|m| (m.0, m.1.encoding.unwrap_resolved()))
+        .collect::<Vec<_>>();
+
+    // Now only retain the smallest encodings
     let smallest_size = encodings_resolved
         .iter()
         .map(|e| e.1.size.unwrap())
@@ -152,12 +192,14 @@ pub fn resolve_encoding(
     let smallest_encodings = encodings_resolved
         .iter()
         .filter(|e| e.1.size.unwrap() == smallest_size)
+        .copied()
         .collect::<Vec<_>>();
     
 
     // Expect only a single remaining encoding
     // on the last iteration
-    if ctx.is_last_iteration && smallest_encodings.len() > 1
+    if ctx.is_last_iteration &&
+        smallest_encodings.len() > 1
     {
         let mut notes = Vec::new();
 
@@ -182,9 +224,7 @@ pub fn resolve_encoding(
     }
 
 
-    let chosen_encoding = smallest_encodings[0].1.clone();
-
-    return Ok(Some(chosen_encoding));
+    return Ok(Some(smallest_encodings));
 }
 
 

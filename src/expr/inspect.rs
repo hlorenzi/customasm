@@ -1,18 +1,46 @@
 use crate::*;
 
 
-pub struct StaticSizeInfo
+pub struct StaticallyKnownProvider<'a>
 {
-	pub locals: std::collections::HashMap<String, usize>,
+	pub locals: std::collections::HashMap<String, StaticallyKnownLocal>,
+	pub query_variable: &'a dyn Fn(&StaticallyKnownVariableQuery) -> bool,
 }
 
 
-impl StaticSizeInfo
+pub struct StaticallyKnownVariableQuery<'a>
 {
-	pub fn new() -> StaticSizeInfo
+	pub hierarchy_level: usize,
+	pub hierarchy: &'a Vec<String>,
+}
+
+
+impl<'a> StaticallyKnownProvider<'a>
+{
+	pub fn new() -> StaticallyKnownProvider<'a>
 	{
-		StaticSizeInfo {
+		StaticallyKnownProvider {
 			locals: std::collections::HashMap::new(),
+			query_variable: &|_| false,
+		}
+	}
+}
+
+
+pub struct StaticallyKnownLocal
+{
+	pub size: Option<usize>,
+	pub value_known: bool,
+}
+
+
+impl StaticallyKnownLocal
+{
+	pub fn new() -> StaticallyKnownLocal
+	{
+		StaticallyKnownLocal {
+			size: None,
+			value_known: false,
 		}
 	}
 }
@@ -22,7 +50,7 @@ impl expr::Expr
 {
 	pub fn get_static_size(
 		&self,
-		info: &StaticSizeInfo)
+		provider: &StaticallyKnownProvider)
 		-> Option<usize>
 	{
 		match self
@@ -35,7 +63,8 @@ impl expr::Expr
 					return None;
 				}
 
-				if let Some(size) = info.locals.get(&hierarchy[0])
+				if let Some(StaticallyKnownLocal { size: Some(size), .. }) =
+					provider.locals.get(&hierarchy[0])
 				{
 					return Some(*size);
 				}
@@ -48,8 +77,8 @@ impl expr::Expr
 			
 			expr::Expr::BinaryOp(_, _, expr::BinaryOp::Concat, ref lhs, ref rhs) =>
 			{
-				let lhs_size = lhs.get_static_size(info)?;
-				let rhs_size = rhs.get_static_size(info)?;
+				let lhs_size = lhs.get_static_size(provider)?;
+				let rhs_size = rhs.get_static_size(provider)?;
 
 				Some(lhs_size + rhs_size)
 			}
@@ -62,8 +91,8 @@ impl expr::Expr
 			
 			expr::Expr::TernaryOp(_, _, ref true_branch, ref false_branch) =>
 			{
-				let true_size = true_branch.get_static_size(info)?;
-				let false_size = false_branch.get_static_size(info)?;
+				let true_size = true_branch.get_static_size(provider)?;
+				let false_size = false_branch.get_static_size(provider)?;
 				
 				if true_size == false_size
 				{
@@ -76,7 +105,7 @@ impl expr::Expr
 			}
 			
 			expr::Expr::Block(_, ref exprs) =>
-				exprs.last()?.get_static_size(info),
+				exprs.last()?.get_static_size(provider),
 
 			expr::Expr::Call(_, func, args) =>
 			{
@@ -84,13 +113,19 @@ impl expr::Expr
 					_,
 					expr::Value::ExprBuiltInFunction(ref builtin_name)) = *func.as_ref()
 				{
-					expr::get_static_size_builtin_fn(builtin_name, info, &args)
+					expr::get_static_size_builtin_fn(
+						builtin_name,
+						provider,
+						&args)
 				}
 				else if let expr::Expr::Variable(_, 0, ref names) = *func.as_ref()
 				{
 					if names.len() == 1
 					{
-						expr::get_static_size_builtin_fn(&names[0], info, &args)
+						expr::get_static_size_builtin_fn(
+							&names[0],
+							provider,
+							&args)
 					}
 					else
 					{
@@ -104,6 +139,105 @@ impl expr::Expr
 			}
 			
 			_ => None
+		}
+	}
+
+
+	pub fn is_value_statically_known(
+		&self,
+		provider: &StaticallyKnownProvider)
+		-> bool
+	{
+		match self
+		{
+			expr::Expr::Variable(_, hierarchy_level, ref hierarchy) =>
+			{
+				if *hierarchy_level == 0 && hierarchy.len() == 1
+				{
+					if let Some(var) = provider.locals.get(&hierarchy[0])
+					{
+						return var.value_known;
+					}
+				}
+
+				let info = StaticallyKnownVariableQuery {
+					hierarchy,
+					hierarchy_level: *hierarchy_level,
+				};
+
+				(provider.query_variable)(&info)
+			}
+			
+			expr::Expr::Literal(_, _) => true,
+			
+			expr::Expr::BinaryOp(_, _, _, ref lhs, ref rhs) =>
+			{
+				let lhs_known = lhs.is_value_statically_known(provider);
+				let rhs_known = rhs.is_value_statically_known(provider);
+
+				lhs_known && rhs_known
+			}
+			
+			expr::Expr::BitSlice(_, _, _, _, ref expr) =>
+				expr.is_value_statically_known(provider),
+
+			expr::Expr::SoftSlice(_, _, _, _, ref expr) =>
+				expr.is_value_statically_known(provider),
+			
+			expr::Expr::TernaryOp(_, ref condition, ref true_branch, ref false_branch) =>
+			{
+				let condition_known = condition.is_value_statically_known(provider);
+				let true_known = true_branch.is_value_statically_known(provider);
+				let false_known = false_branch.is_value_statically_known(provider);
+				
+				condition_known && true_known && false_known
+			}
+			
+			expr::Expr::Block(_, ref exprs) =>
+			{
+				for expr in exprs
+				{
+					if !expr.is_value_statically_known(provider)
+					{
+						return false;
+					}
+				}
+				
+				true
+			}
+
+			expr::Expr::Call(_, func, args) =>
+			{
+				if let expr::Expr::Literal(
+					_,
+					expr::Value::ExprBuiltInFunction(ref builtin_name)) = *func.as_ref()
+				{
+					expr::get_statically_known_value_builtin_fn(
+						builtin_name,
+						provider,
+						&args)
+				}
+				else if let expr::Expr::Variable(_, 0, ref names) = *func.as_ref()
+				{
+					if names.len() == 1
+					{
+						expr::get_statically_known_value_builtin_fn(
+							&names[0],
+							provider,
+							&args)
+					}
+					else
+					{
+						false
+					}
+				}
+				else
+				{
+					false
+				}
+			}
+			
+			_ => false
 		}
 	}
 	

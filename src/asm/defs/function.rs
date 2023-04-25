@@ -52,7 +52,9 @@ pub fn define(
 
             let symbol = asm::Symbol {
                 item_ref,
+                value_statically_known: true,
                 value: expr::Value::Function(fn_ref.0),
+                resolved: true,
                 bankdef_ref: None,
             };
 

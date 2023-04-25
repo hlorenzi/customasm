@@ -5,7 +5,9 @@ use crate::*;
 pub struct Symbol
 {
     pub item_ref: util::ItemRef<Self>,
+    pub value_statically_known: bool,
     pub value: expr::Value,
+    pub resolved: bool,
     pub bankdef_ref: Option<util::ItemRef<asm::Bankdef>>,
 }
 
@@ -23,9 +25,22 @@ pub fn define(
         {
             let item_ref = node.item_ref.unwrap();
 
+            let value_statically_known = {
+                match node.kind
+                {
+                    asm::AstSymbolKind::Constant(ref constant) =>
+                        constant.expr.is_value_statically_known(
+                            &expr::StaticallyKnownProvider::new()),
+                    
+                    _ => false,
+                }
+            };
+
             let symbol = Symbol {
                 item_ref,
+                value_statically_known,
                 value: expr::Value::Unknown,
+                resolved: false,
                 bankdef_ref: None,
             };
 

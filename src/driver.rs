@@ -170,25 +170,27 @@ fn drive_inner(
 	};
 
 	let mut opts = asm::AssemblyOptions::new();
+	
+	opts.debug_iterations =
+		matches.opt_present("debug-iters");
 
-	opts.max_iterations = {
-		match matches.opt_str("t")
-		{
-			None => 10,
-			Some(t) =>
+	opts.optimize_statically_known =
+		!matches.opt_present("debug-no-optimize-static");
+
+	if let Some(t) = matches.opt_str("t")
+	{
+		opts.max_iterations = {
+			match t.parse::<usize>()
 			{
-				match t.parse::<usize>()
+				Ok(t) => t,
+				Err(_) =>
 				{
-					Ok(t) => t,
-					Err(_) =>
-					{
-						report.error("invalid number of iterations");
-						return Err(true);
-					}
+					report.error("invalid number of iterations");
+					return Err(true);
 				}
 			}
-		}
-	};
+		};
+	}
 	
 	if !quiet
 		{ print_version_short(); }
@@ -333,8 +335,10 @@ fn make_opts() -> getopts::Options
     opts.optopt("", "symbol-format", "The format of the symbol file. Possible formats: default, mesen-mlb", "SYMBOL-FORMAT");
     opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
     opts.opt("t", "iter", "The max number of passes the assembler will attempt (default: 10).", "NUM", getopts::HasArg::Maybe, getopts::Occur::Optional);
-    opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
+	opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
     opts.optflag("q", "quiet", "Suppress progress reports.");
+    opts.optflag("", "debug-iters", "Print debug info for the resolution iterations.");
+	opts.optflag("", "debug-no-optimize-static", "Prevent optimization of statically-known values.");
     opts.optflag("v", "version", "Display version information.");
 	opts.optflag("h", "help", "Display this information.");
 	

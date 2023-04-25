@@ -91,6 +91,7 @@ pub struct AssemblyOptions
 {
     pub max_iterations: usize,
     pub debug_iterations: bool,
+    pub optimize_statically_known: bool,
 }
 
 
@@ -101,6 +102,7 @@ impl AssemblyOptions
         AssemblyOptions {
             max_iterations: 10,
             debug_iterations: false,
+            optimize_statically_known: true,
         }
     }
 }
@@ -151,6 +153,7 @@ pub fn assemble<S>(
             report,
             opts,
             assembly.ast.as_ref().unwrap(),
+            assembly.decls.as_ref().unwrap(),
             assembly.defs.as_mut().unwrap())?;
 
         assembly.iterations_taken = Some(resolver::resolve_iteratively(

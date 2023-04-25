@@ -22,7 +22,7 @@ pub fn resolve_builtin_fn(
 
 pub fn get_static_size_builtin_fn(
     name: &str,
-    info: &expr::StaticSizeInfo,
+    info: &expr::StaticallyKnownProvider,
     args: &Vec<expr::Expr>)
     -> Option<usize>
 {
@@ -37,6 +37,20 @@ pub fn get_static_size_builtin_fn(
     get_static_size_fn(
         info,
         args)
+}
+
+
+pub fn get_statically_known_value_builtin_fn(
+    name: &str,
+    info: &expr::StaticallyKnownProvider,
+    args: &Vec<expr::Expr>)
+    -> bool
+{
+    match name.as_ref()
+    {
+        "le" => get_statically_known_value_builtin_le(info, args),
+        _ => false,
+    }
 }
 
 
@@ -112,8 +126,24 @@ pub fn eval_builtin_le(
 }
 
 
+pub fn get_statically_known_value_builtin_le(
+    info: &expr::StaticallyKnownProvider,
+    args: &Vec<expr::Expr>)
+    -> bool
+{
+    if args.len() == 1
+    {
+        args[0].is_value_statically_known(info)
+    }
+    else
+    {
+        false
+    }
+}
+
+
 pub fn get_static_size_builtin_le(
-    info: &expr::StaticSizeInfo,
+    info: &expr::StaticallyKnownProvider,
     args: &Vec<expr::Expr>)
     -> Option<usize>
 {
