@@ -559,13 +559,13 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
     
 		self.walker.expect(self.report, syntax::TokenKind::BraceOpen)?;
 
-		let contents = self.walker.cutoff_at_token_over_nested_braces(syntax::TokenKind::BraceClose);
+		let skipped = self.walker.skip_until_token_over_nested_braces(syntax::TokenKind::BraceClose);
 
 		let tk_brace_close = self.walker.expect(self.report, syntax::TokenKind::BraceClose)?;
 
 		let expr = expr::Expr::Asm(
 			tk_asm_span.join(&tk_brace_close.span),
-			contents.get_cloned_tokens());
+			skipped.get_cloned_tokens());
 
 		Ok(expr)
 	}

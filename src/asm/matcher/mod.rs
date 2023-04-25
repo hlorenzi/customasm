@@ -688,13 +688,13 @@ fn parse_with_lookahead<'tokens, F, T>(
 
     if let Some(lookahead) = maybe_lookahead
     {
-        let maybe_cutoff_walker = walker
-            .cutoff_at_char_over_nested_parens(lookahead);
+        let maybe_lookahead_walker = walker
+            .try_lookahead_until_char_over_nested_parens(lookahead);
     
-        if let Some(mut cutoff_walker) = maybe_cutoff_walker
+        if let Some(mut lookahead_walker) = maybe_lookahead_walker
         {
-            let result = parse_fn(&mut cutoff_walker);
-            walker.copy_state_from(&cutoff_walker);
+            let result = parse_fn(&mut lookahead_walker);
+            walker.copy_state_from(&lookahead_walker);
             return result;
         }
     }

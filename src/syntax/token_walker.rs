@@ -166,7 +166,7 @@ impl<'tokens> TokenWalker<'tokens>
 	}
 
 
-	pub fn cutoff_at_linebreak_over_nested_braces<'b>(
+	pub fn skip_until_linebreak_over_nested_braces<'b>(
 		&'b mut self)
 		-> TokenWalker<'tokens>
 	{
@@ -202,7 +202,7 @@ impl<'tokens> TokenWalker<'tokens>
 	}
 
 
-	pub fn cutoff_at_token_over_nested_braces<'b>(
+	pub fn skip_until_token_over_nested_braces<'b>(
 		&'b mut self,
 		kind: syntax::TokenKind)
 		-> TokenWalker<'tokens>
@@ -239,61 +239,63 @@ impl<'tokens> TokenWalker<'tokens>
 	}
 
 
-	pub fn cutoff_at_char_over_nested_parens<'b>(
-		&'b mut self,
+	pub fn try_lookahead_until_char_over_nested_parens<'b>(
+		&'b self,
 		c: char)
 		-> Option<TokenWalker<'tokens>>
 	{
-		let mut new_walker = self.clone();
-		let start = self.get_current_token_index();
+		let mut lookahead = self.clone();
+		let start = lookahead.get_current_token_index();
 
 		let mut paren_nesting = 0;
 
 		loop
 		{
-			if self.is_over()
+			if lookahead.is_over()
 			{
 				break;
 			}
 
-			if self.next_partial() == c &&
+			if lookahead.next_partial() == c &&
 				paren_nesting == 0 &&
-				self.get_current_token_index() > start
+				lookahead.get_current_token_index() > start
 			{
 				break;
 			}
 
-			if self.next_is(0, syntax::TokenKind::ParenOpen)
+			if lookahead.next_is(0, syntax::TokenKind::ParenOpen)
 			{
 				paren_nesting += 1;
-				self.advance();
+				lookahead.advance();
 				continue;
 			}
 			
-			if self.next_is(0, syntax::TokenKind::ParenClose) && paren_nesting > 0
+			if lookahead.next_is(0, syntax::TokenKind::ParenClose) &&
+				paren_nesting > 0
 			{
 				paren_nesting -= 1;
-				self.advance();
+				lookahead.advance();
 				continue;
 			}
 
 			if paren_nesting > 0
 			{
-				self.advance();
+				lookahead.advance();
 				continue;
 			}
 
-			self.advance_partial();
+			lookahead.advance_partial();
 		}
 
-		let end = self.get_previous_token_index() + 1;
+		let end = lookahead.get_previous_token_index() + 1;
 
-		if self.is_at_partial() || start > end
+		if lookahead.is_at_partial() || start > end
 		{
 			None
 		}
 		else
 		{
+			let mut new_walker = self.clone();
 			new_walker.tokens = &self.tokens[0..end];
 			Some(new_walker)
 		}
