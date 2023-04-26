@@ -17,7 +17,7 @@ pub fn parse(
 {
     report.error_span(
         "standalone `#labelalign` is deprecated; use it inside a `#bankdef`",
-        &header_span);
+        header_span);
     
     Err(())
 }

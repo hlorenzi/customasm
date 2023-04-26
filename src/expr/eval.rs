@@ -36,7 +36,7 @@ impl EvalContext
 	pub fn check_recursion_depth_limit(
 		&self,
 		report: &mut diagn::Report,
-		span: &diagn::Span)
+		span: diagn::Span)
 		-> Result<(), ()>
 	{
 		if self.recursion_depth >= 25
@@ -157,26 +157,38 @@ impl EvalContext
 }
 
 
-pub struct EvalVariableInfo<'a>
+pub type EvalProvider<'provider> =
+	&'provider mut dyn for<'query> FnMut(EvalQuery<'query>) -> Result<expr::Value, ()>;
+
+
+pub enum EvalQuery<'a>
+{
+	Variable(&'a mut EvalVariableQuery<'a>),
+	Function(&'a mut EvalFunctionQuery<'a>),
+	AsmBlock(&'a mut EvalAsmBlockQuery<'a>),
+}
+
+
+pub struct EvalVariableQuery<'a>
 {
 	pub report: &'a mut diagn::Report,
 	pub hierarchy_level: usize,
 	pub hierarchy: &'a Vec<String>,
-	pub span: &'a diagn::Span,
+	pub span: diagn::Span,
 }
 
 
-pub struct EvalFunctionInfo<'a>
+pub struct EvalFunctionQuery<'a>
 {
 	pub report: &'a mut diagn::Report,
 	pub func: expr::Value,
-	pub args: Vec<EvalFunctionArgument<'a>>,
-	pub span: &'a diagn::Span,
+	pub args: Vec<EvalFunctionQueryArgument>,
+	pub span: diagn::Span,
 	pub eval_ctx: &'a mut EvalContext,
 }
 
 
-impl<'a> EvalFunctionInfo<'a>
+impl<'a> EvalFunctionQuery<'a>
 {
 	pub fn ensure_arg_number(
 		&mut self,
@@ -210,67 +222,73 @@ impl<'a> EvalFunctionInfo<'a>
 }
 
 
-pub struct EvalFunctionArgument<'a>
+pub struct EvalFunctionQueryArgument
 {
 	pub value: expr::Value,
-	pub span: &'a diagn::Span,
+	pub span: diagn::Span,
 }
 
 
-pub struct EvalAsmInfo<'a>
+pub struct EvalAsmBlockQuery<'a>
 {
 	pub report: &'a mut diagn::Report,
 	pub tokens: &'a [syntax::Token],
-	pub span: &'a diagn::Span,
+	pub span: diagn::Span,
 	pub eval_ctx: &'a mut EvalContext,
 }
 
 
-pub struct EvalProvider<'f, FVar, FFn, FAsm>
-where
-    FVar: FnMut(&mut EvalVariableInfo) -> Result<expr::Value, ()>,
-    FFn: FnMut(&mut EvalFunctionInfo) -> Result<expr::Value, ()>,
-    FAsm: FnMut(&mut EvalAsmInfo) -> Result<expr::Value, ()>
+pub fn dummy_eval_query(
+	query: expr::EvalQuery)
+	-> Result<expr::Value, ()>
 {
-    pub eval_var: &'f mut FVar,
-    pub eval_fn: &'f mut FFn,
-    pub eval_asm: &'f mut FAsm,
+	match query
+	{
+		expr::EvalQuery::Variable(query_var) =>
+			expr::dummy_eval_var(query_var),
+		
+		expr::EvalQuery::Function(query_fn) =>
+			expr::dummy_eval_fn(query_fn),
+			
+		expr::EvalQuery::AsmBlock(query_asm) =>
+			expr::dummy_eval_asm(query_asm),
+	}
 }
 
 
-pub fn dummy_eval_var() -> impl Fn(&mut EvalVariableInfo) -> Result<expr::Value, ()>
+pub fn dummy_eval_var(
+	query: &mut EvalVariableQuery)
+	-> Result<expr::Value, ()>
 {
-    |info| {
-        info.report.error_span(
-            "cannot reference variables in this context",
-            &info.span);
-            
-        Err(())
-    }
+	query.report.error_span(
+		"cannot reference variables in this context",
+		query.span);
+		
+	Err(())
 }
 
 
-pub fn dummy_eval_fn() -> impl Fn(&mut EvalFunctionInfo) -> Result<expr::Value, ()>
+pub fn dummy_eval_fn(
+	query: &mut EvalFunctionQuery)
+	-> Result<expr::Value, ()>
 {
-    |info| {
-        info.report.error_span(
-            "cannot reference functions in this context",
-            &info.span);
-            
-        Err(())
-    }
+	query.report.error_span(
+		"cannot reference functions in this context",
+		query.span);
+		
+	Err(())
 }
 
 
-pub fn dummy_eval_asm() -> impl Fn(&mut EvalAsmInfo) -> Result<expr::Value, ()>
+pub fn dummy_eval_asm(
+	query: &mut EvalAsmBlockQuery)
+	-> Result<expr::Value, ()>
 {
-    |info| {
-        info.report.error_span(
-            "cannot use `asm` blocks in this context",
-            &info.span);
-            
-        Err(())
-    }
+	query.report.error_span(
+		"cannot use `asm` blocks in this context",
+		query.span);
+		
+	Err(())
 }
 
 
@@ -294,15 +312,11 @@ macro_rules! propagate {
 
 impl expr::Expr
 {
-	pub fn eval_usize<'f, FVar, FFn, FAsm>(
+	pub fn eval_usize<'provider>(
 		&self,
 		report: &mut diagn::Report,
-		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
+		provider: EvalProvider)
 		-> Result<usize, ()>
-        where
-            FVar: FnMut(&mut EvalVariableInfo) -> Result<expr::Value, ()>,
-            FFn: FnMut(&mut EvalFunctionInfo) -> Result<expr::Value, ()>,
-            FAsm: FnMut(&mut EvalAsmInfo) -> Result<expr::Value, ()>
 	{
         self
 			.eval_with_ctx(
@@ -311,19 +325,15 @@ impl expr::Expr
 				provider)?
 			.expect_usize(
 				report,
-				&self.span())
+				self.span())
 	}
 
 
-	pub fn eval_nonzero_usize<'f, FVar, FFn, FAsm>(
+	pub fn eval_nonzero_usize<'provider>(
 		&self,
 		report: &mut diagn::Report,
-		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
+		provider: EvalProvider<'provider>)
 		-> Result<usize, ()>
-        where
-            FVar: FnMut(&mut EvalVariableInfo) -> Result<expr::Value, ()>,
-            FFn: FnMut(&mut EvalFunctionInfo) -> Result<expr::Value, ()>,
-            FAsm: FnMut(&mut EvalAsmInfo) -> Result<expr::Value, ()>
 	{
         self
 			.eval_with_ctx(
@@ -332,19 +342,15 @@ impl expr::Expr
 				provider)?
 			.expect_nonzero_usize(
 				report,
-				&self.span())
+				self.span())
 	}
 
 
-	pub fn eval_bigint<'f, FVar, FFn, FAsm>(
+	pub fn eval_bigint<'provider>(
 		&self,
 		report: &mut diagn::Report,
-		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
+		provider: EvalProvider<'provider>)
 		-> Result<util::BigInt, ()>
-        where
-            FVar: FnMut(&mut EvalVariableInfo) -> Result<expr::Value, ()>,
-            FFn: FnMut(&mut EvalFunctionInfo) -> Result<expr::Value, ()>,
-            FAsm: FnMut(&mut EvalAsmInfo) -> Result<expr::Value, ()>
 	{
         let result = self.eval_with_ctx(
 			report,
@@ -353,21 +359,17 @@ impl expr::Expr
 
 		let bigint = result.expect_bigint(
 			report,
-			&self.span())?;
+			self.span())?;
 
 		Ok(bigint.clone())
 	}
 
 
-	pub fn eval<'f, FVar, FFn, FAsm>(
+	pub fn eval<'provider>(
 		&self,
 		report: &mut diagn::Report,
-		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
+		provider: EvalProvider<'provider>)
 		-> Result<expr::Value, ()>
-        where
-            FVar: FnMut(&mut EvalVariableInfo) -> Result<expr::Value, ()>,
-            FFn: FnMut(&mut EvalFunctionInfo) -> Result<expr::Value, ()>,
-            FAsm: FnMut(&mut EvalAsmInfo) -> Result<expr::Value, ()>
 	{
         self.eval_with_ctx(
             report,
@@ -376,24 +378,20 @@ impl expr::Expr
     }
 
 
-	pub fn eval_with_ctx<'f, FVar, FFn, FAsm>(
+	pub fn eval_with_ctx<'provider>(
 		&self,
 		report: &mut diagn::Report,
 		ctx: &mut EvalContext,
-		provider: &mut EvalProvider<'f, FVar, FFn, FAsm>)
+		provider: EvalProvider<'provider>)
 		-> Result<expr::Value, ()>
-        where
-            FVar: FnMut(&mut EvalVariableInfo) -> Result<expr::Value, ()>,
-            FFn: FnMut(&mut EvalFunctionInfo) -> Result<expr::Value, ()>,
-            FAsm: FnMut(&mut EvalAsmInfo) -> Result<expr::Value, ()>
 	{
 		match self
 		{
 			&expr::Expr::Literal(_, ref value) => Ok(value.clone()),
 			
-			&expr::Expr::Variable(ref span, hierarchy_level, ref hierarchy) =>
+			&expr::Expr::Variable(span, hierarchy_level, ref hierarchy) =>
 			{
-				let mut info = EvalVariableInfo {
+				let mut query = EvalVariableQuery {
 					report,
 					hierarchy_level,
 					hierarchy,
@@ -414,10 +412,10 @@ impl expr::Expr
 					}
 				}
 
-				(provider.eval_var)(&mut info)
+				provider(EvalQuery::Variable(&mut query))
 			}
 			
-			&expr::Expr::UnaryOp(ref span, _, op, ref inner_expr) =>
+			&expr::Expr::UnaryOp(span, _, op, ref inner_expr) =>
 			{
 				match propagate!(
 					inner_expr.eval_with_ctx(report, ctx, provider)?)
@@ -431,14 +429,14 @@ impl expr::Expr
 					expr::Value::Bool(b) => match op
 					{
 						expr::UnaryOp::Not => Ok(expr::Value::Bool(!b)),
-						_ => Err(report.error_span("invalid argument type to operator", &span))
+						_ => Err(report.error_span("invalid argument type to operator", span))
 					},
 					
-					_ => Err(report.error_span("invalid argument type to operator", &span))
+					_ => Err(report.error_span("invalid argument type to operator", span))
 				}
 			}
 			
-			&expr::Expr::BinaryOp(ref span, ref op_span, op, ref lhs_expr, ref rhs_expr) =>
+			&expr::Expr::BinaryOp(span, ref op_span, op, ref lhs_expr, ref rhs_expr) =>
 			{
 				if op == expr::BinaryOp::Assign
 				{
@@ -456,10 +454,10 @@ impl expr::Expr
 								return Ok(expr::Value::Void);
 							}
 							
-							Err(report.error_span("symbol cannot be assigned to", &lhs_expr.span()))
+							Err(report.error_span("symbol cannot be assigned to", lhs_expr.span()))
 						}
 						
-						_ => Err(report.error_span("invalid assignment destination", &lhs_expr.span()))
+						_ => Err(report.error_span("invalid assignment destination", lhs_expr.span()))
 					}
 				}
 				
@@ -474,7 +472,7 @@ impl expr::Expr
 						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(false)) => return Ok(lhs),
 						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(false)) => { }
 						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(true))  => { }
-						_ => return Err(report.error_span("invalid argument type to operator", &lhs_expr.span()))
+						_ => return Err(report.error_span("invalid argument type to operator", lhs_expr.span()))
 					}
 					
 					let rhs = propagate!(
@@ -486,7 +484,7 @@ impl expr::Expr
 						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(false)) => Ok(rhs),
 						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(false)) => Ok(rhs),
 						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(true))  => Ok(rhs),
-						_ => Err(report.error_span("invalid argument type to operator", &rhs_expr.span()))
+						_ => Err(report.error_span("invalid argument type to operator", rhs_expr.span()))
 					}
 				}
 				
@@ -509,7 +507,7 @@ impl expr::Expr
 								expr::BinaryOp::Xor => Ok(expr::Value::Bool(lhs ^ rhs)),
 								expr::BinaryOp::Eq  => Ok(expr::Value::Bool(lhs == rhs)),
 								expr::BinaryOp::Ne  => Ok(expr::Value::Bool(lhs != rhs)),
-								_ => Err(report.error_span("invalid argument types to operator", &span))
+								_ => Err(report.error_span("invalid argument types to operator", span))
 							}
 						}
 
@@ -532,25 +530,25 @@ impl expr::Expr
 								expr::BinaryOp::Div => match lhs.checked_div(rhs)
 								{
 									Some(x) => Ok(expr::Value::make_integer(x)),
-									None => Err(report.error_span("division by zero", &op_span.join(&rhs_expr.span())))
+									None => Err(report.error_span("division by zero", op_span.join(rhs_expr.span())))
 								},
 								
 								expr::BinaryOp::Mod => match lhs.checked_rem(rhs)
 								{
 									Some(x) => Ok(expr::Value::make_integer(x)),
-									None => Err(report.error_span("modulo by zero", &op_span.join(&rhs_expr.span())))
+									None => Err(report.error_span("modulo by zero", op_span.join(rhs_expr.span())))
 								},
 								
 								expr::BinaryOp::Shl => match lhs.checked_shl(rhs)
 								{
 									Some(x) => Ok(expr::Value::make_integer(x)),
-									None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
+									None => Err(report.error_span("invalid shift value", op_span.join(rhs_expr.span())))
 								},
 								
 								expr::BinaryOp::Shr => match lhs.checked_shr(rhs)
 								{
 									Some(x) => Ok(expr::Value::make_integer(x)),
-									None => Err(report.error_span("invalid shift value", &op_span.join(&rhs_expr.span())))
+									None => Err(report.error_span("invalid shift value", op_span.join(rhs_expr.span())))
 								},
 								
 								expr::BinaryOp::And  => Ok(expr::Value::make_integer(lhs & rhs)),
@@ -568,16 +566,16 @@ impl expr::Expr
 									match (lhs.size, rhs.size)
 									{
 										(Some(lhs_width), Some(rhs_width)) => Ok(expr::Value::make_integer(lhs.concat((lhs_width, 0), &rhs, (rhs_width, 0)))),
-										(None, _) => Err(report.error_span("argument to concatenation with indefinite size", &lhs_expr.span())),
-										(_, None) => Err(report.error_span("argument to concatenation with indefinite size", &rhs_expr.span()))
+										(None, _) => Err(report.error_span("argument to concatenation with indefinite size", lhs_expr.span())),
+										(_, None) => Err(report.error_span("argument to concatenation with indefinite size", rhs_expr.span()))
 									}
 								}
 
-								_ => Err(report.error_span("invalid argument types to operator", &span))
+								_ => Err(report.error_span("invalid argument types to operator", span))
 							}
 						}
 						
-						_ => Err(report.error_span("invalid argument types to operator", &span))
+						_ => Err(report.error_span("invalid argument types to operator", span))
 					}
 				}
 			}
@@ -590,17 +588,17 @@ impl expr::Expr
 						true_branch.eval_with_ctx(report, ctx, provider)?)),
 					expr::Value::Bool(false) => Ok(propagate!(
 						false_branch.eval_with_ctx(report, ctx, provider)?)),
-					_ => Err(report.error_span("invalid condition type", &cond.span()))
+					_ => Err(report.error_span("invalid condition type", cond.span()))
 				}
 			}
 			
-			&expr::Expr::BitSlice(ref span, _, left, right, ref inner) =>
+			&expr::Expr::BitSlice(span, _, left, right, ref inner) =>
 			{
 				match propagate!(
 					inner.eval_with_ctx(report, ctx, provider)?).get_bigint()
 				{
 					Some(ref x) => Ok(expr::Value::make_integer(x.slice(left, right))),
-					None => Err(report.error_span("invalid argument type to slice", &span))
+					None => Err(report.error_span("invalid argument type to slice", span))
 				}
 			}
 			
@@ -622,7 +620,7 @@ impl expr::Expr
 				Ok(result)
 			}
 			
-			&expr::Expr::Call(ref span, ref target, ref arg_exprs) =>
+			&expr::Expr::Call(span, ref target, ref arg_exprs) =>
 			{
 				let func = propagate!(
 					target.eval_with_ctx(report, ctx, provider)?);
@@ -633,13 +631,13 @@ impl expr::Expr
 					let value = propagate!(
 						expr.eval_with_ctx(report, ctx, provider)?);
 					
-					args.push(EvalFunctionArgument {
+					args.push(EvalFunctionQueryArgument {
 						value,
 						span: expr.span()
 					});
 				}
 
-				let mut info = EvalFunctionInfo {
+				let mut query = EvalFunctionQuery {
 					report,
 					func,
 					args,
@@ -647,35 +645,35 @@ impl expr::Expr
 					eval_ctx: ctx,
 				};
 
-				match info.func
+				match query.func
 				{
 					expr::Value::ExprBuiltInFunction(_) =>
-						expr::eval_builtin_fn(&mut info),
+						expr::eval_builtin_fn(&mut query),
 
 					expr::Value::AsmBuiltInFunction(_) =>
-						(provider.eval_fn)(&mut info),
+						provider(EvalQuery::Function(&mut query)),
 
 					expr::Value::Function(_) =>
-						(provider.eval_fn)(&mut info),
+						provider(EvalQuery::Function(&mut query)),
 
 					expr::Value::Unknown =>
-						Err(report.error_span("unknown function", &target.span())),
+						Err(report.error_span("unknown function", target.span())),
 					
 					_ =>
-						Err(report.error_span("expression is not callable", &target.span()))
+						Err(report.error_span("expression is not callable", target.span()))
 				}
 			}
 			
-			&expr::Expr::Asm(ref span, ref tokens) =>
+			&expr::Expr::Asm(span, ref tokens) =>
 			{
-				let mut info = EvalAsmInfo {
+				let mut query = EvalAsmBlockQuery {
 					report,
 					tokens,
 					span,
 					eval_ctx: ctx,
 				};
 
-                (provider.eval_asm)(&mut info)
+                provider(EvalQuery::AsmBlock(&mut query))
 			}
 		}
 	}

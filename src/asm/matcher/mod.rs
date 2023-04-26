@@ -110,7 +110,7 @@ pub fn match_all(
             
             if let Err(()) = error_on_no_matches(
                 report,
-                &ast_instr.span,
+                ast_instr.span,
                 &matches)
             {
                 continue;
@@ -176,7 +176,7 @@ pub fn match_all(
 
 pub fn error_on_no_matches(
     report: &mut diagn::Report,
-    span: &diagn::Span,
+    span: diagn::Span,
     matches: &InstructionMatches)
     -> Result<(), ()>
 {

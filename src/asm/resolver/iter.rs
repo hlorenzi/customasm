@@ -52,7 +52,7 @@ pub struct ResolverContext<'iter, 'ast, 'decls>
     pub node: ResolverNode<'ast>,
     pub is_first_iteration: bool,
     pub is_last_iteration: bool,
-    pub filename_ctx: Option<&'ast str>,
+    pub file_handle_ctx: Option<util::FileServerHandle>,
     pub symbol_ctx: &'decls util::SymbolContext,
     pub bank_ref: util::ItemRef<asm::Bankdef>,
     pub bank_data: &'iter BankData,
@@ -111,7 +111,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
         let ast_any = &self.ast.nodes[self.index];
 
         let node: ResolverNode;
-        let filename_ctx: Option<&str>;
+        let file_handle_ctx: Option<util::FileServerHandle>;
 
         match ast_any
         {
@@ -121,7 +121,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
                 self.index += 1;
                 node = ResolverNode::None;
-                filename_ctx = Some(&ast_bank.header_span.file);
+                file_handle_ctx = Some(ast_bank.header_span.file_handle);
             }
 
             asm::AstAny::DirectiveBankdef(ast_bankdef) =>
@@ -130,7 +130,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
                 self.index += 1;
                 node = ResolverNode::None;
-                filename_ctx = Some(&ast_bankdef.header_span.file);
+                file_handle_ctx = Some(ast_bankdef.header_span.file_handle);
             }
 
             asm::AstAny::Symbol(ast_symbol) =>
@@ -156,14 +156,14 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
                 self.index += 1;
                 node = ResolverNode::Symbol(ast_symbol);
-                filename_ctx = Some(&ast_symbol.decl_span.file);
+                file_handle_ctx = Some(ast_symbol.decl_span.file_handle);
             }
 
             asm::AstAny::Instruction(ast_instr) =>
             {
                 self.index += 1;
                 node = ResolverNode::Instruction(ast_instr);
-                filename_ctx = Some(&ast_instr.span.file);
+                file_handle_ctx = Some(ast_instr.span.file_handle);
             }
 
             asm::AstAny::DirectiveData(ast_data) =>
@@ -178,35 +178,35 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 }
 
                 node = ResolverNode::DataElement(ast_data, elem_index);
-                filename_ctx = Some(&ast_data.header_span.file);
+                file_handle_ctx = Some(ast_data.header_span.file_handle);
             }
 
             asm::AstAny::DirectiveRes(ast_res) =>
             {
                 self.index += 1;
                 node = ResolverNode::Res(ast_res);
-                filename_ctx = Some(&ast_res.header_span.file);
+                file_handle_ctx = Some(ast_res.header_span.file_handle);
             }
 
             asm::AstAny::DirectiveAlign(ast_align) =>
             {
                 self.index += 1;
                 node = ResolverNode::Align(ast_align);
-                filename_ctx = Some(&ast_align.header_span.file);
+                file_handle_ctx = Some(ast_align.header_span.file_handle);
             }
 
             asm::AstAny::DirectiveAddr(ast_addr) =>
             {
                 self.index += 1;
                 node = ResolverNode::Addr(ast_addr);
-                filename_ctx = Some(&ast_addr.header_span.file);
+                file_handle_ctx = Some(ast_addr.header_span.file_handle);
             }
 
             _ =>
             {
                 self.index += 1;
                 node = ResolverNode::None;
-                filename_ctx = None;
+                file_handle_ctx = None;
             }
         }
 
@@ -214,7 +214,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
             node,
             is_first_iteration: self.is_first_iteration,
             is_last_iteration: self.is_last_iteration,
-            filename_ctx,
+            file_handle_ctx,
             symbol_ctx: self.symbol_ctx,
             bank_ref: self.bank_ref,
             bank_data: &self.bank_data[self.bank_ref.0],
@@ -394,7 +394,7 @@ impl<'iter, 'ast, 'decls> ResolverContext<'iter, 'ast, 'decls>
     pub fn eval_address(
         &self,
         report: &mut diagn::Report,
-        span: &diagn::Span,
+        span: diagn::Span,
         defs: &asm::ItemDefs,
         can_guess: bool)
         -> Result<util::BigInt, ()>

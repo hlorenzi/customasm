@@ -27,6 +27,8 @@ mod eval;
 pub use eval::{
     eval,
     eval_simple,
+    eval_variable,
+    eval_variable_simple,
 };
 
 mod eval_asm;
@@ -63,7 +65,7 @@ impl ResolutionState
 pub fn resolve_iteratively(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     ast: &asm::AstTopLevel,
     decls: &asm::ItemDecls,
     defs: &mut asm::ItemDefs,
@@ -132,7 +134,7 @@ pub fn resolve_iteratively(
 pub fn resolve_once(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     ast: &asm::AstTopLevel,
     decls: &asm::ItemDecls,
     defs: &mut asm::ItemDefs,

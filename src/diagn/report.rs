@@ -67,13 +67,13 @@ impl Message
 	}
 	
 	
-	pub fn error_span<S>(descr: S, span: &diagn::Span) -> Message
+	pub fn error_span<S>(descr: S, span: diagn::Span) -> Message
 	where S: Into<String>
 	{
 		Message {
 			descr: descr.into(),
 			kind: MessageKind::Error,
-			span: Some(span.clone()),
+			span: Some(span),
 			short_excerpt: false,
 			inner: Vec::new(),
 		}
@@ -93,13 +93,13 @@ impl Message
 	}
 	
 	
-	pub fn warning_span<S>(descr: S, span: &diagn::Span) -> Message
+	pub fn warning_span<S>(descr: S, span: diagn::Span) -> Message
 	where S: Into<String>
 	{
 		Message {
 			descr: descr.into(),
 			kind: MessageKind::Warning,
-			span: Some(span.clone()),
+			span: Some(span),
 			short_excerpt: false,
 			inner: Vec::new(),
 		}
@@ -119,26 +119,26 @@ impl Message
 	}
 	
 	
-	pub fn note_span<S>(descr: S, span: &diagn::Span) -> Message
+	pub fn note_span<S>(descr: S, span: diagn::Span) -> Message
 	where S: Into<String>
 	{
 		Message {
 			descr: descr.into(),
 			kind: MessageKind::Note,
-			span: Some(span.clone()),
+			span: Some(span),
 			short_excerpt: false,
 			inner: Vec::new(),
 		}
 	}
 	
 	
-	pub fn short_note_span<S>(descr: S, span: &diagn::Span) -> Message
+	pub fn short_note_span<S>(descr: S, span: diagn::Span) -> Message
 	where S: Into<String>
 	{
 		Message {
 			descr: descr.into(),
 			kind: MessageKind::Note,
-			span: Some(span.clone()),
+			span: Some(span),
 			short_excerpt: true,
 			inner: Vec::new(),
 		}
@@ -233,7 +233,7 @@ impl Report
 			msg = Message {
 				descr: parent.descr.clone(),
 				kind: parent.kind,
-				span: parent.span.clone(),
+				span: parent.span,
 				short_excerpt: parent.short_excerpt,
 				inner: vec![msg],
 			};
@@ -253,7 +253,7 @@ impl Report
 			msg = Message {
 				descr: parent.descr.clone(),
 				kind: parent.kind,
-				span: parent.span.clone(),
+				span: parent.span,
 				short_excerpt: parent.short_excerpt,
 				inner: vec![msg],
 			};
@@ -293,7 +293,7 @@ impl Report
 			msg = Message {
 				descr: parent.descr.clone(),
 				kind: parent.kind,
-				span: parent.span.clone(),
+				span: parent.span,
 				short_excerpt: parent.short_excerpt,
 				inner: vec![msg],
 			};
@@ -326,7 +326,7 @@ impl Report
 			let msg = Message {
 				descr: parent.descr.clone(),
 				kind: parent.kind,
-				span: parent.span.clone(),
+				span: parent.span,
 				short_excerpt: parent.short_excerpt,
 				inner: msgs,
 			};
@@ -362,7 +362,7 @@ impl Report
 	}
 	
 	
-	pub fn error_span<S>(&mut self, descr: S, span: &diagn::Span)
+	pub fn error_span<S>(&mut self, descr: S, span: diagn::Span)
 	where S: Into<String>
 	{
 		self.message(Message::error_span(descr, span));
@@ -376,7 +376,7 @@ impl Report
 	}
 	
 	
-	pub fn warning_span<S>(&mut self, descr: S, span: &diagn::Span)
+	pub fn warning_span<S>(&mut self, descr: S, span: diagn::Span)
 	where S: Into<String>
 	{
 		self.message(Message::warning_span(descr, span));
@@ -390,28 +390,28 @@ impl Report
 	}
 	
 	
-	pub fn note_span<S>(&mut self, descr: S, span: &diagn::Span)
+	pub fn note_span<S>(&mut self, descr: S, span: diagn::Span)
 	where S: Into<String>
 	{
 		self.message(Message::note_span(descr, span));
 	}
 	
 	
-	pub fn push_parent<S>(&mut self, descr: S, span: &diagn::Span)
+	pub fn push_parent<S>(&mut self, descr: S, span: diagn::Span)
 	where S: Into<String>
 	{
 		self.parents.push(Message::error_span(descr, span));
 	}
 	
 	
-	pub fn push_parent_note<S>(&mut self, descr: S, span: &diagn::Span)
+	pub fn push_parent_note<S>(&mut self, descr: S, span: diagn::Span)
 	where S: Into<String>
 	{
 		self.parents.push(Message::note_span(descr, span));
 	}
 	
 	
-	pub fn push_parent_short_note<S>(&mut self, descr: S, span: &diagn::Span)
+	pub fn push_parent_short_note<S>(&mut self, descr: S, span: diagn::Span)
 	where S: Into<String>
 	{
 		self.parents.push(Message::short_note_span(descr, span));
@@ -466,7 +466,7 @@ impl Report
 	}
 	
 	
-	pub fn has_message_at(&self, fileserver: &dyn util::FileServer, filename: &str, kind: MessageKind, line: usize, error_excerpt: &str) -> bool
+	pub fn has_message_at(&self, fileserver: &mut dyn util::FileServer, filename: &str, kind: MessageKind, line: usize, error_excerpt: &str) -> bool
 	{
 		for msg in &self.messages
 		{
@@ -478,7 +478,7 @@ impl Report
 	}
 	
 	
-	pub fn has_error_at(&self, fileserver: &dyn util::FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	pub fn has_error_at(&self, fileserver: &mut dyn util::FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
 	{
 		for msg in &self.messages
 		{
@@ -490,7 +490,7 @@ impl Report
 	}
 	
 	
-	pub fn has_first_error_at(&self, fileserver: &dyn util::FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
+	pub fn has_first_error_at(&self, fileserver: &mut dyn util::FileServer, filename: &str, line: usize, error_excerpt: &str) -> bool
 	{
 		if self.messages.len() == 0
 			{ return false; }
@@ -502,7 +502,7 @@ impl Report
 	fn msg_has_error_at(
 		&self,
 		msg: &Message,
-		fileserver: &dyn util::FileServer,
+		fileserver: &mut dyn util::FileServer,
 		filename: &str,
 		kind: MessageKind,
 		line: usize,
@@ -532,9 +532,16 @@ impl Report
 		if msg.span.is_none()
 			{ return true; }
 			
+		let file_handle =
+			fileserver.get_handle(
+				&mut diagn::Report::new(),
+				None,
+				filename)
+			.unwrap();
+		
 		let span = msg.span.as_ref().unwrap();
 		
-		if &*span.file != filename
+		if span.file_handle != file_handle
 			{ return false; }
 		
 		if span.location.is_none()
@@ -546,7 +553,7 @@ impl Report
 			fileserver.get_chars(
 				&mut diagn::Report::new(),
 				None,
-				&*span.file)
+				file_handle)
 			.unwrap();
 
 		let counter = util::CharCounter::new(&chars);
@@ -636,7 +643,7 @@ impl Report
 			fileserver.get_chars(
 				&mut diagn::Report::new(),
 				None,
-				&span.file)
+				span.file_handle)
 			.unwrap();
 			
 		let counter = util::CharCounter::new(&chars);
@@ -715,7 +722,7 @@ impl Report
 		{
 			self.print_indent(writer, indent);
 			write!(writer, "{} --> ", C_LOCATION).unwrap();
-			write!(writer, "{}:", span.file).unwrap();
+			write!(writer, "{}:", span.file_handle).unwrap();
 			write!(writer, "{}", C_DEFAULT).unwrap();
 			writeln!(writer).unwrap();
 			return 0;
@@ -728,7 +735,7 @@ impl Report
 
 		self.print_indent(writer, indent + line_info.label_width - 1);
 		write!(writer, "{} --> ", C_LOCATION).unwrap();
-		write!(writer, "{}:", span.file).unwrap();
+		write!(writer, "{}:", span.file_handle).unwrap();
 		write!(writer, "{}", C_DEFAULT).unwrap();
 
 		// Print location information.
@@ -736,7 +743,7 @@ impl Report
 			fileserver.get_chars(
 				&mut diagn::Report::new(),
 				None,
-				&span.file)
+				span.file_handle)
 			.unwrap();
 
 		let counter = util::CharCounter::new(&chars);

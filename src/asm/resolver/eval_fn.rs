@@ -2,11 +2,11 @@ use crate::*;
 
 
 type BuiltinFn = fn(
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    info: &mut expr::EvalFunctionInfo)
+    query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>;
 
 
@@ -25,14 +25,14 @@ pub fn resolve_builtin_fn(
 
 
 pub fn eval_fn(
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    info: &mut expr::EvalFunctionInfo)
+    query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>
 {
-    if let expr::Value::AsmBuiltInFunction(ref name) = info.func
+    if let expr::Value::AsmBuiltInFunction(ref name) = query.func
     {
         let builtin_fn = resolve_builtin_fn(name).unwrap();
 
@@ -41,45 +41,45 @@ pub fn eval_fn(
             decls,
             defs,
             ctx,
-            info)
+            query)
     }
-    else if let expr::Value::Function(fn_index) = info.func
+    else if let expr::Value::Function(fn_index) = query.func
     {
-        info.eval_ctx.check_recursion_depth_limit(
-            info.report,
-            info.span)?;
+        query.eval_ctx.check_recursion_depth_limit(
+            query.report,
+            query.span)?;
         
         let fn_ref = util::ItemRef::<asm::Function>::new(fn_index);
         let function = defs.functions.get(fn_ref);
         let symbol_decl = decls.symbols.get(function.item_ref);
         
         let mut args_ctx = expr::EvalContext::new_deepened(
-            &info.eval_ctx);
+            &query.eval_ctx);
 
-        info.ensure_arg_number(function.params.len())?;
+        query.ensure_arg_number(function.params.len())?;
 
         for param_index in 0..function.params.len()
         {
             let param = &function.params[param_index];
-            let arg = &info.args[param_index];
+            let arg = &query.args[param_index];
             
             args_ctx.set_local(
                 param.name.clone(),
                 arg.value.clone());
         }
 
-        info.report.push_parent(
+        query.report.push_parent(
             "failed to resolve function call",
-            info.span);
+            query.span);
 
-        info.report.push_parent_short_note(
+        query.report.push_parent_short_note(
             format!(
                 "within function `{}`",
                 symbol_decl.name),
-            &symbol_decl.span);
+            symbol_decl.span);
 
         let maybe_result = asm::resolver::eval(
-            info.report,
+            query.report,
             fileserver,
             decls,
             defs,
@@ -87,8 +87,8 @@ pub fn eval_fn(
             &mut args_ctx,
             &function.body);
 
-        info.report.pop_parent();
-        info.report.pop_parent();
+        query.report.pop_parent();
+        query.report.pop_parent();
 
         maybe_result
     }
@@ -100,29 +100,37 @@ pub fn eval_fn(
 
 
 fn eval_builtin_incbin(
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     _decls: &asm::ItemDecls,
     _defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    info: &mut expr::EvalFunctionInfo)
+    query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>
 {
-    info.ensure_arg_number(1)?;
+    query.ensure_arg_number(1)?;
 
-    let relative_filename = info.args[0].value.expect_string(
-        info.report,
-        info.args[0].span)?;
+    let relative_filename = query.args[0].value.expect_string(
+        query.report,
+        query.args[0].span)?;
+
+    let filename_ctx = fileserver.get_filename(
+        ctx.file_handle_ctx.unwrap());
 
     let absolute_filename = util::filename_navigate(
-        info.report,
-        info.args[0].span,
-        &ctx.filename_ctx.unwrap(),
+        query.report,
+        query.args[0].span,
+        filename_ctx,
         &relative_filename.utf8_contents)?;
 
-    let bytes = fileserver.get_bytes(
-        info.report,
-        Some(info.args[0].span),
+    let file_handle = fileserver.get_handle(
+        query.report,
+        Some(query.args[0].span),
         &absolute_filename)?;
+
+    let bytes = fileserver.get_bytes(
+        query.report,
+        Some(query.args[0].span),
+        file_handle)?;
 
     Ok(expr::Value::make_integer(
         util::BigInt::from_bytes_be(&bytes)))
@@ -130,11 +138,11 @@ fn eval_builtin_incbin(
 
 
 fn eval_builtin_incbinstr(
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    info: &mut expr::EvalFunctionInfo)
+    query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>
 {
     eval_builtin_incstr(
@@ -143,16 +151,16 @@ fn eval_builtin_incbinstr(
         decls,
         defs,
         ctx,
-        info)
+        query)
 }
 
 
 fn eval_builtin_inchexstr(
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    info: &mut expr::EvalFunctionInfo)
+    query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>
 {
     eval_builtin_incstr(
@@ -161,35 +169,43 @@ fn eval_builtin_inchexstr(
         decls,
         defs,
         ctx,
-        info)
+        query)
 }
 
 
 fn eval_builtin_incstr(
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     bits_per_char: usize,
     _decls: &asm::ItemDecls,
     _defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    info: &mut expr::EvalFunctionInfo)
+    query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>
 {
-    info.ensure_arg_number(1)?;
+    query.ensure_arg_number(1)?;
 
-    let relative_filename = info.args[0].value.expect_string(
-        info.report,
-        info.args[0].span)?;
+    let relative_filename = query.args[0].value.expect_string(
+        query.report,
+        query.args[0].span)?;
 
+    let filename_ctx = fileserver.get_filename(
+        ctx.file_handle_ctx.unwrap());
+    
     let absolute_filename = util::filename_navigate(
-        info.report,
-        info.args[0].span,
-        &ctx.filename_ctx.unwrap(),
+        query.report,
+        query.args[0].span,
+        filename_ctx,
         &relative_filename.utf8_contents)?;
 
-    let chars = fileserver.get_chars(
-        info.report,
-        Some(info.args[0].span),
+    let file_handle = fileserver.get_handle(
+        query.report,
+        Some(query.args[0].span),
         &absolute_filename)?;
+    
+    let chars = fileserver.get_chars(
+        query.report,
+        Some(query.args[0].span),
+        file_handle)?;
 
     
     let mut bitvec = util::BitVec::new();
@@ -210,9 +226,9 @@ fn eval_builtin_incstr(
                 Some(digit) => digit,
                 None =>
                 {
-                    info.report.error_span(
+                    query.report.error_span(
                         "invalid character in file contents",
-                        &info.span);
+                        query.span);
                     
                     return Err(());
                 }

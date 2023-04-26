@@ -4,7 +4,7 @@ use crate::*;
 pub fn resolve_res(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     ast_res: &asm::AstDirectiveRes,
     decls: &asm::ItemDecls,
     defs: &mut asm::ItemDefs,
@@ -24,7 +24,7 @@ pub fn resolve_res(
 
     let value = value.expect_error_or_usize(
         report,
-        &ast_res.expr.span())?;
+        ast_res.expr.span())?;
 
     let value = {
         match value
@@ -50,7 +50,7 @@ pub fn resolve_res(
         {
             report.error_span(
                 "reserve size did not converge",
-                &ast_res.expr.span());
+                ast_res.expr.span());
         }
 
         if opts.debug_iterations

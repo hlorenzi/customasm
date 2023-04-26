@@ -24,6 +24,7 @@ pub use self::overlap_checker::{
 mod fileserver;
 pub use self::fileserver::{
     FileServer,
+    FileServerHandle,
     FileServerMock,
     FileServerReal,
 };

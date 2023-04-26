@@ -63,8 +63,8 @@ pub fn parse(
     let tk_name = walker.maybe_expect(syntax::TokenKind::Identifier);
     let name = tk_name.map(|tk| tk.excerpt.clone().unwrap());
     let name_span = tk_name
-        .map(|tk| tk.span.clone())
-        .unwrap_or_else(|| header_span.clone());
+        .map(|tk| tk.span)
+        .unwrap_or_else(|| header_span);
 
     walker.expect(report, syntax::TokenKind::BraceOpen)?;
 
@@ -116,7 +116,7 @@ fn parse_rule(
         !walker.next_is(0, syntax::TokenKind::HeavyArrowRight)
     {
         let tk = walker.advance();
-        pattern_span = pattern_span.join(&tk.span);
+        pattern_span = pattern_span.join(tk.span);
 
 
         if tk.kind == syntax::TokenKind::BraceOpen
@@ -134,7 +134,7 @@ fn parse_rule(
                 pattern.push(AstRulePatternPart::Parameter(param));
 
                 let tk_close = walker.expect(report, syntax::TokenKind::BraceClose)?;
-                pattern_span = pattern_span.join(&tk_close.span);
+                pattern_span = pattern_span.join(tk_close.span);
             }
         }
         
@@ -150,7 +150,7 @@ fn parse_rule(
         {
             report.error_span(
                 "invalid pattern token",
-                &tk.span);
+                tk.span);
 
             return Err(());
         }
@@ -172,7 +172,7 @@ fn parse_rule(
     {
         report.error_span(
             "expected pattern",
-            &tk_heavy_arrow.span.before());
+            tk_heavy_arrow.span.before());
         
         return Err(());
     }
@@ -195,7 +195,7 @@ fn parse_rule_parameter(
 {
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
     let name = tk_name.excerpt.as_ref().unwrap().clone();
-    let name_span = tk_name.span.clone();
+    let name_span = tk_name.span;
 
     let (typ, type_span) = {
         if walker.maybe_expect(syntax::TokenKind::Colon).is_some()
@@ -203,7 +203,7 @@ fn parse_rule_parameter(
             let tk_typename = walker.expect(report, syntax::TokenKind::Identifier)?;
             let typename = tk_typename.excerpt.as_ref().unwrap().clone();
             let typ = interpret_typename(&typename);
-            (typ, tk_typename.span.clone())
+            (typ, tk_typename.span)
         }
         else
         {

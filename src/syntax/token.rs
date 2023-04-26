@@ -1,7 +1,7 @@
 use crate::*;
 
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct Token
 {
 	pub span: diagn::Span,
@@ -10,7 +10,7 @@ pub struct Token
 }
 
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum TokenKind
 {
 	Error,
@@ -232,14 +232,12 @@ impl Token
 }
 
 
-pub fn tokenize<S>(
+pub fn tokenize(
     report: &mut diagn::Report,
-    src_filename: S,
+    src_file_handle: util::FileServerHandle,
     src: &[char])
     -> Result<Vec<Token>, ()>
-    where S: Into<String>
 {
-	let filename = std::rc::Rc::new(src_filename.into());
 	let mut tokens = Vec::new();
 	let mut index = 0;
 	
@@ -256,9 +254,9 @@ pub fn tokenize<S>(
 			(TokenKind::Error, 1)))))));
 		
 		let span = diagn::Span::new(
-            filename.clone(),
-            index,
-            index + length);
+            src_file_handle,
+            index.try_into().unwrap(),
+            (index + length).try_into().unwrap());
 		
 		// Get the source excerpt for variable tokens (e.g. identifiers).
 		let excerpt = {
@@ -277,7 +275,7 @@ pub fn tokenize<S>(
 		{
 			report.error_span(
                 "unexpected character",
-                &span);
+                span);
 
 			return Err(());
 		}

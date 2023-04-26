@@ -75,20 +75,20 @@ impl Expr
 	}
 
 	
-	pub fn span(&self) -> &diagn::Span
+	pub fn span(&self) -> diagn::Span
 	{
 		match self
 		{
-			&Expr::Literal  (ref span, ..) => &span,
-			&Expr::Variable (ref span, ..) => &span,
-			&Expr::UnaryOp  (ref span, ..) => &span,
-			&Expr::BinaryOp (ref span, ..) => &span,
-			&Expr::TernaryOp(ref span, ..) => &span,
-			&Expr::BitSlice (ref span, ..) => &span,
-			&Expr::SoftSlice(ref span, ..) => &span,
-			&Expr::Block    (ref span, ..) => &span,
-			&Expr::Call     (ref span, ..) => &span,
-			&Expr::Asm      (ref span, ..) => &span,
+			&Expr::Literal  (span, ..) => span,
+			&Expr::Variable (span, ..) => span,
+			&Expr::UnaryOp  (span, ..) => span,
+			&Expr::BinaryOp (span, ..) => span,
+			&Expr::TernaryOp(span, ..) => span,
+			&Expr::BitSlice (span, ..) => span,
+			&Expr::SoftSlice(span, ..) => span,
+			&Expr::Block    (span, ..) => span,
+			&Expr::Call     (span, ..) => span,
+			&Expr::Asm      (span, ..) => span,
 		}
 	}
 }
@@ -180,7 +180,7 @@ impl Value
 	pub fn expect_bigint(
 		&self,
 		report: &mut diagn::Report,
-		span: &diagn::Span)
+		span: diagn::Span)
 		-> Result<&util::BigInt, ()>
 	{
 		match self
@@ -202,7 +202,7 @@ impl Value
 	pub fn expect_bigint_mut(
 		&mut self,
 		report: &mut diagn::Report,
-		span: &diagn::Span)
+		span: diagn::Span)
 		-> Result<&mut util::BigInt, ()>
 	{
 		match self
@@ -223,7 +223,7 @@ impl Value
 	pub fn expect_sized_bigint(
 		&self,
 		report: &mut diagn::Report,
-		span: &diagn::Span)
+		span: diagn::Span)
 		-> Result<&util::BigInt, ()>
 	{
 		let bigint = self.expect_bigint(report, span)?;
@@ -246,7 +246,7 @@ impl Value
 	pub fn expect_error_or_bigint(
 		self,
 		report: &mut diagn::Report,
-		span: &diagn::Span)
+		span: diagn::Span)
 		-> Result<expr::Value, ()>
 	{
 		match self.coallesce_to_integer().as_ref()
@@ -273,7 +273,7 @@ impl Value
 	pub fn expect_error_or_sized_bigint(
 		self,
 		report: &mut diagn::Report,
-		span: &diagn::Span)
+		span: diagn::Span)
 		-> Result<expr::Value, ()>
 	{
 		match self.coallesce_to_integer().as_ref()
@@ -319,7 +319,7 @@ impl Value
 	pub fn expect_usize(
 		&self,
 		report: &mut diagn::Report,
-		span: &diagn::Span)
+		span: diagn::Span)
 		-> Result<usize, ()>
 	{
 		match self
@@ -355,7 +355,7 @@ impl Value
 	pub fn expect_error_or_usize(
 		self,
 		report: &mut diagn::Report,
-		span: &diagn::Span)
+		span: diagn::Span)
 		-> Result<expr::Value, ()>
 	{
 		match &self
@@ -395,7 +395,7 @@ impl Value
 	pub fn expect_nonzero_usize(
 		&self,
 		report: &mut diagn::Report,
-		span: &diagn::Span)
+		span: diagn::Span)
 		-> Result<usize, ()>
 	{
 		match self
@@ -431,7 +431,7 @@ impl Value
 	pub fn expect_bool(
 		&self,
 		report: &mut diagn::Report,
-		span: &diagn::Span)
+		span: diagn::Span)
 		-> Result<bool, ()>
 	{
 		match self
@@ -452,7 +452,7 @@ impl Value
 	pub fn expect_string(
 		&self,
 		report: &mut diagn::Report,
-		span: &diagn::Span)
+		span: diagn::Span)
 		-> Result<&ExprString, ()>
 	{
 		match self

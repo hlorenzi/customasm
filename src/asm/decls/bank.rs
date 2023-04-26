@@ -13,7 +13,7 @@ pub fn collect(
         {
             let item_ref = decls.bankdefs.get_by_name_global(
                 report,
-                &node.name_span,
+                node.name_span,
                 &node.name)?;
                 
             node.item_ref = Some(item_ref);

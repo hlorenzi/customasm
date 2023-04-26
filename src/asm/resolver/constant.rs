@@ -9,7 +9,7 @@ use crate::*;
 pub fn resolve_constants(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     ast: &asm::AstTopLevel,
     decls: &asm::ItemDecls,
     defs: &mut asm::ItemDefs)
@@ -40,7 +40,7 @@ pub fn resolve_constants(
 pub fn resolve_constants_once(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     ast: &asm::AstTopLevel,
     decls: &asm::ItemDecls,
     defs: &mut asm::ItemDefs)
@@ -84,7 +84,7 @@ pub fn resolve_constants_once(
 pub fn resolve_constant(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     ast_symbol: &asm::AstSymbol,
     decls: &asm::ItemDecls,
     defs: &mut asm::ItemDefs,
@@ -136,7 +136,7 @@ pub fn resolve_constant(
             {
                 report.error_span(
                     "constant value did not converge",
-                    &ast_symbol.decl_span);
+                    ast_symbol.decl_span);
             }
 
             if opts.debug_iterations

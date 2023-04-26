@@ -54,7 +54,7 @@ pub fn parse(
 
     Ok(AstDirectiveFn {
         header_span,
-        name_span: tk_name.span.clone(),
+        name_span: tk_name.span,
         name,
         params,
         body,

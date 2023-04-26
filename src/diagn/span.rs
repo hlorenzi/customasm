@@ -1,22 +1,27 @@
-#[derive(Clone, Hash, Eq)]
+use crate::*;
+
+
+pub type SpanIndex = usize;
+
+
+#[derive(Copy, Clone, Hash, Eq)]
 pub struct Span
 {
-	pub file: std::rc::Rc<String>,
-	pub location: Option<(usize, usize)>
+	pub file_handle: util::FileServerHandle,
+	pub location: Option<(SpanIndex, SpanIndex)>
 }
 
 
 impl Span
 {
 	pub fn new(
-		filename: std::rc::Rc<String>,
-		start: usize,
-		end: usize)
+		file_handle: util::FileServerHandle,
+		start: SpanIndex,
+		end: SpanIndex)
 		-> Span
 	{
-		Span
-		{
-			file: filename,
+		Span {
+			file_handle,
 			location: Some((start, end))
 		}
 	}
@@ -24,10 +29,9 @@ impl Span
 	
 	pub fn new_dummy() -> Span
 	{
-		Span
-		{
-			file: std::rc::Rc::new("".to_string()),
-			location: None
+		Span {
+			file_handle: 0,
+			location: None,
 		}
 	}
 	
@@ -35,15 +39,16 @@ impl Span
 	pub fn before(&self) -> Span
 	{
 		if self.location.is_none()
-			{ self.clone() }
+		{
+			*self
+		}
 		
 		else
 		{
 			let start = self.location.unwrap().0;
 			
-			Span
-			{
-				file: self.file.clone(),
+			Span {
+				file_handle: self.file_handle,
 				location: Some((start, start))
 			}
 		}
@@ -53,43 +58,46 @@ impl Span
 	pub fn after(&self) -> Span
 	{
 		if self.location.is_none()
-			{ self.clone() }
+		{
+			*self
+		}
 		
 		else
 		{
 			let end = self.location.unwrap().1;
 			
-			Span
-			{
-				file: self.file.clone(),
-				location: Some((end, end))
+			Span {
+				file_handle: self.file_handle,
+				location: Some((end, end)),
 			}
 		}
 	}
 	
 	
-	pub fn join(&self, other: &Span) -> Span
+	pub fn join(&self, other: Span) -> Span
 	{
-		if self.location.is_none()
-			{ return other.clone(); }
-			
-		else if other.location.is_none()
-			{ return self.clone(); }
-			
-		assert!(self.file == other.file, "joining spans from different files");
+		match (self.location, other.location)
+		{
+			(_, None) => *self,
+			(None, _) => other,
+			(Some(self_loc), Some(other_loc)) =>
+			{
+				assert!(
+					self.file_handle == other.file_handle,
+					"joining spans from different files");
 
-		let location =
-		{
-			use std::cmp::{max, min};
-			let start = min(self.location.unwrap().0, other.location.unwrap().0);
-			let end   = max(self.location.unwrap().1, other.location.unwrap().1);
-			Some((start, end))
-		};
-		
-		Span
-		{
-			file: self.file.clone(),
-			location: location
+				let location = {
+					use std::cmp::{max, min};
+					let start = min(self_loc.0, other_loc.0);
+					let end   = max(self_loc.1, other_loc.1);
+					Some((start, end))
+				};
+				
+				Span {
+					file_handle: self.file_handle,
+					location,
+				}
+			}
 		}
 	}
 }
@@ -99,7 +107,7 @@ impl PartialEq for Span
 {
 	fn eq(&self, other: &Self) -> bool
 	{
-		self.file == other.file && self.location == other.location
+		self.file_handle == other.file_handle && self.location == other.location
 	}
 }
 
@@ -109,14 +117,14 @@ impl std::fmt::Debug for Span
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
         f.write_str("Span(")?;
-        f.write_str(&self.file)?;
+		write!(f, "file#{:?}", &self.file_handle)?;
 
 		if let Some(location) = self.location
 		{
 			f.write_str("[")?;
-			<usize as std::fmt::Debug>::fmt(&location.0, f)?;
+			<SpanIndex as std::fmt::Debug>::fmt(&location.0, f)?;
 			f.write_str("..")?;
-			<usize as std::fmt::Debug>::fmt(&location.1, f)?;
+			<SpanIndex as std::fmt::Debug>::fmt(&location.1, f)?;
 			f.write_str("]")?;
 		}
 

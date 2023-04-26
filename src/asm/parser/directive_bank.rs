@@ -20,7 +20,7 @@ pub fn parse(
 {
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
     let name = tk_name.excerpt.clone().unwrap();
-    let name_span = tk_name.span.clone();
+    let name_span = tk_name.span;
 
     walker.expect_linebreak(report)?;
 

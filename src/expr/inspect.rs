@@ -242,15 +242,15 @@ impl expr::Expr
 	}
 	
 	
-	pub fn returned_value_span(&self) -> &diagn::Span
+	pub fn returned_value_span(&self) -> diagn::Span
 	{
 		match self
 		{
-			&expr::Expr::Block(ref span, ref exprs) =>
+			&expr::Expr::Block(span, ref exprs) =>
 			{
 				match exprs.last()
 				{
-					None => &span,
+					None => span,
 					Some(expr) => expr.returned_value_span()
 				}
 			}

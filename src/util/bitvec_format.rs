@@ -416,7 +416,7 @@ impl util::BitVec
 		result.push_str("\n");
 		result.push_str("\n");
 		
-		let mut prev_filename = "";
+		let mut prev_file_handle = util::FileServerHandle::MAX;
         let mut prev_file_chars = Vec::new();
         
         for span in &sorted_spans
@@ -460,14 +460,14 @@ impl util::BitVec
                 contents_str.push(c);
             }
             
-            if &*span.span.file != prev_filename
+            if span.span.file_handle != prev_file_handle
             {
-                prev_filename = &*span.span.file;
+                prev_file_handle = span.span.file_handle;
                 prev_file_chars =
 					fileserver.get_chars(
 						&mut diagn::Report::new(),
 						None,
-						&prev_filename)
+						prev_file_handle)
 					.unwrap();
             }
             
@@ -501,7 +501,7 @@ impl util::BitVec
 				fileserver.get_chars(
 					&mut diagn::Report::new(),
 					None,
-					&span.span.file)
+					span.span.file_handle)
 				.unwrap();
 		
             let counter = util::CharCounter::new(&chars);
@@ -524,13 +524,13 @@ impl util::BitVec
 
                 result.push_str(
                     &format!("{}:{}:{}:{}:{}",
-                        &span.span.file,
+                        &span.span.file_handle,
                         line_start, col_start,
                         line_end, col_end));
             }
             else
             {
-                result.push_str(&format!("{}:-:-:-:-", &span.span.file));
+                result.push_str(&format!("{}:-:-:-:-", &span.span.file_handle));
             };
             
             result.push_str("\n");

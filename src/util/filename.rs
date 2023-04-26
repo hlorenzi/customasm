@@ -3,7 +3,7 @@ use crate::*;
 
 pub fn filename_validate(
 	report: &mut diagn::Report,
-	span: &diagn::Span,
+	span: diagn::Span,
 	filename: &str)
 	-> Result<(), ()>
 {
@@ -35,7 +35,7 @@ pub fn filename_validate(
 
 pub fn filename_navigate(
 	report: &mut diagn::Report,
-	span: &diagn::Span,
+	span: diagn::Span,
 	current: &str,
 	nav: &str)
 	-> Result<String, ()>

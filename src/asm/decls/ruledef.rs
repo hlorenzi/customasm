@@ -19,7 +19,7 @@ pub fn collect(
 
             let item_ref = decls.ruledefs.declare(
                 report,
-                &node.name_span,
+                node.name_span,
                 &util::SymbolContext::new_global(),
                 name,
                 0,

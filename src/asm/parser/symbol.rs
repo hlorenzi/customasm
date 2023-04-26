@@ -39,12 +39,12 @@ pub fn parse(
     while let Some(tk_dot) = walker.maybe_expect(syntax::TokenKind::Dot)
     {
         hierarchy_level += 1;
-        decl_span = decl_span.join(&tk_dot.span);
+        decl_span = decl_span.join(tk_dot.span);
     }
 
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
     let name = tk_name.excerpt.clone().unwrap();
-    decl_span = decl_span.join(&tk_name.span);
+    decl_span = decl_span.join(tk_name.span);
 
 
     if walker.maybe_expect(syntax::TokenKind::Equal).is_some()
@@ -66,7 +66,7 @@ pub fn parse(
     else
     {
         let tk_colon = walker.expect(report, syntax::TokenKind::Colon)?;
-        decl_span = decl_span.join(&tk_colon.span);
+        decl_span = decl_span.join(tk_colon.span);
         
         Ok(AstAny::Symbol(AstSymbol {
             decl_span,

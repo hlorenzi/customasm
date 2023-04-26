@@ -1,3 +1,6 @@
+use crate::*;
+
+
 pub struct CharCounter<'s>
 {
 	chars: &'s [char]
@@ -15,9 +18,13 @@ impl<'s> CharCounter<'s>
 	}
 	
 	
-	pub fn get_excerpt(&self, start: usize, end: usize) -> &[char]
+	pub fn get_excerpt(
+		&self,
+		start: diagn::SpanIndex,
+		end: diagn::SpanIndex)
+		-> &[char]
 	{
-		&self.chars[start..end]
+		&self.chars[(start as usize)..(end as usize)]
 	}
 	
 	
@@ -35,13 +42,16 @@ impl<'s> CharCounter<'s>
 	}
 	
 	
-	pub fn get_line_column_at_index(&self, index: usize) -> (usize, usize)
+	pub fn get_line_column_at_index(
+		&self,
+		index: diagn::SpanIndex)
+		-> (usize, usize)
 	{
 		let mut line = 0;
 		let mut column = 0;
 		
 		let mut i = 0;
-		while i < index && i < self.chars.len()
+		while i < index as usize && i < self.chars.len()
 		{
 			if self.chars[i] == '\n'
 			{
@@ -58,7 +68,10 @@ impl<'s> CharCounter<'s>
 	}
 	
 	
-	pub fn get_index_range_of_line(&self, line: usize) -> (usize, usize)
+	pub fn get_index_range_of_line(
+		&self,
+		line: usize)
+		-> (diagn::SpanIndex, diagn::SpanIndex)
 	{
 		let mut line_count = 0;
 		let mut line_begin = 0;
@@ -80,6 +93,9 @@ impl<'s> CharCounter<'s>
 				{ break; }
 		}
 		
-		(line_begin, line_end)
+		(
+			line_begin.try_into().unwrap(),
+			line_end.try_into().unwrap()
+		)
 	}
 }

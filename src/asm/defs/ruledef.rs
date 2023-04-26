@@ -137,7 +137,7 @@ pub fn resolve_rule(
     }
 
     Ok(Rule {
-        pattern_span: ast_rule.pattern_span.clone(),
+        pattern_span: ast_rule.pattern_span,
         pattern,
         exact_part_count: exact_parts,
         parameters,
@@ -172,11 +172,11 @@ pub fn resolve_rule_parameter(
             {
                 let item_ref = decls.ruledefs.get_by_name_global(
                     report,
-                    &ast_param.type_span,
+                    ast_param.type_span,
                     &ruledef_name)?;
 
                 decls.ruledefs.add_span_ref(
-                    ast_param.type_span.clone(),
+                    ast_param.type_span,
                     item_ref);
                 
                 RuleParameterType::RuledefRef(item_ref)
@@ -195,7 +195,7 @@ pub fn resolve_rule_parameter(
     {
         report.error_span(
             format!("duplicate parameter `{}`", name),
-            &ast_param.name_span);
+            ast_param.name_span);
         
         return Err(());
     }

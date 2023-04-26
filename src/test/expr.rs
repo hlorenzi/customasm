@@ -8,24 +8,19 @@ where S: Into<Vec<u8>>
 {
 	fn compile(
 		report: &mut diagn::Report,
-		fileserver: &dyn util::FileServer)
+		fileserver: &dyn util::FileServer,
+		file_handle: util::FileServerHandle)
 		-> Result<expr::Value, ()>
 	{
-		let chars = fileserver.get_chars(report, None, "test")?;
-		let tokens = syntax::tokenize(report, "test", &chars)?;
+		let chars = fileserver.get_chars(report, None, file_handle)?;
+		let tokens = syntax::tokenize(report, file_handle, &chars)?;
 		
 		let mut walker = syntax::TokenWalker::new(&tokens);
 		let expr = expr::parse(report, &mut walker)?;
-
-		let mut eval_provider = expr::EvalProvider {
-			eval_var: &mut expr::dummy_eval_var(),
-			eval_fn: &mut expr::dummy_eval_fn(),
-			eval_asm: &mut expr::dummy_eval_asm(),
-		};
 		
 		let expr_value = expr.eval(
 			report,
-			&mut eval_provider)?;
+			&mut expr::dummy_eval_query)?;
 		
 		Ok(expr_value)
 	}
@@ -34,14 +29,18 @@ where S: Into<Vec<u8>>
 	let mut report = diagn::Report::new();
 	let mut fileserver = util::FileServerMock::new();
 	fileserver.add("test", src);
+
+	use crate::util::FileServer;
+	let file_handle = fileserver.get_handle_unwrap("test");
 	
 	let result = compile(
 		&mut report,
-		&fileserver);
+		&fileserver,
+		file_handle);
 
 	expect_result(
 		&mut report,
-		&fileserver,
+		&mut fileserver,
 		result.ok(),
 		expected);
 }

@@ -4,7 +4,7 @@ use crate::*;
 pub fn resolve_data_element(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     ast_data: &asm::AstDirectiveData,
     elem_index: usize,
     decls: &asm::ItemDecls,

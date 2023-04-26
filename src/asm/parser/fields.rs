@@ -39,7 +39,7 @@ pub fn parse(
         {
             report.error_span(
                 format!("duplicate field `{}`", name),
-                &tk_name.span);
+                tk_name.span);
 
             return Err(());
         }
@@ -50,7 +50,7 @@ pub fn parse(
                 walker.maybe_expect(syntax::TokenKind::Equal).is_some()
             {
                 let expr = expr::parse(report, walker)?;
-                fields.span = fields.span.join(&expr.span());
+                fields.span = fields.span.join(expr.span());
                 Some(expr)
             }
             else
@@ -60,10 +60,10 @@ pub fn parse(
         };
 
 
-        fields.span = fields.span.join(&tk_name.span);
+        fields.span = fields.span.join(tk_name.span);
 
         fields.fields.push(AstField {
-            span: tk_name.span.clone(),
+            span: tk_name.span,
             name,
             maybe_expr,
         });
@@ -117,7 +117,7 @@ impl AstFields
             {
                 report.error_span(
                     format!("missing field `{}`", field_name),
-                    &self.span);
+                    self.span);
 
                 Err(())
             }
@@ -175,7 +175,7 @@ impl AstFields
         {
             report.error_span(
                 format!("invalid field `{}`", field.name),
-                &field.span);
+                field.span);
         }
 
         if self.fields.len() > 0

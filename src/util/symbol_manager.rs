@@ -158,7 +158,7 @@ impl<T> SymbolManager<T>
     pub fn get_by_name_global(
         &self,
         report: &mut diagn::Report,
-        span: &diagn::Span,
+        span: diagn::Span,
         name: &str)
         -> Result<util::ItemRef<T>, ()>
     {
@@ -199,7 +199,7 @@ impl<T> SymbolManager<T>
     pub fn get_by_name<S>(
         &self,
         report: &mut diagn::Report,
-        span: &diagn::Span,
+        span: diagn::Span,
         ctx: &SymbolContext,
         hierarchy_level: usize,
         hierarchy: &[S])
@@ -258,7 +258,7 @@ impl<T> SymbolManager<T>
     pub fn declare(
         &mut self,
         report: &mut diagn::Report,
-        span: &diagn::Span,
+        span: diagn::Span,
         ctx: &SymbolContext,
         name: String,
         hierarchy_level: usize,
@@ -270,7 +270,7 @@ impl<T> SymbolManager<T>
         {
             report.error_span(
                 "symbol declaration skips a nesting level",
-                &span);
+                span);
             
             return Err(());
         }
@@ -291,7 +291,7 @@ impl<T> SymbolManager<T>
 
             report.note_span(
                 "first declared here",
-                &self.get(*duplicate_ref).span);
+                self.get(*duplicate_ref).span);
 
             report.pop_parent();
 
@@ -345,7 +345,7 @@ impl<T> SymbolManager<T>
         };
 
         self.decls.push(SymbolDecl {
-            span: span.clone(),
+            span: span,
             name: full_name.clone(),
             kind,
             depth: hierarchy_level,
@@ -355,7 +355,7 @@ impl<T> SymbolManager<T>
         });
 
         self.span_refs.insert(
-            span.clone(),
+            span,
             item_ref);
 
 

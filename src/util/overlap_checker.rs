@@ -43,11 +43,11 @@ impl OverlapChecker
         {
             report.push_parent(
                 "output overlap",
-                &span);
+                span);
 
             report.note_span(
                 "overlaps with:",
-                &overlapping_entry.span);
+                overlapping_entry.span);
 
             report.pop_parent();
 

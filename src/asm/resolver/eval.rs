@@ -3,7 +3,7 @@ use crate::*;
 
 pub fn eval(
     report: &mut diagn::Report,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
@@ -11,84 +11,33 @@ pub fn eval(
     expr: &expr::Expr)
     -> Result<expr::Value, ()>
 {
-    let mut eval_var = |info: &mut expr::EvalVariableInfo|
+    let mut provider = |query: expr::EvalQuery|
     {
-        if info.hierarchy_level == 0
+        match query
         {
-            let maybe_builtin = eval_builtin_symbol(
-                decls,
-                defs,
-                ctx,
-                info,
-                info.hierarchy[0].as_ref())?;
-
-            if let Some(builtin) = maybe_builtin
-            {
-                return Ok(builtin);
-            }
-        }
-
-        let symbol_ref = decls.symbols.get_by_name(
-            info.report,
-            info.span,
-            ctx.symbol_ctx,
-            info.hierarchy_level,
-            info.hierarchy)?;
-
-        let symbol = defs.symbols.get(symbol_ref);
-
-        let value = {
-            match symbol.value.clone()
-            {
-                value @ expr::Value::Unknown =>
-                {
-                    if !ctx.can_guess()
-                    {
-                        info.report.error_span(
-                            format!(
-                                "unresolved symbol `{}`",
-                                decls.symbols.get_displayable_name(
-                                    info.hierarchy_level,
-                                    info.hierarchy)),
-                            info.span);
+            expr::EvalQuery::Variable(query_var) =>
+                asm::resolver::eval_variable(
+                    decls,
+                    defs,
+                    ctx,
+                    query_var),
+                    
+            expr::EvalQuery::Function(query_fn) =>
+                asm::resolver::eval_fn(
+                    fileserver,
+                    decls,
+                    defs,
+                    ctx,
+                    query_fn),
                 
-                        return Err(());
-                    }
-
-                    value
-                }
-
-                value => value,
-            }
-        };
-
-        Ok(value)
-    };
-
-    let mut eval_fn = |info: &mut expr::EvalFunctionInfo|
-    {
-        asm::resolver::eval_fn(
-            fileserver,
-            decls,
-            defs,
-            ctx,
-            info)
-    };
-
-    let mut eval_asm = |info: &mut expr::EvalAsmInfo|
-    {
-        asm::resolver::eval_asm(
-            fileserver,
-            decls,
-            defs,
-            ctx,
-            info)
-    };
-
-    let mut provider = expr::EvalProvider {
-        eval_var: &mut eval_var,
-        eval_fn: &mut eval_fn,
-        eval_asm: &mut eval_asm,
+            expr::EvalQuery::AsmBlock(query_asm) =>
+                asm::resolver::eval_asm(
+                    fileserver,
+                    decls,
+                    defs,
+                    ctx,
+                    query_asm),
+        }
     };
 
     expr.eval_with_ctx(
@@ -105,61 +54,22 @@ pub fn eval_simple(
     expr: &expr::Expr)
     -> Result<expr::Value, ()>
 {
-    let mut eval_var = |info: &mut expr::EvalVariableInfo|
+    let mut provider = |query: expr::EvalQuery|
     {
-        if info.hierarchy_level == 0
+        match query
         {
-            match info.hierarchy[0].as_ref()
-            {
-                "$" | "pc" =>
-                {
-                    info.report.error_span(
-                        "cannot get address in this context",
-                        info.span);
-            
-                    return Err(());
-                }
-
-                _ => {}
-            }
+            expr::EvalQuery::Variable(query_var) =>
+                asm::resolver::eval_variable_simple(
+                    decls,
+                    defs,
+                    query_var),
+                    
+            expr::EvalQuery::Function(query_fn) =>
+                expr::dummy_eval_fn(query_fn),
+                
+            expr::EvalQuery::AsmBlock(query_asm) =>
+                expr::dummy_eval_asm(query_asm),
         }
-
-        let symbol_ref = decls.symbols.get_by_name(
-            info.report,
-            info.span,
-            &util::SymbolContext::new_global(),
-            info.hierarchy_level,
-            info.hierarchy)?;
-
-        let symbol = defs.symbols.get(symbol_ref);
-
-        let value = {
-            match symbol.value.clone()
-            {
-                expr::Value::Unknown =>
-                {
-                    info.report.error_span(
-                        format!(
-                            "unresolved symbol `{}`",
-                            decls.symbols.get_displayable_name(
-                                info.hierarchy_level,
-                                info.hierarchy)),
-                        info.span);
-            
-                    return Err(());
-                }
-
-                value => value,
-            }
-        };
-
-        Ok(value)
-    };
-
-    let mut provider = expr::EvalProvider {
-        eval_var: &mut eval_var,
-        eval_fn: &mut expr::dummy_eval_fn(),
-        eval_asm: &mut expr::dummy_eval_asm(),
     };
 
     let result = expr.eval_with_ctx(
@@ -173,7 +83,7 @@ pub fn eval_simple(
         {
             report.error_span(
                 "cannot resolve expression",
-                &expr.span());
+                expr.span());
     
             Err(())
         }
@@ -189,11 +99,127 @@ pub fn eval_simple(
 }
 
 
+pub fn eval_variable(
+    decls: &asm::ItemDecls,
+    defs: &asm::ItemDefs,
+    ctx: &asm::ResolverContext,
+    query: &mut expr::EvalVariableQuery)
+    -> Result<expr::Value, ()>
+{
+    if query.hierarchy_level == 0
+    {
+        let maybe_builtin = eval_builtin_symbol(
+            decls,
+            defs,
+            ctx,
+            query,
+            query.hierarchy[0].as_ref())?;
+
+        if let Some(builtin) = maybe_builtin
+        {
+            return Ok(builtin);
+        }
+    }
+
+    let symbol_ref = decls.symbols.get_by_name(
+        query.report,
+        query.span,
+        ctx.symbol_ctx,
+        query.hierarchy_level,
+        query.hierarchy)?;
+
+    let symbol = defs.symbols.get(symbol_ref);
+
+    let value = {
+        match symbol.value.clone()
+        {
+            value @ expr::Value::Unknown =>
+            {
+                if !ctx.can_guess()
+                {
+                    query.report.error_span(
+                        format!(
+                            "unresolved symbol `{}`",
+                            decls.symbols.get_displayable_name(
+                                query.hierarchy_level,
+                                query.hierarchy)),
+                        query.span);
+            
+                    return Err(());
+                }
+
+                value
+            }
+
+            value => value,
+        }
+    };
+
+    Ok(value)
+}
+
+
+pub fn eval_variable_simple(
+    decls: &asm::ItemDecls,
+    defs: &asm::ItemDefs,
+    query: &mut expr::EvalVariableQuery)
+    -> Result<expr::Value, ()>
+{
+    if query.hierarchy_level == 0
+    {
+        match query.hierarchy[0].as_ref()
+        {
+            "$" | "pc" =>
+            {
+                query.report.error_span(
+                    "cannot get address in this context",
+                    query.span);
+        
+                return Err(());
+            }
+
+            _ => {}
+        }
+    }
+
+    let symbol_ref = decls.symbols.get_by_name(
+        query.report,
+        query.span,
+        &util::SymbolContext::new_global(),
+        query.hierarchy_level,
+        query.hierarchy)?;
+
+    let symbol = defs.symbols.get(symbol_ref);
+
+    let value = {
+        match symbol.value.clone()
+        {
+            expr::Value::Unknown =>
+            {
+                query.report.error_span(
+                    format!(
+                        "unresolved symbol `{}`",
+                        decls.symbols.get_displayable_name(
+                            query.hierarchy_level,
+                            query.hierarchy)),
+                    query.span);
+        
+                return Err(());
+            }
+
+            value => value,
+        }
+    };
+
+    Ok(value)
+}
+
+
 fn eval_builtin_symbol(
     _decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    info: &mut expr::EvalVariableInfo,
+    query: &mut expr::EvalVariableQuery,
     name: &str)
     -> Result<Option<expr::Value>, ()>
 {
@@ -202,8 +228,8 @@ fn eval_builtin_symbol(
         "$" | "pc" =>
         {
             Ok(Some(expr::Value::Integer(ctx.eval_address(
-                info.report,
-                info.span,
+                query.report,
+                query.span,
                 defs,
                 ctx.can_guess())?)))
         }

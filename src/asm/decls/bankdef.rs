@@ -9,7 +9,7 @@ pub fn collect(
 {
     let initial_item_ref = decls.bankdefs.declare(
         report,
-        &diagn::Span::new_dummy(),
+        diagn::Span::new_dummy(),
         &util::SymbolContext::new_global(),
         "#global_bankdef".to_string(),
         0,
@@ -24,7 +24,7 @@ pub fn collect(
         {
             let item_ref = decls.bankdefs.declare(
                 report,
-                &node.name_span,
+                node.name_span,
                 &util::SymbolContext::new_global(),
                 node.name.clone(),
                 0,

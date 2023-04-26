@@ -4,7 +4,7 @@ use crate::*;
 pub fn resolve_align(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     ast_align: &asm::AstDirectiveAlign,
     decls: &asm::ItemDecls,
     defs: &mut asm::ItemDefs,
@@ -24,7 +24,7 @@ pub fn resolve_align(
 
     let value = value.expect_error_or_usize(
         report,
-        &ast_align.expr.span())?;
+        ast_align.expr.span())?;
 
     let value = {
         match value
@@ -48,7 +48,7 @@ pub fn resolve_align(
         {
             report.error_span(
                 "alignment size did not converge",
-                &ast_align.expr.span());
+                ast_align.expr.span());
         }
 
         if opts.debug_iterations
@@ -66,7 +66,7 @@ pub fn resolve_align(
         {
             report.error_span(
                 "invalid alignment size",
-                &ast_align.expr.span());
+                ast_align.expr.span());
 
             return Err(());
         }

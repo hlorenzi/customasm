@@ -48,7 +48,7 @@ pub fn extract_expectations(
                 let value =
                     syntax::excerpt_as_bigint(
                         &mut diagn::Report::new(),
-                        &diagn::Span::new_dummy(),
+                        diagn::Span::new_dummy(),
                         value_str)
                     .unwrap();
                 
@@ -193,7 +193,7 @@ pub fn test_file(filepath: &str)
     let mut has_msg_mismatch = false;
     for msg in &expectations.messages
     {
-        if !report.has_message_at(&fileserver, &msg.file, msg.kind, msg.line, &msg.excerpt)
+        if !report.has_message_at(&mut fileserver, &msg.file, msg.kind, msg.line, &msg.excerpt)
         {
             println!("\n\
                 > test failed -- missing diagnostics message\n\

@@ -17,7 +17,7 @@ pub enum ExpectedResult<T>
 
 pub fn expect_result<T>(
 	report: &mut diagn::Report,
-	fileserver: &dyn util::FileServer,
+	fileserver: &mut dyn util::FileServer,
 	got: Option<T>,
 	expected: ExpectedResult<T>)
 	where T: std::fmt::Debug + PartialEq

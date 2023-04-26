@@ -22,7 +22,7 @@ impl<'tokens> TokenWalker<'tokens>
 		let dummy_span = {
 			if let Some(tk_last) = tokens.last()
 			{
-				tk_last.span.clone()
+				tk_last.span
 			}
 			else
 			{
@@ -73,7 +73,7 @@ impl<'tokens> TokenWalker<'tokens>
 		}
 		else
 		{
-			self.tokens[0].span.join(&self.tokens.last().unwrap().span)
+			self.tokens[0].span.join(self.tokens.last().unwrap().span)
 		}
 	}
 
@@ -132,12 +132,12 @@ impl<'tokens> TokenWalker<'tokens>
 			return diagn::Span::new_dummy();
 		}
 
-		let mut span = self.tokens[self.index].span.clone();
+		let mut span = self.tokens[self.index].span;
 
 		let mut i = 1;
 		while i <= count && self.index + i < self.tokens.len()
 		{
-			span = span.join(&self.tokens[self.index + i].span);
+			span = span.join(self.tokens[self.index + i].span);
 			i += 1;
 		}
 
@@ -469,7 +469,7 @@ impl<'tokens> TokenWalker<'tokens>
 			{
 				let descr = format!("expected {}", kind.printable());
 				let span = self.tokens[self.index_prev].span.after();
-				report.error_span(descr, &span);
+				report.error_span(descr, span);
 				Err(())
 			}
 		}
@@ -490,7 +490,7 @@ impl<'tokens> TokenWalker<'tokens>
 			{
 				report.error_span(
 					descr,
-					&self.tokens[self.index_prev].span.after());
+					self.tokens[self.index_prev].span.after());
 				
 				Err(())
 			}
@@ -606,7 +606,7 @@ impl<'tokens> TokenWalker<'tokens>
 		{
 			report.error_span(
 				"expected line break",
-				&self.tokens[self.index_prev].span.after());
+				self.tokens[self.index_prev].span.after());
 			
 			Err(())
 		}
@@ -631,7 +631,7 @@ impl<'tokens> TokenWalker<'tokens>
 		{
 			report.error_span(
 				"expected line break",
-				&self.tokens[self.index_prev].span.after());
+				self.tokens[self.index_prev].span.after());
 			
 			Err(())
 		}
@@ -647,7 +647,7 @@ impl<'tokens> TokenWalker<'tokens>
 
 		let value = syntax::excerpt_as_usize(
 			report,
-			&tk.span,
+			tk.span,
 			&tk.excerpt.as_ref().unwrap())?;
 		
 		Ok((tk, value))

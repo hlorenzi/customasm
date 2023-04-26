@@ -43,11 +43,7 @@ pub fn define(
         {
             let item_ref = node.item_ref.unwrap();
 
-            let mut provider = expr::EvalProvider {
-                eval_var: &mut expr::dummy_eval_var(),
-                eval_fn: &mut expr::dummy_eval_fn(),
-                eval_asm: &mut expr::dummy_eval_asm(),
-            };
+            let mut provider = expr::dummy_eval_query;
             
             let addr_unit = match &node.addr_unit
             {
@@ -106,7 +102,7 @@ pub fn define(
                     {
                         report.error_span(
                             "both `addr_end` and `size` defined",
-                            &node.header_span);
+                            node.header_span);
 
                         return Err(());
                     }

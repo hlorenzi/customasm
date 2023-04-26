@@ -57,13 +57,13 @@ pub fn check_bank_overlap(
                         "output of bank `{}` overlaps with bank `{}`",
                         decl1.name,
                         decl2.name),
-                    &decl1.span);
+                    decl1.span);
 
                 report.note_span(
                     format!(
                         "bank `{}` defined here",
                         decl2.name),
-                    &decl2.span);
+                    decl2.span);
                     
                 return Err(());
             }
@@ -105,13 +105,13 @@ pub fn build_output(
             {
                 check_bank_usage(
                     report,
-                    &ast_symbol.decl_span,
+                    ast_symbol.decl_span,
                     defs,
                     &ctx)?;
 
                 check_bank_output(
                     report,
-                    &ast_symbol.decl_span,
+                    ast_symbol.decl_span,
                     decls,
                     defs,
                     &ctx,
@@ -124,7 +124,7 @@ pub fn build_output(
                     maybe_pos,
                     0,
                     symbol.value.unwrap_bigint().clone(),
-                    ast_symbol.decl_span.clone());
+                    ast_symbol.decl_span);
             }
         }
         
@@ -134,13 +134,13 @@ pub fn build_output(
 
             check_bank_usage(
                 report,
-                &ast_instr.span,
+                ast_instr.span,
                 defs,
                 &ctx)?;
 
             check_bank_output(
                 report,
-                &ast_instr.span,
+                ast_instr.span,
                 decls,
                 defs,
                 &ctx,
@@ -152,12 +152,12 @@ pub fn build_output(
 
             overlap_checker.check_and_insert(
                 report,
-				ast_instr.span.clone(),
+				ast_instr.span,
                 pos,
                 instr.encoding.size.unwrap())?;
 
 			output.write_bigint_with_span(
-				ast_instr.span.clone(),
+				ast_instr.span,
                 pos,
 				addr,
                 &instr.encoding);
@@ -188,12 +188,12 @@ pub fn build_output(
 
             overlap_checker.check_and_insert(
                 report,
-                ast_data.elems[elem_index].span().clone(),
+                ast_data.elems[elem_index].span(),
                 pos,
                 elem.encoding.size.unwrap())?;
 
             output.write_bigint_with_span(
-                ast_data.elems[elem_index].span().clone(),
+                ast_data.elems[elem_index].span(),
                 pos,
                 addr,
                 &elem.encoding);
@@ -206,13 +206,13 @@ pub fn build_output(
 
             check_bank_usage(
                 report,
-                &ast_res.header_span,
+                ast_res.header_span,
                 defs,
                 &ctx)?;
 
             check_bank_output(
                 report,
-                &ast_res.header_span,
+                ast_res.header_span,
                 decls,
                 defs,
                 &ctx,
@@ -223,7 +223,7 @@ pub fn build_output(
             {
                 overlap_checker.check_and_insert(
                     report,
-                    ast_res.header_span.clone(),
+                    ast_res.header_span,
                     pos,
                     res.reserve_size)?;
             }
@@ -261,7 +261,7 @@ fn fill_banks(
 
 fn check_bank_usage(
     report: &mut diagn::Report,
-    span: &diagn::Span,
+    span: diagn::Span,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext)
     -> Result<(), ()>
@@ -286,7 +286,7 @@ fn check_bank_usage(
 
 fn check_bank_output(
     report: &mut diagn::Report,
-    span: &diagn::Span,
+    span: diagn::Span,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
@@ -310,7 +310,7 @@ fn check_bank_output(
 
             report.note_span(
                 "bank defined here:",
-                &bankdef_decl.span);
+                bankdef_decl.span);
     
             report.pop_parent();
     
@@ -328,7 +328,7 @@ fn check_bank_output(
 
         report.note_span(
             "no `outp` defined for bank",
-            &bankdef_decl.span);
+            bankdef_decl.span);
 
         report.pop_parent();
 

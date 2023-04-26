@@ -16,7 +16,7 @@ pub fn resolve_label(
     {
         let value = ctx.eval_address(
             report,
-            &ast_symbol.decl_span,
+            ast_symbol.decl_span,
             defs,
             ctx.can_guess())?;
         
@@ -34,7 +34,7 @@ pub fn resolve_label(
             {
                 report.error_span(
                     "label address did not converge",
-                    &ast_symbol.decl_span);
+                    ast_symbol.decl_span);
             }
             
             if opts.debug_iterations

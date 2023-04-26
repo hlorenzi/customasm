@@ -4,7 +4,7 @@ use crate::*;
 pub fn resolve_instruction(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     ast_instr: &asm::AstInstruction,
     decls: &asm::ItemDecls,
     defs: &mut asm::ItemDefs,
@@ -25,7 +25,7 @@ pub fn resolve_instruction(
         
     let maybe_encodings = resolve_encoding(
         report,
-        &ast_instr.span,
+        ast_instr.span,
         fileserver,
         &mut matches,
         decls,
@@ -89,7 +89,7 @@ pub fn resolve_instruction(
         {
             report.error_span(
                 "instruction encoding did not converge",
-                &ast_instr.span);
+                ast_instr.span);
         }
         
         if opts.debug_iterations
@@ -112,8 +112,8 @@ pub fn resolve_instruction(
 
 pub fn resolve_encoding<'encoding>(
     report: &mut diagn::Report,
-    instr_span: &diagn::Span,
-    fileserver: &dyn util::FileServer,
+    instr_span: diagn::Span,
+    fileserver: &mut dyn util::FileServer,
     matches: &'encoding mut asm::InstructionMatches,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -230,7 +230,7 @@ pub fn resolve_encoding<'encoding>(
 
 fn resolve_instruction_matches(
     report: &mut diagn::Report,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     matches: &mut asm::InstructionMatches,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -255,7 +255,7 @@ fn resolve_instruction_matches(
 
         let value_definite = value.expect_error_or_sized_bigint(
             report,
-            &rule.expr.returned_value_span())?;
+            rule.expr.returned_value_span())?;
 
 
         if let expr::Value::Integer(bigint) = value_definite
@@ -300,7 +300,7 @@ fn build_recursive_candidate_note(
                     "match on `{}`, rule {}:",
                     ruledef_name,
                     instr_match.rule_ref.0),
-                &rule.pattern_span)
+                rule.pattern_span)
         }
         else
         {
@@ -309,7 +309,7 @@ fn build_recursive_candidate_note(
                     "nested match on `{}`, rule {}:",
                     ruledef_name,
                     instr_match.rule_ref.0),
-                &rule.pattern_span)
+                rule.pattern_span)
         }
     };
 
@@ -332,7 +332,7 @@ fn build_recursive_candidate_note(
 fn resolve_instruction_match(
     report: &mut diagn::Report,
     mtch: &asm::InstructionMatch,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
@@ -348,7 +348,7 @@ fn resolve_instruction_match(
             "within `{}`, rule {}",
             ruledef_name,
             mtch.rule_ref.0),
-        &rule.pattern_span);
+        rule.pattern_span);
 
     let maybe_value = resolve_instruction_match_inner(
         report,
@@ -368,7 +368,7 @@ fn resolve_instruction_match(
 fn resolve_instruction_match_inner(
     report: &mut diagn::Report,
     mtch: &asm::InstructionMatch,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
@@ -405,7 +405,7 @@ fn resolve_instruction_match_inner(
 
                 let constrained_arg_value = check_and_constrain_argument(
                     report,
-                    &expr.span(),
+                    expr.span(),
                     arg_value,
                     param.typ)?;
 
@@ -443,7 +443,7 @@ fn resolve_instruction_match_inner(
     }
 
     let mut rule_ctx = (*ctx).clone();
-    rule_ctx.filename_ctx = Some(&rule.expr.span().file);
+    rule_ctx.file_handle_ctx = Some(rule.expr.span().file_handle);
 
     asm::resolver::eval(
         report,
@@ -458,7 +458,7 @@ fn resolve_instruction_match_inner(
 
 pub fn check_and_constrain_argument(
     report: &mut diagn::Report,
-    span: &diagn::Span,
+    span: diagn::Span,
     value: expr::Value,
     typ: asm::RuleParameterType)
     -> Result<expr::Value, ()>
@@ -517,7 +517,7 @@ pub fn check_and_constrain_argument(
 
 fn check_and_constrain_value_for_integer_type(
     report: &mut diagn::Report,
-    span: &diagn::Span,
+    span: diagn::Span,
     size: usize,
     typename_prefix: &'static str,
     mut bigint: util::BigInt,

@@ -26,7 +26,7 @@ pub fn collect(
 
             let item_ref = decls.symbols.declare(
                 report,
-                &node.decl_span,
+                node.decl_span,
                 &symbol_ctx,
                 node.name.clone(),
                 node.hierarchy_level,

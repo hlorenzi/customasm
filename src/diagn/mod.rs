@@ -1,6 +1,7 @@
 mod span;
 pub use self::span::{
     Span,
+    SpanIndex,
 };
 
 mod report;

@@ -3,7 +3,7 @@ use crate::*;
 
 pub fn excerpt_as_string_contents(
 	report: &mut diagn::Report,
-	span: &diagn::Span,
+	span: diagn::Span,
 	excerpt: &str)
 	-> Result<String, ()>
 {
@@ -106,7 +106,7 @@ pub fn excerpt_as_string_contents(
 
 pub fn excerpt_as_usize(
 	report: &mut diagn::Report,
-	span: &diagn::Span,
+	span: diagn::Span,
 	excerpt: &str)
 	-> Result<usize, ()>
 {
@@ -170,7 +170,7 @@ pub fn excerpt_as_usize(
 
 pub fn excerpt_as_bigint(
 	report: &mut diagn::Report,
-	span: &diagn::Span,
+	span: diagn::Span,
 	excerpt: &str)
 	-> Result<util::BigInt, ()>
 {

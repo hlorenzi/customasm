@@ -8,7 +8,7 @@ pub fn parse(
 {
     let tk_hash = walker.expect(report, syntax::TokenKind::Hash)?;
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
-    let header_span = tk_hash.span.join(&tk_name.span);
+    let header_span = tk_hash.span.join(tk_name.span);
 
     let name = tk_name.excerpt.as_ref().unwrap().to_ascii_lowercase();
 
@@ -79,7 +79,7 @@ pub fn parse(
         {
             report.error_span(
                 format!("unknown directive `{}`", name),
-                &header_span);
+                header_span);
             
             Err(())
         }

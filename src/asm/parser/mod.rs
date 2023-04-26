@@ -122,7 +122,7 @@ pub struct AstTopLevel
 
 pub fn parse_many_and_resolve_includes<S>(
     report: &mut diagn::Report,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     root_filenames: &[S])
     -> Result<AstTopLevel, ()>
     where S: std::borrow::Borrow<str>
@@ -151,7 +151,7 @@ pub fn parse_many_and_resolve_includes<S>(
 
 pub fn parse_and_resolve_includes<S>(
     report: &mut diagn::Report,
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     root_filename: S,
     seen_filenames: &mut Vec<String>,
     once_filenames: &mut std::collections::HashSet<String>)
@@ -165,14 +165,19 @@ pub fn parse_and_resolve_includes<S>(
         });
     }
 
-    let chars = fileserver.get_chars(
+    let file_handle = fileserver.get_handle(
         report,
         None,
         root_filename.borrow())?;
 
+    let chars = fileserver.get_chars(
+        report,
+        None,
+        file_handle)?;
+
     let tokens = syntax::tokenize(
         report,
-        root_filename.borrow(),
+        file_handle,
         &chars)?;
 
     let mut root_ast = parse(report, &tokens)?;
@@ -191,7 +196,7 @@ pub fn parse_and_resolve_includes<S>(
         {
             let included_filename = util::filename_navigate(
                 report,
-                &dir_include.filename_span,
+                dir_include.filename_span,
                 root_filename.borrow(),
                 &dir_include.filename)?;
 
@@ -200,7 +205,7 @@ pub fn parse_and_resolve_includes<S>(
             {
                 report.error_span(
                     "recursive file inclusion",
-                    &dir_include.filename_span);
+                    dir_include.filename_span);
 
                 return Err(());
             }
@@ -300,25 +305,25 @@ fn parse_line(
 
 impl AstAny
 {
-    pub fn span(&self) -> &diagn::Span
+    pub fn span(&self) -> diagn::Span
     {
         match self
         {
-            AstAny::DirectiveAddr(node) => &node.header_span,
-            AstAny::DirectiveAlign(node) => &node.header_span,
-            AstAny::DirectiveBank(node) => &node.header_span,
-            AstAny::DirectiveBankdef(node) => &node.header_span,
-            AstAny::DirectiveBits(node) => &node.header_span,
-            AstAny::DirectiveData(node) => &node.header_span,
-            AstAny::DirectiveFn(node) => &node.header_span,
-            AstAny::DirectiveInclude(node) => &node.header_span,
-            AstAny::DirectiveLabelAlign(node) => &node.header_span,
-            AstAny::DirectiveNoEmit(node) => &node.header_span,
-            AstAny::DirectiveOnce(node) => &node.header_span,
-            AstAny::DirectiveRes(node) => &node.header_span,
-            AstAny::DirectiveRuledef(node) => &node.header_span,
-            AstAny::Instruction(node) => &node.span,
-            AstAny::Symbol(node) => &node.decl_span,
+            AstAny::DirectiveAddr(node) => node.header_span,
+            AstAny::DirectiveAlign(node) => node.header_span,
+            AstAny::DirectiveBank(node) => node.header_span,
+            AstAny::DirectiveBankdef(node) => node.header_span,
+            AstAny::DirectiveBits(node) => node.header_span,
+            AstAny::DirectiveData(node) => node.header_span,
+            AstAny::DirectiveFn(node) => node.header_span,
+            AstAny::DirectiveInclude(node) => node.header_span,
+            AstAny::DirectiveLabelAlign(node) => node.header_span,
+            AstAny::DirectiveNoEmit(node) => node.header_span,
+            AstAny::DirectiveOnce(node) => node.header_span,
+            AstAny::DirectiveRes(node) => node.header_span,
+            AstAny::DirectiveRuledef(node) => node.header_span,
+            AstAny::Instruction(node) => node.span,
+            AstAny::Symbol(node) => node.decl_span,
         }
     }
 }

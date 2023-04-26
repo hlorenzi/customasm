@@ -1,27 +1,57 @@
 use crate::*;
 
 
+pub type FileServerHandle = u16;
+
+
 pub trait FileServer
 {
+	fn get_handle(
+		&mut self,
+		report: &mut diagn::Report,
+		span: Option<diagn::Span>,
+		filename: &str)
+		-> Result<FileServerHandle, ()>;
+
+
+	fn get_handle_unwrap(
+		&mut self,
+		filename: &str)
+		-> FileServerHandle
+	{
+		self.get_handle(
+				&mut diagn::Report::new(),
+				None,
+				filename)
+			.unwrap()
+	}
+
+
+	fn get_filename(
+		&self,
+		file_handle: FileServerHandle)
+		-> &str;
+
+	
 	fn get_bytes(
 		&self,
 		report: &mut diagn::Report,
-		span: Option<&diagn::Span>,
-		filename: &str)
+		span: Option<diagn::Span>,
+		file_handle: FileServerHandle)
 		-> Result<Vec<u8>, ()>;
 	
 	
 	fn get_chars(
 		&self,
 		report: &mut diagn::Report,
-		span: Option<&diagn::Span>,
-		filename: &str)
+		span: Option<diagn::Span>,
+		file_handle: FileServerHandle)
 		-> Result<Vec<char>, ()>
 	{
 		let bytes = self.get_bytes(
 			report,
 			span,
-			filename)?;
+			file_handle)?;
 
 		let string = String::from_utf8_lossy(&bytes)
 			.chars()
@@ -34,7 +64,7 @@ pub trait FileServer
 	fn write_bytes(
 		&mut self,
 		report: &mut diagn::Report,
-		span: Option<&diagn::Span>,
+		span: Option<diagn::Span>,
 		filename: &str,
 		data: &Vec<u8>)
 		-> Result<(), ()>;
@@ -42,13 +72,13 @@ pub trait FileServer
 	
 	fn get_excerpt(
 		&self,
-		span: &diagn::Span)
+		span: diagn::Span)
 		-> String
 	{
 		if let Ok(chars) = self.get_chars(
 			&mut diagn::Report::new(),
 			None,
-			&*span.file)
+			span.file_handle)
 		{
 			let counter = util::CharCounter::new(&chars);
 			let location = span.location.unwrap();
@@ -64,28 +94,53 @@ pub trait FileServer
 
 pub struct FileServerMock
 {
-	files: std::collections::HashMap<String, Vec<u8>>
+	handles: std::collections::HashMap<String, FileServerHandle>,
+	handles_to_filename: Vec<String>,
+	files: Vec<Vec<u8>>,
 }
 
 
-pub struct FileServerReal;
+pub struct FileServerReal
+{
+	handles: std::collections::HashMap<String, FileServerHandle>,
+	handles_to_filename: Vec<String>,
+}
 
 
 impl FileServerMock
 {
 	pub fn new() -> FileServerMock
 	{
-		FileServerMock
-		{
-			files: std::collections::HashMap::new()
+		FileServerMock {
+			handles: std::collections::HashMap::new(),
+			handles_to_filename: Vec::new(),
+			files: Vec::new(),
 		}
 	}
 	
 	
-	pub fn add<S, T>(&mut self, filename: S, contents: T)
-	where S: Into<String>, T: Into<Vec<u8>>
+	pub fn add<S, T>(
+		&mut self,
+		filename: S,
+		contents: T)
+		where S: Into<String>, T: Into<Vec<u8>>
 	{
-		self.files.insert(filename.into(), contents.into());
+		let filename = filename.into();
+
+		let next_index = self.handles.len();
+
+		let handle = *self.handles
+			.entry(filename.clone())
+			.or_insert(next_index.try_into().unwrap());
+
+		while handle as usize >= self.files.len()
+		{
+			self.handles_to_filename.push("".to_string());
+			self.files.push(Vec::new());
+		}
+
+		self.handles_to_filename[handle as usize] = filename;
+		self.files[handle as usize] = contents.into();
 	}
 }
 
@@ -94,48 +149,92 @@ impl FileServerReal
 {
 	pub fn new() -> FileServerReal
 	{
-		FileServerReal
+		FileServerReal {
+			handles: std::collections::HashMap::new(),
+			handles_to_filename: Vec::new(),
+		}
 	}
 }
 
 
 impl FileServer for FileServerMock
 {
+	fn get_handle(
+		&mut self,
+		report: &mut diagn::Report,
+		span: Option<diagn::Span>,
+		filename: &str)
+		-> Result<FileServerHandle, ()>
+	{
+		if self.handles.len() == FileServerHandle::MAX as usize
+		{
+			report_error(
+				report,
+				span,
+				"exhausted number of file handles");
+
+			return Err(());
+		}
+
+		if !self.handles.contains_key(filename)
+		{
+			report_error(
+				report,
+				span,
+				format!(
+					"file not found: `{}`",
+					filename));
+
+			return Err(());
+		}
+
+		let handle = self.handles.get(filename).unwrap();
+
+		Ok(*handle)
+	}
+
+
+	fn get_filename(
+		&self,
+		file_handle: FileServerHandle)
+		-> &str
+	{
+		&self.handles_to_filename[file_handle as usize]
+	}
+
+
 	fn get_bytes(
 		&self,
-		report: &mut diagn::Report,
-		span: Option<&diagn::Span>,
-		filename: &str)
+		_report: &mut diagn::Report,
+		_span: Option<diagn::Span>,
+		file_handle: FileServerHandle)
 		-> Result<Vec<u8>, ()>
 	{
-		match self.files.get(filename)
-		{
-			Some(bytes) => Ok(bytes.clone()),
-
-			None =>
-			{
-				report_error(
-					report,
-					span,
-					format!(
-						"file not found: `{}`",
-						filename));
-
-				return Err(());
-			}
-		}
+		Ok(self.files[file_handle as usize].clone())
 	}
 	
 	
 	fn write_bytes(
 		&mut self,
 		_report: &mut diagn::Report,
-		_span: Option<&diagn::Span>,
+		_span: Option<diagn::Span>,
 		filename: &str,
 		data: &Vec<u8>)
 		-> Result<(), ()>
 	{
-		self.files.insert(filename.to_string(), data.clone());
+		let new_index = self.handles.len();
+
+		let handle = *self.handles
+			.entry(filename.into())
+			.or_insert(new_index.try_into().unwrap());
+
+		while handle as usize >= self.files.len()
+		{
+			self.files.push(Vec::new());
+		}
+
+		self.files[handle as usize] = data.clone();
+		
 		Ok(())
 	}
 }
@@ -143,12 +242,12 @@ impl FileServer for FileServerMock
 
 impl FileServer for FileServerReal
 {
-	fn get_bytes(
-		&self,
+	fn get_handle(
+		&mut self,
 		report: &mut diagn::Report,
-		span: Option<&diagn::Span>,
+		span: Option<diagn::Span>,
 		filename: &str)
-		-> Result<Vec<u8>, ()>
+		-> Result<FileServerHandle, ()>
 	{
 		let filename_path = &std::path::Path::new(filename);
 		
@@ -163,6 +262,56 @@ impl FileServer for FileServerReal
 			
 			return Err(());
 		}
+		
+		if self.handles.len() == FileServerHandle::MAX as usize
+		{
+			report_error(
+				report,
+				span,
+				"exhausted number of file handles");
+
+			return Err(());
+		}
+
+		match self.handles.get(filename)
+		{
+			Some(handle) => Ok(*handle),
+			None =>
+			{
+				let handle =
+					self.handles.len() as FileServerHandle;
+
+				self.handles.insert(
+					filename.to_string(),
+					handle);
+
+				self.handles_to_filename.push(
+					filename.to_string());
+
+				Ok(handle)
+			}
+		}
+	}
+
+
+	fn get_filename(
+		&self,
+		file_handle: FileServerHandle)
+		-> &str
+	{
+		&self.handles_to_filename[file_handle as usize]
+	}
+
+
+	fn get_bytes(
+		&self,
+		report: &mut diagn::Report,
+		span: Option<diagn::Span>,
+		file_handle: FileServerHandle)
+		-> Result<Vec<u8>, ()>
+	{
+		let filename = &self.handles_to_filename[file_handle as usize];
+		let filename_path = &std::path::Path::new(filename);
 		
 		let mut file = {
 			match std::fs::File::open(filename_path)
@@ -208,7 +357,7 @@ impl FileServer for FileServerReal
 	fn write_bytes(
 		&mut self,
 		report: &mut diagn::Report,
-		span: Option<&diagn::Span>,
+		span: Option<diagn::Span>,
 		filename: &str,
 		data: &Vec<u8>)
 		-> Result<(), ()>
@@ -256,7 +405,7 @@ impl FileServer for FileServerReal
 
 fn report_error<S>(
 	report: &mut diagn::Report,
-	span: Option<&diagn::Span>,
+	span: Option<diagn::Span>,
 	descr: S)
 	where S: Into<String>
 {

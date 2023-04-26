@@ -28,7 +28,7 @@ pub fn parse(
         {
             report.error_span(
                 "unknown noemit state",
-                &tk_status.span,
+                tk_status.span,
             );
 
             return Err(());

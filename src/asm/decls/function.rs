@@ -13,7 +13,7 @@ pub fn collect(
         {
             let item_ref = decls.symbols.declare(
                 report,
-                &node.name_span,
+                node.name_span,
                 &util::SymbolContext::new_global(),
                 node.name.clone(),
                 0,

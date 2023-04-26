@@ -2,16 +2,16 @@ use crate::*;
 
 
 pub fn eval_asm(
-    fileserver: &dyn util::FileServer,
+    fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    info: &mut expr::EvalAsmInfo)
+    query: &mut expr::EvalAsmBlockQuery)
     -> Result<expr::Value, ()>
 {
-    info.eval_ctx.check_recursion_depth_limit(
-        info.report,
-        info.span)?;
+    query.eval_ctx.check_recursion_depth_limit(
+        query.report,
+        query.span)?;
 
 
     // Keep the current position to advance
@@ -22,21 +22,21 @@ pub fn eval_asm(
     let mut result = util::BigInt::new(0, Some(0));
     
     let ast = asm::parser::parse(
-        info.report,
-        info.tokens)?;
+        query.report,
+        query.tokens)?;
 
     for node in &ast.nodes
     {
         if let asm::AstAny::Instruction(ast_instr) = node
         {
             let substs = parse_substitutions(
-                info.report,
+                query.report,
                 &ast_instr.tokens)?;
 
             let new_tokens = perform_substitutions(
                 &ast_instr.tokens,
                 &substs,
-                info)?;
+                query)?;
 
             
             // Run the matcher algorithm
@@ -45,8 +45,8 @@ pub fn eval_asm(
                 &new_tokens);
 
             asm::matcher::error_on_no_matches(
-                info.report,
-                &ast_instr.span,
+                query.report,
+                ast_instr.span,
                 &matches)?;
             
             
@@ -60,12 +60,12 @@ pub fn eval_asm(
 
 
             // Try to resolve the encoding
-            let mut new_eval_ctx = info.eval_ctx
+            let mut new_eval_ctx = query.eval_ctx
                 .hygienize_locals_for_asm_subst();
 
             let maybe_encodings = asm::resolver::instruction::resolve_encoding(
-                info.report,
-                &ast_instr.span,
+                query.report,
+                ast_instr.span,
                 fileserver,
                 &mut matches,
                 decls,
@@ -91,7 +91,7 @@ pub fn eval_asm(
 
         else
         {
-            info.report.error_span(
+            query.report.error_span(
                 "invalid content for `asm` block",
                 node.span());
 
@@ -108,7 +108,7 @@ struct AsmSubstitution<'a>
     pub start: usize,
     pub end: usize,
     pub name: &'a str,
-    pub span: &'a diagn::Span,
+    pub span: diagn::Span,
 }
 
 
@@ -132,7 +132,7 @@ fn parse_substitutions<'tokens>(
                 syntax::TokenKind::Identifier)?;
             
             let name = tk_name.excerpt.as_ref().unwrap();
-            let span = &tk_name.span;
+            let span = tk_name.span;
 
             walker.expect(
                 report,
@@ -160,7 +160,7 @@ fn parse_substitutions<'tokens>(
 fn perform_substitutions<'tokens>(
     tokens: &'tokens [syntax::Token],
     substs: &Vec<AsmSubstitution<'tokens>>,
-    info: &mut expr::EvalAsmInfo)
+    info: &mut expr::EvalAsmBlockQuery)
     -> Result<Vec<syntax::Token>, ()>
 {
     let mut result: Vec<syntax::Token> = Vec::new();
@@ -195,7 +195,7 @@ fn perform_substitutions<'tokens>(
         for token in token_subst.iter()
         {
             let mut new_token = token.clone();
-            new_token.span = subst.span.clone();
+            new_token.span = subst.span;
             result.push(new_token);
         }
 
