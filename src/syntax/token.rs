@@ -247,7 +247,7 @@ pub fn tokenize(
 		let (kind, length) =
 			check_for_whitespace(&src[index..]).unwrap_or_else(||
 			check_for_comment   (&src[index..]).unwrap_or_else(||
-			check_for_fixed     (&src[index..]).unwrap_or_else(||
+			check_for_special   (&src[index..]).unwrap_or_else(||
 			check_for_identifier(&src[index..]).unwrap_or_else(||
 			check_for_number    (&src[index..]).unwrap_or_else(||
 			check_for_string    (&src[index..]).unwrap_or_else(||
@@ -354,6 +354,7 @@ fn check_for_comment(src: &[char]) -> Option<(TokenKind, usize)>
     {
     	while length < src.len() && src[length] != '\n'
     		{ length += 1; }
+		
     	return Some((TokenKind::Comment, length));
     }
 }
@@ -368,6 +369,24 @@ fn check_for_identifier(src: &[char]) -> Option<(TokenKind, usize)>
 	
 	while length < src.len() && is_identifier_mid(src[length])
 		{ length += 1; }
+
+
+	static KEYWORDS: [(&str, TokenKind); 1] =
+	[
+		("asm", TokenKind::KeywordAsm),
+	];
+
+	for keyword in KEYWORDS
+	{
+		if length == keyword.0.len() &&
+			src[0..length].iter()
+				.copied()
+				.zip(keyword.0.chars())
+				.all(|(a, b)| a == b)
+		{
+			return Some((keyword.1, length));
+		}
+	}
 		
 	Some((TokenKind::Identifier, length))
 }
@@ -411,12 +430,11 @@ fn check_for_string(src: &[char]) -> Option<(TokenKind, usize)>
 }
 
 
-fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
+fn check_for_special(src: &[char]) -> Option<(TokenKind, usize)>
 {
-	static POSSIBLE_TOKENS: [(&str, TokenKind); 41] =
+	static TOKENS: [(&str, TokenKind); 40] =
 	[
 		("\n",  TokenKind::LineBreak),
-		("asm", TokenKind::KeywordAsm),
 		("(",   TokenKind::ParenOpen),
 		(")",   TokenKind::ParenClose),
 		("[",   TokenKind::BracketOpen),
@@ -458,17 +476,15 @@ fn check_for_fixed(src: &[char]) -> Option<(TokenKind, usize)>
 		(">",   TokenKind::GreaterThan)
 	];
 	
-	let maybe_match = POSSIBLE_TOKENS.iter().find(|op|
-	{
-		for (i, c) in op.0.chars().enumerate()
-		{
-			if i >= src.len() || src[i] != c
-				{ return false; }
-		}
-		true
-	});
-	
-	maybe_match.map(|s| { (s.1, s.0.chars().count()) })
+	TOKENS.iter()
+		.find(|tk|
+			src.len() >= tk.0.len() &&
+			src[0..tk.0.len()].iter()
+				.copied()
+				.zip(tk.0.chars())
+				.all(|(a, b)| a == b)
+		)
+		.map(|s| (s.1, s.0.chars().count()))
 }
 
 
