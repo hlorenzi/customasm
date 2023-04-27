@@ -392,6 +392,17 @@ impl<'tokens> TokenWalker<'tokens>
 	{
 		&self.tokens[self.index]
 	}
+	
+	
+	pub fn next_nth(&self, nth: usize) -> &syntax::Token
+	{
+		if self.index + nth >= self.tokens.len()
+		{
+			return &self.dummy_token;
+		}
+
+		&self.tokens[self.index + nth]
+	}
 
 
 	pub fn next_partial(&mut self) -> char
@@ -402,7 +413,12 @@ impl<'tokens> TokenWalker<'tokens>
 		if self.tokens[self.index].kind == syntax::TokenKind::Whitespace
 			{ return ' '; }
 
-		let sliced = unsafe { self.tokens[self.index].text().get_unchecked(self.partial_index..) };
+		let sliced = unsafe {
+			self.tokens[self.index]
+				.text()
+				.get_unchecked(self.partial_index..)
+		};
+
 		let mut char_indices = sliced.char_indices();
 		char_indices.next().unwrap().1
 	}

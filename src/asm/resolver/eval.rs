@@ -3,6 +3,7 @@ use crate::*;
 
 pub fn eval(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -24,6 +25,7 @@ pub fn eval(
                     
             expr::EvalQuery::Function(query_fn) =>
                 asm::resolver::eval_fn(
+                    opts,
                     fileserver,
                     decls,
                     defs,
@@ -32,6 +34,7 @@ pub fn eval(
                 
             expr::EvalQuery::AsmBlock(query_asm) =>
                 asm::resolver::eval_asm(
+                    opts,
                     fileserver,
                     decls,
                     defs,

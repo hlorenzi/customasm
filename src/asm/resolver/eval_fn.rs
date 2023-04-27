@@ -25,6 +25,7 @@ pub fn resolve_builtin_fn(
 
 
 pub fn eval_fn(
+    opts: &asm::AssemblyOptions,
     fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -80,6 +81,7 @@ pub fn eval_fn(
 
         let maybe_result = asm::resolver::eval(
             query.report,
+            opts,
             fileserver,
             decls,
             defs,

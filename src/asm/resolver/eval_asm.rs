@@ -2,6 +2,7 @@ use crate::*;
 
 
 pub fn eval_asm(
+    opts: &asm::AssemblyOptions,
     fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -41,6 +42,7 @@ pub fn eval_asm(
             
             // Run the matcher algorithm
             let mut matches = asm::matcher::match_instr(
+                opts,
                 defs,
                 &new_tokens);
 
@@ -65,6 +67,7 @@ pub fn eval_asm(
 
             let maybe_encodings = asm::resolver::instruction::resolve_encoding(
                 query.report,
+                opts,
                 ast_instr.span,
                 fileserver,
                 &mut matches,

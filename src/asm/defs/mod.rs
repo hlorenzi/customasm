@@ -16,6 +16,12 @@ pub use ruledef::{
     RulePatternPart,
 };
 
+mod ruledef_map;
+pub use ruledef_map::{
+    RuledefMap,
+    RuledefMapEntry,
+};
+
 mod symbol;
 pub use symbol::{
     Symbol,
@@ -58,6 +64,7 @@ pub struct ItemDefs
 {
     pub bankdefs: DefList<Bankdef>,
     pub ruledefs: DefList<Ruledef>,
+    pub ruledef_map: RuledefMap,
     pub symbols: DefList<Symbol>,
     pub functions: DefList<Function>,
     pub instructions: DefList<Instruction>,
@@ -118,6 +125,7 @@ impl<T> DefList<T>
 
 pub fn define(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     ast: &mut asm::parser::AstTopLevel,
     decls: &mut asm::decls::ItemDecls)
     -> Result<ItemDefs, ()>
@@ -125,6 +133,7 @@ pub fn define(
     let mut defs = ItemDefs {
         bankdefs: DefList::new(),
         ruledefs: DefList::new(),
+        ruledef_map: RuledefMap::new(),
         symbols: DefList::new(),
         functions: DefList::new(),
         instructions: DefList::new(),
@@ -144,9 +153,13 @@ pub fn define(
     res::define(report, ast, decls, &mut defs)?;
     align::define(report, ast, decls, &mut defs)?;
     addr::define(report, ast, decls, &mut defs)?;
-
+    
     report.stop_at_errors()?;
 
+    if opts.optimize_instruction_matching
+    {
+        defs.ruledef_map.build(&defs.ruledefs);
+    }
 
     Ok(defs)
 }

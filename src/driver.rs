@@ -177,6 +177,9 @@ fn drive_inner(
 	opts.optimize_statically_known =
 		!matches.opt_present("debug-no-optimize-static");
 
+	opts.optimize_instruction_matching =
+		!matches.opt_present("debug-no-optimize-matcher");
+
 	if let Some(t) = matches.opt_str("t")
 	{
 		opts.max_iterations = {
@@ -339,6 +342,7 @@ fn make_opts() -> getopts::Options
     opts.optflag("q", "quiet", "Suppress progress reports.");
     opts.optflag("", "debug-iters", "Print debug info for the resolution iterations.");
 	opts.optflag("", "debug-no-optimize-static", "Prevent optimization of statically-known values.");
+	opts.optflag("", "debug-no-optimize-matcher", "Prevent optimization of the instruction matcher algorithm.");
     opts.optflag("v", "version", "Display version information.");
 	opts.optflag("h", "help", "Display this information.");
 	

@@ -97,6 +97,7 @@ pub fn resolve_constant(
     {
         let value = asm::resolver::eval(
             report,
+            opts,
             fileserver,
             decls,
             defs,

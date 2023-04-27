@@ -25,6 +25,7 @@ pub fn resolve_instruction(
         
     let maybe_encodings = resolve_encoding(
         report,
+        opts,
         ast_instr.span,
         fileserver,
         &mut matches,
@@ -112,6 +113,7 @@ pub fn resolve_instruction(
 
 pub fn resolve_encoding<'encoding>(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     instr_span: diagn::Span,
     fileserver: &mut dyn util::FileServer,
     matches: &'encoding mut asm::InstructionMatches,
@@ -130,6 +132,7 @@ pub fn resolve_encoding<'encoding>(
     // Try to resolve every match
     let resolved = resolve_instruction_matches(
         report,
+        opts,
         fileserver,
         matches,
         decls,
@@ -230,6 +233,7 @@ pub fn resolve_encoding<'encoding>(
 
 fn resolve_instruction_matches(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     fileserver: &mut dyn util::FileServer,
     matches: &mut asm::InstructionMatches,
     decls: &asm::ItemDecls,
@@ -246,6 +250,7 @@ fn resolve_instruction_matches(
 
         let value = resolve_instruction_match(
             report,
+            opts,
             &mtch,
             fileserver,
             decls,
@@ -331,6 +336,7 @@ fn build_recursive_candidate_note(
 
 fn resolve_instruction_match(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     mtch: &asm::InstructionMatch,
     fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
@@ -352,6 +358,7 @@ fn resolve_instruction_match(
 
     let maybe_value = resolve_instruction_match_inner(
         report,
+        opts,
         &mtch,
         fileserver,
         decls,
@@ -367,6 +374,7 @@ fn resolve_instruction_match(
 
 fn resolve_instruction_match_inner(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     mtch: &asm::InstructionMatch,
     fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
@@ -389,6 +397,7 @@ fn resolve_instruction_match_inner(
             {
                 let arg_value = asm::resolver::eval(
                     report,
+                    opts,
                     fileserver,
                     decls,
                     defs,
@@ -422,6 +431,7 @@ fn resolve_instruction_match_inner(
             {
                 let arg_value = resolve_instruction_match(
                     report,
+                    opts,
                     &nested_match,
                     fileserver,
                     decls,
@@ -447,6 +457,7 @@ fn resolve_instruction_match_inner(
 
     asm::resolver::eval(
         report,
+        opts,
         fileserver,
         decls,
         defs,

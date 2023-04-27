@@ -15,6 +15,7 @@ pub fn resolve_align(
 
     let value = asm::resolver::eval(
         report,
+        opts,
         fileserver,
         decls,
         defs,

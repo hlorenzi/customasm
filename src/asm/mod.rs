@@ -41,6 +41,8 @@ pub use defs::{
     ItemDefs,
     Bankdef,
     Ruledef,
+    RuledefMap,
+    RuledefMapEntry,
     Rule,
     RuleParameter,
     RuleParameterType,
@@ -92,6 +94,7 @@ pub struct AssemblyOptions
     pub max_iterations: usize,
     pub debug_iterations: bool,
     pub optimize_statically_known: bool,
+    pub optimize_instruction_matching: bool,
 }
 
 
@@ -103,6 +106,7 @@ impl AssemblyOptions
             max_iterations: 10,
             debug_iterations: false,
             optimize_statically_known: true,
+            optimize_instruction_matching: true,
         }
     }
 }
@@ -138,6 +142,7 @@ pub fn assemble<S>(
             
         assembly.defs = Some(defs::define(
             report,
+            opts,
             assembly.ast.as_mut().unwrap(),
             assembly.decls.as_mut().unwrap())?);
             

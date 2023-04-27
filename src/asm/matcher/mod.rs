@@ -104,6 +104,7 @@ pub fn match_all(
         if let asm::AstAny::Instruction(ast_instr) = any_node
         {
             let mut matches = match_instr(
+                opts,
                 defs,
                 &ast_instr.tokens);
 
@@ -192,73 +193,6 @@ pub fn error_on_no_matches(
     {
         Ok(())
     }
-}
-
-
-/// Runs the instruction-matching algorithm on the given
-/// Token slice, and returns the matches.
-pub fn match_instr(
-    defs: &asm::ItemDefs,
-    tokens: &[syntax::Token])
-    -> InstructionMatches
-{
-    let mut working_matches = WorkingMatches::new();
-
-    for i in 0..defs.ruledefs.defs.len()
-    {
-        let ruledef_ref = util::ItemRef::<asm::Ruledef>::new(i);
-        let ruledef = defs.ruledefs.get(ruledef_ref);
-
-        if ruledef.is_subruledef
-        {
-            continue;
-        }
-
-        let mut walker = syntax::TokenWalker::new(tokens);
-
-        let ruledef_matches = match_with_ruledef(
-            defs,
-            ruledef_ref,
-            &mut walker,
-            true);
-
-        working_matches.extend(ruledef_matches);
-    }
-
-    if working_matches.len() == 0
-    {
-        return vec![];
-    }
-
-
-    let mut matches = working_matches
-        .into_iter()
-        .map(|m| m.0)
-        .collect::<Vec<_>>();
-
-
-    // Calculate recursive "exact" pattern-part count for
-    // each match
-    for mtch in &mut matches
-    {
-        mtch.exact_part_count = get_recursive_exact_part_count(
-            defs,
-            mtch);
-    }
-
-
-    // Only keep matches with the maximum count of
-    // "exact" pattern-parts
-    let max_exact_count = matches
-        .iter()
-        .max_by_key(|m| m.exact_part_count)
-        .unwrap()
-        .exact_part_count;
-
-    matches.retain(|c| c.exact_part_count == max_exact_count);
-
-
-    matches
 }
 
 
@@ -400,6 +334,116 @@ fn get_match_static_size(
 }
 
 
+/// Runs the instruction-matching algorithm on the given
+/// Token slice, and returns the matches.
+pub fn match_instr(
+    opts: &asm::AssemblyOptions,
+    defs: &asm::ItemDefs,
+    tokens: &[syntax::Token])
+    -> InstructionMatches
+{
+    let mut working_matches = WorkingMatches::new();
+    let mut walker = syntax::TokenWalker::new(tokens);
+
+    if opts.optimize_instruction_matching
+    {
+        let ruledef_matches = match_with_ruledef_map(
+            defs,
+            walker);
+
+        working_matches.extend(ruledef_matches);
+    }
+
+    else
+    {
+        for i in 0..defs.ruledefs.defs.len()
+        {
+            let ruledef_ref = util::ItemRef::<asm::Ruledef>::new(i);
+            let ruledef = defs.ruledefs.get(ruledef_ref);
+
+            if ruledef.is_subruledef
+            {
+                continue;
+            }
+
+            let ruledef_matches = match_with_ruledef(
+                defs,
+                ruledef_ref,
+                &mut walker,
+                true);
+
+            working_matches.extend(ruledef_matches);
+        }
+    }
+
+    if working_matches.len() == 0
+    {
+        return vec![];
+    }
+
+
+    let mut matches = working_matches
+        .into_iter()
+        .map(|m| m.0)
+        .collect::<Vec<_>>();
+
+
+    // Calculate recursive "exact" pattern-part count for
+    // each match
+    for mtch in &mut matches
+    {
+        mtch.exact_part_count = get_recursive_exact_part_count(
+            defs,
+            mtch);
+    }
+
+
+    // Only keep matches with the maximum count of
+    // "exact" pattern-parts
+    let max_exact_count = matches
+        .iter()
+        .max_by_key(|m| m.exact_part_count)
+        .unwrap()
+        .exact_part_count;
+
+    matches.retain(|c| c.exact_part_count == max_exact_count);
+
+
+    matches
+}
+
+
+fn match_with_ruledef_map<'tokens>(
+    defs: &asm::ItemDefs,
+    walker: syntax::TokenWalker<'tokens>)
+    -> WorkingMatches<'tokens>
+{
+    let mut matches = WorkingMatches::new();
+
+    let prefix = asm::RuledefMap::parse_prefix(&walker);
+    let prefixed_entries = defs.ruledef_map.query_prefixed(prefix);
+    let unprefixed_entries = defs.ruledef_map.query_unprefixed();
+
+    for entry in prefixed_entries.iter().chain(unprefixed_entries)
+    {
+        let ruledef = defs.ruledefs.get(entry.ruledef_ref);
+        let rule = ruledef.get_rule(entry.rule_ref);
+
+        let rule_matches = begin_match_with_rule(
+            defs,
+            entry.ruledef_ref,
+            entry.rule_ref,
+            rule,
+            walker.clone(),
+            true);
+            
+        matches.extend(rule_matches);
+    }
+
+    matches
+}
+
+
 fn match_with_ruledef<'tokens>(
     defs: &asm::ItemDefs,
     ruledef_ref: util::ItemRef<asm::Ruledef>,
@@ -415,26 +459,45 @@ fn match_with_ruledef<'tokens>(
     {
         let rule = &ruledef.get_rule(rule_ref);
 
-        let rule_matches = match_with_rule(
+        let rule_matches = begin_match_with_rule(
             defs,
+            ruledef_ref,
+            rule_ref,
             rule,
-            &mut walker.clone(),
-            needs_consume_all_tokens,
-            0,
-            &mut InstructionMatch {
-                ruledef_ref,
-                rule_ref,
-                args: Vec::new(),
-                exact_part_count: 0,
-                encoding_statically_known: false,
-                encoding_size: 0,
-                encoding: InstructionMatchResolution::Unresolved,
-            });
+            walker.clone(),
+            needs_consume_all_tokens);
             
         matches.extend(rule_matches);
     }
 
     matches
+}
+
+
+fn begin_match_with_rule<'tokens>(
+    defs: &asm::ItemDefs,
+    ruledef_ref: util::ItemRef<asm::Ruledef>,
+    rule_ref: util::ItemRef<asm::Rule>,
+    rule: &asm::Rule,
+    mut walker: syntax::TokenWalker<'tokens>,
+    needs_consume_all_tokens: bool)
+    -> WorkingMatches<'tokens>
+{
+    match_with_rule(
+        defs,
+        rule,
+        &mut walker,
+        needs_consume_all_tokens,
+        0,
+        &mut InstructionMatch {
+            ruledef_ref,
+            rule_ref,
+            args: Vec::new(),
+            exact_part_count: 0,
+            encoding_statically_known: false,
+            encoding_size: 0,
+            encoding: InstructionMatchResolution::Unresolved,
+        })
 }
 
 
