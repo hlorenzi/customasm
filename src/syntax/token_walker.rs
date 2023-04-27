@@ -173,7 +173,8 @@ impl<'tokens> TokenWalker<'tokens>
 		let start = self.get_current_token_index();
 		let mut brace_nesting = 0;
 
-		while !self.is_over() && (!self.next_is_linebreak() || brace_nesting > 0)
+		while !self.is_over() &&
+			(!self.next_is_linebreak() || brace_nesting > 0)
 		{
 			if self.next_is(0, syntax::TokenKind::BraceOpen)
 			{
@@ -198,7 +199,14 @@ impl<'tokens> TokenWalker<'tokens>
 			self.advance();
 		}
 
-		self.clone_slice(start, self.get_previous_token_index() + 1)
+		if self.get_current_token_index() == start
+		{
+			self.clone_slice(start, start)
+		}
+		else
+		{
+			self.clone_slice(start, self.get_previous_token_index() + 1)
+		}
 	}
 
 
@@ -210,7 +218,8 @@ impl<'tokens> TokenWalker<'tokens>
 		let start = self.get_current_token_index();
 		let mut brace_nesting = 0;
 
-		while !self.is_over() && (!self.next_is(0, kind) || brace_nesting > 0)
+		while !self.is_over() &&
+			(!self.next_is(0, kind) || brace_nesting > 0)
 		{
 			if self.next_is(0, syntax::TokenKind::BraceOpen)
 			{
@@ -235,7 +244,14 @@ impl<'tokens> TokenWalker<'tokens>
 			self.advance();
 		}
 
-		self.clone_slice(start, self.get_previous_token_index() + 1)
+		if self.get_current_token_index() == start
+		{
+			self.clone_slice(start, start)
+		}
+		else
+		{
+			self.clone_slice(start, self.get_previous_token_index() + 1)
+		}
 	}
 
 
@@ -289,7 +305,7 @@ impl<'tokens> TokenWalker<'tokens>
 
 		let end = lookahead.get_previous_token_index() + 1;
 
-		if lookahead.is_at_partial() || start > end
+		if lookahead.is_at_partial() || start >= end
 		{
 			None
 		}
