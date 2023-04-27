@@ -379,7 +379,11 @@ impl<'tokens> TokenWalker<'tokens>
 		if self.index >= self.tokens.len()
 			{ return '\0'; }
 
-		let sliced = unsafe { self.tokens[self.index].text().get_unchecked(self.partial_index..) };
+		let sliced = self.tokens[self.index]
+			.text()
+			.get(self.partial_index..)
+			.unwrap();
+		
 		let mut char_indices = sliced.char_indices();
 		let c = char_indices.next().unwrap().1;
 
@@ -429,11 +433,10 @@ impl<'tokens> TokenWalker<'tokens>
 		if self.tokens[self.index].kind == syntax::TokenKind::Whitespace
 			{ return ' '; }
 
-		let sliced = unsafe {
-			self.tokens[self.index]
-				.text()
-				.get_unchecked(self.partial_index..)
-		};
+		let sliced = self.tokens[self.index]
+			.text()
+			.get(self.partial_index..)
+			.unwrap();
 
 		let mut char_indices = sliced.char_indices();
 		char_indices.next().unwrap().1
