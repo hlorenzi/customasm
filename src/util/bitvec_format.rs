@@ -467,7 +467,7 @@ impl util::BitVec
 					.get_str_unwrap(prev_file_handle);
             }
             
-            let span_location = span.span.location.unwrap();
+            let span_location = span.span.location().unwrap();
             let char_counter = util::CharCounter::new(&prev_file_chars);
             
             result.push_str(&format!("{:1$}", contents_str, content_width));
@@ -513,7 +513,7 @@ impl util::BitVec
 
             result.push_str(&format!("{:x} | ", span.addr));
             
-            if let Some((start, end)) = span.span.location
+            if let Some((start, end)) = span.span.location()
             {
                 let (line_start, col_start) = counter.get_line_column_at_index(start);
                 let (line_end, col_end) = counter.get_line_column_at_index(end);

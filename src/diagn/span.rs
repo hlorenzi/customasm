@@ -1,14 +1,14 @@
 use crate::*;
 
 
-pub type SpanIndex = usize;
+pub type SpanIndex = u32;
 
 
 #[derive(Copy, Clone, Hash, Eq)]
 pub struct Span
 {
 	pub file_handle: util::FileServerHandle,
-	pub location: Option<(SpanIndex, SpanIndex)>
+	location: (SpanIndex, SpanIndex),
 }
 
 
@@ -22,7 +22,7 @@ impl Span
 	{
 		Span {
 			file_handle,
-			location: Some((start, end))
+			location: (start, end)
 		}
 	}
 	
@@ -31,25 +31,36 @@ impl Span
 	{
 		Span {
 			file_handle: 0,
-			location: None,
+			location: (SpanIndex::MAX, SpanIndex::MAX),
 		}
+	}
+
+
+	pub fn location(&self) -> Option<(SpanIndex, SpanIndex)>
+	{
+		if self.location.0 == SpanIndex::MAX
+		{
+			return None;
+		}
+
+		Some(self.location)
 	}
 	
 	
 	pub fn before(&self) -> Span
 	{
-		if self.location.is_none()
+		if self.location.0 == SpanIndex::MAX
 		{
 			*self
 		}
 		
 		else
 		{
-			let start = self.location.unwrap().0;
+			let start = self.location.0;
 			
 			Span {
 				file_handle: self.file_handle,
-				location: Some((start, start))
+				location: (start, start),
 			}
 		}
 	}
@@ -57,18 +68,18 @@ impl Span
 	
 	pub fn after(&self) -> Span
 	{
-		if self.location.is_none()
+		if self.location.0 == SpanIndex::MAX
 		{
 			*self
 		}
 		
 		else
 		{
-			let end = self.location.unwrap().1;
+			let end = self.location.1;
 			
 			Span {
 				file_handle: self.file_handle,
-				location: Some((end, end)),
+				location: (end, end),
 			}
 		}
 	}
@@ -78,24 +89,25 @@ impl Span
 	{
 		match (self.location, other.location)
 		{
-			(_, None) => *self,
-			(None, _) => other,
-			(Some(self_loc), Some(other_loc)) =>
+			(_, (SpanIndex::MAX, _)) => *self,
+			((SpanIndex::MAX, _), _) => other,
+			(self_loc, other_loc) =>
 			{
 				assert!(
 					self.file_handle == other.file_handle,
 					"joining spans from different files");
 
-				let location = {
-					use std::cmp::{max, min};
-					let start = min(self_loc.0, other_loc.0);
-					let end   = max(self_loc.1, other_loc.1);
-					Some((start, end))
-				};
+				let start = std::cmp::min(
+					self_loc.0,
+					other_loc.0);
+
+				let end = std::cmp::max(
+					self_loc.1,
+					other_loc.1);
 				
 				Span {
 					file_handle: self.file_handle,
-					location,
+					location: (start, end),
 				}
 			}
 		}
@@ -105,9 +117,10 @@ impl Span
 
 impl PartialEq for Span
 {
-	fn eq(&self, other: &Self) -> bool
+	fn eq(&self, other: &diagn::Span) -> bool
 	{
-		self.file_handle == other.file_handle && self.location == other.location
+		self.file_handle == other.file_handle &&
+			self.location == other.location
 	}
 }
 
@@ -119,12 +132,12 @@ impl std::fmt::Debug for Span
         f.write_str("Span(")?;
 		write!(f, "file#{:?}", &self.file_handle)?;
 
-		if let Some(location) = self.location
+		if self.location.0 != SpanIndex::MAX
 		{
 			f.write_str("[")?;
-			<SpanIndex as std::fmt::Debug>::fmt(&location.0, f)?;
+			<SpanIndex as std::fmt::Debug>::fmt(&self.location.0, f)?;
 			f.write_str("..")?;
-			<SpanIndex as std::fmt::Debug>::fmt(&location.1, f)?;
+			<SpanIndex as std::fmt::Debug>::fmt(&self.location.1, f)?;
 			f.write_str("]")?;
 		}
 

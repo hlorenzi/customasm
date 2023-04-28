@@ -544,10 +544,10 @@ impl Report
 		if span.file_handle != file_handle
 			{ return false; }
 		
-		if span.location.is_none()
+		if span.location().is_none()
 			{ return false; }
 			
-		let location = span.location.unwrap();
+		let location = span.location().unwrap();
 		
 		let chars = fileserver.get_str_unwrap(file_handle);
 
@@ -639,7 +639,7 @@ impl Report
 		let counter = util::CharCounter::new(&chars);
 		
 
-		let (start, end) = span.location.unwrap();
+		let (start, end) = span.location().unwrap();
 		let (line1, col1) = counter.get_line_column_at_index(start);
 		let (line2, col2) = counter.get_line_column_at_index(end);
 
@@ -708,11 +708,13 @@ impl Report
 		let highlight_color = msg.kind.get_color();
 
 		// Print filename.
-		if span.location.is_none()
+		if span.location().is_none()
 		{
+			let filename = fileserver.get_filename(span.file_handle);
+
 			self.print_indent(writer, indent);
 			write!(writer, "{} --> ", C_LOCATION).unwrap();
-			write!(writer, "{}:", span.file_handle).unwrap();
+			write!(writer, "{}", filename).unwrap();
 			write!(writer, "{}", C_DEFAULT).unwrap();
 			writeln!(writer).unwrap();
 			return 0;
@@ -723,9 +725,11 @@ impl Report
 			span,
 			msg);
 
+		let filename = fileserver.get_filename(span.file_handle);
+		
 		self.print_indent(writer, indent + line_info.label_width - 1);
 		write!(writer, "{} --> ", C_LOCATION).unwrap();
-		write!(writer, "{}:", span.file_handle).unwrap();
+		write!(writer, "{}:", filename).unwrap();
 		write!(writer, "{}", C_DEFAULT).unwrap();
 
 		// Print location information.

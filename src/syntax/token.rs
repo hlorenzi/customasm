@@ -238,6 +238,15 @@ pub fn tokenize(
     src: &str)
     -> Result<Vec<Token>, ()>
 {
+	if let Err(_) = <usize as TryInto::<diagn::SpanIndex>>::try_into(src.len())
+	{
+		report.error_span(
+			"file is too large",
+			diagn::Span::new_dummy());
+
+		return Err(());
+	}
+
 	let mut tokens = Vec::new();
 	let mut index = 0;
 	
@@ -254,11 +263,11 @@ pub fn tokenize(
 			check_for_number    (remaining).unwrap_or_else(||
 			check_for_string    (remaining).unwrap_or_else(||
 			(TokenKind::Error, 1)))))));
-
+		
 		let span = diagn::Span::new(
-            src_file_handle,
-            index.try_into().unwrap(),
-            (index + length).try_into().unwrap());
+			src_file_handle,
+			index as diagn::SpanIndex,
+			(index + length) as diagn::SpanIndex);
 		
 		// Get the source excerpt for variable tokens (e.g. identifiers).
 		let excerpt = {

@@ -92,7 +92,7 @@ pub trait FileServer
 			span.file_handle)
 		{
 			let counter = util::CharCounter::new(&chars);
-			let location = span.location.unwrap();
+			let location = span.location().unwrap();
 			counter.get_excerpt(location.0, location.1).iter().collect()
 		}
 		else
