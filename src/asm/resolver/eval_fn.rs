@@ -204,7 +204,7 @@ fn eval_builtin_incstr(
         Some(query.args[0].span),
         &absolute_filename)?;
     
-    let chars = fileserver.get_chars(
+    let contents = fileserver.get_str(
         query.report,
         Some(query.args[0].span),
         file_handle)?;
@@ -212,7 +212,7 @@ fn eval_builtin_incstr(
     
     let mut bitvec = util::BitVec::new();
 
-    for c in chars
+    for c in contents.chars()
     {
         if syntax::is_whitespace(c) ||
             c == '_' ||

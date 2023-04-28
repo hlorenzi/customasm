@@ -417,7 +417,7 @@ impl util::BitVec
 		result.push_str("\n");
 		
 		let mut prev_file_handle = util::FileServerHandle::MAX;
-        let mut prev_file_chars = Vec::new();
+        let mut prev_file_chars = "".to_string();
         
         for span in &sorted_spans
         {
@@ -463,12 +463,8 @@ impl util::BitVec
             if span.span.file_handle != prev_file_handle
             {
                 prev_file_handle = span.span.file_handle;
-                prev_file_chars =
-					fileserver.get_chars(
-						&mut diagn::Report::new(),
-						None,
-						prev_file_handle)
-					.unwrap();
+                prev_file_chars = fileserver
+					.get_str_unwrap(prev_file_handle);
             }
             
             let span_location = span.span.location.unwrap();
@@ -498,7 +494,7 @@ impl util::BitVec
         for span in &sorted_spans
         {
             let chars =
-				fileserver.get_chars(
+				fileserver.get_str(
 					&mut diagn::Report::new(),
 					None,
 					span.span.file_handle)

@@ -41,23 +41,34 @@ pub trait FileServer
 		-> Result<Vec<u8>, ()>;
 	
 	
-	fn get_chars(
+	fn get_str(
 		&self,
 		report: &mut diagn::Report,
 		span: Option<diagn::Span>,
 		file_handle: FileServerHandle)
-		-> Result<Vec<char>, ()>
+		-> Result<String, ()>
 	{
 		let bytes = self.get_bytes(
 			report,
 			span,
 			file_handle)?;
 
-		let string = String::from_utf8_lossy(&bytes)
-			.chars()
-			.collect();
+		let string = String::from_utf8_lossy(&bytes).to_string();
 		
 		Ok(string)
+	}
+	
+	
+	fn get_str_unwrap(
+		&self,
+		file_handle: FileServerHandle)
+		-> String
+	{
+		self.get_str(
+				&mut diagn::Report::new(),
+				None,
+				file_handle)
+			.unwrap()
 	}
 	
 	
@@ -75,7 +86,7 @@ pub trait FileServer
 		span: diagn::Span)
 		-> String
 	{
-		if let Ok(chars) = self.get_chars(
+		if let Ok(chars) = self.get_str(
 			&mut diagn::Report::new(),
 			None,
 			span.file_handle)

@@ -1,19 +1,19 @@
 use crate::*;
 
 
-pub struct CharCounter<'s>
+pub struct CharCounter
 {
-	chars: &'s [char]
+	chars: Vec<char>,
 }
 
 
-impl<'s> CharCounter<'s>
+impl CharCounter
 {
-	pub fn new(chars: &'s [char]) -> CharCounter<'s>
+	pub fn new(src: &str) -> CharCounter
 	{
 		CharCounter
 		{
-			chars: chars
+			chars: src.chars().collect(),
 		}
 	}
 	
@@ -32,9 +32,9 @@ impl<'s> CharCounter<'s>
 	{
 		let mut lines = 1;
 		
-		for &c in self.chars
+		for c in &self.chars
 		{
-			if c == '\n'
+			if *c == '\n'
 				{ lines += 1; }
 		}
 		

@@ -549,12 +549,7 @@ impl Report
 			
 		let location = span.location.unwrap();
 		
-		let chars =
-			fileserver.get_chars(
-				&mut diagn::Report::new(),
-				None,
-				file_handle)
-			.unwrap();
+		let chars = fileserver.get_str_unwrap(file_handle);
 
 		let counter = util::CharCounter::new(&chars);
 		
@@ -639,12 +634,7 @@ impl Report
 		msg: &Message)
 		-> LineInfo
 	{
-		let chars =
-			fileserver.get_chars(
-				&mut diagn::Report::new(),
-				None,
-				span.file_handle)
-			.unwrap();
+		let chars = fileserver.get_str_unwrap(span.file_handle);
 			
 		let counter = util::CharCounter::new(&chars);
 		
@@ -739,12 +729,7 @@ impl Report
 		write!(writer, "{}", C_DEFAULT).unwrap();
 
 		// Print location information.
-		let chars =
-			fileserver.get_chars(
-				&mut diagn::Report::new(),
-				None,
-				span.file_handle)
-			.unwrap();
+		let chars = fileserver.get_str_unwrap(span.file_handle);
 
 		let counter = util::CharCounter::new(&chars);
 		

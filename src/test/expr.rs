@@ -12,7 +12,7 @@ where S: Into<Vec<u8>>
 		file_handle: util::FileServerHandle)
 		-> Result<expr::Value, ()>
 	{
-		let chars = fileserver.get_chars(report, None, file_handle)?;
+		let chars = fileserver.get_str(report, None, file_handle)?;
 		let tokens = syntax::tokenize(report, file_handle, &chars)?;
 		
 		let mut walker = syntax::TokenWalker::new(&tokens);

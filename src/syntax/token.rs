@@ -235,7 +235,7 @@ impl Token
 pub fn tokenize(
     report: &mut diagn::Report,
     src_file_handle: util::FileServerHandle,
-    src: &[char])
+    src: &str)
     -> Result<Vec<Token>, ()>
 {
 	let mut tokens = Vec::new();
@@ -243,16 +243,18 @@ pub fn tokenize(
 	
 	while index < src.len()
 	{
+		let remaining = &src.get(index..).unwrap();
+
 		// Decide what the next token's kind and length are.
 		let (kind, length) =
-			check_for_whitespace(&src[index..]).unwrap_or_else(||
-			check_for_comment   (&src[index..]).unwrap_or_else(||
-			check_for_special   (&src[index..]).unwrap_or_else(||
-			check_for_identifier(&src[index..]).unwrap_or_else(||
-			check_for_number    (&src[index..]).unwrap_or_else(||
-			check_for_string    (&src[index..]).unwrap_or_else(||
+			check_for_whitespace(remaining).unwrap_or_else(||
+			check_for_comment   (remaining).unwrap_or_else(||
+			check_for_special   (remaining).unwrap_or_else(||
+			check_for_identifier(remaining).unwrap_or_else(||
+			check_for_number    (remaining).unwrap_or_else(||
+			check_for_string    (remaining).unwrap_or_else(||
 			(TokenKind::Error, 1)))))));
-		
+
 		let span = diagn::Span::new(
             src_file_handle,
             index.try_into().unwrap(),
@@ -263,10 +265,10 @@ pub fn tokenize(
             match kind.needs_excerpt()
             {
                 false => None,
-                true => Some(src[index..]
-                    .iter()
-                    .take(length)
-                    .collect()),
+                true => Some(src
+					.get(index..index + length)
+					.unwrap()
+					.to_string()),
             }
         };
 		
@@ -296,80 +298,204 @@ pub fn tokenize(
 }
 
 
-fn check_for_whitespace(src: &[char]) -> Option<(TokenKind, usize)>
+#[derive(Clone)]
+struct CharWalker<'a>
 {
-	let mut length = 0;
-	
-	if !is_whitespace(src[length])
-		{ return None; }
-	
-	while length < src.len() && is_whitespace(src[length])
-		{ length += 1; }
-		
-	Some((TokenKind::Whitespace, length))
+	src: &'a str,
+	char_indices: std::str::CharIndices<'a>,
+	current: char,
+	length: usize,
 }
 
 
-fn check_for_comment(src: &[char]) -> Option<(TokenKind, usize)>
+impl<'a> CharWalker<'a>
 {
-	let mut length = 0;
+	pub fn new(src: &'a str) -> CharWalker<'a>
+	{
+		let mut walker = CharWalker {
+			src,
+			char_indices: src.char_indices(),
+			current: '\0',
+			length: 0,
+		};
+
+		walker.advance();
+		walker
+	}
+
+
+	pub fn ended(&self) -> bool
+	{
+		self.length >= self.src.len()
+	}
+
+
+	pub fn advance(&mut self)
+	{
+		match self.char_indices.next()
+		{
+			None =>
+			{
+				self.current = '\0';
+				self.length = self.src.len();
+			}
+			Some((index, c)) =>
+			{
+				self.current = c;
+				self.length = index;
+			}
+		}
+	}
+
+
+	pub fn consume_if(&mut self, fn_test: fn(char) -> bool) -> bool
+	{
+		if fn_test(self.current)
+		{
+			self.advance();
+			true
+		}
+		else
+		{
+			false
+		}
+	}
+
+
+	pub fn consume_char(&mut self, wanted: char) -> bool
+	{
+		if self.current == wanted
+		{
+			self.advance();
+			true
+		}
+		else
+		{
+			false
+		}
+	}
+
+
+	pub fn consume_str(&mut self, wanted: &str) -> bool
+	{
+		let mut cloned = self.clone();
+
+		for c in wanted.chars()
+		{
+			if !cloned.consume_char(c)
+			{
+				return false;
+			}
+		}
+
+		*self = cloned;
+		true
+	}
+
+
+	pub fn consume_while(
+		&mut self,
+		fn_start: fn(char) -> bool,
+		fn_mid: fn(char) -> bool)
+		-> bool
+	{
+		if !self.consume_if(fn_start)
+		{
+			return false;
+		}
+
+		while self.consume_if(fn_mid) {}
+
+		true
+	}
+
+
+	pub fn consume_until_char(&mut self, wanted: char)
+	{
+		while !self.ended() && self.current != wanted
+		{
+			self.advance();
+		}
+	}
+}
+
+
+fn check_for_whitespace(src: &str) -> Option<(TokenKind, usize)>
+{
+	let mut walker = CharWalker::new(src);
 	
-	if src[length] != ';'
+	if !walker.consume_while(
+		is_whitespace,
+		is_whitespace)
+	{
+		return None;
+	}
+
+	Some((TokenKind::Whitespace, walker.length))
+}
+
+
+fn check_for_comment(src: &str) -> Option<(TokenKind, usize)>
+{
+	let mut walker = CharWalker::new(src);
+	
+	if !walker.consume_char(';')
 		{ return None; }
 
-	if length + 1 < src.len() && src[length + 1] == '*'
+	if walker.consume_char('*')
     {
-		let mut nesting = 1;
-		length += 2;
+		let mut nesting = 0;
 
 		loop
 		{
-			if length + 1 >= src.len()
-				{ return None; }
+			if walker.ended()
+			{
+				return None;
+			}
 
-			if src[length] == ';' && src[length + 1] == '*'
+			else if walker.consume_str(";*")
 			{
 				nesting += 1;
-				length += 2;
-				continue;
 			}
 			
-			if src[length] == '*' && src[length + 1] == ';'
+			else if walker.consume_str("*;")
 			{
-				nesting -= 1;
-				length += 2;
-
 				if nesting == 0
 					{ break; }
 
-				continue;
+				nesting -= 1;
 			}
 
-			length += 1;
+			else
+			{
+				walker.advance();
+			}
 		}
 
-    	return Some((TokenKind::Comment, length));
+    	return Some((TokenKind::Comment, walker.length));
     }
     else
     {
-    	while length < src.len() && src[length] != '\n'
-    		{ length += 1; }
-		
-    	return Some((TokenKind::Comment, length));
+		walker.consume_until_char('\n');
+    	return Some((TokenKind::Comment, walker.length));
     }
 }
 
 
-fn check_for_identifier(src: &[char]) -> Option<(TokenKind, usize)>
+fn check_for_identifier(src: &str) -> Option<(TokenKind, usize)>
 {
-	let mut length = 0;
+	let mut walker = CharWalker::new(src);
 	
-	if !is_identifier_start(src[length])
-		{ return None; }
-	
-	while length < src.len() && is_identifier_mid(src[length])
-		{ length += 1; }
+	if !walker.consume_while(
+		is_identifier_start,
+		is_identifier_mid)
+	{
+		return None;
+	}
 
+	let length = walker.length;
+
+	let ident = src.get(0..length).unwrap();
 
 	static KEYWORDS: [(&str, TokenKind); 1] =
 	[
@@ -378,11 +504,7 @@ fn check_for_identifier(src: &[char]) -> Option<(TokenKind, usize)>
 
 	for keyword in KEYWORDS
 	{
-		if length == keyword.0.len() &&
-			src[0..length].iter()
-				.copied()
-				.zip(keyword.0.chars())
-				.all(|(a, b)| a == b)
+		if ident == keyword.0
 		{
 			return Some((keyword.1, length));
 		}
@@ -392,45 +514,38 @@ fn check_for_identifier(src: &[char]) -> Option<(TokenKind, usize)>
 }
 
 
-fn check_for_number(src: &[char]) -> Option<(TokenKind, usize)>
+fn check_for_number(src: &str) -> Option<(TokenKind, usize)>
 {
-	let mut length = 0;
+	let mut walker = CharWalker::new(src);
 	
-	if !is_number_start(src[length])
-		{ return None; }
-	
-	while length < src.len() && is_number_mid(src[length])
-		{ length += 1; }
-		
-	Some((TokenKind::Number, length))
+	if !walker.consume_while(
+		is_number_start,
+		is_number_mid)
+	{
+		return None;
+	}
+
+	Some((TokenKind::Number, walker.length))
 }
 
 
-fn check_for_string(src: &[char]) -> Option<(TokenKind, usize)>
+fn check_for_string(src: &str) -> Option<(TokenKind, usize)>
 {
-	let mut length = 0;
-	
-	if src[length] != '\"'
+	let mut walker = CharWalker::new(src);
+
+	if !walker.consume_char('\"')
 		{ return None; }
 		
-	length += 1;
-	
-	while length < src.len() && src[length] != '\"'
-		{ length += 1; }
+	walker.consume_until_char('\"');
 		
-	if length >= src.len()
+	if !walker.consume_char('\"')
 		{ return None; }
 		
-	if src[length] != '\"'
-		{ return None; }
-		
-	length += 1;
-		
-	Some((TokenKind::String, length))
+	Some((TokenKind::String, walker.length))
 }
 
 
-fn check_for_special(src: &[char]) -> Option<(TokenKind, usize)>
+fn check_for_special(src: &str) -> Option<(TokenKind, usize)>
 {
 	static TOKENS: [(&str, TokenKind); 40] =
 	[
@@ -475,16 +590,18 @@ fn check_for_special(src: &[char]) -> Option<(TokenKind, usize)>
 		(">>",  TokenKind::GreaterThanGreaterThan),
 		(">",   TokenKind::GreaterThan)
 	];
+
+	let mut walker = CharWalker::new(src);
+
+	for tk in TOKENS
+	{
+		if walker.consume_str(tk.0)
+		{
+			return Some((tk.1, walker.length));
+		}
+	}
 	
-	TOKENS.iter()
-		.find(|tk|
-			src.len() >= tk.0.len() &&
-			src[0..tk.0.len()].iter()
-				.copied()
-				.zip(tk.0.chars())
-				.all(|(a, b)| a == b)
-		)
-		.map(|s| (s.1, s.0.chars().count()))
+	None
 }
 
 

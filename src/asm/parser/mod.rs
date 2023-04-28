@@ -170,7 +170,7 @@ pub fn parse_and_resolve_includes<S>(
         None,
         root_filename.borrow())?;
 
-    let chars = fileserver.get_chars(
+    let chars = fileserver.get_str(
         report,
         None,
         file_handle)?;
