@@ -41,3 +41,7 @@ pub use self::builtin_fn::{
     get_static_size_builtin_fn,
     get_statically_known_value_builtin_fn,
 };
+
+
+pub const PARSE_RECURSION_DEPTH_MAX: usize = 50;
+pub const EVAL_RECURSION_DEPTH_MAX: usize = 25;

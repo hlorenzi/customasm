@@ -24,6 +24,7 @@ struct ExpressionParser<'a, 'tokens: 'a>
 {
     report: &'a mut diagn::Report,
 	walker: &'a mut syntax::TokenWalker<'tokens>,
+	recursion_depth: usize,
 }
 
 
@@ -34,43 +35,86 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
         walker: &'a mut syntax::TokenWalker<'tokens>)
         -> ExpressionParser<'a, 'tokens>
 	{
-		ExpressionParser
-		{
+		ExpressionParser {
             report,
 			walker,
+			recursion_depth: 0,
 		}
+	}
+
+
+	pub fn check_recursion_limit(&mut self) -> Result<(), ()>
+	{
+		if self.recursion_depth > expr::PARSE_RECURSION_DEPTH_MAX
+		{
+			self.report.message_with_parents_dedup(
+				diagn::Message::error_span(
+					"expression recursion depth limit reached",
+					self.walker.get_span_after_prev()));
+	
+			return Err(());
+		}
+
+		Ok(())
 	}
 	
 	
 	pub fn parse_expr(&mut self) -> Result<expr::Expr, ()>
 	{
-		self.parse_ternary_conditional()
+		self.recursion_depth += 1;
+
+		self.check_recursion_limit()?;
+		
+		let maybe_expr = self.parse_ternary_conditional();
+
+		self.recursion_depth -= 1;
+
+		maybe_expr
 	}
 	
 	
-	fn parse_unary_ops<F>(&mut self, ops: &[(syntax::TokenKind, expr::UnaryOp)], parse_inner: F) -> Result<expr::Expr, ()>
-	where F: Fn(&mut ExpressionParser<'a, 'tokens>) -> Result<expr::Expr, ()>
+	fn parse_unary_ops<F>(
+		&mut self,
+		ops: &[(syntax::TokenKind, expr::UnaryOp)],
+		parse_inner: F)
+		-> Result<expr::Expr, ()>
+		where F: Fn(&mut ExpressionParser<'a, 'tokens>) -> Result<expr::Expr, ()>
 	{
 		for op in ops
 		{
-			let tk_span = match self.walker.maybe_expect(op.0)
-			{
-				Some(tk) => tk.span,
-				None => continue
+			let tk_span = {
+				match self.walker.maybe_expect(op.0)
+				{
+					Some(tk) => tk.span,
+					None => continue,
+				}
 			};
-				
+			
+			self.recursion_depth += 1;
+			self.check_recursion_limit()?;
+			
 			let inner = self.parse_unary_ops(ops, parse_inner)?;
 			let span = tk_span.join(inner.span());
 			
-			return Ok(expr::Expr::UnaryOp(span, tk_span, op.1, Box::new(inner)));
+			self.recursion_depth -= 1;
+			
+			return Ok(expr::Expr::UnaryOp(
+				span,
+				tk_span,
+				op.1,
+				Box::new(inner)));
 		}
 		
 		parse_inner(self)
 	}
 	
 
-	fn parse_binary_ops<F>(&mut self, ops: &[(syntax::TokenKind, expr::BinaryOp)], parse_inner: F) -> Result<expr::Expr, ()>
-	where F: Fn(&mut ExpressionParser<'a, 'tokens>) -> Result<expr::Expr, ()>
+	fn parse_binary_ops<F>(
+		&mut self,
+		ops: &[(syntax::TokenKind, expr::BinaryOp)],
+		parse_inner: F)
+		-> Result<expr::Expr, ()>
+		where F: Fn(&mut ExpressionParser<'a, 'tokens>) -> Result<expr::Expr, ()>
 	{
 		let mut lhs = parse_inner(self)?;
 		
@@ -95,7 +139,12 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 				let rhs = parse_inner(self)?;
 				let span = lhs.span().join(rhs.span());
 				
-				lhs = expr::Expr::BinaryOp(span, op_match.0, op_match.1, Box::new(lhs), Box::new(rhs));
+				lhs = expr::Expr::BinaryOp(
+					span,
+					op_match.0,
+					op_match.1,
+					Box::new(lhs),
+					Box::new(rhs));
 			}
 			else
 				{ break; }

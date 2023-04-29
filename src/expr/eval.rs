@@ -39,7 +39,7 @@ impl EvalContext
 		span: diagn::Span)
 		-> Result<(), ()>
 	{
-		if self.recursion_depth >= 25
+		if self.recursion_depth >= expr::EVAL_RECURSION_DEPTH_MAX
 		{
 			report.message_with_parents_dedup(
 				diagn::Message::error_span(
