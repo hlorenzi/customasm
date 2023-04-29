@@ -149,13 +149,15 @@ fn populate_fileserver(
 pub fn test_file(filepath: &str)
 {
     let path_prefix = std::path::PathBuf::from(&filepath)
-        .parent().unwrap()
+        .parent()
+        .unwrap()
         .to_path_buf();
 
 	let contents = std::fs::read_to_string(&filepath).unwrap();
 	
     let stripped_filename = std::path::PathBuf::from(&filepath)
-        .strip_prefix(&path_prefix).unwrap()
+        .strip_prefix(&path_prefix)
+        .unwrap()
         .to_string_lossy()
         .into_owned();
 
@@ -172,6 +174,7 @@ pub fn test_file(filepath: &str)
 
 	let mut fileserver = util::FileServerMock::new();
     populate_fileserver(&mut fileserver, &path_prefix, "");
+	fileserver.add_std_files(test::STD_FILES);
 
 	let mut report = diagn::Report::new();
 

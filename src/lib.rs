@@ -6,6 +6,7 @@ pub mod util;
 pub mod driver;
 
 
+#[cfg(target_arch="wasm32")]
 pub mod webasm;
 
 

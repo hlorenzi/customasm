@@ -1,0 +1,5 @@
+#include "<std>/platform/nes/cpu.asm"
+sei ; = 0x78
+clc ; = 0x18
+lda #0x55 ; = 0xa955
+rts ; = 0x60

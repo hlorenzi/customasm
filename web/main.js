@@ -108,6 +108,8 @@ function assemble()
 	dropRustString(asmPtr)
 	dropRustString(outputPtr)
 	
+	output = output.replace(/\</g, "&lt;")
+	output = output.replace(/\>/g, "&gt;")
 	output = output.replace(/\n/g, "<br>")
 	output = output.replace(/\x1b\[90m/g, "</span><span style='color:gray;'>")
 	output = output.replace(/\x1b\[91m/g, "</span><span style='color:red;'>")

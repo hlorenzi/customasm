@@ -115,6 +115,7 @@ pub struct FileServerReal
 {
 	handles: std::collections::HashMap<String, FileServerHandle>,
 	handles_to_filename: Vec<String>,
+	std_files: Vec<Option<&'static str>>,
 }
 
 
@@ -126,6 +127,17 @@ impl FileServerMock
 			handles: std::collections::HashMap::new(),
 			handles_to_filename: Vec::new(),
 			files: Vec::new(),
+		}
+	}
+
+
+	pub fn add_std_files(
+		&mut self,
+		entries: &[(&str, &str)])
+	{
+		for (filename, contents) in entries
+		{
+			self.add(*filename, *contents);
 		}
 	}
 	
@@ -163,7 +175,44 @@ impl FileServerReal
 		FileServerReal {
 			handles: std::collections::HashMap::new(),
 			handles_to_filename: Vec::new(),
+			std_files: Vec::new(),
 		}
+	}
+
+
+	pub fn add_std_files(
+		&mut self,
+		entries: &[(&str, &'static str)])
+	{
+		for (filename, contents) in entries
+		{
+			self.add(*filename, *contents);
+		}
+	}
+	
+	
+	pub fn add<S>(
+		&mut self,
+		filename: S,
+		contents: &'static str)
+		where S: Into<String>
+	{
+		let filename = filename.into();
+
+		let next_index = self.handles.len();
+
+		let handle = *self.handles
+			.entry(filename.clone())
+			.or_insert(next_index.try_into().unwrap());
+
+		while handle as usize >= self.std_files.len()
+		{
+			self.handles_to_filename.push("".to_string());
+			self.std_files.push(None);
+		}
+
+		self.handles_to_filename[handle as usize] = filename;
+		self.std_files[handle as usize] = Some(contents);
 	}
 }
 
@@ -260,8 +309,13 @@ impl FileServer for FileServerReal
 		filename: &str)
 		-> Result<FileServerHandle, ()>
 	{
-		let filename_path = &std::path::Path::new(filename);
-		
+		if let Some(handle) = self.handles.get(filename)
+		{
+			return Ok(*handle);
+		}
+
+		let filename_path = std::path::PathBuf::from(filename);
+
 		if !filename_path.exists()
 		{
 			report_error(
@@ -284,7 +338,11 @@ impl FileServer for FileServerReal
 			return Err(());
 		}
 
-		match self.handles.get(filename)
+		let filename_path_str = filename_path
+			.to_string_lossy()
+			.to_string();
+
+		match self.handles.get(&filename_path_str)
 		{
 			Some(handle) => Ok(*handle),
 			None =>
@@ -293,11 +351,11 @@ impl FileServer for FileServerReal
 					self.handles.len() as FileServerHandle;
 
 				self.handles.insert(
-					filename.to_string(),
+					filename_path_str.clone(),
 					handle);
 
 				self.handles_to_filename.push(
-					filename.to_string());
+					filename_path_str);
 
 				Ok(handle)
 			}
@@ -321,6 +379,11 @@ impl FileServer for FileServerReal
 		file_handle: FileServerHandle)
 		-> Result<Vec<u8>, ()>
 	{
+		if let Some(Some(std_contents)) = self.std_files.get(file_handle as usize)
+		{
+			return Ok(std_contents.as_bytes().iter().copied().collect());
+		}
+		
 		let filename = &self.handles_to_filename[file_handle as usize];
 		let filename_path = &std::path::Path::new(filename);
 		

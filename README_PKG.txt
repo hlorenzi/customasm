@@ -2,6 +2,7 @@ Downloaded from:
 
 https://github.com/hlorenzi/customasm
 
-Also check the following page for Documentation and a how-to guide:
+Check the following page for documentation
+and a how-to-start guide:
 
-https://github.com/hlorenzi/customasm/wiki/User-Guide
+https://github.com/hlorenzi/customasm/wiki

@@ -25,7 +25,7 @@ you just implemented in an FPGA chip!
 
 [🖥️ Try it right now on your browser!](https://hlorenzi.github.io/customasm/web/)
 
-[🕹️ Check out an example project](/examples/nes/) which targets the NES!
+[🕹️ Check out an example project](/examples/nes_colors.asm) which targets the NES!
 
 [⌨️ Install the VSCode syntax highlight extension!](https://marketplace.visualstudio.com/items?itemName=hlorenzi.customasm-vscode)
 

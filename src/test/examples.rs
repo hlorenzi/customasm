@@ -2,10 +2,14 @@ use crate::*;
 use sha2::*;
 
 
+
+
 fn test_example(filename: &str, hash: &[u8])
 {
 	let mut report = diagn::Report::new();
+
     let mut fileserver = util::FileServerReal::new();
+	fileserver.add_std_files(test::STD_FILES);
 
     let opts = asm::AssemblyOptions::new();
     
@@ -37,7 +41,7 @@ fn test_example(filename: &str, hash: &[u8])
 fn test_nes_example()
 {
     test_example(
-        "examples/nes/main.asm",
+        "examples/nes_colors.asm",
         &[
             226, 68, 213, 226, 71, 200, 16, 113, 21, 132,
             193, 34, 10, 134, 112, 238, 69, 165, 45, 199, 40,

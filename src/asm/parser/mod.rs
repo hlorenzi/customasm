@@ -137,6 +137,7 @@ pub fn parse_many_and_resolve_includes<S>(
     {
         let ast = parse_and_resolve_includes(
             report,
+            None,
             fileserver,
             file.borrow(),
             &mut Vec::new(),
@@ -151,6 +152,7 @@ pub fn parse_many_and_resolve_includes<S>(
 
 pub fn parse_and_resolve_includes<S>(
     report: &mut diagn::Report,
+    span: Option<diagn::Span>,
     fileserver: &mut dyn util::FileServer,
     root_filename: S,
     seen_filenames: &mut Vec<String>,
@@ -167,12 +169,12 @@ pub fn parse_and_resolve_includes<S>(
 
     let file_handle = fileserver.get_handle(
         report,
-        None,
+        span,
         root_filename.borrow())?;
 
     let chars = fileserver.get_str(
         report,
-        None,
+        span,
         file_handle)?;
 
     let tokens = syntax::tokenize(
@@ -188,24 +190,26 @@ pub fn parse_and_resolve_includes<S>(
         once_filenames.insert(root_filename.borrow().to_owned());
     }
 
+    // TODO: Iterate in forward order, to keep the order of
+    // potential errors in order too
     for node_index in (0..root_ast.nodes.len()).rev()
     {
         let node = &root_ast.nodes[node_index];
 
-        if let AstAny::DirectiveInclude(dir_include) = node
+        if let AstAny::DirectiveInclude(ast_include) = node
         {
             let included_filename = util::filename_navigate(
                 report,
-                dir_include.filename_span,
+                ast_include.filename_span,
                 root_filename.borrow(),
-                &dir_include.filename)?;
+                &ast_include.filename)?;
 
 
             if seen_filenames.contains(&included_filename)
             {
                 report.error_span(
                     "recursive file inclusion",
-                    dir_include.filename_span);
+                    ast_include.filename_span);
 
                 return Err(());
             }
@@ -215,6 +219,7 @@ pub fn parse_and_resolve_includes<S>(
 
             let inner_ast = parse_and_resolve_includes(
                 report,
+                Some(ast_include.filename_span),
                 fileserver,
                 included_filename.as_ref(),
                 seen_filenames,

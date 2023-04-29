@@ -1,6 +1,17 @@
 use crate::*;
 
 
+pub const STD_PATH_PREFIX: &str = "<std>/";
+
+
+pub fn is_std_path(
+	path: &str)
+	-> bool
+{
+	path.starts_with(STD_PATH_PREFIX)
+}
+
+
 pub fn filename_validate(
 	report: &mut diagn::Report,
 	span: diagn::Span,
@@ -40,6 +51,11 @@ pub fn filename_navigate(
 	nav: &str)
 	-> Result<String, ()>
 {
+	if is_std_path(nav)
+	{
+		return Ok(nav.to_string());
+	}
+
 	let current = current.replace("\\", "/");
 	let nav = nav.replace("\\", "/");
 

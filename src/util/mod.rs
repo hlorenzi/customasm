@@ -27,10 +27,13 @@ pub use self::fileserver::{
     FileServerHandle,
     FileServerMock,
     FileServerReal,
+    
 };
 
 mod filename;
 pub use self::filename::{
+    STD_PATH_PREFIX,
+    is_std_path,
     filename_validate,
     filename_navigate,
 };

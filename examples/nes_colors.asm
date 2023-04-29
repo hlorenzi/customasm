@@ -1,6 +1,13 @@
-#include "cpu6502.asm"
-#include "ines_nrom.asm"
-#include "nes.asm"
+;;; Compile this program with:
+;;; 
+;;; customasm nes_colors.asm -o nes_colors.nes
+;;; 
+;;; ...then run it on your favorite NES emulator!
+
+
+#include "<std>/platform/nes/cpu.asm"
+#include "<std>/platform/nes/ines_nrom.asm"
+#include "<std>/platform/nes/constants.asm"
 
 
 #bank zeropage
