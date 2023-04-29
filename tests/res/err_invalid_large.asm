@@ -4,4 +4,4 @@
 }
 
 
-#res 0x1_0000_0000_0000_0000 ; error: supported range
+#res 0x1_0000_0000 ; error: supported range

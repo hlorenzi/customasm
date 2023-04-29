@@ -159,7 +159,7 @@ pub fn resolve_once(
         is_first_iteration,
         is_last_iteration);
 
-    while let Some(ctx) = iter.next(decls, defs)
+    while let Some(ctx) = iter.next(report, decls, defs)?
     {
         if let asm::ResolverNode::Symbol(ast_symbol) = ctx.node
         {

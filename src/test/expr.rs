@@ -140,6 +140,10 @@ fn test_ops_arithmetic()
 	test("-1 << 8", Pass(expr::Value::make_integer(util::BigInt::new(-256, None))));
 	test("-1 << 9", Pass(expr::Value::make_integer(util::BigInt::new(-512, None))));
 	
+	test("-1 >> 1", Pass(expr::Value::make_integer(util::BigInt::new(-1, None))));
+	test("-1 >> 2", Pass(expr::Value::make_integer(util::BigInt::new(-1, None))));
+	test("-1 >> 3", Pass(expr::Value::make_integer(util::BigInt::new(-1, None))));
+	
 	test("4 >> 0", Pass(expr::Value::make_integer(util::BigInt::new(4, None))));
 	test("4 >> 1", Pass(expr::Value::make_integer(util::BigInt::new(2, None))));
 	test("4 >> 2", Pass(expr::Value::make_integer(util::BigInt::new(1, None))));
@@ -149,6 +153,8 @@ fn test_ops_arithmetic()
 	test("-4 >> 1", Pass(expr::Value::make_integer(util::BigInt::new(-2, None))));
 	test("-4 >> 2", Pass(expr::Value::make_integer(util::BigInt::new(-1, None))));
 	test("-4 >> 3", Pass(expr::Value::make_integer(util::BigInt::new(-1, None))));
+	test("-4 >> 4", Pass(expr::Value::make_integer(util::BigInt::new(-1, None))));
+	test("-4 >> 5", Pass(expr::Value::make_integer(util::BigInt::new(-1, None))));
 	
 	test("123`0 + 2", Pass(expr::Value::make_integer(util::BigInt::new(2, None))));
 }
@@ -432,9 +438,9 @@ fn test_ops_arith_errors()
 	test("2 % 0",       Fail(("test", 1, "modulo by zero")));
 	test("2 % (1 - 1)", Fail(("test", 1, "modulo by zero")));
 	
-	test("2 << (1 << 1000)", Fail(("test", 1, "invalid shift")));
-	test("2 >> (1 << 1000)", Fail(("test", 1, "invalid shift")));
-	test("2 >> (1 << 1000)", Fail(("test", 1, "invalid shift")));
+	test("2 << (1 << 1000)", Fail(("test", 1, "out of supported range")));
+	test("2 >> (1 << 1000)", Fail(("test", 1, "out of supported range")));
+	test("2 >> (1 << 1000)", Fail(("test", 1, "out of supported range")));
 }
 
 

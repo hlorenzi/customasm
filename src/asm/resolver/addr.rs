@@ -73,25 +73,24 @@ pub fn resolve_addr(
             return Err(());
         }
 
-        let addr_size = &addr.address - &bank.addr_start;
+        let addr_size = &addr.address.checked_sub(
+            report,
+            ast_addr.header_span,
+            &bank.addr_start)?;
 
-        let maybe_addr_delta =
-            (&addr_size * &util::BigInt::new(bank.addr_unit, None))
-            .checked_to_usize();
+        let addr_delta = addr_size
+            .checked_mul(
+                report,
+                ast_addr.header_span,
+                &util::BigInt::new(bank.addr_unit, None))?
+            .checked_into::<usize>(
+                report,
+                ast_addr.header_span)?;
 
-        if maybe_addr_delta.is_none()
+
+        if let Some(size) = bank.size
         {
-            report.error_span(
-                "value is out of supported range",
-                ast_addr.expr.span());
-
-            return Err(());
-        }
-
-        else if let Some(size) = bank.size
-        {
-            if maybe_addr_delta.is_none() ||
-                maybe_addr_delta.unwrap() >= size
+            if addr_delta >= size
             {
                 report.error_span(
                     "address is out of bank range",

@@ -54,7 +54,7 @@ pub fn resolve_constants_once(
         true,
         false);
 
-    while let Some(ctx) = iter.next(decls, defs)
+    while let Some(ctx) = iter.next(report, decls, defs)?
     {
         if let asm::ResolverNode::Symbol(ast_symbol) = ctx.node
         {

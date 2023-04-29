@@ -1,3 +1,9 @@
+use crate::*;
+
+
+pub const BIGINT_MAX_BITS: u64 = 8 * 100_000_000;
+
+
 #[derive(Clone, Eq)]
 pub struct BigInt
 {
@@ -88,71 +94,239 @@ impl BigInt
     }
 
 
-    pub fn checked_to_usize(&self) -> Option<usize>
+    pub fn maybe_into<T>(&self) -> Option<T>
+        where T: for<'a> TryFrom<&'a num_bigint::BigInt>
     {
         (&self.bigint).try_into().ok()
     }
 
 
-    pub fn checked_to_isize(&self) -> Option<isize>
+    pub fn checked_into<T>(
+        &self,
+        report: &mut diagn::Report,
+        span: diagn::Span)
+        -> Result<T, ()>
+        where T: for<'a> TryFrom<&'a num_bigint::BigInt>
     {
-        (&self.bigint).try_into().ok()
+        match self.maybe_into::<T>()
+        {
+            Some(res) => Ok(res),
+            None =>
+            {            
+                report.error_span(
+                    "value is out of supported range",
+                    span);
+                
+                Err(())
+            }
+        }
     }
 
 
-    pub fn checked_div(&self, rhs: &BigInt) -> Option<BigInt>
+    pub fn checked_into_nonzero_usize(
+        &self,
+        report: &mut diagn::Report,
+        span: diagn::Span)
+        -> Result<usize, ()>
     {
-        self.bigint.checked_div(&rhs.bigint).map(|res| res.into())
+        match self.maybe_into::<usize>()
+        {
+            None | Some(0) =>
+            {            
+                report.error_span(
+                    "value is out of supported range",
+                    span);
+                
+                Err(())
+            }
+            Some(res) => Ok(res),
+        }
     }
 
 
-    pub fn checked_rem(&self, rhs: &BigInt) -> Option<BigInt>
+    pub fn checked_add(
+        &self,
+        report: &mut diagn::Report,
+        span: diagn::Span,
+        rhs: &BigInt)
+        -> Result<BigInt, ()>
+    {
+        let largest_bits = std::cmp::max(
+            self.bigint.bits(),
+            rhs.bigint.bits());
+            
+        if largest_bits >= BIGINT_MAX_BITS - 1
+        {
+            report.error_span(
+                "value is out of supported range",
+                span);
+            
+            return Err(());
+        }
+
+        self.bigint
+            .checked_add(&rhs.bigint)
+            .ok_or(())
+            .map(|res| res.into())
+    }
+
+
+    pub fn checked_sub(
+        &self,
+        report: &mut diagn::Report,
+        span: diagn::Span,
+        rhs: &BigInt)
+        -> Result<BigInt, ()>
+    {
+        let largest_bits = std::cmp::max(
+            self.bigint.bits(),
+            rhs.bigint.bits());
+            
+        if largest_bits >= BIGINT_MAX_BITS - 2
+        {
+            report.error_span(
+                "value is out of supported range",
+                span);
+            
+            return Err(());
+        }
+
+        self.bigint
+            .checked_sub(&rhs.bigint)
+            .ok_or(())
+            .map(|res| res.into())
+    }
+
+
+    pub fn checked_mul(
+        &self,
+        report: &mut diagn::Report,
+        span: diagn::Span,
+        rhs: &BigInt)
+        -> Result<BigInt, ()>
+    {
+        let largest_bits = std::cmp::max(
+            self.bigint.bits(),
+            rhs.bigint.bits());
+            
+        if largest_bits >= BIGINT_MAX_BITS / 2
+        {
+            report.error_span(
+                "value is out of supported range",
+                span);
+            
+            return Err(());
+        }
+
+        self.bigint
+            .checked_mul(&rhs.bigint)
+            .ok_or(())
+            .map(|res| res.into())
+    }
+
+
+    pub fn checked_div(
+        &self,
+        report: &mut diagn::Report,
+        span: diagn::Span,
+        rhs: &BigInt)
+        -> Result<BigInt, ()>
     {
         if rhs.bigint == num_bigint::BigInt::from(0)
-            { None }
-        else
-            { Some((&self.bigint % &rhs.bigint).into()) }
-    }
-
-
-    pub fn shl(&self, rhs: usize) -> BigInt
-    {
-        (&self.bigint << rhs).into()
-    }
-
-
-    pub fn shr(&self, rhs: usize) -> BigInt
-    {
-        let lhs_sign = self.bigint.sign();
-        let result = &self.bigint >> rhs;
-
-        if lhs_sign == num_bigint::Sign::Minus &&
-            result.sign() == num_bigint::Sign::NoSign
         {
-            BigInt::from(-1)
+            report.error_span(
+                "division by zero",
+                span);
+            
+            return Err(());
         }
-        else
-        {
-            result.into()
-        }
+
+        self.bigint
+            .checked_div(&rhs.bigint)
+            .ok_or(())
+            .map(|res| res.into())
     }
 
 
-    pub fn checked_shl(&self, rhs: &BigInt) -> Option<BigInt>
+    pub fn checked_mod(
+        &self,
+        report: &mut diagn::Report,
+        span: diagn::Span,
+        rhs: &BigInt)
+        -> Result<BigInt, ()>
     {
+        if rhs.bigint == num_bigint::BigInt::from(0)
+        {
+            report.error_span(
+                "modulo by zero",
+                span);
+            
+            return Err(());
+        }
+
+        Ok((&self.bigint % &rhs.bigint).into())
+    }
+
+
+    pub fn checked_shl(
+        &self,
+        report: &mut diagn::Report,
+        span: diagn::Span,
+        rhs: &BigInt)
+        -> Result<BigInt, ()>
+    {
+        let maybe_rhs_u64: Result<u32, _> = (&rhs.bigint).try_into();
+
+        let result_too_large = {
+            match maybe_rhs_u64
+            {
+                Err(_) => true,
+                Ok(size) =>
+                    self.bigint.bits() + (size as u64) >= BIGINT_MAX_BITS,
+            }
+        };
+
+        if result_too_large
+        {
+            report.error_span(
+                "value is out of supported range",
+                span);
+            
+            return Err(());
+        }
+
         (&rhs.bigint)
             .try_into()
-            .ok()
-            .map(|rhs| self.shl(rhs).into())
+            .map(|rhs: usize| (&self.bigint << rhs).into())
+            .map_err(|_| ())
     }
     
     
-    pub fn checked_shr(&self, rhs: &BigInt) -> Option<BigInt>
+    pub fn checked_shr(
+        &self,
+        report: &mut diagn::Report,
+        span: diagn::Span,
+        rhs: &BigInt)
+        -> Result<BigInt, ()>
     {
-        (&rhs.bigint)
+        let maybe_result: Result<num_bigint::BigInt, ()> = (&rhs.bigint)
             .try_into()
-            .ok()
-            .map(|rhs| self.shr(rhs).into())
+            .map(|rhs: usize| (&self.bigint >> rhs).into())
+            .map_err(|_| ());
+
+        match maybe_result
+        {
+            Ok(result) => Ok(result.into()),
+
+            Err(_) =>
+            {
+                report.error_span(
+                    "value is out of supported range",
+                    span);
+                
+                Err(())
+            }
+        }
     }
     
     
@@ -278,42 +452,6 @@ impl std::ops::Neg for &BigInt
     fn neg(self) -> Self::Output
     {
         (-&self.bigint).into()
-    }
-}
-
-
-impl std::ops::Add for &BigInt
-{
-    type Output = BigInt;
-
-
-    fn add(self, rhs: &BigInt) -> Self::Output
-    {
-        (&self.bigint + &rhs.bigint).into()
-    }
-}
-
-
-impl std::ops::Sub for &BigInt
-{
-    type Output = BigInt;
-
-
-    fn sub(self, rhs: &BigInt) -> Self::Output
-    {
-        (&self.bigint - &rhs.bigint).into()
-    }
-}
-
-
-impl std::ops::Mul for &BigInt
-{
-    type Output = BigInt;
-
-
-    fn mul(self, rhs: &BigInt) -> Self::Output
-    {
-        (&self.bigint * &rhs.bigint).into()
     }
 }
 

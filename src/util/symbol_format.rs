@@ -48,9 +48,9 @@ impl util::SymbolManager<asm::Symbol>
                 let bankdef = defs.bankdefs.get(bankdef_ref);
                 if let Some(output_offset) = bankdef.output_offset
                 {
-                    if let Some(addr) = bigint.checked_to_usize()
+                    if let Some(addr) = bigint.maybe_into::<usize>()
                     {
-                        if let Some(addr_start) = bankdef.addr_start.checked_to_usize()
+                        if let Some(addr_start) = bankdef.addr_start.maybe_into::<usize>()
                         {
                             let prg_offset = addr - addr_start + output_offset / 8 - 0x10;
                             result.push_str("P:");

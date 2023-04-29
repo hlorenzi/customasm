@@ -82,21 +82,14 @@ pub fn define(
                     (Some(size), None) => Some(size),
                     (None, Some(end)) =>
                     {
-                        let maybe_size =
-                            (&end - &addr_start).checked_to_usize();
-                        
-                        match maybe_size
-                        {
-                            Some(size) => Some(size),
-                            None =>
-                            {
-                                report.error_span(
-                                    "value out of supported range",
-                                    node.addr_end.as_ref().unwrap().span());
-        
-                                return Err(());
-                            }
-                        }
+                        Some(end
+                            .checked_sub(
+                                report,
+                                node.addr_end.as_ref().unwrap().span(),
+                                &addr_start)?
+                            .checked_into::<usize>(
+                                report,
+                                node.addr_end.as_ref().unwrap().span())?)
                     }
                     (Some(_), Some(_)) =>
                     {

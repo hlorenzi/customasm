@@ -95,7 +95,7 @@ pub fn build_output(
         false,
         true);
 
-    while let Some(ctx) = iter.next(decls, defs)
+    while let Some(ctx) = iter.next(report, decls, defs)?
     {
         if let asm::ResolverNode::Symbol(ast_symbol) = ctx.node
         {
@@ -147,7 +147,14 @@ pub fn build_output(
                 instr.encoding.size.unwrap(),
                 true)?;
                 
-            let addr = ctx.get_address(defs, true).unwrap();
+            let addr = ctx
+                .get_address(
+                    report,
+                    ast_instr.span,
+                    defs,
+                    true)?
+                .unwrap();
+            
             let pos = ctx.get_output_position(defs).unwrap();
 
             overlap_checker.check_and_insert(
@@ -167,16 +174,17 @@ pub fn build_output(
         {
             let item_ref = ast_data.item_refs[elem_index];
             let elem = defs.data_elems.get(item_ref);
+            let span = ast_data.elems[elem_index].span();
 
             check_bank_usage(
                 report,
-                ast_data.elems[elem_index].span(),
+                span,
                 defs,
                 &ctx)?;
 
             check_bank_output(
                 report,
-                ast_data.elems[elem_index].span(),
+                span,
                 decls,
                 defs,
                 &ctx,
@@ -184,16 +192,22 @@ pub fn build_output(
                 true)?;
                 
             let pos = ctx.get_output_position(defs).unwrap();
-            let addr = ctx.get_address(defs, true).unwrap();
+            let addr = ctx
+                .get_address(
+                    report,
+                    span,
+                    defs,
+                    true)?
+                .unwrap();
 
             overlap_checker.check_and_insert(
                 report,
-                ast_data.elems[elem_index].span(),
+                span,
                 pos,
                 elem.encoding.size.unwrap())?;
 
             output.write_bigint_with_span(
-                ast_data.elems[elem_index].span(),
+                span,
                 pos,
                 addr,
                 &elem.encoding);

@@ -436,7 +436,7 @@ impl expr::Expr
 				}
 			}
 			
-			&expr::Expr::BinaryOp(span, ref op_span, op, ref lhs_expr, ref rhs_expr) =>
+			&expr::Expr::BinaryOp(span, _, op, ref lhs_expr, ref rhs_expr) =>
 			{
 				if op == expr::BinaryOp::Assign
 				{
@@ -523,33 +523,54 @@ impl expr::Expr
 						{
 							match op
 							{
-								expr::BinaryOp::Add => Ok(expr::Value::make_integer(lhs + rhs)),
-								expr::BinaryOp::Sub => Ok(expr::Value::make_integer(lhs - rhs)),
-								expr::BinaryOp::Mul => Ok(expr::Value::make_integer(lhs * rhs)),
+								expr::BinaryOp::Add =>
+									Ok(expr::Value::make_integer(
+										lhs.checked_add(
+											report,
+											span,
+											rhs)?)),
+
+								expr::BinaryOp::Sub =>
+									Ok(expr::Value::make_integer(
+										lhs.checked_sub(
+											report,
+											span,
+											rhs)?)),
+
+								expr::BinaryOp::Mul =>
+									Ok(expr::Value::make_integer(
+										lhs.checked_mul(
+											report,
+											span,
+											rhs)?)),
 								
-								expr::BinaryOp::Div => match lhs.checked_div(rhs)
-								{
-									Some(x) => Ok(expr::Value::make_integer(x)),
-									None => Err(report.error_span("division by zero", op_span.join(rhs_expr.span())))
-								},
+								expr::BinaryOp::Div =>
+									Ok(expr::Value::make_integer(
+										lhs.checked_div(
+											report,
+											span,
+											rhs)?)),
 								
-								expr::BinaryOp::Mod => match lhs.checked_rem(rhs)
-								{
-									Some(x) => Ok(expr::Value::make_integer(x)),
-									None => Err(report.error_span("modulo by zero", op_span.join(rhs_expr.span())))
-								},
+								expr::BinaryOp::Mod =>
+									Ok(expr::Value::make_integer(
+										lhs.checked_mod(
+											report,
+											span,
+											rhs)?)),
 								
-								expr::BinaryOp::Shl => match lhs.checked_shl(rhs)
-								{
-									Some(x) => Ok(expr::Value::make_integer(x)),
-									None => Err(report.error_span("invalid shift value", op_span.join(rhs_expr.span())))
-								},
+								expr::BinaryOp::Shl =>
+									Ok(expr::Value::make_integer(
+										lhs.checked_shl(
+											report,
+											span,
+											rhs)?)),
 								
-								expr::BinaryOp::Shr => match lhs.checked_shr(rhs)
-								{
-									Some(x) => Ok(expr::Value::make_integer(x)),
-									None => Err(report.error_span("invalid shift value", op_span.join(rhs_expr.span())))
-								},
+								expr::BinaryOp::Shr =>
+									Ok(expr::Value::make_integer(
+										lhs.checked_shr(
+											report,
+											span,
+											rhs)?)),
 								
 								expr::BinaryOp::And  => Ok(expr::Value::make_integer(lhs & rhs)),
 								expr::BinaryOp::Or   => Ok(expr::Value::make_integer(lhs | rhs)),

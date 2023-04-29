@@ -31,7 +31,9 @@ pub fn resolve_align(
         match value
         {
             expr::Value::Integer(bigint) =>
-                bigint.checked_to_usize().unwrap(),
+                bigint.checked_into::<usize>(
+                    report,
+                    ast_align.header_span)?,
 
             _ => 0,
         }

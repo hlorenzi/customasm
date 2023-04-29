@@ -303,13 +303,7 @@ impl Value
 		match self
 		{
 			Value::Integer(ref bigint) =>
-			{
-				match bigint.checked_to_usize()
-				{
-					Some(value) => Some(value),
-					None => None,
-				}
-			}
+				bigint.maybe_into::<usize>(),
 
 			_ => None,
 		}
@@ -325,20 +319,9 @@ impl Value
 		match self
 		{
 			Value::Integer(ref bigint) =>
-			{
-				match bigint.checked_to_usize()
-				{
-					Some(value) => Ok(value),
-					None =>
-					{
-						report.error_span(
-							"value out of supported range",
-							span);
-
-						Err(())
-					}
-				}
-			}
+				bigint.checked_into::<usize>(
+					report,
+					span),
 
 			_ =>
 			{
@@ -366,18 +349,11 @@ impl Value
 
 			Value::Integer(ref bigint) =>
 			{
-				match bigint.checked_to_usize()
-				{
-					Some(_) => Ok(self),
-					None =>
-					{
-						report.error_span(
-							"value out of supported range",
-							span);
+				bigint.checked_into::<usize>(
+					report,
+					span)?;
 
-						Err(())
-					}
-				}
+				Ok(self)
 			}
 
 			_ =>
@@ -402,18 +378,9 @@ impl Value
 		{
 			Value::Integer(ref bigint) =>
 			{
-				match bigint.checked_to_usize()
-				{
-					Some(0) | None =>
-					{
-						report.error_span(
-							"value out of supported range",
-							span);
-
-						Err(())
-					}
-					Some(value) => Ok(value),
-				}
+				bigint.checked_into_nonzero_usize(
+					report,
+					span)
 			}
 
 			_ =>

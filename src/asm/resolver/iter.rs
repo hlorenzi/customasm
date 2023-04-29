@@ -94,15 +94,18 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
     pub fn next<'iter>(
         &'iter mut self,
+        report: &mut diagn::Report,
         decls: &'decls asm::ItemDecls,
         defs: &asm::ItemDefs)
-        -> Option<ResolverContext<'iter, 'ast, 'decls>>
+        -> Result<Option<ResolverContext<'iter, 'ast, 'decls>>, ()>
     {
-        self.advance_address(defs);
+        self.advance_address(
+            report,
+            defs)?;
 
         if self.index >= self.ast.nodes.len()
         {
-            return None;
+            return Ok(None);
         }
 
         self.index_prev = Some(self.index);
@@ -210,7 +213,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
             }
         }
 
-        Some(ResolverContext {
+        Ok(Some(ResolverContext {
             node,
             is_first_iteration: self.is_first_iteration,
             is_last_iteration: self.is_last_iteration,
@@ -218,18 +221,20 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
             symbol_ctx: self.symbol_ctx,
             bank_ref: self.bank_ref,
             bank_data: &self.bank_data[self.bank_ref.0],
-        })
+        }))
     }
 
 
     fn advance_address(
         &mut self,
+        report: &mut diagn::Report,
         defs: &asm::ItemDefs)
+        -> Result<(), ()>
     {
         if self.index_prev.is_none() ||
             self.subindex_prev.is_none()
         {
-            return;
+            return Ok(());
         }
 
         let ast_any = &self.ast.nodes[self.index_prev.unwrap()];
@@ -304,8 +309,11 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let new_position = {
                     if addr.address >= bank.addr_start
                     {
-                        (&addr.address - &bank.addr_start)
-                            .checked_to_usize()
+                        &addr.address.checked_sub(
+                                report,
+                                ast_addr.header_span,
+                                &bank.addr_start)?
+                            .maybe_into::<usize>()
                             .unwrap_or(0)
                             * bank.addr_unit
                     }
@@ -320,6 +328,8 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
             _ => {}
         }
+
+        Ok(())
     }
 }
 
@@ -368,9 +378,11 @@ impl<'iter, 'ast, 'decls> ResolverContext<'iter, 'ast, 'decls>
 
     pub fn get_address(
         &self,
+        report: &mut diagn::Report,
+        span: diagn::Span,
         defs: &asm::ItemDefs,
         can_guess: bool)
-        -> Option<util::BigInt>
+        -> Result<Option<util::BigInt>, ()>
     {
         let bankdef = &defs.bankdefs.get(self.bank_ref);
         let addr_unit = bankdef.addr_unit;
@@ -380,14 +392,16 @@ impl<'iter, 'ast, 'decls> ResolverContext<'iter, 'ast, 'decls>
         let excess_bits = cur_position % addr_unit;
         if excess_bits != 0 && !can_guess
         {
-            return None;
+            return Ok(None);
         }
             
-        let addr =
-            &util::BigInt::from(cur_position / addr_unit) +
-            &bankdef.addr_start;
+        let addr = util::BigInt::from(cur_position / addr_unit)
+            .checked_add(
+                report,
+                span,
+                &bankdef.addr_start)?;
         
-        Some(addr)
+        Ok(Some(addr))
     }
 
 
@@ -430,9 +444,12 @@ impl<'iter, 'ast, 'decls> ResolverContext<'iter, 'ast, 'decls>
             return Err(());
         }
         
-        let addr =
-            &util::BigInt::from(cur_position / addr_unit) +
-            &bankdef.addr_start;
+            
+        let addr = util::BigInt::from(cur_position / addr_unit)
+            .checked_add(
+                report,
+                span,
+                &bankdef.addr_start)?;
 
         Ok(addr)
     }
