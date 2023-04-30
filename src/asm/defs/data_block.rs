@@ -36,8 +36,10 @@ pub fn define(
                     }
                 };
 
-                let statically_known = expr.is_value_statically_known(
-                    &expr::StaticallyKnownProvider::new());
+                let mut provider = expr::StaticallyKnownProvider::new();
+                provider.query_function = &asm::resolver::get_statically_known_builtin_fn;
+                
+                let statically_known = expr.is_value_statically_known(&provider);
 
                 let data_block = DataElement {
                     item_ref,

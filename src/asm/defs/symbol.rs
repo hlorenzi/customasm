@@ -29,8 +29,12 @@ pub fn define(
                 match node.kind
                 {
                     asm::AstSymbolKind::Constant(ref constant) =>
-                        constant.expr.is_value_statically_known(
-                            &expr::StaticallyKnownProvider::new()),
+                    {
+                        let mut provider = expr::StaticallyKnownProvider::new();
+                        provider.query_function = &asm::resolver::get_statically_known_builtin_fn;
+                        
+                        constant.expr.is_value_statically_known(&provider)
+                    }
                     
                     _ => false,
                 }

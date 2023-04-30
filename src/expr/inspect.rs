@@ -5,6 +5,7 @@ pub struct StaticallyKnownProvider<'a>
 {
 	pub locals: std::collections::HashMap<String, StaticallyKnownLocal>,
 	pub query_variable: &'a dyn Fn(&StaticallyKnownVariableQuery) -> bool,
+	pub query_function: &'a dyn Fn(&StaticallyKnownFunctionQuery) -> bool,
 }
 
 
@@ -15,6 +16,13 @@ pub struct StaticallyKnownVariableQuery<'a>
 }
 
 
+pub struct StaticallyKnownFunctionQuery<'a>
+{
+	pub func: &'a str,
+	pub args: &'a Vec<expr::Expr>,
+}
+
+
 impl<'a> StaticallyKnownProvider<'a>
 {
 	pub fn new() -> StaticallyKnownProvider<'a>
@@ -22,6 +30,7 @@ impl<'a> StaticallyKnownProvider<'a>
 		StaticallyKnownProvider {
 			locals: std::collections::HashMap::new(),
 			query_variable: &|_| false,
+			query_function: &|_| false,
 		}
 	}
 }
@@ -109,16 +118,7 @@ impl expr::Expr
 
 			expr::Expr::Call(_, func, args) =>
 			{
-				if let expr::Expr::Literal(
-					_,
-					expr::Value::ExprBuiltInFunction(ref builtin_name)) = *func.as_ref()
-				{
-					expr::get_static_size_builtin_fn(
-						builtin_name,
-						provider,
-						&args)
-				}
-				else if let expr::Expr::Variable(_, 0, ref names) = *func.as_ref()
+				if let expr::Expr::Variable(_, 0, ref names) = *func.as_ref()
 				{
 					if names.len() == 1
 					{
@@ -160,12 +160,12 @@ impl expr::Expr
 					}
 				}
 
-				let info = StaticallyKnownVariableQuery {
+				let query = StaticallyKnownVariableQuery {
 					hierarchy,
 					hierarchy_level: *hierarchy_level,
 				};
 
-				(provider.query_variable)(&info)
+				(provider.query_variable)(&query)
 			}
 			
 			expr::Expr::Literal(_, _) => true,
@@ -208,23 +208,31 @@ impl expr::Expr
 
 			expr::Expr::Call(_, func, args) =>
 			{
-				if let expr::Expr::Literal(
-					_,
-					expr::Value::ExprBuiltInFunction(ref builtin_name)) = *func.as_ref()
+				if let expr::Expr::Variable(_, 0, ref names) = *func.as_ref()
 				{
-					expr::get_statically_known_value_builtin_fn(
-						builtin_name,
-						provider,
-						&args)
-				}
-				else if let expr::Expr::Variable(_, 0, ref names) = *func.as_ref()
-				{
+					for arg in args
+					{
+						if !arg.is_value_statically_known(provider)
+						{
+							return false;
+						}
+					}
+					
 					if names.len() == 1
 					{
-						expr::get_statically_known_value_builtin_fn(
+						if expr::get_statically_known_value_builtin_fn(
 							&names[0],
-							provider,
 							&args)
+						{
+							return true;
+						}
+							
+						let query = StaticallyKnownFunctionQuery {
+							func: &names[0],
+							args,
+						};
+
+						(provider.query_function)(&query)
 					}
 					else
 					{

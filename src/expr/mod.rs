@@ -17,6 +17,7 @@ mod inspect;
 pub use inspect::{
     StaticallyKnownProvider,
     StaticallyKnownVariableQuery,
+    StaticallyKnownFunctionQuery,
     StaticallyKnownLocal,
 };
 

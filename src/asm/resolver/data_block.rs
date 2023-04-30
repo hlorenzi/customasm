@@ -154,7 +154,10 @@ pub fn resolve_data_element(
         {
             if opts.debug_iterations
             {
-                println!(" data: {:?} [static]", data_elem.encoding);
+                println!(
+                    " data: {} = {:?} [static]",
+                    fileserver.get_excerpt(expr.span()),
+                    data_elem.encoding);
             }
 
             data_elem.resolved = true;
@@ -175,7 +178,10 @@ pub fn resolve_data_element(
         
         if opts.debug_iterations
         {
-            println!(" data: {:?}", data_elem.encoding);
+            println!(
+                " data: {} = {:?}",
+                fileserver.get_excerpt(expr.span()),
+                data_elem.encoding);
         }
         
         return Ok(asm::ResolutionState::Unresolved);

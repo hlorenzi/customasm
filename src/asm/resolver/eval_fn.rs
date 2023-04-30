@@ -24,6 +24,20 @@ pub fn resolve_builtin_fn(
 }
 
 
+pub fn get_statically_known_builtin_fn(
+    query: &expr::StaticallyKnownFunctionQuery)
+    -> bool
+{
+    match query.func.as_ref()
+    {
+        "incbin" => true,
+        "incbinstr" => true,
+        "inchexstr" => true,
+        _ => false,
+    }
+}
+
+
 pub fn eval_fn(
     opts: &asm::AssemblyOptions,
     fileserver: &mut dyn util::FileServer,

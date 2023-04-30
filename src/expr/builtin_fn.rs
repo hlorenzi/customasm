@@ -22,7 +22,7 @@ pub fn resolve_builtin_fn(
 
 pub fn get_static_size_builtin_fn(
     name: &str,
-    info: &expr::StaticallyKnownProvider,
+    provider: &expr::StaticallyKnownProvider,
     args: &Vec<expr::Expr>)
     -> Option<usize>
 {
@@ -35,31 +35,37 @@ pub fn get_static_size_builtin_fn(
     };
 
     get_static_size_fn(
-        info,
+        provider,
         args)
 }
 
 
 pub fn get_statically_known_value_builtin_fn(
     name: &str,
-    info: &expr::StaticallyKnownProvider,
-    args: &Vec<expr::Expr>)
+    _args: &Vec<expr::Expr>)
     -> bool
 {
     match name.as_ref()
     {
-        "le" => get_statically_known_value_builtin_le(info, args),
+        "assert" => false,
+        "le" => true,
+        "ascii" => true,
+        "utf8" => true,
+        "utf16be" => true,
+        "utf16le" => true,
+        "utf32be" => true,
+        "utf32le" => true,
         _ => false,
     }
 }
 
 
 pub fn eval_builtin_fn(
-    info: &mut expr::EvalFunctionQuery)
+    query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>
 {
     let builtin_name = {
-        match info.func
+        match query.func
         {
             expr::Value::ExprBuiltInFunction(ref name) => name,
             _ => unreachable!(),
@@ -67,7 +73,7 @@ pub fn eval_builtin_fn(
     };
 
     let builtin_fn = resolve_builtin_fn(builtin_name).unwrap();
-    builtin_fn(info)
+    builtin_fn(query)
 }
 
 
@@ -126,30 +132,14 @@ pub fn eval_builtin_le(
 }
 
 
-pub fn get_statically_known_value_builtin_le(
-    info: &expr::StaticallyKnownProvider,
-    args: &Vec<expr::Expr>)
-    -> bool
-{
-    if args.len() == 1
-    {
-        args[0].is_value_statically_known(info)
-    }
-    else
-    {
-        false
-    }
-}
-
-
 pub fn get_static_size_builtin_le(
-    info: &expr::StaticallyKnownProvider,
+    provider: &expr::StaticallyKnownProvider,
     args: &Vec<expr::Expr>)
     -> Option<usize>
 {
     if args.len() == 1
     {
-        args[0].get_static_size(info)
+        args[0].get_static_size(provider)
     }
     else
     {

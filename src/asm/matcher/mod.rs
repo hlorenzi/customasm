@@ -224,6 +224,7 @@ fn get_match_statically_known(
 
     let mut provider = expr::StaticallyKnownProvider::new();
     provider.query_variable = &query_variable;
+    provider.query_function = &asm::resolver::get_statically_known_builtin_fn;
 
     for i in 0..rule.parameters.len()
     {
