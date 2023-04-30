@@ -1,6 +1,6 @@
 # customasm
-This is an assembler that takes custom, user-defined instruction sets
-and uses them to assemble source files.  
+`customasm` is an assembler that allows you to provide your own **custom
+instruction sets** to assemble your source files! 
 It can be useful, for example, if you're trying to test the bytecode of a new virtual machine,
 or if you're eager to write programs for that new microprocessor architecture 
 you just implemented in an FPGA chip!
@@ -23,22 +23,22 @@ you just implemented in an FPGA chip!
 [badge-discord-img]: https://img.shields.io/discord/394999035540275222?label=Join%20the%20Discord%20server!&logo=discord
 [badge-discord-url]: https://discord.com/invite/pXeDXGD
 
-[🖥️ Try it right now on your browser!](https://hlorenzi.github.io/customasm/web/)
+[🖥️ Try it right now on your web browser!](https://hlorenzi.github.io/customasm/web/)
 
 [🕹️ Check out an example project](/examples/nes_colors.asm) which targets the NES!
 
 [⌨️ Install the VSCode syntax highlight extension!](https://marketplace.visualstudio.com/items?itemName=hlorenzi.customasm-vscode)
 
-[❤️ Support me!](https://accounts.hlorenzi.com/supporters)
+[❤️ Support the author!](https://accounts.hlorenzi.com/supporters)
 
 ## Documentation
 
 [📚 Check out the wiki](https://github.com/hlorenzi/customasm/wiki)
-for a changelog, details on advanced features, and a how-to guide!
+for a changelog, documentation, and a how-to-start guide!
 
 ## Installation
 
-You can install directly from crates.io by running `cargo install customasm`.
+You can install directly from *crates.io* by running `cargo install customasm`.
 Then the `customasm` application should automatically become available in your
 command-line environment.
 
@@ -48,10 +48,6 @@ You can also download pre-built executables from the
 You can compile from source yourself by first cloning the repository and
 then simply running `cargo build`.
 There's also a battery of tests available at `cargo test`.
-
-## Upgrade to v0.11
-
-[📖 Check out instructions for migration from older versions to v0.11!](https://github.com/hlorenzi/customasm/wiki/Migrating-to-v0.11)
 
 ## Example
 
