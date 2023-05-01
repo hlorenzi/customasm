@@ -98,6 +98,22 @@ pub struct AssemblyOptions
 }
 
 
+impl AssemblyResult
+{
+    pub fn new() -> AssemblyResult
+    {
+        AssemblyResult {
+            error: false,
+            ast: None,
+            decls: None,
+            defs: None,
+            output: None,
+            iterations_taken: None,
+        }
+    }
+}
+
+
 impl AssemblyOptions
 {
     pub fn new() -> AssemblyOptions
@@ -120,14 +136,7 @@ pub fn assemble<S>(
     -> AssemblyResult
     where S: std::borrow::Borrow<str>
 {
-    let mut assembly = AssemblyResult {
-        error: false,
-        ast: None,
-        decls: None,
-        defs: None,
-        output: None,
-        iterations_taken: None,
-    };
+    let mut assembly = AssemblyResult::new();
 
     let mut run = || -> Result<(), ()>
     {

@@ -3,15 +3,15 @@ pub mod diagn;
 pub mod expr;
 pub mod syntax;
 pub mod util;
-pub mod driver;
-
 
 #[cfg(target_arch="wasm32")]
 pub mod webasm;
 
-
 #[cfg(test)]
 pub mod test;
+
+#[cfg(test)]
+pub mod driver;
 
 
 /// Convenience function to assemble a given string.

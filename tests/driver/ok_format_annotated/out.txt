@@ -1,0 +1,4 @@
+ outp | addr | data
+
+  0:0 |    0 | 55 ; halt
+  1:0 |    1 | 55 ; halt

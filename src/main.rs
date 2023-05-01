@@ -5,6 +5,9 @@ use customasm::*;
 include!(concat!(env!("OUT_DIR"), "/std_files.rs"));
 
 
+pub mod driver;
+
+
 fn main()
 {
 	let args: Vec<String> = std::env::args().collect();

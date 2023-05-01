@@ -7,9 +7,10 @@ include!(concat!(env!("OUT_DIR"), "/test.rs"));
 
 pub struct TestExpectations
 {
-    has_any: bool,
-    output: util::BitVec,
+    encoding: Option<util::BitVec>,
     messages: Vec<TestMessageExpectation>,
+    command: Option<Vec<String>>,
+    output_files: Vec<String>,
 }
 
 
@@ -25,13 +26,13 @@ pub struct TestMessageExpectation
 pub fn extract_expectations(
     orig_filename: &str,
     contents: &str)
-    -> Result<TestExpectations, ()>
+    -> TestExpectations
 {
-    let mut expectations = TestExpectations
-    {
-        has_any: false,
-        output: util::BitVec::new(),
+    let mut expectations = TestExpectations {
+        encoding: None,
         messages: Vec::new(),
+        command: None,
+        output_files: Vec::new(),
     };
 
     let mut line_num = 0;
@@ -40,7 +41,8 @@ pub fn extract_expectations(
     {
         if let Some(value_index) = line.find("; =")
         {
-            expectations.has_any = true;
+            let mut encoding = expectations.encoding
+                .unwrap_or_else(|| util::BitVec::new());
 
             let value_str = line.get((value_index + 3)..).unwrap().trim();
             if value_str != "0x"
@@ -52,14 +54,15 @@ pub fn extract_expectations(
                         value_str)
                     .unwrap();
                 
-                let index = expectations.output.len();
-                expectations.output.write_bigint(index, &value);
+                let index = encoding.len();
+                encoding.write_bigint(index, &value);
             }
-        }
-        else if line.find("; error:").is_some() || line.find("; note:").is_some()
-        {
-            expectations.has_any = true;
 
+            expectations.encoding = Some(encoding);
+        }
+        else if line.find("; error:").is_some() ||
+            line.find("; note:").is_some()
+        {
             let messages = line
                 .get((line.find("; ").unwrap() + 1)..).unwrap()
                 .split("/")
@@ -94,14 +97,39 @@ pub fn extract_expectations(
                     (orig_filename.to_string(), line_num, parts[1].to_string())
                 };
 
-                expectations.messages.push(TestMessageExpectation
-                {
+                expectations.messages.push(TestMessageExpectation {
                     kind,
                     file,
                     line,
                     excerpt,
                 });
             }
+        }
+        else if let Some(pos_command) = line.find("; command: ")
+        {
+            let mut args = line
+                .get((pos_command + "; command: ".len())..).unwrap()
+                .split(" ")
+                .map(|s| s.trim().to_string())
+                .collect::<Vec<_>>();
+
+            args = args.into_iter()
+                .map(|arg| match arg.as_ref() {
+                    "[file]" => orig_filename.to_string(),
+                    _ => arg,
+                })
+                .collect();
+
+            args.insert(0, "customasm".to_string());
+
+            expectations.command = Some(args);
+        }
+        else if let Some(pos_output) = line.find("; output: ")
+        {
+            expectations.output_files.push(line
+                .get((pos_output + "; output: ".len())..).unwrap()
+                .trim()
+                .to_string());
         }
         else if line.find(";").is_some() && line.find(":").is_some()
         {
@@ -111,7 +139,7 @@ pub fn extract_expectations(
         line_num += 1;
     }
 
-    Ok(expectations)
+    expectations
 }
 
 
@@ -161,13 +189,14 @@ pub fn test_file(filepath: &str)
         .to_string_lossy()
         .into_owned();
 
-	let expectations =
-        extract_expectations(
-            &stripped_filename,
-            &contents)
-        .unwrap();
+	let expectations = extract_expectations(
+        &stripped_filename,
+        &contents);
 
-    if !expectations.has_any
+    if expectations.encoding.is_none() &&
+        expectations.messages.len() == 0 &&
+        expectations.command.is_none() &&
+        expectations.output_files.len() == 0
     {
         return;
     }
@@ -178,25 +207,45 @@ pub fn test_file(filepath: &str)
 
 	let mut report = diagn::Report::new();
 
-    let opts = asm::AssemblyOptions::new();
 
-    let result = asm::assemble(
-        &mut report,
-        &opts,
-        &mut fileserver,
-        &[stripped_filename]);
+    let maybe_assembly = {
+        if let Some(command) = expectations.command
+        {
+            println!("command: {:?}", command);
+            println!("output: {:?}", expectations.output_files);
 
-    let output = result.output
-        .unwrap_or_else(|| util::BitVec::new());
+            driver::drive_inner(
+                &mut report,
+                &command,
+                &mut fileserver)
+        }
+        else
+        {
+            let opts = asm::AssemblyOptions::new();
 
-	let mut msgs = Vec::<u8>::new();
-	report.print_all(&mut msgs, &fileserver);
+            Ok(asm::assemble(
+                &mut report,
+                &opts,
+                &mut fileserver,
+                &[stripped_filename]))
+        }
+    };
+
+
+    let mut msgs = Vec::<u8>::new();
+    report.print_all(&mut msgs, &fileserver);
     print!("{}", String::from_utf8(msgs).unwrap());
-    
+
+
     let mut has_msg_mismatch = false;
     for msg in &expectations.messages
     {
-        if !report.has_message_at(&mut fileserver, &msg.file, msg.kind, msg.line, &msg.excerpt)
+        if !report.has_message_at(
+            &mut fileserver,
+            &msg.file,
+            msg.kind,
+            msg.line,
+            &msg.excerpt)
         {
             println!("\n\
                 > test failed -- missing diagnostics message\n\
@@ -206,10 +255,16 @@ pub fn test_file(filepath: &str)
             has_msg_mismatch = true;
         }
     }
+
+
+    let encoding = maybe_assembly
+        .map(|asm| asm.output)
+        .unwrap_or(None)
+        .unwrap_or_else(|| util::BitVec::new());
     
     if has_msg_mismatch
     {
-        println!("got output: 0x{:x}", &output);
+        println!("got encoding: 0x{:x}", &encoding);
         panic!("test failed");
     }
 
@@ -220,18 +275,68 @@ pub fn test_file(filepath: &str)
             > expected {} messages, got {}\n",
             expectations.messages.len(), report.len());
             
-        println!("got output: 0x{:x}", &output);
+        println!("got encoding: 0x{:x}", &encoding);
         panic!("test failed");
     }
     
-    if format!("{:x}", output) != format!("{:x}", expectations.output)
+    if let Some(expected_encoding) = expectations.encoding
     {
-        println!("\n\
-            > test failed -- output mismatch\n\
-            > got:      0x{:x}\n\
-            > expected: 0x{:x}\n",
-            &output, &expectations.output);
-            
-        panic!("test failed");
+        if format!("{:x}", encoding) != format!("{:x}", expected_encoding)
+        {
+            println!("\n\
+                > test failed -- encoding mismatch\n\
+                > got:      0x{:x}\n\
+                > expected: 0x{:x}\n",
+                &encoding, &expected_encoding);
+                
+            panic!("test failed");
+        }
+    }
+
+    for filename in &expectations.output_files
+    {
+        use util::FileServer;
+
+        let handle_expected = fileserver.get_handle_unwrap(
+            filename);
+
+        let handle_written = fileserver.get_handle_unwrap(
+            &format!(
+                "{}{}",
+                filename,
+                util::FILESERVER_MOCK_WRITE_FILENAME_SUFFIX));
+
+        let mut contents_expected = fileserver.get_bytes_unwrap(
+            handle_expected);
+
+        let mut contents_written = fileserver.get_bytes_unwrap(
+            handle_written);
+
+        // Normalize line endings if it's a text file
+        if filename.ends_with(".txt")
+        {
+            contents_expected.retain(|c| *c as char != '\r');
+            contents_written.retain(|c| *c as char != '\r');
+        }
+
+        if contents_expected != contents_written
+        {
+            println!("\n\
+                > test failed -- output file mismatch\n\
+                > file: `{}`\n\
+                > contents copied to `test_output_mismatch` for debugging\n",
+                filename);
+
+            println!("\
+                > got:      {:x?}\n\
+                > expected: {:x?}\n",
+                contents_written,
+                contents_expected);
+
+            std::fs::write("test_output_mismatch", contents_written)
+                .unwrap();
+                
+            panic!("test failed");
+        }
     }
 }

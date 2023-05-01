@@ -27,7 +27,7 @@ pub use self::fileserver::{
     FileServerHandle,
     FileServerMock,
     FileServerReal,
-    
+    FILESERVER_MOCK_WRITE_FILENAME_SUFFIX,
 };
 
 mod filename;

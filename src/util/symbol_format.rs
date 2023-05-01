@@ -88,16 +88,13 @@ impl util::SymbolManager<asm::Symbol>
 	{
 		let mut result = String::new();
 
-		for (name, item_ref) in &self.globals
-		{
-            self.format_recursive(
-                decls,
-                defs,
-                &mut result,
-                &mut vec![name.clone()],
-                self.get(*item_ref),
-                formatter);
-		}
+        self.format_recursive(
+            decls,
+            defs,
+            &mut result,
+            &self.globals,
+            &mut vec![],
+            formatter);
 
 		result
     }
@@ -108,8 +105,8 @@ impl util::SymbolManager<asm::Symbol>
         decls: &asm::ItemDecls,
         defs: &asm::ItemDefs,
         result: &mut String,
+        children: &std::collections::HashMap<String, util::ItemRef<asm::Symbol>>,
         hierarchy: &mut Vec<String>,
-        symbol_decl: &util::SymbolDecl<asm::Symbol>,
         formatter: &mut FnFormat)
         where FnFormat: FnMut(
             &mut String,
@@ -118,9 +115,21 @@ impl util::SymbolManager<asm::Symbol>
             &util::BigInt)
             -> ()
     {
-        if true//data.emit
+        let mut sorted_children = children
+            .iter()
+            .collect::<Vec<_>>();
+
+        sorted_children.sort_by_key(|c| c.1.0);
+
+        for (child_name, child_ref) in sorted_children
         {
+            hierarchy.push(child_name.clone());
+
+            
+            // TODO: Respect the #noemit directive
+            let symbol_decl = self.get(*child_ref);
             let symbol = defs.symbols.get(symbol_decl.item_ref);
+
             match symbol.value
             {
                 expr::Value::Integer(ref bigint) =>
@@ -141,18 +150,14 @@ impl util::SymbolManager<asm::Symbol>
                 }
                 _ => {}
             }
-        }
 
-        for (child_name, child_ref) in &symbol_decl.children
-        {
-            hierarchy.push(child_name.clone());
 
             self.format_recursive(
                 decls,
                 defs,
                 result,
+                &symbol_decl.children,
                 hierarchy,
-                &self.get(*child_ref),
                 formatter);
 
             hierarchy.pop();

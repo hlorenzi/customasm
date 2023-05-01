@@ -26,8 +26,8 @@ enum OutputFormat
 
 enum SymbolFormat
 {
-	Default,
-	MesenMlb,
+	Symbols,
+	SymbolsMesenMlb,
 }
 
 
@@ -36,13 +36,10 @@ pub fn drive(
 	fileserver: &mut dyn util::FileServer)
 	-> Result<(), ()>
 {
-	let opts = make_opts();
-	
 	let mut report = diagn::Report::new();
 	
 	let result = drive_inner(
 		&mut report,
-		&opts,
 		args,
 		fileserver);
 	
@@ -52,40 +49,36 @@ pub fn drive(
 	util::enable_windows_ansi_support();
 	report.print_all(&mut std::io::stderr(), fileserver);
 	
-	if let Err(show_usage) = result
-	{
-		if show_usage
-		{
-			print_version_short();
-			print_usage(&opts);
-		}
-	}
-	
-	result.map_err(|_| ())
+	result
+		.map(|_| ())
+		.map_err(|_| ())
 }
 
 
-fn drive_inner(
+pub fn drive_inner(
 	report: &mut diagn::Report,
-	opts: &getopts::Options,
 	args: &Vec<String>,
 	fileserver: &mut dyn util::FileServer)
-	-> Result<(), bool>
+	-> Result<asm::AssemblyResult, ()>
 {
-	let matches = parse_opts(report, opts, args)
-		.map_err(|_| true)?;
+	let opts = make_opts();
+	
+	let matches = parse_opts(
+		report,
+		&opts,
+		args)?;
 	
 	if matches.opt_present("h")
 	{
 		print_version_full();
 		print_usage(&opts);
-		return Ok(());
+		return Ok(asm::AssemblyResult::new());
 	}
 	
 	if matches.opt_present("v")
 	{
 		print_version_full();
-		return Ok(());
+		return Ok(asm::AssemblyResult::new());
 	}
 	
 	let quiet = matches.opt_present("q");
@@ -123,26 +116,26 @@ fn drive_inner(
 		Some(_) =>
 		{
 			report.error("invalid output format");
-			return Err(true);
+			return Err(());
 		}
 	};
 
 	let symbol_format = match matches.opt_str("symbol-format").as_ref().map(|s| s.as_ref())
 	{
 		None |
-		Some("default")   => SymbolFormat::Default,
-		Some("mesen-mlb") => SymbolFormat::MesenMlb,
+		Some("default")   => SymbolFormat::Symbols,
+		Some("mesen-mlb") => SymbolFormat::SymbolsMesenMlb,
 		Some(_) =>
 		{
 			report.error("invalid symbol format");
-			return Err(true);
+			return Err(());
 		}
 	};
 	
 	if matches.free.len() < 1
 	{
 		report.error("no input files");
-		return Err(true);
+		return Err(());
 	}
 	
 	let main_asm_file = matches.free[0].clone();
@@ -160,11 +153,7 @@ fn drive_inner(
 				{ None }
 			else
 			{
-				match get_default_output_filename(report, &main_asm_file)
-				{
-					Ok(f) => Some(f),
-					Err(_) => None,
-				}
+				Some(get_default_output_filename(report, &main_asm_file)?)
 			}
 		}
 	};
@@ -189,7 +178,7 @@ fn drive_inner(
 				Err(_) =>
 				{
 					report.error("invalid number of iterations");
-					return Err(true);
+					return Err(());
 				}
 			}
 		};
@@ -216,15 +205,15 @@ fn drive_inner(
 		root_filenames);
 
 	let output = {
-		match assembly.output
+		match assembly.output.as_ref()
 		{
 			Some(o) => o,
-			None => return Err(false),
+			None => return Err(()),
 		}
 	};
 
-	let decls = assembly.decls.unwrap();
-	let defs = assembly.defs.unwrap();
+	let decls = assembly.decls.as_ref().unwrap();
+	let defs = assembly.defs.as_ref().unwrap();
 	let iterations_taken = assembly.iterations_taken.unwrap();
 
 
@@ -236,8 +225,8 @@ fn drive_inner(
 	{
 		Some(match symbol_format
 		{
-			SymbolFormat::Default  => decls.symbols.format_default(&decls, &defs),
-			SymbolFormat::MesenMlb => decls.symbols.format_mesen_mlb(&decls, &defs),
+			SymbolFormat::Symbols  => decls.symbols.format_default(&decls, &defs),
+			SymbolFormat::SymbolsMesenMlb => decls.symbols.format_mesen_mlb(&decls, &defs),
 		})
 	};
 
@@ -289,11 +278,10 @@ fn drive_inner(
 		{
 			println!("writing `{}`...", &output_file);
 			fileserver.write_bytes(
-					report,
-					None,
-					&output_file,
-					&output_data)
-				.map_err(|_| false)?;
+				report,
+				None,
+				&output_file,
+				&output_data)?;
 
 			any_files_written = true;
 		}
@@ -304,11 +292,10 @@ fn drive_inner(
 			{
 				println!("writing `{}`...", &output_symbol_file);
 				fileserver.write_bytes(
-						report,
-						None,
-						&output_symbol_file,
-						&output_symbol_data.bytes().collect::<Vec<u8>>())
-					.map_err(|_| false)?;
+					report,
+					None,
+					&output_symbol_file,
+					&output_symbol_data.bytes().collect::<Vec<u8>>())?;
 
 				any_files_written = true;
 			}
@@ -326,7 +313,7 @@ fn drive_inner(
 			if iterations_taken == 1 { "" } else { "s" });
 	}
 	
-	Ok(())
+	Ok(assembly)
 }
 
 

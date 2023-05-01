@@ -4,5 +4,6 @@
 /.vscode/
 /Cargo.lock
 /test.asm
+/test_output_mismatch
 
 /web/customasm.gc.wasm

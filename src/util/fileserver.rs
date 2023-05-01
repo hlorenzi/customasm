@@ -4,6 +4,9 @@ use crate::*;
 pub type FileServerHandle = u16;
 
 
+pub const FILESERVER_MOCK_WRITE_FILENAME_SUFFIX: &str = "_written";
+
+
 pub trait FileServer
 {
 	fn get_handle(
@@ -39,6 +42,19 @@ pub trait FileServer
 		span: Option<diagn::Span>,
 		file_handle: FileServerHandle)
 		-> Result<Vec<u8>, ()>;
+
+	
+	fn get_bytes_unwrap(
+		&self,
+		file_handle: FileServerHandle)
+		-> Vec<u8>
+	{
+		self.get_bytes(
+				&mut diagn::Report::new(),
+				None,
+				file_handle)
+			.unwrap()
+	}
 	
 	
 	fn get_str(
@@ -284,8 +300,13 @@ impl FileServer for FileServerMock
 	{
 		let new_index = self.handles.len();
 
+		let mock_filename = format!(
+			"{}{}",
+			filename,
+			FILESERVER_MOCK_WRITE_FILENAME_SUFFIX);
+
 		let handle = *self.handles
-			.entry(filename.into())
+			.entry(mock_filename)
 			.or_insert(new_index.try_into().unwrap());
 
 		while handle as usize >= self.files.len()

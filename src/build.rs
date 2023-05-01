@@ -1,6 +1,3 @@
-extern crate vergen;
-
-
 use vergen::{ConstantsFlags, generate_cargo_keys};
 
 
@@ -23,7 +20,6 @@ fn generate_std()
 {
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let destination = std::path::Path::new(&out_dir).join("std_files.rs");
-    println!("{:?}", destination);
     let mut f = std::fs::File::create(&destination).unwrap();
 
     use std::io::Write;
@@ -43,6 +39,8 @@ fn generate_std_from_folder(
     folder: &std::path::Path,
     relative_path: &str)
 {
+    println!("cargo:rerun-if-changed={}", folder.to_string_lossy());
+
     for entry in std::fs::read_dir(folder).unwrap()
     {
         let entry = entry.unwrap();
@@ -52,13 +50,13 @@ fn generate_std_from_folder(
             .unwrap()
             .to_string_lossy();
 
-        println!("cargo:rerun-if-changed={}", path.to_string_lossy());
-
         let mut inner_relative_path = relative_path.to_string();
         inner_relative_path.push_str(&filename);
 
         if path.is_file()
         {
+            println!("cargo:rerun-if-changed={}", path.to_string_lossy());
+    
             let line = format!("\t(\"{}\", include_str!(\"{}\")),",
                 inner_relative_path,
                 path.to_string_lossy().replace('\\', "/"));
@@ -82,7 +80,6 @@ fn generate_tests()
 {
     let out_dir = std::env::var("OUT_DIR").unwrap();
     let destination = std::path::Path::new(&out_dir).join("test.rs");
-    println!("{:?}", destination);
     let mut f = std::fs::File::create(&destination).unwrap();
 
     generate_tests_from_folder(
@@ -97,21 +94,34 @@ fn generate_tests_from_folder(
     folder: &std::path::Path,
     test_name: &str)
 {
+    println!("cargo:rerun-if-changed={}", folder.to_string_lossy());
+
     for entry in std::fs::read_dir(folder).unwrap()
     {
         let entry = entry.unwrap();
         let path = entry.path();
-        let file_stem = path.file_stem()
+
+        let file_stem = path
+            .file_stem()
             .unwrap()
             .to_string_lossy();
-
-        println!("cargo:rerun-if-changed={}", path.to_string_lossy());
 
         let mut new_test_name = test_name.to_string();
         new_test_name.push_str(&file_stem);
 
         if path.is_file()
         {
+            println!("cargo:rerun-if-changed={}", path.to_string_lossy());
+    
+            let extension = path
+                .extension()
+                .map_or("", |e| e.to_str().unwrap());
+
+            if extension != "asm"
+            {
+                continue;
+            }
+
             writeln!(f, "#[test]").unwrap();
             writeln!(f, "fn {}()", new_test_name.replace(".", "_")).unwrap();
             writeln!(f, "{{").unwrap();
