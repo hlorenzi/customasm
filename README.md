@@ -36,6 +36,8 @@ you just implemented in an FPGA chip!
 [📚 Check out the wiki](https://github.com/hlorenzi/customasm/wiki)
 for a changelog, documentation, and a how-to-start guide!
 
+[💲 Check out the command-line help!](/src/usage_help.txt)
+
 ## Installation
 
 You can install directly from *crates.io* by running `cargo install customasm`.
@@ -56,13 +58,13 @@ Given the following file:
 ```asm
 #ruledef
 {
-    load r1, {value} => 0x11 @ value`8
-    load r2, {value} => 0x12 @ value`8
-    load r3, {value} => 0x13 @ value`8
-    add  r1, r2      => 0x21
-    sub  r3, {value} => 0x33 @ value`8
-    jnz  {address}   => 0x40 @ address`16
-    ret              => 0x50
+    load r1, {value: i8} => 0x11 @ value
+    load r2, {value: i8} => 0x12 @ value
+    load r3, {value: i8} => 0x13 @ value
+    add  r1, r2          => 0x21
+    sub  r3, {value: i8} => 0x33 @ value
+    jnz  {address: u16}  => 0x40 @ address
+    ret                  => 0x50
 }
 
 multiply3x4:
@@ -82,7 +84,7 @@ multiply3x4:
 instructions into binary code:
 
 ```asm
- outp | addr | data
+ outp | addr | data (base 16)
 
   0:0 |    0 |          ; multiply3x4:
   0:0 |    0 | 11 00    ; load r1, 0
@@ -93,28 +95,4 @@ instructions into binary code:
   7:0 |    7 | 33 01    ; sub r3, 1
   9:0 |    9 | 40 00 06 ; jnz .loop
   c:0 |    c | 50       ; ret
-```
-
-## Command-Line Usage
-
-```
-Usage: customasm [options] <asm-file-1> ... <asm-file-N>
-
-Options:
-    -f, --format FORMAT The format of the output file. Possible formats:
-                        binary, annotated, annotatedbin, binstr, hexstr,
-                        bindump, hexdump, mif, intelhex, deccomma, hexcomma,
-                        decspace, hexspace, decc, hexc, logisim8, logisim16,
-                        addrspan
-    -o, --output [FILE] The name of the output file.
-        --symbol-format SYMBOL-FORMAT
-                        The format of the symbol file. Possible formats:
-                        default, mesen-mlb
-    -s, --symbol [FILE] The name of the output symbol file.
-    -t, --iter [NUM]    The max number of passes the assembler will attempt
-                        (default: 10).
-    -p, --print         Print output to stdout instead of writing to a file.
-    -q, --quiet         Suppress progress reports.
-    -v, --version       Display version information.
-    -h, --help          Display this information.
 ```

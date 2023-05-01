@@ -1,0 +1,73 @@
+Usage:
+    customasm <INPUT-FILES...> [options] <OUTPUT-GROUPS...>
+
+    Specify multiple OUTPUT-GROUPS using the -- separator.
+    For example: (ignore the line breaks and backslashes)
+
+    customasm main.asm \
+        -f binary -o main.bin -- \
+        -f annotated -p -- \
+        -f symbols -o symbols.txt
+
+Global Options:
+    -t, --iter [NUM]    The max number of resolution iterations to attempt. 
+                        (Default: 10)
+        --debug-iters   Print debug info for the resolution iterations.     
+        --debug-no-optimize-static
+                        Prevent optimization of statically-known values.    
+        --debug-no-optimize-matcher
+                        Prevent optimization of the instruction matcher     
+                        algorithm.
+    -q, --quiet         Suppress progress reports.
+    -v, --version       Display version information.
+    -h, --help          Display this information.
+
+Output Options:
+    -f, --format FORMAT The format of the output file.
+                        See below for possible values.
+    -o, --output [FILE] The name of the output file.
+    -p, --print         Print the output to the screen instead of
+                        writing to a file.
+
+Format Usage:
+    Use the format names below with or without
+    the extra parameters, separated by commas,
+    with no whitespace in between.
+
+    Example: -f annotated
+    Example: -f annotated,group:4
+    Example: -f annotated,base:8,group:3
+
+Formats:
+    binary
+
+    annotated,base:16,group:2
+        Annotate the output data with snippets
+        of the source code.
+
+    annotatedbin
+        Same as: annotated,base:2,group:8
+    
+    binstr
+    hexstr
+    bindump
+    hexdump
+
+    mif
+    intelhex
+
+    deccomma
+    hexcomma
+    decspace
+    hexspace
+
+    decc
+    hexc
+
+    logisim8
+    logisim16
+
+    addrspan
+
+    symbols
+    mesen-mlb

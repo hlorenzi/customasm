@@ -356,36 +356,28 @@ impl util::BitVec
 		
 		result
     }
-    
-
-    pub fn format_annotated_bin(&self, fileserver: &dyn util::FileServer) -> String
-	{
-		self.format_annotated(fileserver, 1, 8)
-	}
 	
 	
-	pub fn format_annotated_hex(&self, fileserver: &dyn util::FileServer) -> String
-	{
-		self.format_annotated(fileserver, 4, 2)
-	}
-	
-	
-	pub fn format_annotated(&self, fileserver: &dyn util::FileServer, digit_bits: usize, byte_digits: usize) -> String
+	pub fn format_annotated(
+		&self,
+		fileserver: &dyn util::FileServer,
+		base: usize,
+		digits_per_group: usize)
+		-> String
 	{
 		let mut result = String::new();
-		
-		let byte_bits = byte_digits * digit_bits;
+
+		let bits_per_digit = (base - 1).count_ones() as usize;
+		let bits_per_group = digits_per_group * bits_per_digit;
 		
 		let mut outp_width = 2;
-		let outp_bit_width = format!("{:x}", digit_bits - 1).len();
+		let mut outp_bit_width = 1;
 		let mut addr_width = 4;
-		let mut content_width = (byte_digits + 1) * 1 - 1;
+		let mut content_width = (digits_per_group + 1) * 1 - 1;
 						
 		let mut sorted_spans = self.spans.clone();
         sorted_spans.sort_by(|a, b|
-        {
-            a.offset.cmp(&b.offset)
-        });
+        	a.offset.cmp(&b.offset));
 		
         for span in &sorted_spans
         {
@@ -393,16 +385,20 @@ impl util::BitVec
             {
                 outp_width = std::cmp::max(
                     outp_width, 
-                    format!("{:x}", offset / byte_bits).len());
-
+                    format!("{:x}", offset / bits_per_group).len());
+					
+				outp_bit_width = std::cmp::max(
+					outp_bit_width, 
+					format!("{:x}", offset % bits_per_group).len());
+					
                 addr_width = std::cmp::max(
                     addr_width,
                     format!("{:x}", span.addr).len());
 
-                let data_digits = span.size / digit_bits + if span.size % digit_bits == 0 { 0 } else { 1 };
-				let this_content_width = data_digits + data_digits / byte_digits;
+                let data_digits = span.size / bits_per_digit + if span.size % bits_per_digit == 0 { 0 } else { 1 };
+				let this_content_width = data_digits + data_digits / digits_per_group;
 
-				if this_content_width > 1 && this_content_width <= (byte_digits + 1) * 5
+				if this_content_width > 1 && this_content_width <= (digits_per_group + 1) * 5
 				{
 					content_width = std::cmp::max(
 						content_width,
@@ -412,7 +408,8 @@ impl util::BitVec
 		}
 		
 		result.push_str(&format!(" {:>1$} |", "outp", outp_width + outp_bit_width + 1));
-		result.push_str(&format!(" {:>1$} | data", "addr", addr_width));
+		result.push_str(&format!(" {:>1$} |", "addr", addr_width));
+		result.push_str(&format!(" data (base {})", base));
 		result.push_str("\n");
 		result.push_str("\n");
 		
@@ -423,8 +420,8 @@ impl util::BitVec
         {
             if let Some(offset) = span.offset
             {
-                result.push_str(&format!(" {:1$x}", offset / byte_bits, outp_width));
-                result.push_str(&format!(":{:1$x} | ", offset % byte_bits, outp_bit_width));
+                result.push_str(&format!(" {:1$x}", offset / bits_per_group, outp_width));
+                result.push_str(&format!(":{:1$x} | ", offset % bits_per_group, outp_bit_width));
             }
             else
             {
@@ -436,16 +433,16 @@ impl util::BitVec
             
             let mut contents_str = String::new();
             
-            let digit_num = span.size / digit_bits + if span.size % digit_bits == 0 { 0 } else { 1 };
+            let digit_num = span.size / bits_per_digit + if span.size % bits_per_digit == 0 { 0 } else { 1 };
             for digit_index in 0..digit_num
             {
-                if digit_index > 0 && digit_index % byte_digits == 0
+                if digit_index > 0 && digit_index % digits_per_group == 0
                     { contents_str.push_str(" "); }
             
                 let mut digit = 0;
-                for bit_index in 0..digit_bits
+                for bit_index in 0..bits_per_digit
                 {
-                    let i = span.offset.unwrap() + digit_index * digit_bits + bit_index;
+                    let i = span.offset.unwrap() + digit_index * bits_per_digit + bit_index;
                     let bit = self.read_bit(i);
 
                     digit <<= 1;

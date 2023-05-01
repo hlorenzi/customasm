@@ -7,12 +7,13 @@ include!(concat!(env!("OUT_DIR"), "/std_files.rs"));
 
 #[no_mangle]
 pub unsafe extern fn wasm_assemble(
-	format: u32,
+	format_str: *const String,
 	src: *mut String)
 	-> *mut String
 {
 	let virtual_filename = "asm";
 
+	let format_str = std::mem::transmute::<_, &String>(format_str);
 	let src = std::mem::transmute::<_, &String>(src);
 			
 	let mut report = diagn::Report::new();
@@ -42,31 +43,20 @@ pub unsafe extern fn wasm_assemble(
 			}
 		}
 	};
-	
-	let formatted = {
-		match format
-		{
-			0 => output.format_annotated_hex(&fileserver),
-			1 => output.format_annotated_bin(&fileserver),
-			2 => output.format_hexdump(),
-			3 => output.format_bindump(),
-			4 => output.format_hexstr(),
-			5 => output.format_binstr(),
-			6 => output.format_mif(),
-			7 => output.format_intelhex(),
-			8 => output.format_separator(10, ", "),
-			9 => output.format_separator(16, ", "),
-			10 => output.format_separator(10, " "),
-			11 => output.format_separator(16, " "),
-			12 => output.format_c_array(10),
-			13 => output.format_c_array(16),
-			14 => output.format_logisim(8),
-			15 => output.format_logisim(16),
-			_ => unreachable!()
-		}
-	};
 
-	wasm_string_new_with(formatted)
+	let format = driver::parse_output_format(
+			&mut report,
+			format_str)
+		.unwrap();
+	
+	let formatted = driver::format_output(
+		&fileserver,
+		&assembly.decls.as_ref().unwrap(),
+		&assembly.defs.as_ref().unwrap(),
+		&output,
+		format);
+
+	wasm_string_new_with(String::from_utf8_lossy(&formatted))
 }
 
 

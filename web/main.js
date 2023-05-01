@@ -1,5 +1,6 @@
 let g_wasm = null
 let g_codeEditor = null
+let g_initialText = ""
 
 
 function main()
@@ -33,7 +34,11 @@ function setupEditor()
 	
 	fetch("../examples/basic.asm")
 		.then(r => r.text())
-		.then(r => g_codeEditor.setValue(r))
+		.then(r => {
+			r = r.replace(/\r/g, "")
+			g_initialText = r
+			g_codeEditor.setValue(r)
+		})
 	
 	g_codeEditor.refresh()
 }
@@ -65,9 +70,14 @@ function onResize()
 }
 
 
-function onBeforeUnload()
+function onBeforeUnload(ev)
 {
-	return "Your work will be lost if you close the page."
+	if (g_codeEditor.getValue() != g_initialText)
+    {
+        ev.preventDefault()
+        ev.returnValue = "Your work will be lost if you close the page."
+        return ev.returnValue
+    }
 }
 
 
@@ -89,13 +99,16 @@ function assemble()
 	if (g_wasm == null)
 		return
 	
-	let format = document.getElementById("selectFormat").selectedIndex
-	
-	let asmPtr = makeRustString(g_codeEditor.getValue())
+	let formatPtr = makeRustString(
+		document.getElementById("selectFormat").value)
+
+	let asmPtr = makeRustString(
+		g_codeEditor.getValue())
+
 	let outputPtr = null
 	try
 	{
-		outputPtr = g_wasm.instance.exports.wasm_assemble(format, asmPtr)
+		outputPtr = g_wasm.instance.exports.wasm_assemble(formatPtr, asmPtr)
 	}
 	catch (e)
 	{

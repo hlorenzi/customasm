@@ -88,28 +88,34 @@
 				<div id="divCodeMirror"></div>
 			</div>
 			<div id="divHeader">
+				<a href="https://github.com/hlorenzi/customasm">
+					customasm
+					
+					<span id="spanVersion"></span></a>
+				--
 				Output Format:
 				<select id="selectFormat">
-					<option>Annotated</option>
-					<option>Annotated Bin</option>
-					<option>Hex Dump</option>
-					<option>Bin Dump</option>
-					<option>Hex String</option>
-					<option>Bin String</option>
-					<option>MIF</option>
-					<option>Intel HEX</option>
-					<option>Comma-separated Dec</option>
-					<option>Comma-separated Hex</option>
-					<option>Space-separated Dec</option>
-					<option>Space-separated Hex</option>
-					<option>C Dec Array</option>
-					<option>C Hex Array</option>
-					<option>LogiSim 8-bit</option>
-					<option>LogiSim 16-bit</option>
+					<option value="annotated">Annotated</option>
+					<option value="annotated,base:2,group:8">Annotated Bin</option>
+					<option value="hexdump">Hex Dump</option>
+					<option value="bindump">Bin Dump</option>
+					<option value="hexstr">Hex String</option>
+					<option value="binstr">Bin String</option>
+					<option value="mif">MIF</option>
+					<option value="intelhex">Intel HEX</option>
+					<option value="deccomma">Comma-separated Dec</option>
+					<option value="hexcomma">Comma-separated Hex</option>
+					<option value="decspace">Space-separated Dec</option>
+					<option value="hexspace">Space-separated Hex</option>
+					<option value="decc">C Dec Array</option>
+					<option value="hexc">C Hex Array</option>
+					<option value="logisim8">LogiSim 8-bit</option>
+					<option value="logisim16">LogiSim 16-bit</option>
+					<option value="addrspan">Address-Span</option>
+					<option value="symbols">Symbols</option>
+					<option value="mesen-mlb">Mesen MLB</option>
 				</select>
 				<button id="buttonAssemble" onclick="assemble()" disabled>Assemble (Ctrl+Enter) &gt;&gt;</button>
-				<span id="spanVersion"></span>
-				<a href="https://github.com/hlorenzi/customasm">GitHub Repository</a>
 			</div>
 			<div id="divOutput">
 				<div id="divOutputText"></div>

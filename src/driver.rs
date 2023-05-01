@@ -1,11 +1,33 @@
 use crate::*;
 
 
-enum OutputFormat
+struct Command
+{
+	pub input_filenames: Vec<String>,
+	pub output_groups: Vec<CommandOutput>,
+	pub opts: asm::AssemblyOptions,
+	pub quiet: bool,
+	pub show_version: bool,
+	pub show_help: bool,
+}
+
+
+struct CommandOutput
+{
+	pub format: Option<OutputFormat>,
+	pub printout: bool,
+	pub output_filename: Option<String>,
+}
+
+
+#[derive(Copy, Clone)]
+pub enum OutputFormat
 {
 	Binary,
-	AnnotatedHex,
-	AnnotatedBin,
+	Annotated {
+		base: usize,
+		group: usize,
+	},
 	BinStr,
 	HexStr,
 	BinDump,
@@ -21,11 +43,7 @@ enum OutputFormat
 	LogiSim8,
 	LogiSim16,
 	AddressSpan,
-}
-
-
-enum SymbolFormat
-{
+	
 	Symbols,
 	SymbolsMesenMlb,
 }
@@ -61,138 +79,34 @@ pub fn drive_inner(
 	fileserver: &mut dyn util::FileServer)
 	-> Result<asm::AssemblyResult, ()>
 {
-	let opts = make_opts();
-	
-	let matches = parse_opts(
+	let command = parse_command(
 		report,
-		&opts,
 		args)?;
 	
-	if matches.opt_present("h")
+	if command.show_help
 	{
 		print_version_full();
-		print_usage(&opts);
+		print_usage();
 		return Ok(asm::AssemblyResult::new());
 	}
 	
-	if matches.opt_present("v")
+	if command.show_version
 	{
 		print_version_full();
 		return Ok(asm::AssemblyResult::new());
 	}
-	
-	let quiet = matches.opt_present("q");
-	let out_stdout = matches.opt_present("p");
-	
-	let out_format = match matches.opt_str("f").as_ref().map(|s| s.as_ref())
-	{
-		Some("annotated")    => OutputFormat::AnnotatedHex,
-		Some("annotatedhex") => OutputFormat::AnnotatedHex,
-		Some("annotatedbin") => OutputFormat::AnnotatedBin,
-		
-		Some("binstr")    => OutputFormat::BinStr,
-		Some("bindump")   => OutputFormat::BinDump,
-		Some("hexstr")    => OutputFormat::HexStr,
-		Some("hexdump")   => OutputFormat::HexDump,
-		Some("binary")    => OutputFormat::Binary,
-		Some("mif")       => OutputFormat::Mif,
-		Some("intelhex")  => OutputFormat::IntelHex,
-		Some("deccomma")  => OutputFormat::DecComma,
-		Some("hexcomma")  => OutputFormat::HexComma,
-		Some("decspace")  => OutputFormat::DecSpace,
-		Some("hexspace")  => OutputFormat::HexSpace,
-		Some("decc")      => OutputFormat::DecC,
-		Some("hexc")      => OutputFormat::HexC,
-		Some("c")         => OutputFormat::HexC,
-		Some("logisim8")  => OutputFormat::LogiSim8,
-		Some("logisim16") => OutputFormat::LogiSim16,
-		Some("addrspan")  => OutputFormat::AddressSpan,
-		
-		None => if out_stdout
-			{ OutputFormat::AnnotatedHex }
-		else
-			{ OutputFormat::Binary },
-		
-		Some(_) =>
-		{
-			report.error("invalid output format");
-			return Err(());
-		}
-	};
 
-	let symbol_format = match matches.opt_str("symbol-format").as_ref().map(|s| s.as_ref())
-	{
-		None |
-		Some("default")   => SymbolFormat::Symbols,
-		Some("mesen-mlb") => SymbolFormat::SymbolsMesenMlb,
-		Some(_) =>
-		{
-			report.error("invalid symbol format");
-			return Err(());
-		}
-	};
-	
-	if matches.free.len() < 1
+	if command.input_filenames.len() < 1
 	{
 		report.error("no input files");
 		return Err(());
 	}
-	
-	let main_asm_file = matches.free[0].clone();
-	
-	let output_symbol_requested = matches.opt_present("s");
-	let output_requested = matches.opt_present("o");
 
-	let output_symbol_file = matches.opt_str("s");
-	let output_file = match matches.opt_str("o")
+	if !command.quiet
 	{
-		Some(f) => Some(f),
-		None =>
-		{
-			if output_symbol_requested || output_symbol_file.is_some()
-				{ None }
-			else
-			{
-				Some(get_default_output_filename(report, &main_asm_file)?)
-			}
-		}
-	};
+		print_version_short();
 
-	let mut opts = asm::AssemblyOptions::new();
-	
-	opts.debug_iterations =
-		matches.opt_present("debug-iters");
-
-	opts.optimize_statically_known =
-		!matches.opt_present("debug-no-optimize-static");
-
-	opts.optimize_instruction_matching =
-		!matches.opt_present("debug-no-optimize-matcher");
-
-	if let Some(t) = matches.opt_str("t")
-	{
-		opts.max_iterations = {
-			match t.parse::<usize>()
-			{
-				Ok(t) => t,
-				Err(_) =>
-				{
-					report.error("invalid number of iterations");
-					return Err(());
-				}
-			}
-		};
-	}
-	
-	if !quiet
-		{ print_version_short(); }
-
-
-	let root_filenames = &matches.free;
-	
-	if !quiet
-	{
-		for filename in root_filenames
+		for filename in &command.input_filenames
 		{
 			println!("assembling `{}`...", filename);
 		}
@@ -200,112 +114,57 @@ pub fn drive_inner(
 
 	let assembly = asm::assemble(
 		report,
-		&opts,
+		&command.opts,
 		fileserver,
-		root_filenames);
+		&command.input_filenames);
 
-	let output = {
-		match assembly.output.as_ref()
-		{
-			Some(o) => o,
-			None => return Err(()),
-		}
-	};
+	let output = assembly.output
+		.as_ref()
+		.ok_or(())?;
 
 	let decls = assembly.decls.as_ref().unwrap();
 	let defs = assembly.defs.as_ref().unwrap();
 	let iterations_taken = assembly.iterations_taken.unwrap();
 
-
-	let output_symbol_data = if output_symbol_file.is_none()
+	for output_group in &command.output_groups
 	{
-		None
-	}
-	else
-	{
-		Some(match symbol_format
+		if let Some(format) = output_group.format
 		{
-			SymbolFormat::Symbols  => decls.symbols.format_default(&decls, &defs),
-			SymbolFormat::SymbolsMesenMlb => decls.symbols.format_mesen_mlb(&decls, &defs),
-		})
-	};
+			let formatted = format_output(
+				fileserver,
+				decls,
+				defs,
+				output,
+				format);
 
-	let output_data: Vec<u8> = match out_format
-	{
-		OutputFormat::Binary    => output.format_binary(),
-		
-		OutputFormat::BinStr    => output.format_binstr()           .bytes().collect(),
-		OutputFormat::HexStr    => output.format_hexstr()           .bytes().collect(),
-		OutputFormat::BinDump   => output.format_bindump()          .bytes().collect(),
-		OutputFormat::HexDump   => output.format_hexdump()          .bytes().collect(),
-		OutputFormat::Mif       => output.format_mif()              .bytes().collect(),
-		OutputFormat::IntelHex  => output.format_intelhex()         .bytes().collect(),
-		OutputFormat::DecComma  => output.format_separator(10, ", ").bytes().collect(),
-		OutputFormat::HexComma  => output.format_separator(16, ", ").bytes().collect(),
-		OutputFormat::DecSpace  => output.format_separator(10, " ") .bytes().collect(),
-		OutputFormat::HexSpace  => output.format_separator(16, " ") .bytes().collect(),
-		OutputFormat::DecC      => output.format_c_array(10)        .bytes().collect(),
-		OutputFormat::HexC      => output.format_c_array(16)        .bytes().collect(),
-		OutputFormat::LogiSim8  => output.format_logisim(8)         .bytes().collect(),
-		OutputFormat::LogiSim16 => output.format_logisim(16)        .bytes().collect(),
-		
-		OutputFormat::AnnotatedHex => output.format_annotated_hex(fileserver).bytes().collect(),
-		OutputFormat::AnnotatedBin => output.format_annotated_bin(fileserver).bytes().collect(),
-		OutputFormat::AddressSpan  => output.format_addrspan     (fileserver).bytes().collect(),
-	};
-	
-	if out_stdout
-	{
-		if !quiet
-		{
-			println!("");
-		}
-		
-		if output_requested || output_file.is_some()
-			{ println!("{}", String::from_utf8_lossy(&output_data)); }
-			
-		if output_symbol_requested || output_symbol_file.is_some()
-		{
-			if let Some(output_symbol_data) = output_symbol_data
-				{ println!("{}", &output_symbol_data); }
-		}
-	}
-	else
-	{
-		let mut any_files_written = false;
-
-		if let Some(ref output_file) = output_file
-		{
-			println!("writing `{}`...", &output_file);
-			fileserver.write_bytes(
-				report,
-				None,
-				&output_file,
-				&output_data)?;
-
-			any_files_written = true;
-		}
-
-		if let Some(output_symbol_data) = output_symbol_data
-		{
-			if let Some(ref output_symbol_file) = output_symbol_file
+			if output_group.printout
 			{
-				println!("writing `{}`...", &output_symbol_file);
+				if !command.quiet
+				{
+					println!("");
+				}
+				
+				println!(
+					"{}",
+					String::from_utf8_lossy(&formatted));
+			}
+			else if let Some(ref output_filename) = output_group.output_filename
+			{
+				if !command.quiet
+				{
+					println!("writing `{}`...", &output_filename);
+				}
+
 				fileserver.write_bytes(
 					report,
 					None,
-					&output_symbol_file,
-					&output_symbol_data.bytes().collect::<Vec<u8>>())?;
-
-				any_files_written = true;
+					&output_filename,
+					&formatted)?;
 			}
 		}
-
-		if !any_files_written
-			{ println!("no files written"); }
 	}
 	
-	if !quiet
+	if !command.quiet
 	{
 		println!(
 			"resolved in {} iteration{}",
@@ -319,50 +178,446 @@ pub fn drive_inner(
 
 fn make_opts() -> getopts::Options
 {
+	let asm_opts = asm::AssemblyOptions::new();
+
     let mut opts = getopts::Options::new();
-    opts.optopt("f", "format", "The format of the output file. Possible formats: binary, annotated, annotatedbin, binstr, hexstr, bindump, hexdump, mif, intelhex, deccomma, hexcomma, decspace, hexspace, decc, hexc, logisim8, logisim16, addrspan", "FORMAT");
-    opts.opt("o", "output", "The name of the output file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
-    opts.optopt("", "symbol-format", "The format of the symbol file. Possible formats: default, mesen-mlb", "SYMBOL-FORMAT");
-    opts.opt("s", "symbol", "The name of the output symbol file.", "FILE", getopts::HasArg::Maybe, getopts::Occur::Optional);
-    opts.opt("t", "iter", "The max number of passes the assembler will attempt (default: 10).", "NUM", getopts::HasArg::Maybe, getopts::Occur::Optional);
-	opts.optflag("p", "print", "Print output to stdout instead of writing to a file.");
-    opts.optflag("q", "quiet", "Suppress progress reports.");
-    opts.optflag("", "debug-iters", "Print debug info for the resolution iterations.");
-	opts.optflag("", "debug-no-optimize-static", "Prevent optimization of statically-known values.");
-	opts.optflag("", "debug-no-optimize-matcher", "Prevent optimization of the instruction matcher algorithm.");
-    opts.optflag("v", "version", "Display version information.");
-	opts.optflag("h", "help", "Display this information.");
+	
+    opts.optopt(
+		"f", "format",
+		"The format of the output file.\n\
+		See below for possible values.",
+		"FORMAT");
+
+	opts.opt(
+		"o", "output",
+		"The name of the output file.",
+		"FILE",
+		getopts::HasArg::Maybe,
+		getopts::Occur::Optional);
+	
+    opts.opt(
+		"t", "iter",
+		&format!(
+			"The max number of resolution iterations to attempt. (Default: {})",
+			asm_opts.max_iterations),
+		"NUM",
+		getopts::HasArg::Maybe,
+		getopts::Occur::Optional);
+	
+	opts.optflag(
+		"p", "print",
+		"Print the output to the screen instead of writing to a file.");
+
+    opts.optflag(
+		"q", "quiet",
+		"Suppress progress reports.");
+
+    opts.optflag(
+		"", "debug-iters",
+		"Print debug info for the resolution iterations.");
+
+	opts.optflag(
+		"", "debug-no-optimize-static",
+		"Prevent optimization of statically-known values.");
+
+	opts.optflag(
+		"", "debug-no-optimize-matcher",
+		"Prevent optimization of the instruction matcher algorithm.");
+
+    opts.optflag(
+		"v", "version",
+		"Display version information.");
+
+	opts.optflag(
+		"h", "help",
+		"Display this information.");
 	
 	opts
 }
 
 
-fn parse_opts(
+fn parse_command(
 	report: &mut diagn::Report,
-	opts: &getopts::Options,
 	args: &Vec<String>)
-	-> Result<getopts::Matches, ()>
+	-> Result<Command, ()>
 {
-	match opts.parse(&args[1..])
+	let args_groups = args[1..]
+		.split(|arg| arg == "--")
+		.collect::<Vec<_>>();
+
+	let mut command = Command {
+		input_filenames: Vec::new(),
+		output_groups: Vec::new(),
+		opts: asm::AssemblyOptions::new(),
+		quiet: false,
+		show_version: false,
+		show_help: false,
+	};
+
+	let parse_opts = make_opts();
+
+	for arg_group in args_groups
 	{
-        Ok(m) => Ok(m),
-        Err(f) =>
+		let parsed = {
+			match parse_opts.parse(arg_group)
+			{
+				Ok(parsed) => parsed,
+				Err(failure) =>
+				{
+					report.error(format!("{}", failure));
+					return Err(());
+				}
+			}
+		};
+
+		let mut group = CommandOutput {
+			format: None,
+			output_filename: None,
+			printout: false,
+		};
+
+
+		// Parse options for current output group
+		if let Some(format_str) = parsed.opt_str("f").as_ref()
 		{
-			report.error(format!("{}", f));
-			Err(())
+			group.format = Some(parse_output_format(
+				report,
+				&format_str)?);
 		}
-    }
+
+		if let Some(output_filename) = parsed.opt_str("o").as_ref()
+		{
+			group.output_filename = Some(
+				output_filename.clone());
+		}
+
+		group.printout |= parsed.opt_present("p");
+
+
+		// Parse global command options
+		command.quiet |= parsed.opt_present("q");
+		command.show_version |= parsed.opt_present("v");
+		command.show_help |= parsed.opt_present("h");
+
+		command.opts.debug_iterations |=
+			parsed.opt_present("debug-iters");
+
+		command.opts.optimize_statically_known |=
+			!parsed.opt_present("debug-no-optimize-static");
+
+		command.opts.optimize_instruction_matching |=
+			!parsed.opt_present("debug-no-optimize-matcher");
+		
+		if let Some(t) = parsed.opt_str("t")
+		{
+			command.opts.max_iterations = {
+				match t.parse::<usize>()
+				{
+					Ok(t) => t,
+					Err(_) =>
+					{
+						report.error("invalid number of iterations");
+						return Err(());
+					}
+				}
+			};
+		}
+
+
+		// Add the input filenames to the main command
+		for input_filename in parsed.free.into_iter()
+		{
+			command.input_filenames.push(input_filename);
+		}
+
+
+		command.output_groups.push(group);
+	}
+
+
+	// Set the default format for each group,
+	// if none were specified
+	for group in &mut command.output_groups
+	{
+		if group.format.is_none()
+		{
+			if group.printout
+			{
+				group.format = Some(OutputFormat::Annotated {
+					base: 16,
+					group: 2,
+				});
+			}
+			else
+			{
+				group.format = Some(OutputFormat::Binary);
+			}
+		}
+
+		if !group.printout &&
+			group.output_filename.is_none() &&
+			command.input_filenames.len() >= 1
+		{
+			group.output_filename = Some(derive_output_filename(
+				report,
+				group.format.unwrap(),
+				&command.input_filenames[0])?);
+		}
+	}
+
+
+	Ok(command)
 }
 
 
-fn print_usage(opts: &getopts::Options)
+fn derive_output_filename(
+	report: &mut diagn::Report,
+	format: OutputFormat,
+	input_filename: &str)
+	-> Result<String, ()>
+{
+	let extension = {
+		match format
+		{
+			OutputFormat::Binary => "bin",
+			OutputFormat::SymbolsMesenMlb => "mlb",
+			_ => "txt",
+		}
+	};
+
+	let mut output_filename = std::path::PathBuf::from(input_filename);
+	output_filename.set_extension(extension);
+	
+	let output_filename = output_filename
+		.to_string_lossy()
+		.into_owned()
+		.replace("\\", "/");
+	
+	if output_filename == input_filename
+	{
+		report.error("cannot derive safe output filename");
+		return Err(());
+	}
+	
+	Ok(output_filename)
+}
+
+
+pub fn parse_output_format(
+	report: &mut diagn::Report,
+	format_str: &str)
+	-> Result<OutputFormat, ()>
+{
+	let split = format_str
+		.split(',')
+		.collect::<Vec<_>>();
+
+	let format_id = split[0];
+
+	let mut params = std::collections::HashMap::<String, String>::new();
+	for param in &split[1..]
+	{
+		let param_split = param
+			.split(':')
+			.collect::<Vec<_>>();
+
+		let param_id = param_split[0];
+		
+		if param_split.len() == 1
+		{
+			params.insert(param_id.to_string(), "".to_string());
+		}
+		else if param_split.len() == 2
+		{
+			params.insert(param_id.to_string(), param_split[1].to_string());
+		}
+		else
+		{
+			report.error(
+				format!(
+					"invalid format argument `{},{}`",
+					format_id,
+					param));
+
+			return Err(());
+		}
+	}
+
+	let get_arg_usize = &mut |
+		param_id: &str,
+		def: usize,
+		validate: &mut dyn FnMut(usize)
+		-> bool|
+	{
+		match params.get(param_id)
+		{
+			None => Ok(def),
+			Some(value) =>
+			{
+				match value.parse::<usize>()
+				{
+					Ok(v) =>
+					{
+						if validate(v)
+						{
+							params.remove(param_id);
+							return Ok(v);
+						}
+					}
+					Err(_) => {}
+				}
+
+				report.error(
+					format!(
+						"invalid format argument `{},{}:{}`",
+						format_id,
+						param_id,
+						value));
+	
+				Err(())
+			}
+		}
+	};
+
+	let check_nonzero = &mut |value: usize| -> bool
+	{
+		value > 0
+	};
+
+	let check_valid_base = &mut |base: usize| -> bool
+	{
+		[2, 4, 8, 16, 32, 64, 128].contains(&base)
+	};
+
+	let format = {
+		match format_id
+		{
+			"binary" => OutputFormat::Binary,
+
+			"annotated" => OutputFormat::Annotated {
+				base: get_arg_usize("base", 16, check_valid_base)?,
+				group: get_arg_usize("group", 2, check_nonzero)?,
+			},
+
+			"annotatedhex" => OutputFormat::Annotated {
+				base: 16,
+				group: 2,
+			},
+
+			"annotatedbin" => OutputFormat::Annotated {
+				base: 2,
+				group: 8,
+			},
+
+			"binstr" => OutputFormat::BinStr,
+			"hexstr" => OutputFormat::HexStr,
+
+			"bindump" => OutputFormat::BinDump,
+			"hexdump" => OutputFormat::HexDump,
+			
+			"mif" => OutputFormat::Mif,
+			"intelhex" => OutputFormat::IntelHex,
+
+			"deccomma" => OutputFormat::DecComma,
+			"hexcomma" => OutputFormat::HexComma,
+			"decspace" => OutputFormat::DecSpace,
+			"hexspace" => OutputFormat::HexSpace,
+
+			"decc" => OutputFormat::DecC,
+			"hexc" => OutputFormat::HexC,
+			"c" => OutputFormat::HexC,
+
+			"logisim8" => OutputFormat::LogiSim8,
+			"logisim16" => OutputFormat::LogiSim16,
+
+			"addrspan" => OutputFormat::AddressSpan,
+			
+			"symbols" => OutputFormat::Symbols,
+			"mesen-mlb" => OutputFormat::SymbolsMesenMlb,
+
+			_ =>
+			{
+				report.error(
+					format!(
+						"unknown format `{}`",
+						format_id));
+
+				return Err(());
+			}
+		}
+	};
+
+
+	// Error on remaining parameters that were not handled
+	for entry in params
+	{
+		report.error(
+			format!(
+				"unknown format argument `{},{}`",
+				format_id,
+				entry.0));
+
+		return Err(());
+	}
+
+
+	Ok(format)
+}
+
+
+pub fn format_output(
+	fileserver: &dyn util::FileServer,
+	decls: &asm::ItemDecls,
+	defs: &asm::ItemDefs,
+	output: &util::BitVec,
+	format: OutputFormat)
+	-> Vec<u8>
+{
+	let text = {
+		match format
+		{
+			OutputFormat::Binary =>
+				return output.format_binary(),
+			
+			OutputFormat::Annotated { base, group } =>
+				output.format_annotated(fileserver, base, group),
+			
+			OutputFormat::BinStr => output.format_binstr(),
+			OutputFormat::HexStr => output.format_hexstr(),
+
+			OutputFormat::BinDump => output.format_bindump(),
+			OutputFormat::HexDump => output.format_hexdump(),
+
+			OutputFormat::Mif => output.format_mif(),
+			OutputFormat::IntelHex => output.format_intelhex(),
+
+			OutputFormat::DecComma => output.format_separator(10, ", "),
+			OutputFormat::HexComma => output.format_separator(16, ", "),
+
+			OutputFormat::DecSpace => output.format_separator(10, " "),
+			OutputFormat::HexSpace => output.format_separator(16, " "),
+
+			OutputFormat::DecC => output.format_c_array(10),
+			OutputFormat::HexC => output.format_c_array(16),
+
+			OutputFormat::LogiSim8 => output.format_logisim(8),
+			OutputFormat::LogiSim16 => output.format_logisim(16),
+			
+			OutputFormat::AddressSpan => output.format_addrspan(fileserver),
+			
+			OutputFormat::Symbols => decls.symbols.format_default(decls, defs),
+			OutputFormat::SymbolsMesenMlb => decls.symbols.format_mesen_mlb(decls, defs),
+		}
+	};
+
+	text.bytes().collect()
+}
+
+
+fn print_usage()
 {
 	println!("");
-	println!(
-		"{}",
-		opts.usage(&format!(
-			"Usage: {} [options] <asm-file-1> ... <asm-file-N>",
-			env!("CARGO_PKG_NAME"))));
+	println!(include_str!("usage_help.txt"));
 }
 
 
@@ -394,27 +649,4 @@ fn print_version_full()
 {
 	print_version_short();
 	println!("https://github.com/hlorenzi/customasm");
-}
-
-
-fn get_default_output_filename(
-	report: &mut diagn::Report,
-	input_filename: &str)
-	-> Result<String, ()>
-{
-	let mut output_filename = std::path::PathBuf::from(input_filename);
-	output_filename.set_extension("bin");
-	
-	let output_filename = output_filename
-		.to_string_lossy()
-		.into_owned()
-		.replace("\\", "/");
-	
-	if output_filename == input_filename
-	{
-		report.error("cannot derive safe output filename");
-		return Err(());
-	}
-	
-	Ok(output_filename)
 }

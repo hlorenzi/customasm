@@ -7,4 +7,4 @@ halt
 halt
 
 ; command: main.asm -f unknown -o out.txt
-; error: invalid output format
+; error: unknown format

@@ -1,0 +1,8 @@
+ outp | addr | data (base 8)
+
+  0:0 |    0 |      ; start:
+  0:0 |    0 | 252  ; halt
+  0:8 |    1 |      ; loop:
+  0:8 |    1 | 252  ; halt
+  1:4 |    2 |      ; .inner:
+  1:4 |    2 | 252  ; halt

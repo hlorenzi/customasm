@@ -31,7 +31,7 @@ fn test_example(filename: &str, hash: &[u8])
 
     println!(
         "{}",
-        output.format_annotated_hex(&fileserver));
+        output.format_annotated(&fileserver, 16, 2));
     
     assert_eq!(output_hash[..], *hash);
 }

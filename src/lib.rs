@@ -4,14 +4,14 @@ pub mod expr;
 pub mod syntax;
 pub mod util;
 
-#[cfg(target_arch="wasm32")]
-pub mod webasm;
-
 #[cfg(test)]
 pub mod test;
 
-#[cfg(test)]
+#[cfg(any(test, target_arch="wasm32"))]
 pub mod driver;
+
+#[cfg(target_arch="wasm32")]
+pub mod webasm;
 
 
 /// Convenience function to assemble a given string.

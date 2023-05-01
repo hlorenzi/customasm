@@ -3,12 +3,10 @@
     halt => 0x55
 }
 
-start:
 halt
-loop:
 halt
-.inner:
+halt
 halt
 
-; command: main.asm -f symbols -o out.txt
+; command: main.asm -f annotated,base:8,group:4 -o out.txt
 ; output: out.txt
