@@ -249,5 +249,12 @@ fn parse_radix(chars: &[char], index: usize) -> (usize, usize)
 		}
 	}
 	else
-		{ (10, index) }
+	{
+		match chars[0]
+		{
+			'%' => ( 2, index + 1),
+			'$' => (16, index + 1),
+			_ =>   (10, index)
+		}
+	}
 }

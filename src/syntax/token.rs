@@ -258,9 +258,9 @@ pub fn tokenize(
 		let (kind, length) =
 			check_for_whitespace(remaining).unwrap_or_else(||
 			check_for_comment   (remaining).unwrap_or_else(||
-			check_for_special   (remaining).unwrap_or_else(||
-			check_for_identifier(remaining).unwrap_or_else(||
 			check_for_number    (remaining).unwrap_or_else(||
+			check_for_identifier(remaining).unwrap_or_else(||
+			check_for_special   (remaining).unwrap_or_else(||
 			check_for_string    (remaining).unwrap_or_else(||
 			(TokenKind::Error, 1)))))));
 		
@@ -526,15 +526,35 @@ fn check_for_identifier(src: &str) -> Option<(TokenKind, usize)>
 fn check_for_number(src: &str) -> Option<(TokenKind, usize)>
 {
 	let mut walker = CharWalker::new(src);
-	
-	if !walker.consume_while(
+
+	if walker.consume_while(
 		is_number_start,
 		is_number_mid)
 	{
-		return None;
+		return Some((TokenKind::Number, walker.length));
 	}
 
-	Some((TokenKind::Number, walker.length))
+	else if walker.consume_char('$')
+	{
+		if walker.consume_while(
+			is_number_mid,
+			is_number_mid)
+		{
+			return Some((TokenKind::Number, walker.length));
+		}
+	}
+
+	else if walker.consume_char('%')
+	{
+		if walker.consume_while(
+			is_number_mid,
+			is_number_mid)
+		{
+			return Some((TokenKind::Number, walker.length));
+		}
+	}
+
+	None
 }
 
 
