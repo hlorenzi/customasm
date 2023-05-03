@@ -29,7 +29,7 @@ pub fn expect_result<T>(
 	util::enable_windows_ansi_support();
 	
 	let mut msgs = Vec::<u8>::new();
-	report.print_all(&mut msgs, fileserver);
+	report.print_all(&mut msgs, fileserver, true);
 	print!("{}", String::from_utf8(msgs).unwrap());
 	
 	if let ExpectedResult::Pass(result) = expected

@@ -1,16 +1,6 @@
 use crate::*;
 
 
-const C_DEFAULT:  &'static str = "\u{001b}[0m";
-const C_LOCATION: &'static str = "\u{001b}[90m";
-const C_ERROR:    &'static str = "\u{001b}[91m";
-const C_WARNING:  &'static str = "\u{001b}[93m";
-const C_NOTE:     &'static str = "\u{001b}[96m";
-const C_LINENUM:  &'static str = "\u{001b}[90m";
-const C_SRC:      &'static str = "\u{001b}[97m";
-const C_BOLD:     &'static str = "\u{001b}[1m";
-
-
 #[derive(Clone)]
 pub struct Report
 {
@@ -187,13 +177,15 @@ impl MessageKind
 	}
 	
 	
-	fn get_color(&self) -> &'static str
+	fn apply_color(
+		&self,
+		styler: &mut util::StringStyler)
 	{
 		match self
 		{
-			&MessageKind::Error => C_ERROR,
-			&MessageKind::Warning => C_WARNING,
-			&MessageKind::Note => C_NOTE,
+			&MessageKind::Error => styler.red(),
+			&MessageKind::Warning => styler.yellow(),
+			&MessageKind::Note => styler.cyan(),
 		}
 	}
 }
@@ -565,65 +557,74 @@ impl Report
 	pub fn print_all(
 		&self,
 		writer: &mut dyn std::io::Write,
-		fileserver: &dyn util::FileServer)
+		fileserver: &dyn util::FileServer,
+		use_colors: bool)
 	{
+		if self.messages.len() > 0
+		{
+			write!(writer, "").unwrap();
+		}
+		
 		for msg in &self.messages
 		{
-			self.print_msg(writer, fileserver, msg, 0);
-			writeln!(writer).unwrap();
+			let mut styler = util::StringStyler::new(use_colors);
+
+			self.print_msg(
+				&mut styler,
+				fileserver,
+				msg,
+				0);
+				
+			write!(writer, "{}", styler.result).unwrap();
 		}
 	}
 	
 	
 	fn print_msg(
 		&self,
-		writer: &mut dyn std::io::Write,
+		styler: &mut util::StringStyler,
 		fileserver: &dyn util::FileServer,
 		msg: &Message,
 		indent: usize)
 	{
-		let kind_label = msg.kind.get_label();
-		let highlight_color = msg.kind.get_color();
-		
-		self.print_indent(writer, indent);
-		write!(writer, "{}", C_LOCATION).unwrap();
+		styler.indent(indent);
+
+		styler.gray();
 		if indent > 0
 		{
-			write!(writer, " + ").unwrap();
+			styler.add(" + ");
 		}
 		else
 		{
-			write!(writer, "{}", C_BOLD).unwrap();
+			styler.bold();
 		}
 
-		write!(writer, "{}", highlight_color).unwrap();
-		writeln!(writer, "{}: {}", kind_label, msg.descr).unwrap();
-		write!(writer, "{}", C_DEFAULT).unwrap();
+		msg.kind.apply_color(styler);
+		styler.add(msg.kind.get_label());
+		styler.add(": ");
+		styler.addln(&msg.descr);
+
+		styler.reset();
 
 		let inner_indent = self.print_msg_src(
-			writer,
+			styler,
 			fileserver,
 			msg,
 			indent);
 		
 		for inner in &msg.inner
 		{
-			self.print_msg(writer, fileserver, &inner, indent + inner_indent);
+			self.print_msg(
+				styler,
+				fileserver,
+				&inner,
+				indent + inner_indent);
+			
 			if indent == 0
 			{
-				writeln!(writer).unwrap();
+				styler.addln("");
 			}
 		}
-	}
-	
-	
-	fn print_indent(
-		&self,
-		writer: &mut dyn std::io::Write,
-		indent: usize)
-	{
-		for _ in 0..indent
-			{ write!(writer, " ").unwrap(); }
 	}
 
 
@@ -691,7 +692,7 @@ impl Report
 	
 	fn print_msg_src(
 		&self,
-		writer: &mut dyn std::io::Write,
+		styler: &mut util::StringStyler,
 		fileserver: &dyn util::FileServer,
 		msg: &Message,
 		indent: usize)
@@ -705,18 +706,16 @@ impl Report
 			}
 		};
 
-		let highlight_color = msg.kind.get_color();
+		let filename = fileserver.get_filename(span.file_handle);
 
-		// Print filename.
 		if span.location().is_none()
 		{
-			let filename = fileserver.get_filename(span.file_handle);
-
-			self.print_indent(writer, indent);
-			write!(writer, "{} --> ", C_LOCATION).unwrap();
-			write!(writer, "{}", filename).unwrap();
-			write!(writer, "{}", C_DEFAULT).unwrap();
-			writeln!(writer).unwrap();
+			// If no span, print only the filename.
+			styler.indent(indent);
+			styler.gray();
+			styler.add(" --> ");
+			styler.addln(filename);
+			styler.reset();
 			return 0;
 		}
 
@@ -725,88 +724,109 @@ impl Report
 			span,
 			msg);
 
-		let filename = fileserver.get_filename(span.file_handle);
-		
-		self.print_indent(writer, indent + line_info.label_width - 1);
-		write!(writer, "{} --> ", C_LOCATION).unwrap();
-		write!(writer, "{}:", filename).unwrap();
-		write!(writer, "{}", C_DEFAULT).unwrap();
-
-		// Print location information.
 		let chars = fileserver.get_str_unwrap(span.file_handle);
-
 		let counter = util::CharCounter::new(&chars);
-		
-		write!(writer, "{}", C_LOCATION).unwrap();
-		writeln!(writer, "{}:{}:", line_info.line1 + 1, line_info.col1 + 1).unwrap();
 
+		// Print the filename and line/column information
+		styler.indent(indent + line_info.label_width - 1);
+		styler.gray();
+		styler.add(" --> ");
+		styler.add(filename);
+		styler.add(":");
+		styler.add(&format!("{}", line_info.line1 + 1));
+		styler.add(":");
+		styler.add(&format!("{}", line_info.col1 + 1));
+		styler.addln(":");
+		styler.reset();
 
-		// Print annotated source lines.
+		// Print annotated source lines
 		for line in line_info.excerpt_line1..line_info.excerpt_line2
 		{
-			self.print_indent(writer, indent);
-			write!(writer, "{}", C_LINENUM).unwrap();
-			write!(writer, "{:>1$} | ", line + 1, line_info.label_width).unwrap();
-			write!(writer, "{}", C_SRC).unwrap();
+			styler.indent(indent);
+			styler.gray();
+			styler.add(&format!("{:>1$}", line + 1, line_info.label_width));
+			styler.add(" | ");
+
+			styler.white();
 			
 			let line_pos = counter.get_index_range_of_line(line);
 			let excerpt = counter.get_excerpt(line_pos.0, line_pos.1);
 			
-			// Print source line excerpt.
+			// Print an excerpt of the source line
 			for p in 0..excerpt.len()
 			{
-				// Add a space for spans of zero characters.
+				// Add a space for spans of zero characters
 				if line == line_info.line1 &&
 					line == line_info.line2 &&
 					p == line_info.col1 &&
 					p == line_info.col2
-					{ write!(writer, " ").unwrap(); }
+				{
+					styler.add(" ");
+				}
 				
-				let c = excerpt[p];
-				
-				if c == '\t'
-					{ write!(writer, "  ").unwrap(); }
-				else if c <= ' '
-					{ write!(writer, " ").unwrap(); }
-				else
-					{ write!(writer, "{}", c).unwrap(); }
+				match excerpt[p]
+				{
+					'\t' =>
+						styler.add("  "),
+
+					c @ _ if c <= ' ' =>
+						styler.add(" "),
+
+					c @ _ =>
+						styler.add_char(c),
+				}
 			}
 			
-			writeln!(writer, "").unwrap();
+			styler.addln("");
 			
-			// Print markings on line below, if contained in span.
-			if line >= line_info.line1 && line <= line_info.line2
+			// Print markings on line below, if contained in span
+			if line >= line_info.line1 &&
+				line <= line_info.line2
 			{
-				self.print_indent(writer, indent);
-				write!(writer, "{}", C_LINENUM).unwrap();
-				write!(writer, "{:>1$} | ", "", line_info.label_width).unwrap();
-				write!(writer, "{}", highlight_color).unwrap();
+				styler.indent(indent);
+				styler.gray();
+				styler.add(&format!("{:>1$}", "", line_info.label_width));
+				styler.add(" | ");
+				msg.kind.apply_color(styler);
 				
 				for p in 0..(excerpt.len() + 1)
 				{
-					// Print markings for spans of zero characters.
+					// Print marking for spans of zero characters
 					if p == line_info.col1 &&
 						p == line_info.col2 &&
 						line_info.line1 == line_info.line2
-						{ write!(writer, "^").unwrap(); }
-						
-					let marking = if (line > line_info.line1 || p >= line_info.col1) && (line < line_info.line2 || p < line_info.col2)
-						{ "^" }
-					else
-						{ " " };
+					{
+						styler.add("^");
+					}
+					
+					// Print markings for all other spans
+					let marking = {
+						if (line > line_info.line1 || p >= line_info.col1) &&
+							(line < line_info.line2 || p < line_info.col2)
+							{ "^" }
+						else
+							{ " " }
+					};
 				
 					if p < excerpt.len() && excerpt[p] == '\t'
-						{ write!(writer, "{0}{0}", marking).unwrap(); }
+					{
+						// Double markings for tab characters
+						styler.add(marking);
+						styler.add(marking);
+					}
 					else
-						{ write!(writer, "{}", marking).unwrap(); }
+					{
+						styler.add(marking);
+					}
 				}
 				
-				writeln!(writer, "").unwrap();
+				styler.addln("");
 			}
 		}
 		
-		write!(writer, "{}", C_DEFAULT).unwrap();
+		styler.reset();
 		
+		// Return the new indentation for nested messages
 		line_info.label_width
 	}
 }

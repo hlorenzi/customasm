@@ -15,7 +15,11 @@ fn main()
 	let mut fileserver = util::FileServerReal::new();
 	fileserver.add_std_files(STD_FILES);
 	
-	if let Err(()) = driver::drive(&args, &mut fileserver)
+	let maybe_result = driver::drive_from_commandline(
+		&args,
+		&mut fileserver);
+
+	if let Err(()) = maybe_result
 	{
 		std::process::exit(1);
 	}

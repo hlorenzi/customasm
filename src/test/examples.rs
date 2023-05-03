@@ -21,7 +21,8 @@ fn test_example(filename: &str, hash: &[u8])
 
     report.print_all(
         &mut std::io::stdout(),
-        &fileserver);
+        &fileserver,
+        true);
 
     let output = assembly.output.unwrap();
 

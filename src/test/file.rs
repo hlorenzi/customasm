@@ -214,7 +214,7 @@ pub fn test_file(filepath: &str)
             println!("command: {:?}", command);
             println!("output: {:?}", expectations.output_files);
 
-            driver::drive_inner(
+            driver::drive(
                 &mut report,
                 &command,
                 &mut fileserver)
@@ -233,7 +233,7 @@ pub fn test_file(filepath: &str)
 
 
     let mut msgs = Vec::<u8>::new();
-    report.print_all(&mut msgs, &fileserver);
+    report.print_all(&mut msgs, &fileserver, true);
     print!("{}", String::from_utf8(msgs).unwrap());
 
 

@@ -7,6 +7,7 @@ struct Command
 	pub output_groups: Vec<CommandOutput>,
 	pub opts: asm::AssemblyOptions,
 	pub quiet: bool,
+	pub use_colors: bool,
 	pub show_version: bool,
 	pub show_help: bool,
 }
@@ -49,31 +50,46 @@ pub enum OutputFormat
 }
 
 
-pub fn drive(
+pub fn drive_from_commandline(
 	args: &Vec<String>,
 	fileserver: &mut dyn util::FileServer)
 	-> Result<(), ()>
 {
+	util::enable_windows_ansi_support();
+	
 	let mut report = diagn::Report::new();
 	
-	let result = drive_inner(
+	let maybe_command = parse_command(
 		&mut report,
-		args,
-		fileserver);
-	
-	if report.has_messages()
-		{ println!(""); }
-	
-	util::enable_windows_ansi_support();
-	report.print_all(&mut std::io::stderr(), fileserver);
-	
-	result
-		.map(|_| ())
-		.map_err(|_| ())
+		args);
+
+	if let Ok(command) = maybe_command
+	{	
+		let maybe_result = assemble_with_command(
+			&mut report,
+			fileserver,
+			&command);
+			
+		report.print_all(
+			&mut std::io::stderr(),
+			fileserver,
+			command.use_colors);
+
+		maybe_result.map(|_| ())
+	}
+	else
+	{
+		report.print_all(
+			&mut std::io::stderr(),
+			fileserver,
+			true);
+
+		Err(())
+	}
 }
 
 
-pub fn drive_inner(
+pub fn drive(
 	report: &mut diagn::Report,
 	args: &Vec<String>,
 	fileserver: &mut dyn util::FileServer)
@@ -83,10 +99,24 @@ pub fn drive_inner(
 		report,
 		args)?;
 	
+	let maybe_result = assemble_with_command(
+		report,
+		fileserver,
+		&command);
+
+	maybe_result
+}
+
+
+fn assemble_with_command(
+	report: &mut diagn::Report,
+	fileserver: &mut dyn util::FileServer,
+	command: &Command)
+	-> Result<asm::AssemblyResult, ()>
+{
 	if command.show_help
 	{
-		print_version_full();
-		print_usage();
+		print_usage(command.use_colors);
 		return Ok(asm::AssemblyResult::new());
 	}
 	
@@ -196,7 +226,7 @@ fn make_opts() -> getopts::Options
 		getopts::Occur::Optional);
 	
     opts.opt(
-		"t", "iter",
+		"t", "iters",
 		&format!(
 			"The max number of resolution iterations to attempt. (Default: {})",
 			asm_opts.max_iterations),
@@ -212,6 +242,13 @@ fn make_opts() -> getopts::Options
 		"q", "quiet",
 		"Suppress progress reports.");
 
+	opts.opt(
+		"", "color",
+		"Style the output with colors. [on/off]",
+		"VALUE",
+		getopts::HasArg::Maybe,
+		getopts::Occur::Optional);
+	
     opts.optflag(
 		"", "debug-iters",
 		"Print debug info for the resolution iterations.");
@@ -250,6 +287,7 @@ fn parse_command(
 		output_groups: Vec::new(),
 		opts: asm::AssemblyOptions::new(),
 		quiet: false,
+		use_colors: true,
 		show_version: false,
 		show_help: false,
 	};
@@ -308,17 +346,33 @@ fn parse_command(
 		command.opts.optimize_instruction_matching |=
 			!parsed.opt_present("debug-no-optimize-matcher");
 		
+		if parsed.opt_present("color")
+		{
+			command.use_colors = {
+				match parsed.opt_str("color").as_ref().map(|s| s.as_ref())
+				{
+					Some("on") => true,
+					Some("off") => false,
+					_ =>
+					{
+						report.error("invalid argument for `--color`");
+						return Err(());
+					}
+				}
+			};
+		}
+		
 		if let Some(t) = parsed.opt_str("t")
 		{
 			command.opts.max_iterations = {
 				match t.parse::<usize>()
 				{
-					Ok(t) => t,
-					Err(_) =>
+					Err(_) | Ok(0) =>
 					{
-						report.error("invalid number of iterations");
+						report.error("invalid argument for `--iters`");
 						return Err(());
 					}
+					Ok(t) => t,
 				}
 			};
 		}
@@ -614,10 +668,61 @@ pub fn format_output(
 }
 
 
-fn print_usage()
+fn print_usage(use_colors: bool)
 {
+	let usage_str = include_str!("usage_help.md");
+	let mut styler = util::StringStyler::new(use_colors);
+
+	for line in usage_str.lines()
+	{
+		if line.starts_with("# ")
+		{
+			styler.cyan();
+			styler.bold();
+			styler.addln(line.get("# ".len()..).unwrap());
+			styler.reset();
+		}
+		else if line.starts_with("## ")
+		{
+			styler.cyan();
+			styler.bold();
+			styler.addln(line.get("## ".len()..).unwrap());
+			styler.reset();
+		}
+		else if line.starts_with("`")
+		{
+			styler.white();
+			styler.add("  ");
+			styler.addln(&line.replace("`", ""));
+			styler.reset();
+		}
+		else if line.starts_with("* `")
+		{
+			let cleaned = line
+				.get("* `".len()..).unwrap()
+				.replace("`", "");
+
+			styler.white();
+			styler.add("  ");
+			styler.add_styled(
+				&cleaned,
+				" -- ",
+				&mut |s| s.cyan(),
+				&mut |s| s.white());
+			styler.addln("");
+			styler.reset();
+		}
+		else
+		{
+			styler.gray();
+			styler.add("  ");
+			styler.addln(line);
+			styler.reset();
+		}
+	}
+
 	println!("");
-	println!(include_str!("usage_help.txt"));
+	println!("{}", styler.result);
 }
 
 

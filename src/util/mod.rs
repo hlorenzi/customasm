@@ -43,6 +43,11 @@ pub use self::windows_console::{
     enable_windows_ansi_support,
 };
 
+mod string_styler;
+pub use self::string_styler::{
+    StringStyler,
+};
+
 mod symbol_manager;
 pub use self::symbol_manager::{
     SymbolContext,
