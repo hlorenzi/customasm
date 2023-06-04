@@ -541,6 +541,11 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 			{
 				break;
 			}
+
+			if self.walker.next_is(0, syntax::TokenKind::Minus)
+			{
+				xxxx
+			}
 			
 			let tk_name = self.walker.expect(self.report, syntax::TokenKind::Identifier)?;
 			let name = tk_name.excerpt.clone().unwrap();

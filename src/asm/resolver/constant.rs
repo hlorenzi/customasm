@@ -121,7 +121,7 @@ pub fn resolve_constant(
             if opts.debug_iterations
             {
                 println!("const: {} = {:?} [static]",
-                    ast_symbol.name,
+                    ast_symbol.name.as_ref().unwrap(),
                     symbol.value);
             }
 
@@ -143,7 +143,7 @@ pub fn resolve_constant(
             if opts.debug_iterations
             {
                 println!("const: {} = {:?}",
-                    ast_symbol.name,
+                    ast_symbol.name.as_ref().unwrap(),
                     symbol.value);
             }
 

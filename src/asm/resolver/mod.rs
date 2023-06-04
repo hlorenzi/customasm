@@ -27,8 +27,17 @@ mod eval;
 pub use eval::{
     eval,
     eval_simple,
+};
+
+mod eval_var;
+pub use eval_var::{
     eval_variable,
     eval_variable_simple,
+};
+
+mod eval_rel_label;
+pub use eval_rel_label::{
+    eval_relative_label,
 };
 
 mod eval_asm;

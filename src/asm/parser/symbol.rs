@@ -6,7 +6,7 @@ pub struct AstSymbol
 {
     pub decl_span: diagn::Span,
     pub hierarchy_level: usize,
-    pub name: String,
+    pub name: Option<String>,
     pub kind: AstSymbolKind,
     
     pub item_ref: Option<util::ItemRef::<asm::Symbol>>,
@@ -42,26 +42,43 @@ pub fn parse(
         decl_span = decl_span.join(tk_dot.span);
     }
 
-    let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
-    let name = tk_name.excerpt.clone().unwrap();
-    decl_span = decl_span.join(tk_name.span);
-
+    let maybe_tk_name = walker.maybe_expect(syntax::TokenKind::Identifier);
+    let maybe_name = maybe_tk_name.map(|tk| tk.excerpt.clone().unwrap());
+    
+    if let Some(tk_name) = maybe_tk_name
+    {
+        decl_span = decl_span.join(tk_name.span);
+    }
 
     if walker.maybe_expect(syntax::TokenKind::Equal).is_some()
     {
-        let expr = expr::parse(report, walker)?;
-        walker.expect_linebreak(report)?;
-        
-        Ok(AstAny::Symbol(AstSymbol {
-            decl_span,
-            hierarchy_level,
-            name,
-            kind: AstSymbolKind::Constant(AstSymbolConstant {
-                expr,
-            }),
+        match maybe_name
+        {
+            None =>
+            {
+                report.error_span(
+                    "expected identifier",
+                    walker.get_span_after_prev());
 
-            item_ref: None,
-        }))
+                Err(())
+            }
+            Some(name) =>
+            {
+                let expr = expr::parse(report, walker)?;
+                walker.expect_linebreak(report)?;
+                
+                Ok(AstAny::Symbol(AstSymbol {
+                    decl_span,
+                    hierarchy_level,
+                    name: Some(name),
+                    kind: AstSymbolKind::Constant(AstSymbolConstant {
+                        expr,
+                    }),
+
+                    item_ref: None,
+                }))
+            }
+        }
     }
     else
     {
@@ -71,7 +88,7 @@ pub fn parse(
         Ok(AstAny::Symbol(AstSymbol {
             decl_span,
             hierarchy_level,
-            name,
+            name: maybe_name,
             kind: AstSymbolKind::Label,
 
             item_ref: None,

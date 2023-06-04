@@ -27,10 +27,12 @@ pub use self::eval::{
     EvalProvider,
     EvalQuery,
     EvalVariableQuery,
+    EvalRelativeLabelQuery,
     EvalFunctionQuery,
     EvalAsmBlockQuery,
     dummy_eval_query,
     dummy_eval_var,
+    dummy_eval_rel_label,
     dummy_eval_fn,
     dummy_eval_asm,
 };

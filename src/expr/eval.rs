@@ -164,6 +164,7 @@ pub type EvalProvider<'provider> =
 pub enum EvalQuery<'a>
 {
 	Variable(&'a mut EvalVariableQuery<'a>),
+	RelativeLabel(&'a mut EvalRelativeLabelQuery<'a>),
 	Function(&'a mut EvalFunctionQuery<'a>),
 	AsmBlock(&'a mut EvalAsmBlockQuery<'a>),
 }
@@ -175,6 +176,14 @@ pub struct EvalVariableQuery<'a>
 	pub hierarchy_level: usize,
 	pub hierarchy: &'a Vec<String>,
 	pub span: diagn::Span,
+}
+
+
+pub struct EvalRelativeLabelQuery<'a>
+{
+	pub report: &'a mut diagn::Report,
+	pub span: diagn::Span,
+	pub direction: isize,
 }
 
 
@@ -247,6 +256,9 @@ pub fn dummy_eval_query(
 		expr::EvalQuery::Variable(query_var) =>
 			expr::dummy_eval_var(query_var),
 		
+		expr::EvalQuery::RelativeLabel(query_var) =>
+			expr::dummy_eval_rel_label(query_var),
+		
 		expr::EvalQuery::Function(query_fn) =>
 			expr::dummy_eval_fn(query_fn),
 			
@@ -262,6 +274,18 @@ pub fn dummy_eval_var(
 {
 	query.report.error_span(
 		"cannot reference variables in this context",
+		query.span);
+		
+	Err(())
+}
+
+
+pub fn dummy_eval_rel_label(
+	query: &mut EvalRelativeLabelQuery)
+	-> Result<expr::Value, ()>
+{
+	query.report.error_span(
+		"cannot reference relative labels in this context",
 		query.span);
 		
 	Err(())
@@ -413,6 +437,17 @@ impl expr::Expr
 				}
 
 				provider(EvalQuery::Variable(&mut query))
+			}
+			
+			&expr::Expr::RelativeLabel(span, direction) =>
+			{
+				let mut query = EvalRelativeLabelQuery {
+					report,
+					span,
+					direction,
+				};
+
+				provider(EvalQuery::RelativeLabel(&mut query))
 			}
 			
 			&expr::Expr::UnaryOp(span, _, op, ref inner_expr) =>

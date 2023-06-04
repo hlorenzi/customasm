@@ -6,6 +6,7 @@ pub enum Expr
 {
 	Literal(diagn::Span, Value),
 	Variable(diagn::Span, usize, Vec<String>),
+	RelativeLabel(diagn::Span, isize),
 	UnaryOp(diagn::Span, diagn::Span, UnaryOp, Box<Expr>),
 	BinaryOp(diagn::Span, diagn::Span, BinaryOp, Box<Expr>, Box<Expr>),
 	TernaryOp(diagn::Span, Box<Expr>, Box<Expr>, Box<Expr>),
@@ -81,6 +82,7 @@ impl Expr
 		{
 			&Expr::Literal  (span, ..) => span,
 			&Expr::Variable (span, ..) => span,
+			&Expr::RelativeLabel(span, ..) => span,
 			&Expr::UnaryOp  (span, ..) => span,
 			&Expr::BinaryOp (span, ..) => span,
 			&Expr::TernaryOp(span, ..) => span,

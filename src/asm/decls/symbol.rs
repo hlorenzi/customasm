@@ -24,11 +24,16 @@ pub fn collect(
                 }
             };
 
+            let name = node.name
+                .clone()
+                .unwrap_or_else(||
+                    decls.symbols.generate_anonymous_name());
+
             let item_ref = decls.symbols.declare(
                 report,
                 node.decl_span,
                 &symbol_ctx,
-                node.name.clone(),
+                name,
                 node.hierarchy_level,
                 kind)?;
                 

@@ -40,7 +40,7 @@ pub fn resolve_label(
             if opts.debug_iterations
             {
                 println!("label: {} = {:?}",
-                    ast_symbol.name,
+                    ast_symbol.name.as_ref().unwrap_or(&"".to_string()),
                     symbol.value);
             }
             
