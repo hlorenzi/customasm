@@ -8,6 +8,7 @@ pub struct AstSymbol
     pub hierarchy_level: usize,
     pub name: String,
     pub kind: AstSymbolKind,
+    pub no_emit: bool,
     
     pub item_ref: Option<util::ItemRef::<asm::Symbol>>,
 }
@@ -59,6 +60,7 @@ pub fn parse(
             kind: AstSymbolKind::Constant(AstSymbolConstant {
                 expr,
             }),
+            no_emit: false,
 
             item_ref: None,
         }))
@@ -73,6 +75,7 @@ pub fn parse(
             hierarchy_level,
             name,
             kind: AstSymbolKind::Label,
+            no_emit: false,
 
             item_ref: None,
         }))

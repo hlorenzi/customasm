@@ -51,6 +51,9 @@ pub fn parse(
         "bits" => Ok(asm::AstAny::DirectiveBits(
             asm::parser::directive_bits::parse(report, walker, header_span)?)),
         
+        "const" => Ok(asm::AstAny::Symbol(
+            asm::parser::directive_const::parse(report, walker, header_span)?)),
+            
         "fn" => Ok(asm::AstAny::DirectiveFn(
             asm::parser::directive_fn::parse(report, walker, header_span)?)),
         

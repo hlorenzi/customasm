@@ -52,6 +52,7 @@ pub fn define(
 
             let symbol = asm::Symbol {
                 item_ref,
+                no_emit: true,
                 value_statically_known: true,
                 value: expr::Value::Function(fn_ref.0),
                 resolved: true,

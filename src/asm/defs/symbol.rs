@@ -5,6 +5,7 @@ use crate::*;
 pub struct Symbol
 {
     pub item_ref: util::ItemRef<Self>,
+    pub no_emit: bool,
     pub value_statically_known: bool,
     pub value: expr::Value,
     pub resolved: bool,
@@ -42,6 +43,7 @@ pub fn define(
 
             let symbol = Symbol {
                 item_ref,
+                no_emit: node.no_emit,
                 value_statically_known,
                 value: expr::Value::Unknown,
                 resolved: false,

@@ -28,6 +28,8 @@ pub use directive_bits::{
     AstDirectiveBits,
 };
 
+mod directive_const;
+
 mod directive_data;
 pub use directive_data::{
     AstDirectiveData,

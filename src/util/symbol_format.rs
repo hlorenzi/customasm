@@ -126,29 +126,31 @@ impl util::SymbolManager<asm::Symbol>
             hierarchy.push(child_name.clone());
 
             
-            // TODO: Respect the #noemit directive
             let symbol_decl = self.get(*child_ref);
             let symbol = defs.symbols.get(symbol_decl.item_ref);
 
-            match symbol.value
+            if !symbol.no_emit
             {
-                expr::Value::Integer(ref bigint) =>
+                match symbol.value
                 {
-                    let mut name = String::new();
-
-                    for i in 0..hierarchy.len()
+                    expr::Value::Integer(ref bigint) =>
                     {
-                        if i > 0
+                        let mut name = String::new();
+
+                        for i in 0..hierarchy.len()
                         {
-                            name.push_str(".");
+                            if i > 0
+                            {
+                                name.push_str(".");
+                            }
+
+                            name.push_str(&format!("{}", hierarchy[i]));
                         }
 
-                        name.push_str(&format!("{}", hierarchy[i]));
+                        formatter(result, symbol_decl, &name, &bigint);
                     }
-
-                    formatter(result, symbol_decl, &name, &bigint);
+                    _ => {}
                 }
-                _ => {}
             }
 
 
