@@ -36,7 +36,7 @@ you just implemented in an FPGA chip!
 [📚 Check out the wiki](https://github.com/hlorenzi/customasm/wiki)
 for a changelog, documentation, and a how-to-start guide!
 
-[💲 Check out the command-line help!](/src/usage_help.txt)
+[💲 Check out the command-line help!](/src/usage_help.md)
 
 ## Installation
 
