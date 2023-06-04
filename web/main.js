@@ -12,7 +12,7 @@ function main()
 	window.onkeydown = onKeyDown
 	window.onbeforeunload = onBeforeUnload
 	
-	fetch("customasm.gc.wasm")
+	fetch("customasm.wasm")
 		.then(r => r.arrayBuffer())
 		.then(r => WebAssembly.instantiate(r))
 		.then(wasm =>

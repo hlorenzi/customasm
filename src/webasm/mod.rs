@@ -37,7 +37,7 @@ pub unsafe extern fn wasm_assemble(
 			None =>
 			{
 				let mut err = Vec::<u8>::new();
-				report.print_all(&mut err, &fileserver);
+				report.print_all(&mut err, &fileserver, true);
 				return wasm_string_new_with(
 					String::from_utf8(err).unwrap());
 			}

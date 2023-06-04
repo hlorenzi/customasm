@@ -17,7 +17,7 @@ jobs:
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: nightly
+        toolchain: stable
         target: wasm32-unknown-unknown
         profile: minimal
         override: true
@@ -29,9 +29,7 @@ jobs:
     - run: rm .gitignore
     - run: mv .gitignore.ghpages .gitignore
     - run: cargo build --lib --target wasm32-unknown-unknown --release
-    - run: cargo install wasm-gc
-    - run: wasm-gc ./target/wasm32-unknown-unknown/release/customasm.wasm -o ./target/wasm32-unknown-unknown/release/customasm.gc.wasm
-    - run: mv ./target/wasm32-unknown-unknown/release/customasm.gc.wasm ./web/customasm.gc.wasm
+    - run: mv ./target/wasm32-unknown-unknown/release/customasm.wasm ./web/customasm.wasm
     - run: git config user.name github-actions
     - run: git config user.email github-actions@github.com
     - run: git add -A
