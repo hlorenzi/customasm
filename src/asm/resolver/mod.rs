@@ -11,8 +11,8 @@ pub use iter::{
 
 mod constant;
 pub use constant::{
-    resolve_constants,
-    resolve_constants_once,
+    resolve_constants_simple,
+    resolve_constants_simple_once,
     resolve_constant,
 };
 
@@ -27,8 +27,10 @@ mod eval;
 pub use eval::{
     eval,
     eval_simple,
+    eval_certain,
     eval_variable,
     eval_variable_simple,
+    eval_variable_certain,
 };
 
 mod eval_asm;

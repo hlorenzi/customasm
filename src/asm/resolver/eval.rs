@@ -50,6 +50,9 @@ pub fn eval(
 }
 
 
+/// Evaluates an expression without relying on
+/// addresses, banks, user-defined functions,
+/// or user-defined instructions.
 pub fn eval_simple(
     report: &mut diagn::Report,
     decls: &asm::ItemDecls,
@@ -67,11 +70,54 @@ pub fn eval_simple(
                     defs,
                     query_var),
                     
-            expr::EvalQuery::Function(query_fn) =>
-                expr::dummy_eval_fn(query_fn),
+            expr::EvalQuery::Function(_) =>
+                Ok(expr::Value::Unknown),
                 
-            expr::EvalQuery::AsmBlock(query_asm) =>
-                expr::dummy_eval_asm(query_asm),
+            expr::EvalQuery::AsmBlock(_) =>
+                Ok(expr::Value::Unknown),
+        }
+    };
+
+    let result = expr.eval_with_ctx(
+        report,
+        &mut expr::EvalContext::new(),
+        &mut provider)?;
+
+    match result
+    {
+        expr::Value::FailedConstraint(msg) =>
+        {
+            report.message(msg);
+            Err(())
+        }
+
+        _ => Ok(result)
+    }
+}
+
+
+pub fn eval_certain(
+    report: &mut diagn::Report,
+    decls: &asm::ItemDecls,
+    defs: &asm::ItemDefs,
+    expr: &expr::Expr)
+    -> Result<expr::Value, ()>
+{
+    let mut provider = |query: expr::EvalQuery|
+    {
+        match query
+        {
+            expr::EvalQuery::Variable(query_var) =>
+                asm::resolver::eval_variable_certain(
+                    decls,
+                    defs,
+                    query_var),
+                    
+            expr::EvalQuery::Function(_) =>
+                Ok(expr::Value::Unknown),
+                
+            expr::EvalQuery::AsmBlock(_) =>
+                Ok(expr::Value::Unknown),
         }
     };
 
@@ -162,7 +208,39 @@ pub fn eval_variable(
 }
 
 
+/// Evaluates a variable/symbol without relying on
+/// addresses or banks.
 pub fn eval_variable_simple(
+    decls: &asm::ItemDecls,
+    defs: &asm::ItemDefs,
+    query: &mut expr::EvalVariableQuery)
+    -> Result<expr::Value, ()>
+{
+    if query.hierarchy_level == 0
+    {
+        match query.hierarchy[0].as_ref()
+        {
+            "$" | "pc" => return Ok(expr::Value::Unknown),
+            _ => {}
+        }
+    }
+
+    let symbol_ref = decls.symbols.get_by_name(
+        query.report,
+        query.span,
+        &util::SymbolContext::new_global(),
+        query.hierarchy_level,
+        query.hierarchy)?;
+
+    match defs.symbols.maybe_get(symbol_ref)
+    {
+        Some(symbol) => Ok(symbol.value.clone()),
+        None => Ok(expr::Value::Unknown),
+    }
+}
+
+
+pub fn eval_variable_certain(
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     query: &mut expr::EvalVariableQuery)
@@ -192,12 +270,13 @@ pub fn eval_variable_simple(
         query.hierarchy_level,
         query.hierarchy)?;
 
-    let symbol = defs.symbols.get(symbol_ref);
+    let maybe_symbol = defs.symbols.maybe_get(symbol_ref);
 
     let value = {
-        match symbol.value.clone()
+        match maybe_symbol.map(|s| s.value.clone())
         {
-            expr::Value::Unknown =>
+            None |
+            Some(expr::Value::Unknown) =>
             {
                 query.report.error_span(
                     format!(
@@ -210,7 +289,7 @@ pub fn eval_variable_simple(
                 return Err(());
             }
 
-            value => value,
+            Some(value) => value,
         }
     };
 

@@ -187,6 +187,15 @@ impl Value
 		{
 			Value::Integer(bigint) => Ok(bigint),
 
+			Value::Unknown =>
+			{
+				report.error_span(
+					"value is unknown",
+					span);
+
+				Err(())
+			}
+
 			_ =>
 			{
 				report.error_span(
@@ -208,6 +217,16 @@ impl Value
 		match self
 		{
 			Value::Integer(ref mut bigint) => Ok(bigint),
+			
+			Value::Unknown =>
+			{
+				report.error_span(
+					"value is unknown",
+					span);
+
+				Err(())
+			}
+
 			_ =>
 			{
 				report.error_span(
@@ -231,6 +250,7 @@ impl Value
 		match bigint.size
 		{
 			Some(_) => Ok(&bigint),
+			
 			None =>
 			{
 				report.error_span(
@@ -323,6 +343,15 @@ impl Value
 					report,
 					span),
 
+			Value::Unknown =>
+			{
+				report.error_span(
+					"value is unknown",
+					span);
+
+				Err(())
+			}
+
 			_ =>
 			{
 				report.error_span(
@@ -381,6 +410,15 @@ impl Value
 				bigint.checked_into_nonzero_usize(
 					report,
 					span)
+			}
+
+			Value::Unknown =>
+			{
+				report.error_span(
+					"value is unknown",
+					span);
+
+				Err(())
 			}
 
 			_ =>

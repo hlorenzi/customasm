@@ -225,6 +225,64 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
     }
 
 
+    pub fn next_simple<'iter>(
+        &'iter mut self,
+        _report: &mut diagn::Report,
+        decls: &'decls asm::ItemDecls,
+        _defs: &asm::ItemDefs)
+        -> Result<Option<ResolverContext<'iter, 'ast, 'decls>>, ()>
+    {
+        if self.index >= self.ast.nodes.len()
+        {
+            return Ok(None);
+        }
+
+        self.index_prev = Some(self.index);
+        self.subindex_prev = Some(self.subindex);
+
+        let ast_any = &self.ast.nodes[self.index];
+
+        let node: ResolverNode;
+        let file_handle_ctx: Option<util::FileServerHandle>;
+
+        match ast_any
+        {
+            asm::AstAny::Symbol(ast_symbol) =>
+            {
+                let item_ref = ast_symbol.item_ref.unwrap();
+                let decl = decls.symbols.get(item_ref);
+
+                self.symbol_ctx = &decl.ctx;
+
+                self.index += 1;
+                node = ResolverNode::Symbol(ast_symbol);
+                file_handle_ctx = Some(ast_symbol.decl_span.file_handle);
+            }
+
+            _ =>
+            {
+                self.index += 1;
+                node = ResolverNode::None;
+                file_handle_ctx = None;
+            }
+        }
+
+        static DUMMY_BANK_DATA: BankData = BankData {
+            cur_position: 0,
+        };
+
+        Ok(Some(ResolverContext {
+            node,
+            is_first_iteration: self.is_first_iteration,
+            is_last_iteration: self.is_last_iteration,
+            file_handle_ctx,
+            symbol_ctx: self.symbol_ctx,
+            bank_ref: self.bank_ref,
+            bank_data: &DUMMY_BANK_DATA,
+        }))
+    }
+
+
     fn advance_address(
         &mut self,
         report: &mut diagn::Report,

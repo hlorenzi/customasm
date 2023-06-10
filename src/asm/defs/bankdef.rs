@@ -17,7 +17,7 @@ pub struct Bankdef
 pub fn define(
     report: &mut diagn::Report,
     ast: &asm::AstTopLevel,
-    _decls: &mut asm::ItemDecls,
+    decls: &mut asm::ItemDecls,
     defs: &mut asm::ItemDefs)
     -> Result<(), ()>
 {
@@ -43,36 +43,66 @@ pub fn define(
         {
             let item_ref = node.item_ref.unwrap();
 
-            let mut provider = expr::dummy_eval_query;
-            
             let addr_unit = match &node.addr_unit
             {
                 None => 8,
-                Some(expr) => expr.eval_usize(report, &mut provider)?,
+                Some(expr) =>
+                    asm::resolver::eval_certain(
+                        report,
+                        decls,
+                        defs,
+                        expr)?
+                    .expect_usize(report, expr.span())?,
             };
             
             let label_align = match &node.label_align
             {
                 None => None,
-                Some(expr) => Some(expr.eval_usize(report, &mut provider)?),
+                Some(expr) => Some(
+                    asm::resolver::eval_certain(
+                        report,
+                        decls,
+                        defs,
+                        expr)?
+                    .expect_usize(report, expr.span())?),
             };
             
             let addr_start = match &node.addr_start
             {
                 None => util::BigInt::new(0, None),
-                Some(expr) => expr.eval_bigint(report, &mut provider)?,
+                Some(expr) =>
+                    asm::resolver::eval_certain(
+                        report,
+                        decls,
+                        defs,
+                        expr)?
+                    .expect_bigint(report, expr.span())?
+                    .clone(),
             };
             
             let addr_size = match &node.addr_size
             {
                 None => None,
-                Some(expr) => Some(expr.eval_usize(report, &mut provider)?),
+                Some(expr) => Some(
+                    asm::resolver::eval_certain(
+                        report,
+                        decls,
+                        defs,
+                        expr)?
+                    .expect_usize(report, expr.span())?),
             };
             
             let addr_end = match &node.addr_end
             {
                 None => None,
-                Some(expr) => Some(expr.eval_bigint(report, &mut provider)?),
+                Some(expr) => Some(
+                    asm::resolver::eval_certain(
+                        report,
+                        decls,
+                        defs,
+                        expr)?
+                    .expect_bigint(report, expr.span())?
+                    .clone()),
             };
 
             let addr_size = {
@@ -109,7 +139,13 @@ pub fn define(
             let output_offset = match &node.output_offset
             {
                 None => None,
-                Some(expr) => Some(expr.eval_usize(report, &mut provider)?),
+                Some(expr) => Some(
+                    asm::resolver::eval_certain(
+                        report,
+                        decls,
+                        defs,
+                        expr)?
+                    .expect_usize(report, expr.span())?),
             };
 
             let fill = node.fill;

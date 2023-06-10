@@ -149,19 +149,26 @@ pub fn assemble<S>(
             report,
             assembly.ast.as_mut().unwrap())?);
             
-        assembly.defs = Some(defs::define(
+        assembly.defs = Some(defs::define_symbols(
             report,
             opts,
             assembly.ast.as_mut().unwrap(),
             assembly.decls.as_mut().unwrap())?);
             
-        resolver::resolve_constants(
+        resolver::resolve_constants_simple(
             report,
             opts,
             fileserver,
             assembly.ast.as_ref().unwrap(),
             assembly.decls.as_ref().unwrap(),
             assembly.defs.as_mut().unwrap())?;
+            
+        defs::define(
+            report,
+            opts,
+            assembly.ast.as_mut().unwrap(),
+            assembly.defs.as_mut().unwrap(),
+            assembly.decls.as_mut().unwrap())?;
 
         matcher::match_all(
             report,

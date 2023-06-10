@@ -62,10 +62,10 @@ pub use addr::{
 #[derive(Debug)]
 pub struct ItemDefs
 {
+    pub symbols: DefList<Symbol>,
     pub bankdefs: DefList<Bankdef>,
     pub ruledefs: DefList<Ruledef>,
     pub ruledef_map: RuledefMap,
-    pub symbols: DefList<Symbol>,
     pub functions: DefList<Function>,
     pub instructions: DefList<Instruction>,
     pub data_elems: DefList<DataElement>,
@@ -116,6 +116,19 @@ impl<T> DefList<T>
     }
 
 
+    pub fn maybe_get(&self, item_ref: util::ItemRef<T>) -> Option<&T>
+    {
+        if item_ref.0 >= self.defs.len()
+        {
+            None
+        }
+        else
+        {
+            Some(&self.defs[item_ref.0])
+        }
+    }
+
+
     pub fn next_item_ref(&self) -> util::ItemRef<T>
     {
         util::ItemRef::new(self.defs.len())
@@ -123,18 +136,18 @@ impl<T> DefList<T>
 }
 
 
-pub fn define(
+pub fn define_symbols(
     report: &mut diagn::Report,
-    opts: &asm::AssemblyOptions,
+    _opts: &asm::AssemblyOptions,
     ast: &mut asm::parser::AstTopLevel,
     decls: &mut asm::decls::ItemDecls)
     -> Result<ItemDefs, ()>
 {
     let mut defs = ItemDefs {
+        symbols: DefList::new(),
         bankdefs: DefList::new(),
         ruledefs: DefList::new(),
         ruledef_map: RuledefMap::new(),
-        symbols: DefList::new(),
         functions: DefList::new(),
         instructions: DefList::new(),
         data_elems: DefList::new(),
@@ -144,15 +157,30 @@ pub fn define(
     };
 
 
-    bankdef::define(report, ast, decls, &mut defs)?;
-    ruledef::define(report, ast, decls, &mut defs)?;
     symbol::define(report, ast, decls, &mut defs)?;
-    function::define(report, ast, decls, &mut defs)?;
-    instruction::define(report, ast, decls, &mut defs)?;
-    data_block::define(report, ast, decls, &mut defs)?;
-    res::define(report, ast, decls, &mut defs)?;
-    align::define(report, ast, decls, &mut defs)?;
-    addr::define(report, ast, decls, &mut defs)?;
+    
+    report.stop_at_errors()?;
+
+    Ok(defs)
+}
+
+
+pub fn define(
+    report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
+    ast: &mut asm::parser::AstTopLevel,
+    defs: &mut asm::defs::ItemDefs,
+    decls: &mut asm::decls::ItemDecls)
+    -> Result<(), ()>
+{
+    bankdef::define(report, ast, decls, defs)?;
+    ruledef::define(report, ast, decls, defs)?;
+    function::define(report, ast, decls, defs)?;
+    instruction::define(report, ast, decls, defs)?;
+    data_block::define(report, ast, decls, defs)?;
+    res::define(report, ast, decls, defs)?;
+    align::define(report, ast, decls, defs)?;
+    addr::define(report, ast, decls, defs)?;
     
     report.stop_at_errors()?;
 
@@ -161,5 +189,5 @@ pub fn define(
         defs.ruledef_map.build(&defs.ruledefs);
     }
 
-    Ok(defs)
+    Ok(())
 }
