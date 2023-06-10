@@ -468,7 +468,7 @@ impl util::BitVec
             let char_counter = util::CharCounter::new(&prev_file_chars);
             
             result.push_str(&format!("{:1$}", contents_str, content_width));
-            result.push_str(&format!(" ; {}", char_counter.get_excerpt(span_location.0, span_location.1).iter().collect::<String>()));
+            result.push_str(&format!(" ; {}", char_counter.get_excerpt(span_location.0, span_location.1)));
             result.push_str("\n");
 		}
 		

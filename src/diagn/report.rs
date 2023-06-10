@@ -750,7 +750,10 @@ impl Report
 			styler.white();
 			
 			let line_pos = counter.get_index_range_of_line(line);
-			let excerpt = counter.get_excerpt(line_pos.0, line_pos.1);
+			let excerpt = counter
+				.get_excerpt(line_pos.0, line_pos.1)
+				.chars()
+				.collect::<Vec<_>>();
 			
 			// Print an excerpt of the source line
 			for p in 0..excerpt.len()

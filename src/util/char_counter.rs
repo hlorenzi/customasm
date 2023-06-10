@@ -1,18 +1,19 @@
 use crate::*;
 
 
-pub struct CharCounter
+pub struct CharCounter<'a>
 {
+	src: &'a str,
 	chars: Vec<char>,
 }
 
 
-impl CharCounter
+impl<'a> CharCounter<'a>
 {
-	pub fn new(src: &str) -> CharCounter
+	pub fn new(src: &'a str) -> CharCounter
 	{
-		CharCounter
-		{
+		CharCounter {
+			src,
 			chars: src.chars().collect(),
 		}
 	}
@@ -22,9 +23,9 @@ impl CharCounter
 		&self,
 		start: diagn::SpanIndex,
 		end: diagn::SpanIndex)
-		-> &[char]
+		-> &str
 	{
-		&self.chars[(start as usize)..(end as usize)]
+		self.src.get((start as usize)..(end as usize)).unwrap()
 	}
 	
 	
