@@ -1,0 +1,15 @@
+#d 0xab ; = 0xab
+
+x = y
+
+#if true
+{
+    y = 0xcd
+}
+
+#if false
+{
+    y = 0xef
+}
+
+#d y ; = 0xcd

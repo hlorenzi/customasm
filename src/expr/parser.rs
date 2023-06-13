@@ -462,6 +462,12 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 	
 		else if self.walker.next_is(0, syntax::TokenKind::KeywordAsm)
 			{ self.parse_asm() }
+	
+		else if self.walker.next_is(0, syntax::TokenKind::KeywordTrue)
+			{ self.parse_boolean_true() }
+	
+		else if self.walker.next_is(0, syntax::TokenKind::KeywordFalse)
+			{ self.parse_boolean_false() }
 			
 		else
 		{
@@ -575,6 +581,34 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 		let expr = expr::Expr::Literal(
 			tk_number.span,
 			expr::Value::Integer(bigint));
+
+		Ok(expr)
+	}
+	
+	
+	fn parse_boolean_true(&mut self) -> Result<expr::Expr, ()>
+	{
+		let tk_true = self.walker.expect(
+			self.report,
+			syntax::TokenKind::KeywordTrue)?;
+
+		let expr = expr::Expr::Literal(
+			tk_true.span,
+			expr::Value::Bool(true));
+
+		Ok(expr)
+	}
+	
+	
+	fn parse_boolean_false(&mut self) -> Result<expr::Expr, ()>
+	{
+		let tk_true = self.walker.expect(
+			self.report,
+			syntax::TokenKind::KeywordFalse)?;
+
+		let expr = expr::Expr::Literal(
+			tk_true.span,
+			expr::Value::Bool(false));
 
 		Ok(expr)
 	}

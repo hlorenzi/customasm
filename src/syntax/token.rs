@@ -21,6 +21,8 @@ pub enum TokenKind
 	Number,
 	String,
 	KeywordAsm,
+	KeywordTrue,
+	KeywordFalse,
 	ParenOpen,
 	ParenClose,
 	BracketOpen,
@@ -86,6 +88,8 @@ impl TokenKind
 		self == TokenKind::Identifier ||
 		self == TokenKind::Number ||
 		self == TokenKind::KeywordAsm ||
+		self == TokenKind::KeywordTrue ||
+		self == TokenKind::KeywordFalse ||
 		self == TokenKind::ParenOpen ||
 		self == TokenKind::ParenClose ||
 		self == TokenKind::BracketOpen ||
@@ -123,6 +127,8 @@ impl TokenKind
 			TokenKind::Number => "number",
 			TokenKind::String => "string",
 			TokenKind::KeywordAsm => "`asm` keyword",
+			TokenKind::KeywordTrue => "`true` keyword",
+			TokenKind::KeywordFalse => "`false` keyword",
 			TokenKind::ParenOpen => "`(`",
 			TokenKind::ParenClose => "`)`",
 			TokenKind::BracketOpen => "`[`",
@@ -187,6 +193,8 @@ impl Token
 			TokenKind::Whitespace => " ",
 			TokenKind::LineBreak => "\\n",
 			TokenKind::KeywordAsm => "asm",
+			TokenKind::KeywordTrue => "true",
+			TokenKind::KeywordFalse => "false",
 			TokenKind::ParenOpen => "(",
 			TokenKind::ParenClose => ")",
 			TokenKind::BracketOpen => "[",
@@ -506,9 +514,11 @@ fn check_for_identifier(src: &str) -> Option<(TokenKind, usize)>
 
 	let ident = src.get(0..length).unwrap();
 
-	static KEYWORDS: [(&str, TokenKind); 1] =
+	static KEYWORDS: [(&str, TokenKind); 3] =
 	[
 		("asm", TokenKind::KeywordAsm),
+		("true", TokenKind::KeywordTrue),
+		("false", TokenKind::KeywordFalse),
 	];
 
 	for keyword in KEYWORDS

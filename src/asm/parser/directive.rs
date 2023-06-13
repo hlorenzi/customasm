@@ -57,6 +57,9 @@ pub fn parse(
         "fn" => Ok(asm::AstAny::DirectiveFn(
             asm::parser::directive_fn::parse(report, walker, header_span)?)),
         
+        "if" => Ok(asm::AstAny::DirectiveIf(
+            asm::parser::directive_if::parse(report, walker, header_span)?)),
+        
         "include" => Ok(asm::AstAny::DirectiveInclude(
             asm::parser::directive_include::parse(report, walker, header_span)?)),
         

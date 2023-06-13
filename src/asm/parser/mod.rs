@@ -41,6 +41,11 @@ pub use directive_fn::{
     AstFnParameter,
 };
 
+mod directive_if;
+pub use directive_if::{
+    AstDirectiveIf,
+};
+
 mod directive_include;
 pub use directive_include::{
     AstDirectiveInclude,
@@ -104,6 +109,7 @@ pub enum AstAny
     DirectiveBits(AstDirectiveBits),
     DirectiveData(AstDirectiveData),
     DirectiveFn(AstDirectiveFn),
+    DirectiveIf(AstDirectiveIf),
     DirectiveInclude(AstDirectiveInclude),
     DirectiveLabelAlign(AstDirectiveLabelAlign),
     DirectiveNoEmit(AstDirectiveNoEmit),
@@ -264,6 +270,28 @@ pub fn parse(
 }
 
 
+fn parse_nested_toplevel(
+    report: &mut diagn::Report,
+    walker: &mut syntax::TokenWalker)
+    -> Result<AstTopLevel, ()>
+{
+    let mut nodes = Vec::new();
+    
+    while !walker.is_over() &&
+        !walker.next_is(0, syntax::TokenKind::BraceClose)
+    {
+        if let Some(node) = parse_line(report, walker)?
+        {
+            nodes.push(node);
+        }
+    }
+
+    Ok(AstTopLevel {
+        nodes
+    })
+}
+
+
 fn parse_line(
     report: &mut diagn::Report,
     walker: &mut syntax::TokenWalker)
@@ -323,6 +351,7 @@ impl AstAny
             AstAny::DirectiveBits(node) => node.header_span,
             AstAny::DirectiveData(node) => node.header_span,
             AstAny::DirectiveFn(node) => node.header_span,
+            AstAny::DirectiveIf(node) => node.header_span,
             AstAny::DirectiveInclude(node) => node.header_span,
             AstAny::DirectiveLabelAlign(node) => node.header_span,
             AstAny::DirectiveNoEmit(node) => node.header_span,

@@ -12,7 +12,10 @@ pub fn collect(
 
     for any_node in &mut ast.nodes
     {
-        if let asm::AstAny::Symbol(ref mut node) = any_node
+        let asm::AstAny::Symbol(ref mut node) = any_node
+            else { continue };
+
+        if node.item_ref.is_none()
         {
             let kind = {
                 match node.kind
@@ -33,9 +36,12 @@ pub fn collect(
                 kind)?;
                 
             node.item_ref = Some(item_ref);
-
-            symbol_ctx = decls.symbols.get(item_ref).ctx.clone();
         }
+
+        symbol_ctx = decls.symbols
+            .get(node.item_ref.unwrap())
+            .ctx
+            .clone();
     }
 
 

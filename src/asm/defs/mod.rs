@@ -136,14 +136,9 @@ impl<T> DefList<T>
 }
 
 
-pub fn define_symbols(
-    report: &mut diagn::Report,
-    _opts: &asm::AssemblyOptions,
-    ast: &mut asm::parser::AstTopLevel,
-    decls: &mut asm::decls::ItemDecls)
-    -> Result<ItemDefs, ()>
+pub fn init() -> ItemDefs
 {
-    let mut defs = ItemDefs {
+    ItemDefs {
         symbols: DefList::new(),
         bankdefs: DefList::new(),
         ruledefs: DefList::new(),
@@ -154,18 +149,27 @@ pub fn define_symbols(
         res_directives: DefList::new(),
         align_directives: DefList::new(),
         addr_directives: DefList::new(),
-    };
-
-
-    symbol::define(report, ast, decls, &mut defs)?;
-    
-    report.stop_at_errors()?;
-
-    Ok(defs)
+    }
 }
 
 
-pub fn define(
+pub fn define_symbols(
+    report: &mut diagn::Report,
+    _opts: &asm::AssemblyOptions,
+    ast: &mut asm::parser::AstTopLevel,
+    decls: &asm::decls::ItemDecls,
+    defs: &mut asm::defs::ItemDefs)
+    -> Result<(), ()>
+{
+    symbol::define(report, ast, decls, defs)?;
+    
+    report.stop_at_errors()?;
+
+    Ok(())
+}
+
+
+pub fn define_remaining(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
     ast: &mut asm::parser::AstTopLevel,

@@ -145,25 +145,58 @@ pub fn assemble<S>(
             fileserver,
             root_filenames)?);
 
-        assembly.decls = Some(decls::collect(
+        assembly.decls = Some(decls::init(report)?);
+
+        assembly.defs = Some(defs::init());
+
+        let mut prev_resolved_constants_count = 0;
+
+        loop
+        {
+            decls::collect(
+                report,
+                assembly.ast.as_mut().unwrap(),
+                assembly.decls.as_mut().unwrap())?;
+
+            defs::define_symbols(
+                report,
+                opts,
+                assembly.ast.as_mut().unwrap(),
+                assembly.decls.as_ref().unwrap(),
+                assembly.defs.as_mut().unwrap())?;
+                
+            let resolved_constants_count = resolver::resolve_constants_simple(
+                report,
+                opts,
+                fileserver,
+                assembly.ast.as_ref().unwrap(),
+                assembly.decls.as_ref().unwrap(),
+                assembly.defs.as_mut().unwrap())?;
+    
+            let resolved_ifs_count = resolver::resolve_ifs(
+                report,
+                opts,
+                fileserver,
+                assembly.ast.as_mut().unwrap(),
+                assembly.decls.as_ref().unwrap(),
+                assembly.defs.as_mut().unwrap())?;
+
+            if resolved_constants_count == prev_resolved_constants_count &&
+                resolved_ifs_count == 0
+            {
+                break;
+            }
+
+            prev_resolved_constants_count = resolved_constants_count;
+        }
+
+        resolver::check_leftover_ifs(
             report,
-            assembly.ast.as_mut().unwrap())?);
-            
-        assembly.defs = Some(defs::define_symbols(
-            report,
-            opts,
-            assembly.ast.as_mut().unwrap(),
-            assembly.decls.as_mut().unwrap())?);
-            
-        resolver::resolve_constants_simple(
-            report,
-            opts,
-            fileserver,
             assembly.ast.as_ref().unwrap(),
             assembly.decls.as_ref().unwrap(),
-            assembly.defs.as_mut().unwrap())?;
+            assembly.defs.as_ref().unwrap())?;
             
-        defs::define(
+        defs::define_remaining(
             report,
             opts,
             assembly.ast.as_mut().unwrap(),

@@ -1,0 +1,24 @@
+#d 0xab ; = 0xab
+
+#if false
+{
+    #d 0x00
+}
+#elif false
+{
+    #d 0x11
+}
+#elif true
+{
+    #d 0x22 ; = 0x22
+}
+#elif true
+{
+    #d 0x33
+}
+#else
+{
+    #d 0x44
+}
+
+#d 0xff ; = 0xff

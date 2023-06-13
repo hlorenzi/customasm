@@ -17,25 +17,43 @@ pub struct ItemDecls
 }
 
 
-pub fn collect(
-    report: &mut diagn::Report,
-    ast: &mut asm::AstTopLevel)
+pub fn init(
+    report: &mut diagn::Report)
     -> Result<ItemDecls, ()>
 {
-    let mut collections = ItemDecls {
+    let mut decls = ItemDecls {
         bankdefs: util::SymbolManager::new("bank"),
         ruledefs: util::SymbolManager::new("ruledef"),
         symbols: util::SymbolManager::new("symbol"),
     };
 
+    let initial_item_ref = decls.bankdefs.declare(
+        report,
+        diagn::Span::new_dummy(),
+        &util::SymbolContext::new_global(),
+        "#global_bankdef".to_string(),
+        0,
+        util::SymbolKind::Other)?;
+    
+    debug_assert!(initial_item_ref.0 == 0);
 
-    bankdef::collect(report, ast, &mut collections)?;
-    bank::collect(report, ast, &mut collections)?;
-    ruledef::collect(report, ast, &mut collections)?;
-    symbol::collect(report, ast, &mut collections)?;
-    function::collect(report, ast, &mut collections)?;
+    Ok(decls)
+}
+
+
+pub fn collect(
+    report: &mut diagn::Report,
+    ast: &mut asm::AstTopLevel,
+    decls: &mut asm::ItemDecls)
+    -> Result<(), ()>
+{
+    bankdef::collect(report, ast, decls)?;
+    bank::collect(report, ast, decls)?;
+    ruledef::collect(report, ast, decls)?;
+    symbol::collect(report, ast, decls)?;
+    function::collect(report, ast, decls)?;
 
     report.stop_at_errors()?;
 
-    Ok(collections)
+    Ok(())
 }

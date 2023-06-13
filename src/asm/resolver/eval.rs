@@ -225,14 +225,14 @@ pub fn eval_variable_simple(
         }
     }
 
-    let symbol_ref = decls.symbols.get_by_name(
-        query.report,
-        query.span,
+    let symbol_ref = decls.symbols.try_get_by_name(
         &util::SymbolContext::new_global(),
         query.hierarchy_level,
-        query.hierarchy)?;
+        query.hierarchy);
 
-    match defs.symbols.maybe_get(symbol_ref)
+    match symbol_ref
+        .map(|s| defs.symbols.maybe_get(s))
+        .flatten()
     {
         Some(symbol) => Ok(symbol.value.clone()),
         None => Ok(expr::Value::Unknown),

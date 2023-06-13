@@ -1,48 +1,7 @@
 use crate::*;
 
 
-/// Tries to resolve the value of constants as much
-/// as possible, for whatever number of iterations it takes.
-/// 
-/// Stops as soon as one iteration reports having resolved
-/// no new constants.
 pub fn resolve_constants_simple(
-    report: &mut diagn::Report,
-    opts: &asm::AssemblyOptions,
-    fileserver: &mut dyn util::FileServer,
-    ast: &asm::AstTopLevel,
-    decls: &asm::ItemDecls,
-    defs: &mut asm::ItemDefs)
-    -> Result<(), ()>
-{
-    let mut prev_resolved_count = 0;
-
-    loop
-    {
-        if opts.debug_iterations
-        {
-            println!("[===== constants iteration =====]");
-        }
-
-        let resolved_count = resolve_constants_simple_once(
-            report,
-            opts,
-            fileserver,
-            ast,
-            decls,
-            defs)?;
-
-        if resolved_count == prev_resolved_count
-        {
-            return Ok(());
-        }
-
-        prev_resolved_count = resolved_count;
-    }
-}
-
-
-pub fn resolve_constants_simple_once(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
     _fileserver: &mut dyn util::FileServer,
@@ -61,22 +20,22 @@ pub fn resolve_constants_simple_once(
 
     while let Some(ctx) = iter.next_simple(report, decls, defs)?
     {
-        if let asm::ResolverNode::Symbol(ast_symbol) = ctx.node
-        {
-            if let asm::AstSymbolKind::Constant(_) = ast_symbol.kind
-            {
-                let resolution_state = resolve_constant_simple(
-                    report,
-                    opts,
-                    ast_symbol,
-                    decls,
-                    defs)?;
+        let asm::ResolverNode::Symbol(ast_symbol) = ctx.node
+            else { continue };
+        
+        let asm::AstSymbolKind::Constant(_) = ast_symbol.kind
+            else { continue };
 
-                if let asm::ResolutionState::Resolved = resolution_state
-                {
-                    resolved_count += 1;
-                }
-            }
+        let resolution_state = resolve_constant_simple(
+            report,
+            opts,
+            ast_symbol,
+            decls,
+            defs)?;
+
+        if let asm::ResolutionState::Resolved = resolution_state
+        {
+            resolved_count += 1;
         }
     }
 
@@ -84,7 +43,7 @@ pub fn resolve_constants_simple_once(
 }
 
 
-pub fn resolve_constant_simple(
+fn resolve_constant_simple(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
     ast_symbol: &asm::AstSymbol,

@@ -12,7 +12,6 @@ pub use iter::{
 mod constant;
 pub use constant::{
     resolve_constants_simple,
-    resolve_constants_simple_once,
     resolve_constant,
 };
 
@@ -22,6 +21,12 @@ mod data_block;
 mod res;
 mod align;
 mod addr;
+
+mod directive_if;
+pub use directive_if::{
+    resolve_ifs,
+    check_leftover_ifs,
+};
 
 mod eval;
 pub use eval::{
@@ -164,97 +169,102 @@ pub fn resolve_once(
 
     while let Some(ctx) = iter.next(report, decls, defs)?
     {
-        if let asm::ResolverNode::Symbol(ast_symbol) = ctx.node
+        match ctx.node
         {
-            if let asm::AstSymbolKind::Constant(_) = ast_symbol.kind
+            asm::ResolverNode::None => {}
+            
+            asm::ResolverNode::Symbol(ast_symbol) =>
+            {
+                match ast_symbol.kind
+                {
+                    asm::AstSymbolKind::Constant(_) =>
+                        resolution_state.merge(
+                            resolve_constant(
+                                report,
+                                opts,
+                                fileserver,
+                                ast_symbol,
+                                decls,
+                                defs,
+                                &ctx)?),
+
+                    asm::AstSymbolKind::Label =>
+                        resolution_state.merge(
+                            label::resolve_label(
+                                report,
+                                opts,
+                                ast_symbol,
+                                decls,
+                                defs,
+                                &ctx)?),
+                }
+            }
+        
+            asm::ResolverNode::Instruction(ast_instr) =>
             {
                 resolution_state.merge(
-                    resolve_constant(
+                    instruction::resolve_instruction(
                         report,
                         opts,
                         fileserver,
-                        ast_symbol,
+                        ast_instr,
                         decls,
                         defs,
                         &ctx)?);
             }
-            else
+        
+            asm::ResolverNode::DataElement(ast_data, elem_index) =>
             {
                 resolution_state.merge(
-                    label::resolve_label(
+                    data_block::resolve_data_element(
                         report,
                         opts,
-                        ast_symbol,
+                        fileserver,
+                        ast_data,
+                        elem_index,
                         decls,
                         defs,
                         &ctx)?);
             }
-        }
         
-        else if let asm::ResolverNode::Instruction(ast_instr) = ctx.node
-        {
-            resolution_state.merge(
-                instruction::resolve_instruction(
-                    report,
-                    opts,
-                    fileserver,
-                    ast_instr,
-                    decls,
-                    defs,
-                    &ctx)?);
-        }
+            asm::ResolverNode::Res(ast_res) =>
+            {
+                resolution_state.merge(
+                    res::resolve_res(
+                        report,
+                        opts,
+                        fileserver,
+                        ast_res,
+                        decls,
+                        defs,
+                        &ctx)?);
+            }
         
-        else if let asm::ResolverNode::DataElement(ast_data, elem_index) = ctx.node
-        {
-            resolution_state.merge(
-                data_block::resolve_data_element(
-                    report,
-                    opts,
-                    fileserver,
-                    ast_data,
-                    elem_index,
-                    decls,
-                    defs,
-                    &ctx)?);
-        }
+            asm::ResolverNode::Align(ast_align) =>
+            {
+                resolution_state.merge(
+                    align::resolve_align(
+                        report,
+                        opts,
+                        fileserver,
+                        ast_align,
+                        decls,
+                        defs,
+                        &ctx)?);
+            }
         
-        else if let asm::ResolverNode::Res(ast_res) = ctx.node
-        {
-            resolution_state.merge(
-                res::resolve_res(
-                    report,
-                    opts,
-                    fileserver,
-                    ast_res,
-                    decls,
-                    defs,
-                    &ctx)?);
-        }
-        
-        else if let asm::ResolverNode::Align(ast_align) = ctx.node
-        {
-            resolution_state.merge(
-                align::resolve_align(
-                    report,
-                    opts,
-                    fileserver,
-                    ast_align,
-                    decls,
-                    defs,
-                    &ctx)?);
-        }
-        
-        else if let asm::ResolverNode::Addr(ast_addr) = ctx.node
-        {
-            resolution_state.merge(
-                addr::resolve_addr(
-                    report,
-                    opts,
-                    fileserver,
-                    ast_addr,
-                    decls,
-                    defs,
-                    &ctx)?);
+            asm::ResolverNode::Addr(ast_addr) =>
+            {
+                resolution_state.merge(
+                    addr::resolve_addr(
+                        report,
+                        opts,
+                        fileserver,
+                        ast_addr,
+                        decls,
+                        defs,
+                        &ctx)?);
+            }
         }
     }
 
