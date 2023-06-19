@@ -49,7 +49,7 @@ pub fn extract_expectations(
             {
                 let value =
                     syntax::excerpt_as_bigint(
-                        &mut diagn::Report::new(),
+                        None,
                         diagn::Span::new_dummy(),
                         value_str)
                     .unwrap();

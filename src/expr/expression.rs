@@ -129,6 +129,12 @@ impl Value
 	}
 
 
+	pub fn make_bool(value: bool) -> Value
+	{
+		Value::Bool(value)
+	}
+
+
 	pub fn make_string<T: Into<String>, S: Into<String>>(value: T, encoding: S) -> Value
 	{
 		Value::String(ExprString

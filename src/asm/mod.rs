@@ -95,6 +95,15 @@ pub struct AssemblyOptions
     pub debug_iterations: bool,
     pub optimize_statically_known: bool,
     pub optimize_instruction_matching: bool,
+
+    pub driver_symbol_defs: Vec<DriverSymbolDef>,
+}
+
+
+pub struct DriverSymbolDef
+{
+    pub name: String,
+    pub value: expr::Value,
 }
 
 
@@ -123,6 +132,8 @@ impl AssemblyOptions
             debug_iterations: false,
             optimize_statically_known: true,
             optimize_instruction_matching: true,
+
+            driver_symbol_defs: Vec::new(),
         }
     }
 }
@@ -230,6 +241,11 @@ pub fn assemble<S>(
             assembly.decls.as_ref().unwrap(),
             assembly.defs.as_ref().unwrap())?);
 
+        check_unused_defines(
+            report,
+            opts,
+            assembly.decls.as_ref().unwrap())?;
+
         Ok(())
     };
     
@@ -244,4 +260,42 @@ pub fn assemble<S>(
     }
 
     assembly
+}
+
+
+fn check_unused_defines(
+    report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
+    decls: &asm::ItemDecls)
+    -> Result<(), ()>
+{
+    let mut had_error = false;
+
+    for symbol_def in &opts.driver_symbol_defs
+    {
+        let hierarchy = symbol_def.name
+            .split(".")
+            .collect::<Vec<_>>();
+
+        let maybe_decl = decls.symbols.try_get_by_name(
+            &util::SymbolContext::new_global(),
+            0,
+            &hierarchy);
+
+        if let None = maybe_decl
+        {
+            report.error(
+                format!(
+                    "unused define `{}`",
+                    symbol_def.name));
+
+            had_error = true;
+        }
+    }
+
+    match had_error
+    {
+        false => Ok(()),
+        true => Err(()),
+    }
 }

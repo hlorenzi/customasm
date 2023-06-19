@@ -169,7 +169,7 @@ pub fn excerpt_as_usize(
 
 
 pub fn excerpt_as_bigint(
-	report: &mut diagn::Report,
+	report: Option<&mut diagn::Report>,
 	span: diagn::Span,
 	excerpt: &str)
 	-> Result<util::BigInt, ()>
@@ -195,9 +195,12 @@ pub fn excerpt_as_bigint(
 			Some(d) => d,
 			None => 
 			{
-				report.error_span(
-					"invalid digits",
-					span);
+				if let Some(report) = report
+				{
+					report.error_span(
+						"invalid digits",
+						span);
+				}
 				
 				return Err(());
 			}
@@ -211,9 +214,12 @@ pub fn excerpt_as_bigint(
 	
 	if digit_num == 0
 	{
-		report.error_span(
-			"invalid value",
-			span);
+		if let Some(report) = report
+		{
+			report.error_span(
+				"invalid value",
+				span);
+		}
 		
 		return Err(());
 	}

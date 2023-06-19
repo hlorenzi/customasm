@@ -243,6 +243,13 @@ fn make_opts() -> getopts::Options
 		"Suppress progress reports.");
 
 	opts.opt(
+		"d", "define",
+		"Defines a constant.",
+		"VALUE",
+		getopts::HasArg::Yes,
+		getopts::Occur::Multi);
+	
+	opts.opt(
 		"", "color",
 		"Style the output with colors. [on/off]",
 		"VALUE",
@@ -336,6 +343,14 @@ fn parse_command(
 		command.quiet |= parsed.opt_present("q");
 		command.show_version |= parsed.opt_present("v");
 		command.show_help |= parsed.opt_present("h");
+
+		for define_arg in parsed.opt_strs("d")
+		{
+			command.opts.driver_symbol_defs.push(
+				parse_define_arg(
+					report,
+					&define_arg)?);
+		}
 
 		command.opts.debug_iterations |=
 			parsed.opt_present("debug-iters");
@@ -616,6 +631,85 @@ pub fn parse_output_format(
 
 
 	Ok(format)
+}
+
+
+fn parse_define_arg(
+	report: &mut diagn::Report,
+	raw_str: &str)
+	-> Result<asm::DriverSymbolDef, ()>
+{
+	let split = raw_str
+		.split('=')
+		.collect::<Vec<_>>();
+
+	let name = split[0].to_string();
+
+	if split.len() == 1
+	{
+		return Ok(asm::DriverSymbolDef {
+			name,
+			value: expr::Value::make_bool(true),
+		});
+	}
+
+	if split.len() != 2
+	{
+		report.error(
+			format!(
+				"invalid define argument `{}`",
+				raw_str));
+
+		return Err(());
+	}
+
+	let value_str = split[1];
+
+	let value = {
+		if value_str == "true"
+		{
+			expr::Value::make_bool(true)
+		}
+		else if value_str == "false"
+		{
+			expr::Value::make_bool(false)
+		}
+		else
+		{
+			let has_negative_sign = split[1].chars().next() == Some('-');
+
+			let maybe_value = syntax::excerpt_as_bigint(
+				None,
+				diagn::Span::new_dummy(),
+				if has_negative_sign { split[1].get(1..).unwrap() } else { split[1] });
+				
+			
+			use std::ops::Neg;
+
+			match maybe_value
+			{
+				Ok(value) =>
+					expr::Value::make_integer(
+						if has_negative_sign { value.neg() } else { value }),
+				
+				Err(()) =>
+				{
+					report.error(
+						format!(
+							"invalid value for define `{}`",
+							name));
+
+					return Err(());
+				}
+			}
+		}
+	};
+
+
+	Ok(asm::DriverSymbolDef {
+		name,
+		value,
+	})
 }
 
 

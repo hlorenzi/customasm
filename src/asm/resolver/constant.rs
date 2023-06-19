@@ -62,6 +62,20 @@ fn resolve_constant_simple(
     let asm::AstSymbolKind::Constant(ref ast_const) = ast_symbol.kind
         else { unreachable!() };
 
+
+    // Overwrite with a value from the command-line, if present
+    let symbol_decl = decls.symbols.get(item_ref);
+    if let Some(driver_def) = opts.driver_symbol_defs
+        .iter()
+        .find(|s| s.name == symbol_decl.name)
+    {
+        let symbol = defs.symbols.get_mut(item_ref);
+        symbol.value = driver_def.value.clone();
+        symbol.resolved = true;
+        return Ok(asm::ResolutionState::Resolved);
+    }
+
+
     let value = asm::resolver::eval_simple(
         report,
         decls,

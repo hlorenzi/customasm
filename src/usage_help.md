@@ -22,9 +22,15 @@ Examples:
 * `-h, --help`  
     Display this information.  
 * `-t, --iters=NUM`  
-    The max number of resolution iterations to attempt. (Default: 10)  
+    The maximum number of resolution iterations to attempt.  
+    (Default: 10)  
+* `-dNAME, --define=NAME`
+* `-dNAME=VALUE, --define=NAME=VALUE`
+    Overwrites a constant definition with the given value,
+    or `true` if none is given.
 * `--color=on/off`  
-    Whether to style the output with colors. (Default: on)  
+    Whether to style the output with colors.  
+    (Default: on)  
 * `--debug-iters`  
     Print debug info during resolution iterations.  
 * `--debug-no-optimize-static`  
@@ -54,7 +60,7 @@ Examples:
 * `binary`  
 
 * `annotated,base:16,group:2`  
-    Annotate the output data with snippets
+    Annotates the output data with snippets
     of the source code.  
 
 * `annotatedbin`  

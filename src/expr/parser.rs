@@ -574,7 +574,7 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 		let number = tk_number.excerpt.clone().unwrap();
 		
 		let bigint = syntax::excerpt_as_bigint(
-			self.report,
+			Some(self.report),
 			tk_number.span,
 			&number)?;
 		
