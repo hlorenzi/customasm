@@ -90,6 +90,10 @@ pub fn eval_asm(
                     &encodings[0].1,
                     (size, 0));
             }
+            else if !ctx.can_guess()
+            {
+                return Err(());
+            }
         }
 
         else

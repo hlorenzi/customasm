@@ -439,6 +439,11 @@ fn resolve_instruction_match_inner(
                     ctx,
                     arg_eval_ctx)?;
 
+                if arg_value.should_propagate()
+                {
+                    return Ok(arg_value);
+                }
+
                 let param = &rule.parameters[index];
 
                 eval_ctx.set_local(
