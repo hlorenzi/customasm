@@ -32,9 +32,7 @@ pub use parser::{
 };
 
 pub mod decls;
-pub use decls::{
-    ItemDecls,
-};
+pub use decls::ItemDecls;
 
 pub mod defs;
 pub use defs::{

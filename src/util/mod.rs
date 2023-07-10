@@ -1,12 +1,8 @@
 mod char_counter;
-pub use self::char_counter::{
-    CharCounter,
-};
+pub use self::char_counter::CharCounter;
 
 mod bigint;
-pub use self::bigint::{
-    BigInt,
-};
+pub use self::bigint::BigInt;
 
 mod bitvec;
 pub use self::bitvec::{
@@ -17,9 +13,7 @@ pub use self::bitvec::{
 mod bitvec_format;
 
 mod overlap_checker;
-pub use self::overlap_checker::{
-    OverlapChecker,
-};
+pub use self::overlap_checker::OverlapChecker;
 
 mod fileserver;
 pub use self::fileserver::{
@@ -39,14 +33,10 @@ pub use self::filename::{
 };
 
 mod windows_console;
-pub use self::windows_console::{
-    enable_windows_ansi_support,
-};
+pub use self::windows_console::enable_windows_ansi_support;
 
 mod string_styler;
-pub use self::string_styler::{
-    StringStyler,
-};
+pub use self::string_styler::StringStyler;
 
 mod symbol_manager;
 pub use self::symbol_manager::{
@@ -59,6 +49,4 @@ pub use self::symbol_manager::{
 mod symbol_format;
 
 mod item_ref;
-pub use self::item_ref::{
-    ItemRef,
-};
+pub use self::item_ref::ItemRef;

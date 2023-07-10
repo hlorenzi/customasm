@@ -2,9 +2,7 @@ use crate::*;
 
 
 mod bankdef;
-pub use bankdef::{
-    Bankdef,
-};
+pub use bankdef::Bankdef;
 
 mod ruledef;
 pub use ruledef::{
@@ -23,9 +21,7 @@ pub use ruledef_map::{
 };
 
 mod symbol;
-pub use symbol::{
-    Symbol,
-};
+pub use symbol::Symbol;
 
 mod function;
 pub use function::{
@@ -34,29 +30,19 @@ pub use function::{
 };
 
 mod instruction;
-pub use instruction::{
-    Instruction,
-};
+pub use instruction::Instruction;
 
 mod data_block;
-pub use data_block::{
-    DataElement,
-};
+pub use data_block::DataElement;
 
 mod res;
-pub use res::{
-    ResDirective,
-};
+pub use res::ResDirective;
 
 mod align;
-pub use align::{
-    AlignDirective,
-};
+pub use align::AlignDirective;
 
 mod addr;
-pub use addr::{
-    AddrDirective,
-};
+pub use addr::AddrDirective;
 
 
 #[derive(Debug)]
