@@ -9,7 +9,7 @@ pub fn check_bank_overlap(
 {
     for i in 1..defs.bankdefs.len()
     {
-        let bankdef1 = &defs.bankdefs.defs[i];
+        let bankdef1 = defs.bankdefs.get(util::ItemRef::new(i));
         let decl1 = decls.bankdefs.get(bankdef1.item_ref);
 
         if bankdef1.output_offset.is_none()
@@ -19,7 +19,7 @@ pub fn check_bank_overlap(
 
         for j in (i + 1)..defs.bankdefs.len()
         {
-            let bankdef2 = &defs.bankdefs.defs[j];
+            let bankdef2 = defs.bankdefs.get(util::ItemRef::new(j));
             let decl2 = decls.bankdefs.get(bankdef2.item_ref);
 
             if bankdef2.output_offset.is_none()
@@ -252,8 +252,9 @@ fn fill_banks(
     defs: &asm::ItemDefs,
     output: &mut util::BitVec)
 {
-    for bankdef in &defs.bankdefs.defs
+    for i in 0..defs.bankdefs.defs.len()
     {
+        let bankdef = defs.bankdefs.get(util::ItemRef::new(i));
         if !bankdef.fill
         {
             continue;

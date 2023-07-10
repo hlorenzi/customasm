@@ -78,7 +78,7 @@ pub struct ItemDefs
 #[derive(Debug)]
 pub struct DefList<T>
 {
-    pub defs: Vec<T>,
+    pub defs: Vec<Option<T>>,
 }
 
 
@@ -94,7 +94,14 @@ impl<T> DefList<T>
 
     pub fn define(&mut self, item_ref: util::ItemRef<T>, item: T)
     {
-        self.defs.insert(item_ref.0, item);
+        while item_ref.0 >= self.defs.len()
+        {
+            self.defs.push(None);
+        }
+
+        assert!(self.defs[item_ref.0].is_none());
+
+        self.defs[item_ref.0] = Some(item);
     }
 
 
@@ -106,13 +113,13 @@ impl<T> DefList<T>
 
     pub fn get(&self, item_ref: util::ItemRef<T>) -> &T
     {
-        &self.defs[item_ref.0]
+        self.defs[item_ref.0].as_ref().unwrap()
     }
 
 
     pub fn get_mut(&mut self, item_ref: util::ItemRef<T>) -> &mut T
     {
-        &mut self.defs[item_ref.0]
+        self.defs[item_ref.0].as_mut().unwrap()
     }
 
 
@@ -124,7 +131,7 @@ impl<T> DefList<T>
         }
         else
         {
-            Some(&self.defs[item_ref.0])
+            Some(self.defs[item_ref.0].as_ref().unwrap())
         }
     }
 
