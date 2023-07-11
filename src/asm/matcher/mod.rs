@@ -112,7 +112,8 @@ pub fn match_all(
             if let Err(()) = error_on_no_matches(
                 report,
                 ast_instr.span,
-                &matches)
+                &matches,
+                None)
             {
                 continue;
             }
@@ -178,14 +179,28 @@ pub fn match_all(
 pub fn error_on_no_matches(
     report: &mut diagn::Report,
     span: diagn::Span,
-    matches: &InstructionMatches)
+    matches: &InstructionMatches,
+    tokens_for_note: Option<&Vec<syntax::Token>>)
     -> Result<(), ()>
 {
     if matches.len() == 0
     {
-        report.error_span(
+        let mut error = diagn::Message::error_span(
             "no match found for instruction",
             span);
+
+        if let Some(tokens_for_note) = tokens_for_note
+        {
+            error.inner.push(diagn::Message::note(
+                format!(
+                    "match attempted: `{}`",
+                    tokens_for_note
+                        .iter()
+                        .map(|t| t.text())
+                        .collect::<String>())));
+        }
+
+        report.message(error);
 
         Err(())
     }

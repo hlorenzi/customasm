@@ -1,1 +1,1 @@
-#d4 0b1101 %0b1000 ; error: expected line break
+#d4 0b1101 $0x1000 ; error: expected line break

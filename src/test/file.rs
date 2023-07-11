@@ -273,7 +273,7 @@ pub fn test_file(filepath: &str)
         println!("\n\
             > test failed -- diagnostics mismatch\n\
             > expected {} messages, got {}\n",
-            expectations.messages.len(), report.len());
+            expectations.messages.len(), report.len_with_inner());
             
         println!("got encoding: 0x{:x}", &encoding);
         panic!("test failed");

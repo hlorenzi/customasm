@@ -1,0 +1,1 @@
+#d %r01 ; error: expected expression

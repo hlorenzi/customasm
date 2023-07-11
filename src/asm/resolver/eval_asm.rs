@@ -49,7 +49,8 @@ pub fn eval_asm(
             asm::matcher::error_on_no_matches(
                 query.report,
                 ast_instr.span,
-                &matches)?;
+                &matches,
+                Some(&new_tokens))?;
             
             
             // Clone the context to use our own position

@@ -427,6 +427,29 @@ impl<'a> CharWalker<'a>
 	}
 
 
+	pub fn consume_while_not_followed_by(
+		&mut self,
+		fn_start: fn(char) -> bool,
+		fn_mid: fn(char) -> bool,
+		fn_not_followed_by: fn(char) -> bool)
+		-> bool
+	{
+		if !self.consume_if(fn_start)
+		{
+			return false;
+		}
+
+		while self.consume_if(fn_mid) {}
+
+		if self.consume_if(fn_not_followed_by)
+		{
+			return false;
+		}
+
+		true
+	}
+
+
 	pub fn consume_until_char(&mut self, wanted: char)
 	{
 		while !self.ended() && self.current != wanted
@@ -502,6 +525,11 @@ fn check_for_comment(src: &str) -> Option<(TokenKind, usize)>
 fn check_for_identifier(src: &str) -> Option<(TokenKind, usize)>
 {
 	let mut walker = CharWalker::new(src);
+
+	if walker.consume_if(|c| c == '$')
+	{
+		return Some((TokenKind::Identifier, walker.length));
+	}
 	
 	if !walker.consume_while(
 		is_identifier_start,
@@ -546,9 +574,10 @@ fn check_for_number(src: &str) -> Option<(TokenKind, usize)>
 
 	else if walker.consume_char('$')
 	{
-		if walker.consume_while(
-			is_number_mid,
-			is_number_mid)
+		if walker.consume_while_not_followed_by(
+			is_hex_number_mid,
+			is_hex_number_mid,
+			cannot_follow_hex_number)
 		{
 			return Some((TokenKind::Number, walker.length));
 		}
@@ -556,9 +585,10 @@ fn check_for_number(src: &str) -> Option<(TokenKind, usize)>
 
 	else if walker.consume_char('%')
 	{
-		if walker.consume_while(
-			is_number_mid,
-			is_number_mid)
+		if walker.consume_while_not_followed_by(
+			is_bin_number_mid,
+			is_bin_number_mid,
+			cannot_follow_bin_number)
 		{
 			return Some((TokenKind::Number, walker.length));
 		}
@@ -656,8 +686,7 @@ fn is_identifier_start(c: char) -> bool
 {
 	(c >= 'a' && c <= 'z') ||
 	(c >= 'A' && c <= 'Z') ||
-	c == '_' ||
-	c == '$'
+	c == '_'
 }
 
 
@@ -666,8 +695,7 @@ fn is_identifier_mid(c: char) -> bool
 	(c >= 'a' && c <= 'z') ||
 	(c >= 'A' && c <= 'Z') ||
 	(c >= '0' && c <= '9') ||
-	c == '_' ||
-	c == '$'
+	c == '_'
 }
 
 
@@ -682,6 +710,36 @@ fn is_number_mid(c: char) -> bool
 	(c >= 'a' && c <= 'z') ||
 	(c >= 'A' && c <= 'Z') ||
 	(c >= '0' && c <= '9') ||
-	c == '_' ||
-	c == '.'
+	c == '_'
+}
+
+
+fn is_bin_number_mid(c: char) -> bool
+{
+	(c >= '0' && c <= '1') ||
+	c == '_'
+}
+
+
+fn cannot_follow_bin_number(c: char) -> bool
+{
+	(c >= 'a' && c <= 'z') ||
+	(c >= 'A' && c <= 'Z') ||
+	(c >= '2' && c <= '9')
+}
+
+
+fn is_hex_number_mid(c: char) -> bool
+{
+	(c >= 'a' && c <= 'f') ||
+	(c >= 'A' && c <= 'F') ||
+	(c >= '0' && c <= '9') ||
+	c == '_'
+}
+
+
+fn cannot_follow_hex_number(c: char) -> bool
+{
+	(c >= 'g' && c <= 'z') ||
+	(c >= 'G' && c <= 'Z')
 }

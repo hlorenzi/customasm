@@ -1,0 +1,1 @@
+#d $0x123abc ; error: expected line break

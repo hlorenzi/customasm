@@ -1,1 +1,0 @@
-#d $cdefg ; error: invalid
