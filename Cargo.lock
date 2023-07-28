@@ -121,7 +121,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "customasm"
+name = "customasmlib"
 version = "0.13.0"
 dependencies = [
  "getopts",

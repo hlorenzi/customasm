@@ -1,4 +1,6 @@
-use crate::{asm::Disassembler, *};
+use std::rc::Rc;
+
+use crate::{asm::Disassembler, diagn::Span, *};
 use getopts;
 
 enum InputFormat {
@@ -169,28 +171,41 @@ fn drive_inner(
                     InputFormat::Binary => util::BitVec::parse_binary(
                         fileserver
                             .get_bytes(report.clone(), &f, None)
-                            .map_err(|_| false)?
-                    ,output.state.cur_wordsize),
-                    InputFormat::BinStr => util::BitVec::parse_binstr(String::from_iter(
-                        fileserver
-                            .get_chars(report.clone(), &f, None)
-                            .map_err(|_| false)?
-                    ),output.state.cur_wordsize),
-                    InputFormat::BinLine => util::BitVec::parse_binline(String::from_iter(
-                        fileserver
-                            .get_chars(report.clone(), &f, None)
-                            .map_err(|_| false)?
-                    ),output.state.cur_wordsize),
-                    InputFormat::HexStr => util::BitVec::parse_hexstr(String::from_iter(
-                        fileserver
-                            .get_chars(report.clone(), &f, None)
-                            .map_err(|_| false)?
-                    ),output.state.cur_wordsize),
-                    InputFormat::HexLine => util::BitVec::parse_hexline(String::from_iter(
-                        fileserver
-                            .get_chars(report.clone(), &f, None)
-                            .map_err(|_| false)?
-                    ),output.state.cur_wordsize),
+                            .map_err(|_| false)?,
+                        output.state.cur_wordsize,
+                    ),
+                    InputFormat::BinStr => util::BitVec::parse_binstr(
+                        String::from_iter(
+                            fileserver
+                                .get_chars(report.clone(), &f, None)
+                                .map_err(|_| false)?,
+                        ),
+                        output.state.cur_wordsize,
+                    ),
+                    InputFormat::BinLine => util::BitVec::parse_binline(
+                        String::from_iter(
+                            fileserver
+                                .get_chars(report.clone(), &f, None)
+                                .map_err(|_| false)?,
+                        ),
+                        output.state.cur_wordsize,
+                    ),
+                    InputFormat::HexStr => util::BitVec::parse_hexstr(
+                        String::from_iter(
+                            fileserver
+                                .get_chars(report.clone(), &f, None)
+                                .map_err(|_| false)?,
+                        ),
+                        output.state.cur_wordsize,
+                    ),
+                    InputFormat::HexLine => util::BitVec::parse_hexline(
+                        String::from_iter(
+                            fileserver
+                                .get_chars(report.clone(), &f, None)
+                                .map_err(|_| false)?,
+                        ),
+                        output.state.cur_wordsize,
+                    ),
                 },
                 match matches.opt_str("n").as_ref().map(|s| s.as_ref()) {
                     Some("hex") => asm::NumberFormat::Hex,
@@ -203,7 +218,7 @@ fn drive_inner(
                         report.error("invalid number format");
                         return Err(true);
                     }
-                }
+                },
             )
             .disassemble(report.clone())
             .map_err(|_| false)?;
@@ -215,17 +230,27 @@ fn drive_inner(
             } else {
                 let mut any_files_written = false;
 
-                let mut o = "".to_string();
-
-                for f in matches.free.clone() {
-                    o += &format!("#include \"{}\"\n", f.replace("\\", "/"));
-                }
-
-                o += "\n";
-
-                o += &out.assembly;
-
                 if let Some(ref output_file) = output_file {
+                    let mut o = "".to_string();
+
+                    for f in matches.free.clone() {
+                        o += &format!(
+                            "#include \"{}\"\n",
+                            util::filename_navigate(
+                                report.clone(),
+                                output_file,
+                                &f,
+                                &Span::new(Rc::new("".to_string()), 0, 0)
+                            )
+                            .unwrap()
+                            .replace("\\", "/")
+                        );
+                    }
+
+                    o += "\n";
+
+                    o += &out.assembly;
+
                     println!("writing `{}`...", &output_file);
                     fileserver
                         .write_bytes(report.clone(), &output_file, &o.into_bytes(), None)
@@ -351,8 +376,14 @@ fn drive_inner(
         OutputFormat::LogiSim8 => binary.format_logisim(8).bytes().collect(),
         OutputFormat::LogiSim16 => binary.format_logisim(16).bytes().collect(),
 
-        OutputFormat::AnnotatedHex => binary.format_annotated_hex(fileserver).bytes().collect(),
-        OutputFormat::AnnotatedBin => binary.format_annotated_bin(fileserver).bytes().collect(),
+        OutputFormat::AnnotatedHex => binary
+            .format_annotated_hex(fileserver, output.state.cur_wordsize)
+            .bytes()
+            .collect(),
+        OutputFormat::AnnotatedBin => binary
+            .format_annotated_bin(fileserver, output.state.cur_wordsize)
+            .bytes()
+            .collect(),
         OutputFormat::AddressSpan => binary.format_addrspan(fileserver).bytes().collect(),
     };
 

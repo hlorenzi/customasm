@@ -491,43 +491,51 @@ impl util::BitVec {
         result
     }
 
-    pub fn format_annotated_bin(&self, fileserver: &dyn util::FileServer) -> String {
-        self.format_annotated(fileserver, 1, 8)
+    pub fn format_annotated_bin(
+        &self,
+        fileserver: &dyn util::FileServer,
+        wordsize: usize,
+    ) -> String {
+        self.format_annotated(fileserver, 1, wordsize)
     }
 
-    pub fn format_annotated_hex(&self, fileserver: &dyn util::FileServer) -> String {
-        self.format_annotated(fileserver, 4, 2)
+    pub fn format_annotated_hex(
+        &self,
+        fileserver: &dyn util::FileServer,
+        wordsize: usize,
+    ) -> String {
+        self.format_annotated(fileserver, 4, wordsize)
     }
 
     pub fn format_annotated(
         &self,
         fileserver: &dyn util::FileServer,
         digit_bits: usize,
-        byte_digits: usize,
+        wordsize: usize,
     ) -> String {
         let mut result = String::new();
 
-        let byte_bits = byte_digits * digit_bits;
+        let word_digits = (wordsize + digit_bits - 1) / digit_bits;
 
         let mut outp_width = 2;
         let outp_bit_width = (digit_bits as f32 - 1f32).log(16f32).ceil() as usize;
         let mut addr_width = 4;
-        let mut content_width = (byte_digits + 1) * 1 - 1;
+        let mut content_width = (word_digits + 1) * 1 - 1;
 
         let mut sorted_spans = self.spans.clone();
         sorted_spans.sort_by(|a, b| a.offset.cmp(&b.offset));
 
         for span in &sorted_spans {
             if let Some(offset) = span.offset {
-                outp_width = std::cmp::max(outp_width, format!("{:x}", offset / byte_bits).len());
+                outp_width = std::cmp::max(outp_width, format!("{:x}", offset / wordsize).len());
 
                 addr_width = std::cmp::max(addr_width, format!("{:x}", span.addr).len());
 
                 let data_digits =
                     span.size / digit_bits + if span.size % digit_bits == 0 { 0 } else { 1 };
-                let this_content_width = data_digits + data_digits / byte_digits;
+                let this_content_width = data_digits + data_digits / word_digits;
 
-                if this_content_width > 1 && this_content_width <= (byte_digits + 1) * 5 {
+                if this_content_width > 1 && this_content_width <= (word_digits + 1) * 5 {
                     content_width = std::cmp::max(content_width, this_content_width - 1);
                 }
             }
@@ -545,10 +553,11 @@ impl util::BitVec {
         let mut prev_filename = "";
         let mut prev_file_chars = Vec::new();
 
+        let digit_num = wordsize / digit_bits + if wordsize % digit_bits == 0 { 0 } else { 1 };
         for span in &sorted_spans {
             if let Some(offset) = span.offset {
-                result.push_str(&format!(" {:1$x}", offset / byte_bits, outp_width));
-                result.push_str(&format!(":{:1$x} | ", offset % byte_bits, outp_bit_width));
+                result.push_str(&format!(" {:1$x}", offset / word_digits, outp_width));
+                result.push_str(&format!(":{:1$x} | ", offset % word_digits, outp_bit_width));
             } else {
                 result.push_str(&format!(" {:>1$}", "--", outp_width));
                 result.push_str(&format!(":{:>1$} | ", "-", outp_bit_width));
@@ -558,29 +567,34 @@ impl util::BitVec {
 
             let mut contents_str = String::new();
 
-            let digit_num =
-                span.size / digit_bits + if span.size % digit_bits == 0 { 0 } else { 1 };
-            for digit_index in 0..digit_num {
-                if digit_index > 0 && digit_index % byte_digits == 0 {
+            let word_num = span.size / wordsize;
+            for word_index in 0..word_num {
+                if word_index > 0 {
                     contents_str.push_str(" ");
                 }
 
-                let mut digit = 0;
-                for bit_index in 0..digit_bits {
-                    let i = span.offset.unwrap() + digit_index * digit_bits + bit_index;
-                    let bit = self.read(i);
+                for digit_index in 0..digit_num {
+                    let mut digit = 0;
+                    for bit_index in 0..digit_bits {
+                        let j = digit_index * digit_bits + bit_index;
+                        let bit = if j < wordsize {
+                            self.read(span.offset.unwrap() + word_index * wordsize + j)
+                        } else {
+                            false
+                        };
 
-                    digit <<= 1;
-                    digit |= if bit { 1 } else { 0 };
+                        digit <<= 1;
+                        digit |= if bit { 1 } else { 0 };
+                    }
+
+                    let c = if digit < 10 {
+                        ('0' as u8 + digit) as char
+                    } else {
+                        ('a' as u8 + digit - 10) as char
+                    };
+
+                    contents_str.push(c);
                 }
-
-                let c = if digit < 10 {
-                    ('0' as u8 + digit) as char
-                } else {
-                    ('a' as u8 + digit - 10) as char
-                };
-
-                contents_str.push(c);
             }
 
             if &*span.span.file != prev_filename {

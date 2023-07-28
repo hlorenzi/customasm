@@ -20,7 +20,7 @@ fn test_example(filename: &str, hash: &[u8]) {
             .as_ref()
             .unwrap()
             .binary
-            .format_annotated_hex(&fileserver)
+            .format_annotated_hex(&fileserver, 8)
     );
 
     assert_eq!(output_hash[..], *hash);

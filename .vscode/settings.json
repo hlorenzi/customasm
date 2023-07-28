@@ -9,6 +9,7 @@
     "bankdata",
     "bitvec",
     "customasmlib",
+    "customasmls",
     "elem",
     "gitoxide",
     "hlorenzi",
@@ -16,6 +17,11 @@
     "labelalign",
     "noemit",
     "Ruleset",
-    "rulesets"
+    "rulesets",
+    "serde"
+  ],
+  "rust-analyzer.linkedProjects": [
+    ".\\Cargo.toml",
+    ".\\customasmls\\Cargo.toml"
   ]
 }

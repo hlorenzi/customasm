@@ -19,8 +19,8 @@ pub unsafe extern "C" fn wasm_assemble(format: u32, src: *mut String) -> *mut St
 
         let binary = output.binary;
         match format {
-            0 => Ok(binary.format_annotated_hex(fileserver)),
-            1 => Ok(binary.format_annotated_bin(fileserver)),
+            0 => Ok(binary.format_annotated_hex(fileserver, output.state.cur_wordsize)),
+            1 => Ok(binary.format_annotated_bin(fileserver, output.state.cur_wordsize)),
 
             2 => Ok(binary.format_hexdump()),
             3 => Ok(binary.format_bindump()),

@@ -1,14 +1,14 @@
 [package]
-name = "customasm"
+name = "customasmlib"
 version = "0.13.0"
 edition = "2021"
 authors = [
   "hlorenzi <https://hlorenzi.com>",
-  "josephabbey <https://joseph.abbey1.org.uk>",
+  "josephabbey <https://josephabbey.dev>",
 ]
-description = "An assembler for custom, user-defined instruction sets!"
-homepage = "https://github.com/hlorenzi/customasm"
-repository = "https://github.com/hlorenzi/customasm"
+description = "An assembler/disassembler for custom, user-defined instruction sets!"
+homepage = "https://github.com/JosephAbbey/customasm"
+repository = "https://github.com/JosephAbbey/customasm"
 readme = "README.md"
 license = "Apache-2.0"
 keywords = ["asm", "assembler", "assembly", "custom"]
@@ -32,7 +32,7 @@ num-traits = { version = "0.2.15", default_features = false }
 num-integer = { version = "0.1.45", default_features = false }
 
 [dev-dependencies]
-sha2 = "0.10.5"
+sha2 = "0.10.6"
 
 [build-dependencies]
-vergen = { version = "8.0.0", features = ["build", "git", "gitoxide", "cargo"] }
+vergen = { version = "8.1.1", features = ["build", "git", "gitoxide", "cargo"] }
