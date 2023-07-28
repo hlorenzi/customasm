@@ -32,7 +32,7 @@ num-traits = { version = "0.2.15", default_features = false }
 num-integer = { version = "0.1.45", default_features = false }
 
 [dev-dependencies]
-sha2 = "0.10.6"
+sha2 = "0.10.5"
 
 [build-dependencies]
-vergen = { version = "8.1.1", features = ["build", "git", "gitoxide", "cargo"] }
+vergen = { version = "8.0.0", features = ["build", "git", "gitoxide", "cargo"] }
