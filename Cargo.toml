@@ -36,3 +36,4 @@ sha2 = "0.10.7"
 
 [build-dependencies]
 vergen = { version = "8.2.4", features = ["build", "git", "gitoxide", "cargo"] }
+proc-macro2 = { version = "1.0.66" }
