@@ -383,13 +383,22 @@ impl BigInt
 
     pub fn convert_le(&self) -> BigInt
     {
-        let mut be_bytes = self.bigint.to_bytes_le().1;
-        while be_bytes.len() < self.size.unwrap() / 8
+        let Some(size) = self.size
+            else { panic!("attempting `le` conversion on an unsized value") };
+
+        // Slice is needed here for negative numbers
+        let value = self.slice(size, 0);
+        
+        let mut be_bytes = value.bigint.to_bytes_le().1;
+        while be_bytes.len() < size / 8
         {
             be_bytes.push(0);
         }
 
-        let new_value = num_bigint::BigInt::from_bytes_be(num_bigint::Sign::Plus, &be_bytes);
+        let new_value = num_bigint::BigInt::from_bytes_be(
+            num_bigint::Sign::Plus,
+            &be_bytes);
+        
         BigInt::new(new_value, self.size)
     }
 }
