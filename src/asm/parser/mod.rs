@@ -198,9 +198,10 @@ pub fn parse_and_resolve_includes<S>(
         once_filenames.insert(root_filename.borrow().to_owned());
     }
 
-    // TODO: Iterate in forward order, to keep the order of
-    // potential errors in order too
-    for node_index in (0..root_ast.nodes.len()).rev()
+    // Recursively find and replace our `#include` AST nodes
+    // with the full ASTs of the included files
+    let mut node_index = 0;
+    while node_index < root_ast.nodes.len()
     {
         let node = &root_ast.nodes[node_index];
 
@@ -233,13 +234,21 @@ pub fn parse_and_resolve_includes<S>(
                 seen_filenames,
                 once_filenames)?;
 
-            // Replace the `#include` node with
-            // the actual included file's AST
+            let inner_ast_len = inner_ast.nodes.len();
+
             root_ast.nodes.splice(
                 node_index..(node_index + 1),
                 inner_ast.nodes);
+
+            // Skip over the included AST since it already
+            // had its own `#include` nodes handled and replaced
+            node_index += inner_ast_len;
             
             seen_filenames.pop();
+        }
+        else
+        {
+            node_index += 1;
         }
     }
 

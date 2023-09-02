@@ -1,0 +1,9 @@
+#d 0x0000
+#include "inc1.asm"
+#include "inc2.asm"
+#d 0x0003
+
+; = 0x0000
+; = 0x0001
+; = 0x0002
+; = 0x0003
