@@ -280,7 +280,31 @@ impl Report
 			filtered_parents.push(parent);
 		}
 
+		// Deduplicate "match attempted" messages from
+		// a recursive asm block, leaving only the last one
+		let mut filtered_parents2 = Vec::new();
+		let mut seen_match_attempted_msgs = 0;
 		for parent in filtered_parents.iter().rev()
+		{
+			if parent.descr.starts_with("match attempted")
+			{
+				if seen_match_attempted_msgs > 0
+				{
+					continue;
+				}
+
+				seen_match_attempted_msgs += 1;
+			}
+			else
+			{
+				seen_match_attempted_msgs = 0;
+			}
+
+			filtered_parents2.push(parent);
+		}
+
+
+		for parent in filtered_parents2.iter()
 		{
 			msg = Message {
 				descr: parent.descr.clone(),

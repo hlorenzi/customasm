@@ -46,11 +46,41 @@ pub fn eval_asm(
                 defs,
                 &new_tokens);
 
-            asm::matcher::error_on_no_matches(
+
+            let attempted_match_excerpt = {
+                if substs.len() == 0
+                {
+                    None
+                }
+                else
+                {
+                    Some(format!(
+                        "match attempted: `{}`",
+                        new_tokens
+                            .iter()
+                            .map(|t| t.text())
+                            .collect::<String>()))
+                }
+            };
+
+            if let Some(ref excerpt) = attempted_match_excerpt
+            {
+                query.report.push_parent_short_note(
+                    excerpt.clone(),
+                    ast_instr.span);
+            }
+                    
+            let maybe_no_matches = asm::matcher::error_on_no_matches(
                 query.report,
                 ast_instr.span,
-                &matches,
-                Some(&new_tokens))?;
+                &matches);
+
+            if let Some(_) = attempted_match_excerpt
+            {
+                query.report.pop_parent();
+            }
+
+            maybe_no_matches?;
             
             
             // Clone the context to use our own position
@@ -66,6 +96,13 @@ pub fn eval_asm(
             let mut new_eval_ctx = query.eval_ctx
                 .hygienize_locals_for_asm_subst();
 
+            if let Some(ref s) = attempted_match_excerpt
+            {
+                query.report.push_parent_short_note(
+                    s,
+                    ast_instr.span);
+            }
+                    
             let maybe_encodings = asm::resolver::instruction::resolve_encoding(
                 query.report,
                 opts,
@@ -75,12 +112,16 @@ pub fn eval_asm(
                 decls,
                 defs,
                 &mut inner_ctx,
-                &mut new_eval_ctx)?;
+                &mut new_eval_ctx);
 
+            if let Some(_) = attempted_match_excerpt
+            {
+                query.report.pop_parent();
+            }
 
             // Add the encoding to the result value
             // and advance the position
-            if let Some(encodings) = maybe_encodings
+            if let Some(encodings) = maybe_encodings?
             {
                 let size = encodings[0].1.size.unwrap();
 
@@ -146,7 +187,7 @@ fn parse_substitutions<'tokens>(
                 report,
                 syntax::TokenKind::BraceClose)?;
             
-            let end = walker.get_current_token_index();
+            let end = walker.get_previous_token_index() + 1;
             
             substs.push(AsmSubstitution {
                 start,

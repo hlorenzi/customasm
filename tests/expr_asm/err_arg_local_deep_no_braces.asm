@@ -13,4 +13,4 @@
     }
 }
 
-test1 2 ; error: failed / note:_:10: within / error:_:12: failed / note:_:5: within / error:_:7: failed / note:_:3: within / error:_:7: unknown
+test1 2 ; error: failed / note:_:10: within / note:_:12: test2 :y / error:_:12: failed / note:_:5: within / error:_:7: failed / note:_:3: within / error:_:7: unknown

@@ -19,4 +19,4 @@
 
 test a
 test b
-test c ; error: failed / note:_:17: within / error:_:17: no match / note: `emit c`
+test c ; error: failed / note:_:17: within / note:_:17: emit c / error:_:17: no match

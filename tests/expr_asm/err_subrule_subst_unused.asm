@@ -10,4 +10,4 @@
     test {r: reg} => asm { emit r }
 }
 
-test a ; error: failed / note:_:10: within / error:_:10: no match / note: `emit r`
+test a ; error: failed / note:_:10: within / error:_:10: no match

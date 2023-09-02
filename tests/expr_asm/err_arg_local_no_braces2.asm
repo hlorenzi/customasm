@@ -7,4 +7,4 @@
     }
 }
 
-test 2 ; error: failed / note:_:4: within / error:_:6: failed / note:_:3: within / error:_:6: unknown
+test 2 ; error: failed / note:_:4: within / note:_:6: emit 2 + y / error:_:6: failed / note:_:3: within / error:_:6: unknown symbol `y`

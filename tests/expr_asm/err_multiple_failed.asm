@@ -11,4 +11,4 @@
     test {x} => asm { emit {x} }
 }
 
-test 0x30 ; error: failed / note:_:11: within / error:_:11: failed / note:_:3: within / error:_:4: assertion / note:_:7: within / error:_:8: assertion
+test 0x30 ; error: failed / note:_:11: within / error:_:11: failed / note:_:11: emit 0x30 / note:_:3: within / error:_:4: assertion / note:_:7: within / error:_:8: assertion

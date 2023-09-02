@@ -39,9 +39,7 @@ pub use eval::{
 };
 
 mod eval_asm;
-pub use eval_asm::{
-    eval_asm,
-};
+pub use eval_asm::eval_asm;
 
 mod eval_fn;
 pub use eval_fn::{
