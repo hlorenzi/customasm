@@ -355,10 +355,10 @@ fn parse_command(
 		command.opts.debug_iterations |=
 			parsed.opt_present("debug-iters");
 
-		command.opts.optimize_statically_known |=
+		command.opts.optimize_statically_known &=
 			!parsed.opt_present("debug-no-optimize-static");
 
-		command.opts.optimize_instruction_matching |=
+		command.opts.optimize_instruction_matching &=
 			!parsed.opt_present("debug-no-optimize-matcher");
 		
 		if parsed.opt_present("color")
