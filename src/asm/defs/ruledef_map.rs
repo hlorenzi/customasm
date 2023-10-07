@@ -1,21 +1,20 @@
 use crate::*;
 
 
-pub const RULEDEF_MAP_PREFIX_SIZE: usize = 4;
+const MAX_PREFIX_SIZE: usize = 4;
 
 
-pub type RuledefMapPrefix = [char; RULEDEF_MAP_PREFIX_SIZE];
+pub type RuledefMapPrefix = [char; MAX_PREFIX_SIZE];
 
 
 #[derive(Debug)]
 pub struct RuledefMap
 {
-    /// Instructions that start with a mnemonic
-    prefixed: std::collections::HashMap<RuledefMapPrefix, Vec<RuledefMapEntry>>,
-    
-    /// All other instructions, e.g. the ones that start
-    /// with a parameter
-    unprefixed: Vec<RuledefMapEntry>,
+    /// Each rule is considered to have a prefix
+    /// consisting of the first few "exact" pattern-part characters,
+    /// stopping before parameter and subrule slots, and also
+    /// cut off by the constant maximum prefix size declared above.
+    prefixes_to_rules: std::collections::HashMap<RuledefMapPrefix, Vec<RuledefMapEntry>>,
 }
 
 
@@ -32,8 +31,7 @@ impl RuledefMap
     pub fn new() -> RuledefMap
     {
         RuledefMap {
-            prefixed: std::collections::HashMap::new(),
-            unprefixed: Vec::new(),
+            prefixes_to_rules: std::collections::HashMap::new(),
         }
     }
 
@@ -71,12 +69,12 @@ impl RuledefMap
         rule_ref: util::ItemRef<asm::Rule>,
         rule: &asm::Rule)
     {
-        let mut prefix: RuledefMapPrefix = ['\0'; RULEDEF_MAP_PREFIX_SIZE];
+        let mut prefix: RuledefMapPrefix = ['\0'; MAX_PREFIX_SIZE];
         let mut prefix_index = 0;
 
         for part in &rule.pattern
         {
-            if prefix_index >= RULEDEF_MAP_PREFIX_SIZE
+            if prefix_index >= MAX_PREFIX_SIZE
             {
                 break;
             }
@@ -96,17 +94,10 @@ impl RuledefMap
             rule_ref,
         };
 
-        if prefix_index > 0
-        {
-            self.prefixed
-                .entry(prefix)
-                .or_insert_with(|| Vec::new())
-                .push(entry);
-        }
-        else
-        {
-            self.unprefixed.push(entry);
-        }
+        self.prefixes_to_rules
+            .entry(prefix)
+            .or_insert_with(|| Vec::new())
+            .push(entry);
     }
 
 
@@ -114,12 +105,12 @@ impl RuledefMap
         walker: &syntax::TokenWalker)
         -> RuledefMapPrefix
     {
-        let mut prefix: RuledefMapPrefix = ['\0'; RULEDEF_MAP_PREFIX_SIZE];
+        let mut prefix: RuledefMapPrefix = ['\0'; MAX_PREFIX_SIZE];
         let mut prefix_index = 0;
 
         let mut walker_index = 0;
 
-        while prefix_index < RULEDEF_MAP_PREFIX_SIZE
+        while prefix_index < MAX_PREFIX_SIZE
         {
             let token = walker.next_nth(walker_index);
             walker_index += 1;
@@ -128,7 +119,7 @@ impl RuledefMap
             {
                 for c in token.text().chars()
                 {
-                    if prefix_index >= RULEDEF_MAP_PREFIX_SIZE
+                    if prefix_index >= MAX_PREFIX_SIZE
                     {
                         break;
                     }
@@ -150,20 +141,34 @@ impl RuledefMap
     pub fn query_prefixed(
         &self,
         prefix: RuledefMapPrefix)
-        -> &[RuledefMapEntry]
+        -> [&[RuledefMapEntry]; MAX_PREFIX_SIZE + 1]
     {
-        match self.prefixed.get(&prefix)
+        // Try querying for every possible prefix,
+        // including the empty prefix,
+        // i.e. "abcde" will query for "", "a", "ab", "abc", and "abcd".
+        let mut results: [&[RuledefMapEntry]; MAX_PREFIX_SIZE + 1] =
+            [&[]; MAX_PREFIX_SIZE + 1];
+
+        for i in 0..(MAX_PREFIX_SIZE + 1)
         {
-            Some(entries) => entries,
-            None => &[],
+            let mut subprefix = prefix;
+            for j in i..MAX_PREFIX_SIZE
+            {
+                subprefix[j] = '\0';
+            }
+
+            if let Some(entries) = self.prefixes_to_rules.get(&subprefix)
+            {
+                results[i] = entries;
+            }
+
+            if i < MAX_PREFIX_SIZE &&
+                prefix[i] == '\0'
+            {
+                break;
+            }
         }
-    }
 
-
-    pub fn query_unprefixed(
-        &self)
-        -> &[RuledefMapEntry]
-    {
-        &self.unprefixed
+        results
     }
 }

@@ -422,10 +422,9 @@ fn match_with_ruledef_map<'tokens>(
     let mut matches = WorkingMatches::new();
 
     let prefix = asm::RuledefMap::parse_prefix(&walker);
-    let prefixed_entries = defs.ruledef_map.query_prefixed(prefix);
-    let unprefixed_entries = defs.ruledef_map.query_unprefixed();
+    let entries = defs.ruledef_map.query_prefixed(prefix);
 
-    for entry in prefixed_entries.iter().chain(unprefixed_entries)
+    for entry in entries.iter().flat_map(|e| e.iter())
     {
         let ruledef = defs.ruledefs.get(entry.ruledef_ref);
         let rule = ruledef.get_rule(entry.rule_ref);
