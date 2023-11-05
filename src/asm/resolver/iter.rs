@@ -149,7 +149,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 {
                     if decl.depth == 0
                     {
-                        let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+                        let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
 
                         cur_bank_data.cur_position += bits_until_alignment(
                             cur_bank_data.cur_position,
@@ -304,7 +304,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let item_ref = ast_instr.item_ref.unwrap();
                 let instr = defs.instructions.get(item_ref);
 
-                let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+                let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
 
                 // Advance the current bank's position
                 cur_bank_data.cur_position += {
@@ -321,7 +321,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let item_ref = ast_data.item_refs[self.subindex_prev.unwrap()];
                 let data_elem = defs.data_elems.get(item_ref);
 
-                let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+                let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
 
                 // Advance the current bank's position
                 cur_bank_data.cur_position += {
@@ -338,7 +338,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let item_ref = ast_res.item_ref.unwrap();
                 let res = defs.res_directives.get(item_ref);
 
-                let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+                let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
 
                 // Advance the current bank's position
                 cur_bank_data.cur_position += res.reserve_size;
@@ -349,7 +349,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let item_ref = ast_align.item_ref.unwrap();
                 let align = defs.align_directives.get(item_ref);
 
-                let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+                let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
 
                 cur_bank_data.cur_position += bits_until_alignment(
                     cur_bank_data.cur_position,
@@ -362,7 +362,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let addr = defs.addr_directives.get(item_ref);
 
                 let bank = defs.bankdefs.get(self.bank_ref);
-                let mut cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+                let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
 
                 let new_position = {
                     if addr.address >= bank.addr_start
