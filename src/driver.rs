@@ -44,7 +44,11 @@ pub enum OutputFormat
 	LogiSim8,
 	LogiSim16,
 	AddressSpan,
-	
+	TCGame {
+		base: usize,
+		group: usize,
+	},
+
 	Symbols,
 	SymbolsMesenMlb,
 }
@@ -56,20 +60,20 @@ pub fn drive_from_commandline(
 	-> Result<(), ()>
 {
 	util::enable_windows_ansi_support();
-	
+
 	let mut report = diagn::Report::new();
-	
+
 	let maybe_command = parse_command(
 		&mut report,
 		args);
 
 	if let Ok(command) = maybe_command
-	{	
+	{
 		let maybe_result = assemble_with_command(
 			&mut report,
 			fileserver,
 			&command);
-			
+
 		report.print_all(
 			&mut std::io::stderr(),
 			fileserver,
@@ -98,7 +102,7 @@ pub fn drive(
 	let command = parse_command(
 		report,
 		args)?;
-	
+
 	let maybe_result = assemble_with_command(
 		report,
 		fileserver,
@@ -119,7 +123,7 @@ fn assemble_with_command(
 		print_usage(command.use_colors);
 		return Ok(asm::AssemblyResult::new());
 	}
-	
+
 	if command.show_version
 	{
 		print_version_full();
@@ -173,7 +177,7 @@ fn assemble_with_command(
 				{
 					println!("");
 				}
-				
+
 				println!(
 					"{}",
 					String::from_utf8_lossy(&formatted));
@@ -193,7 +197,7 @@ fn assemble_with_command(
 			}
 		}
 	}
-	
+
 	if !command.quiet
 	{
 		println!(
@@ -201,7 +205,7 @@ fn assemble_with_command(
 			iterations_taken,
 			if iterations_taken == 1 { "" } else { "s" });
 	}
-	
+
 	Ok(assembly)
 }
 
@@ -211,7 +215,7 @@ fn make_opts() -> getopts::Options
 	let asm_opts = asm::AssemblyOptions::new();
 
     let mut opts = getopts::Options::new();
-	
+
     opts.optopt(
 		"f", "format",
 		"The format of the output file.\n\
@@ -224,7 +228,7 @@ fn make_opts() -> getopts::Options
 		"FILE",
 		getopts::HasArg::Maybe,
 		getopts::Occur::Optional);
-	
+
     opts.opt(
 		"t", "iters",
 		&format!(
@@ -233,7 +237,7 @@ fn make_opts() -> getopts::Options
 		"NUM",
 		getopts::HasArg::Maybe,
 		getopts::Occur::Optional);
-	
+
 	opts.optflag(
 		"p", "print",
 		"Print the output to the screen instead of writing to a file.");
@@ -248,14 +252,14 @@ fn make_opts() -> getopts::Options
 		"VALUE",
 		getopts::HasArg::Yes,
 		getopts::Occur::Multi);
-	
+
 	opts.opt(
 		"", "color",
 		"Style the output with colors. [on/off]",
 		"VALUE",
 		getopts::HasArg::Maybe,
 		getopts::Occur::Optional);
-	
+
     opts.optflag(
 		"", "debug-iters",
 		"Print debug info for the resolution iterations.");
@@ -275,7 +279,7 @@ fn make_opts() -> getopts::Options
 	opts.optflag(
 		"h", "help",
 		"Display this information.");
-	
+
 	opts
 }
 
@@ -360,7 +364,7 @@ fn parse_command(
 
 		command.opts.optimize_instruction_matching &=
 			!parsed.opt_present("debug-no-optimize-matcher");
-		
+
 		if parsed.opt_present("color")
 		{
 			command.use_colors = {
@@ -376,7 +380,7 @@ fn parse_command(
 				}
 			};
 		}
-		
+
 		if let Some(t) = parsed.opt_str("t")
 		{
 			command.opts.max_iterations = {
@@ -456,18 +460,18 @@ fn derive_output_filename(
 
 	let mut output_filename = std::path::PathBuf::from(input_filename);
 	output_filename.set_extension(extension);
-	
+
 	let output_filename = output_filename
 		.to_string_lossy()
 		.into_owned()
 		.replace("\\", "/");
-	
+
 	if output_filename == input_filename
 	{
 		report.error("cannot derive safe output filename");
 		return Err(());
 	}
-	
+
 	Ok(output_filename)
 }
 
@@ -491,7 +495,7 @@ pub fn parse_output_format(
 			.collect::<Vec<_>>();
 
 		let param_id = param_split[0];
-		
+
 		if param_split.len() == 1
 		{
 			params.insert(param_id.to_string(), "".to_string());
@@ -542,7 +546,7 @@ pub fn parse_output_format(
 						format_id,
 						param_id,
 						value));
-	
+
 				Err(())
 			}
 		}
@@ -556,6 +560,11 @@ pub fn parse_output_format(
 	let check_valid_base = &mut |base: usize| -> bool
 	{
 		[2, 4, 8, 16, 32, 64, 128].contains(&base)
+	};
+
+	let check_2_or_16 = &mut |base: usize| -> bool
+	{
+		[2, 16].contains(&base)
 	};
 
 	let format = {
@@ -583,7 +592,7 @@ pub fn parse_output_format(
 
 			"bindump" => OutputFormat::BinDump,
 			"hexdump" => OutputFormat::HexDump,
-			
+
 			"mif" => OutputFormat::Mif,
 			"intelhex" => OutputFormat::IntelHex,
 
@@ -600,7 +609,17 @@ pub fn parse_output_format(
 			"logisim16" => OutputFormat::LogiSim16,
 
 			"addrspan" => OutputFormat::AddressSpan,
-			
+
+			"tcgame" => OutputFormat::TCGame {
+				base: get_arg_usize("base", 16, check_2_or_16)?,
+				group: get_arg_usize("group", 2, check_nonzero)?,
+			},
+
+			"tcgamebin" => OutputFormat::TCGame {
+				base: 2,
+				group: 8,
+			},
+
 			"symbols" => OutputFormat::Symbols,
 			"mesen-mlb" => OutputFormat::SymbolsMesenMlb,
 
@@ -682,8 +701,8 @@ fn parse_define_arg(
 				None,
 				diagn::Span::new_dummy(),
 				if has_negative_sign { split[1].get(1..).unwrap() } else { split[1] });
-				
-			
+
+
 			use std::ops::Neg;
 
 			match maybe_value
@@ -691,7 +710,7 @@ fn parse_define_arg(
 				Ok(value) =>
 					expr::Value::make_integer(
 						if has_negative_sign { value.neg() } else { value }),
-				
+
 				Err(()) =>
 				{
 					report.error(
@@ -726,10 +745,13 @@ pub fn format_output(
 		{
 			OutputFormat::Binary =>
 				return output.format_binary(),
-			
+
 			OutputFormat::Annotated { base, group } =>
 				output.format_annotated(fileserver, base, group),
-			
+
+			OutputFormat::TCGame { base, group } =>
+				output.format_tcgame(fileserver, base, group),
+
 			OutputFormat::BinStr => output.format_binstr(),
 			OutputFormat::HexStr => output.format_hexstr(),
 
@@ -750,9 +772,9 @@ pub fn format_output(
 
 			OutputFormat::LogiSim8 => output.format_logisim(8),
 			OutputFormat::LogiSim16 => output.format_logisim(16),
-			
+
 			OutputFormat::AddressSpan => output.format_addrspan(fileserver),
-			
+
 			OutputFormat::Symbols => decls.symbols.format_default(decls, defs),
 			OutputFormat::SymbolsMesenMlb => decls.symbols.format_mesen_mlb(decls, defs),
 		}

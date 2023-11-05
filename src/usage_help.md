@@ -61,8 +61,7 @@ Examples:
 
 * `annotated,base:16,group:2`  
     Annotates the output data with snippets
-    of the source code.  
-
+    of the source code.
 * `annotatedbin`  
     Same as: `annotated,base:2,group:8`  
 
@@ -86,6 +85,16 @@ Examples:
 * `logisim16`  
 
 * `addrspan`  
+
+* `tcgame,base:16,group:2`  
+    Annotates the output data with snippets
+    of the source code in a format compatible
+    with the assembly editor for the game
+    "Turing Complete". Supports base 2 and 16.
+    Comments out annotations with `#` and prefixes
+    each group with `0x` or `0b`.
+* `tcgamebin`  
+    Same as: `tcgame,base:2,group:8`
 
 * `symbols`  
 * `mesen-mlb`  
