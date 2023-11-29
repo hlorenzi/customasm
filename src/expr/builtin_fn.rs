@@ -15,6 +15,7 @@ pub fn resolve_builtin_fn(
         "utf16le" => Some(eval_builtin_utf16le),
         "utf32be" => Some(eval_builtin_utf32be),
         "utf32le" => Some(eval_builtin_utf32le),
+        "strlen" => Some(eval_builtin_strlen),
         _ => None,
     }
 }
@@ -55,6 +56,7 @@ pub fn get_statically_known_value_builtin_fn(
         "utf16le" => true,
         "utf32be" => true,
         "utf32le" => true,
+        "strlen" => true,
         _ => false,
     }
 }
@@ -210,4 +212,19 @@ pub fn eval_builtin_utf32le(
     -> Result<expr::Value, ()>
 {
     eval_builtin_string_encoding("utf32le", query)
+}
+
+
+pub fn eval_builtin_strlen(
+    query: &mut expr::EvalFunctionQuery)
+    -> Result<expr::Value, ()>
+{
+    query.ensure_arg_number(1)?;
+
+    let s = query.args[0].value.expect_string(
+        query.report,
+        query.args[0].span)?;
+
+    Ok(expr::Value::make_integer(s.utf8_contents.len()))
+
 }
