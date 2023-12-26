@@ -1,5 +1,4 @@
-use crate::{*, asm::AstTopLevel};
-
+use crate::{asm::AstTopLevel, *};
 
 #[derive(Debug)]
 pub struct AstDirectiveIf
@@ -11,12 +10,11 @@ pub struct AstDirectiveIf
     pub false_arm: Option<asm::AstTopLevel>,
 }
 
-
 pub fn parse(
     report: &mut diagn::Report,
     walker: &mut syntax::TokenWalker,
-    header_span: diagn::Span)
-    -> Result<AstDirectiveIf, ()>
+    header_span: diagn::Span,
+) -> Result<AstDirectiveIf, ()>
 {
     let expr = expr::parse(report, walker)?;
 
@@ -32,31 +30,27 @@ pub fn parse(
     })
 }
 
-
 fn parse_braced_block(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
-    -> Result<AstTopLevel, ()>
+    walker: &mut syntax::TokenWalker,
+) -> Result<AstTopLevel, ()>
 {
     walker.expect(report, syntax::TokenKind::BraceOpen)?;
 
-    let block = asm::parser::parse_nested_toplevel(
-        report,
-        walker)?;
+    let block = asm::parser::parse_nested_toplevel(report, walker)?;
 
     walker.expect(report, syntax::TokenKind::BraceClose)?;
 
     Ok(block)
 }
 
-
 fn parse_else_blocks(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
-    -> Result<Option<AstTopLevel>, ()>
+    walker: &mut syntax::TokenWalker,
+) -> Result<Option<AstTopLevel>, ()>
 {
-    if !walker.next_is(0, syntax::TokenKind::Hash) ||
-        !walker.next_is(1, syntax::TokenKind::Identifier)
+    if !walker.next_is(0, syntax::TokenKind::Hash)
+        || !walker.next_is(1, syntax::TokenKind::Identifier)
     {
         return Ok(None);
     }
@@ -70,32 +64,21 @@ fn parse_else_blocks(
 
     if directive_name == "else"
     {
-        walker.expect(
-            report,
-            syntax::TokenKind::Hash)?;
-        
-        walker.expect(
-            report,
-            syntax::TokenKind::Identifier)?;
-        
+        walker.expect(report, syntax::TokenKind::Hash)?;
+
+        walker.expect(report, syntax::TokenKind::Identifier)?;
+
         Ok(Some(parse_braced_block(report, walker)?))
     }
     else if directive_name == "elif"
     {
-        let tk_hash = walker.expect(
-            report,
-            syntax::TokenKind::Hash)?;
+        let tk_hash = walker.expect(report, syntax::TokenKind::Hash)?;
 
-        let tk_name = walker.expect(
-            report,
-            syntax::TokenKind::Identifier)?;
+        let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
 
         let header_span = tk_hash.span.join(tk_name.span);
-        
-        let ast_if = parse(
-            report,
-            walker,
-            header_span)?;
+
+        let ast_if = parse(report, walker, header_span)?;
 
         let ast_toplevel = AstTopLevel {
             nodes: vec![asm::AstAny::DirectiveIf(ast_if)],

@@ -1,5 +1,4 @@
-use vergen::{ConstantsFlags, generate_cargo_keys};
-
+use vergen::{generate_cargo_keys, ConstantsFlags};
 
 fn main()
 {
@@ -8,13 +7,12 @@ fn main()
     flags.toggle(ConstantsFlags::SEMVER_LIGHTWEIGHT);
     flags.toggle(ConstantsFlags::COMMIT_DATE);
     flags.toggle(ConstantsFlags::TARGET_TRIPLE);
-    
+
     generate_cargo_keys(flags).expect("Unable to generate the cargo keys!");
 
     generate_std();
     generate_tests();
 }
-
 
 fn generate_std()
 {
@@ -28,16 +26,17 @@ fn generate_std()
     generate_std_from_folder(
         &mut f,
         &std::env::current_dir().unwrap().join("std"),
-        &"<std>/");
-        
+        &"<std>/",
+    );
+
     writeln!(f, "];").unwrap();
 }
-
 
 fn generate_std_from_folder(
     f: &mut dyn std::io::Write,
     folder: &std::path::Path,
-    relative_path: &str)
+    relative_path: &str,
+)
 {
     println!("cargo:rerun-if-changed={}", folder.to_string_lossy());
 
@@ -45,10 +44,7 @@ fn generate_std_from_folder(
     {
         let entry = entry.unwrap();
         let path = entry.path();
-        let filename = path
-            .file_name()
-            .unwrap()
-            .to_string_lossy();
+        let filename = path.file_name().unwrap().to_string_lossy();
 
         let mut inner_relative_path = relative_path.to_string();
         inner_relative_path.push_str(&filename);
@@ -56,25 +52,23 @@ fn generate_std_from_folder(
         if path.is_file()
         {
             println!("cargo:rerun-if-changed={}", path.to_string_lossy());
-    
-            let line = format!("\t(\"{}\", include_str!(\"{}\")),",
+
+            let line = format!(
+                "\t(\"{}\", include_str!(\"{}\")),",
                 inner_relative_path,
-                path.to_string_lossy().replace('\\', "/"));
-            
+                path.to_string_lossy().replace('\\', "/")
+            );
+
             writeln!(f, "{}", line).unwrap();
         }
         else
         {
             inner_relative_path.push_str("/");
 
-            generate_std_from_folder(
-                f,
-                &path,
-                &inner_relative_path);
+            generate_std_from_folder(f, &path, &inner_relative_path);
         }
     }
 }
-
 
 fn generate_tests()
 {
@@ -82,17 +76,10 @@ fn generate_tests()
     let destination = std::path::Path::new(&out_dir).join("test.rs");
     let mut f = std::fs::File::create(&destination).unwrap();
 
-    generate_tests_from_folder(
-        &mut f,
-        &std::env::current_dir().unwrap().join("tests"),
-        "");
+    generate_tests_from_folder(&mut f, &std::env::current_dir().unwrap().join("tests"), "");
 }
 
-
-fn generate_tests_from_folder(
-    f: &mut dyn std::io::Write,
-    folder: &std::path::Path,
-    test_name: &str)
+fn generate_tests_from_folder(f: &mut dyn std::io::Write, folder: &std::path::Path, test_name: &str)
 {
     println!("cargo:rerun-if-changed={}", folder.to_string_lossy());
 
@@ -101,10 +88,7 @@ fn generate_tests_from_folder(
         let entry = entry.unwrap();
         let path = entry.path();
 
-        let file_stem = path
-            .file_stem()
-            .unwrap()
-            .to_string_lossy();
+        let file_stem = path.file_stem().unwrap().to_string_lossy();
 
         let mut new_test_name = test_name.to_string();
         new_test_name.push_str(&file_stem);
@@ -112,10 +96,8 @@ fn generate_tests_from_folder(
         if path.is_file()
         {
             println!("cargo:rerun-if-changed={}", path.to_string_lossy());
-    
-            let extension = path
-                .extension()
-                .map_or("", |e| e.to_str().unwrap());
+
+            let extension = path.extension().map_or("", |e| e.to_str().unwrap());
 
             if extension != "asm"
             {
@@ -133,10 +115,7 @@ fn generate_tests_from_folder(
         {
             new_test_name.push_str("_");
 
-            generate_tests_from_folder(
-                f,
-                &path,
-                &new_test_name);
+            generate_tests_from_folder(f, &path, &new_test_name);
         }
     }
 }

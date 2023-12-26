@@ -1,11 +1,8 @@
 use crate::*;
 
-
 const MAX_PREFIX_SIZE: usize = 4;
 
-
 pub type RuledefMapPrefix = [char; MAX_PREFIX_SIZE];
-
 
 #[derive(Debug)]
 pub struct RuledefMap
@@ -17,14 +14,12 @@ pub struct RuledefMap
     prefixes_to_rules: std::collections::HashMap<RuledefMapPrefix, Vec<RuledefMapEntry>>,
 }
 
-
 #[derive(Copy, Clone, Debug)]
 pub struct RuledefMapEntry
 {
     pub ruledef_ref: util::ItemRef<asm::Ruledef>,
     pub rule_ref: util::ItemRef<asm::Rule>,
 }
-
 
 impl RuledefMap
 {
@@ -35,10 +30,7 @@ impl RuledefMap
         }
     }
 
-
-    pub fn build(
-        &mut self,
-        ruledefs: &asm::defs::DefList<asm::Ruledef>)
+    pub fn build(&mut self, ruledefs: &asm::defs::DefList<asm::Ruledef>)
     {
         for i in 0..ruledefs.defs.len()
         {
@@ -49,25 +41,22 @@ impl RuledefMap
             {
                 continue;
             }
-    
+
             for rule_ref in ruledef.iter_rule_refs()
             {
                 let rule = &ruledef.get_rule(rule_ref);
 
-                self.insert(
-                    ruledef_ref,
-                    rule_ref,
-                    rule);
+                self.insert(ruledef_ref, rule_ref, rule);
             }
         }
     }
-
 
     fn insert(
         &mut self,
         ruledef_ref: util::ItemRef<asm::Ruledef>,
         rule_ref: util::ItemRef<asm::Rule>,
-        rule: &asm::Rule)
+        rule: &asm::Rule,
+    )
     {
         let mut prefix: RuledefMapPrefix = ['\0'; MAX_PREFIX_SIZE];
         let mut prefix_index = 0;
@@ -100,10 +89,7 @@ impl RuledefMap
             .push(entry);
     }
 
-
-    pub fn parse_prefix(
-        walker: &syntax::TokenWalker)
-        -> RuledefMapPrefix
+    pub fn parse_prefix(walker: &syntax::TokenWalker) -> RuledefMapPrefix
     {
         let mut prefix: RuledefMapPrefix = ['\0'; MAX_PREFIX_SIZE];
         let mut prefix_index = 0;
@@ -137,17 +123,15 @@ impl RuledefMap
         prefix
     }
 
-
     pub fn query_prefixed(
         &self,
-        prefix: RuledefMapPrefix)
-        -> [&[RuledefMapEntry]; MAX_PREFIX_SIZE + 1]
+        prefix: RuledefMapPrefix,
+    ) -> [&[RuledefMapEntry]; MAX_PREFIX_SIZE + 1]
     {
         // Try querying for every possible prefix,
         // including the empty prefix,
         // i.e. "abcde" will query for "", "a", "ab", "abc", and "abcd".
-        let mut results: [&[RuledefMapEntry]; MAX_PREFIX_SIZE + 1] =
-            [&[]; MAX_PREFIX_SIZE + 1];
+        let mut results: [&[RuledefMapEntry]; MAX_PREFIX_SIZE + 1] = [&[]; MAX_PREFIX_SIZE + 1];
 
         for i in 0..(MAX_PREFIX_SIZE + 1)
         {
@@ -162,8 +146,7 @@ impl RuledefMap
                 results[i] = entries;
             }
 
-            if i < MAX_PREFIX_SIZE &&
-                prefix[i] == '\0'
+            if i < MAX_PREFIX_SIZE && prefix[i] == '\0'
             {
                 break;
             }

@@ -1,6 +1,5 @@
 use crate::*;
 
-
 #[derive(Debug)]
 pub struct DataElement
 {
@@ -11,13 +10,12 @@ pub struct DataElement
     pub resolved: bool,
 }
 
-
 pub fn define(
     _report: &mut diagn::Report,
     ast: &mut asm::AstTopLevel,
     _decls: &mut asm::ItemDecls,
-    defs: &mut asm::ItemDefs)
-    -> Result<(), ()>
+    defs: &mut asm::ItemDefs,
+) -> Result<(), ()>
 {
     for any_node in &mut ast.nodes
     {
@@ -31,33 +29,29 @@ pub fn define(
                     match ast_data.elem_size
                     {
                         Some(s) => Some(s),
-                        None => expr.get_static_size(
-                            &expr::StaticallyKnownProvider::new()),
+                        None => expr.get_static_size(&expr::StaticallyKnownProvider::new()),
                     }
                 };
 
                 let mut provider = expr::StaticallyKnownProvider::new();
                 provider.query_function = &asm::resolver::get_statically_known_builtin_fn;
-                
+
                 let statically_known = expr.is_value_statically_known(&provider);
 
                 let data_block = DataElement {
                     item_ref,
                     position_within_bank: None,
                     encoding_statically_known: statically_known,
-                    encoding: util::BigInt::new(
-                        0,
-                        Some(size.unwrap_or(0))),
+                    encoding: util::BigInt::new(0, Some(size.unwrap_or(0))),
                     resolved: false,
                 };
-                
+
                 defs.data_elems.define(item_ref, data_block);
-                    
+
                 ast_data.item_refs.push(item_ref);
             }
         }
     }
-
 
     Ok(())
 }

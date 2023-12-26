@@ -1,6 +1,5 @@
 use crate::*;
 
-
 #[derive(Debug)]
 pub struct AstDirectiveAddr
 {
@@ -10,12 +9,11 @@ pub struct AstDirectiveAddr
     pub item_ref: Option<util::ItemRef<asm::AddrDirective>>,
 }
 
-
 pub fn parse(
     report: &mut diagn::Report,
     walker: &mut syntax::TokenWalker,
-    header_span: diagn::Span)
-    -> Result<AstDirectiveAddr, ()>
+    header_span: diagn::Span,
+) -> Result<AstDirectiveAddr, ()>
 {
     let expr = expr::parse(report, walker)?;
 

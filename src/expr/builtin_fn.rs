@@ -2,8 +2,10 @@ use crate::*;
 
 pub fn resolve_builtin_fn(
     name: &str,
-) -> Option<fn(&mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>> {
-    match name.as_ref() {
+) -> Option<fn(&mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>>
+{
+    match name.as_ref()
+    {
         "assert" => Some(eval_builtin_assert),
         "le" => Some(eval_builtin_le),
         "ascii" => Some(eval_builtin_ascii),
@@ -21,9 +23,11 @@ pub fn get_static_size_builtin_fn(
     name: &str,
     provider: &expr::StaticallyKnownProvider,
     args: &Vec<expr::Expr>,
-) -> Option<usize> {
+) -> Option<usize>
+{
     let get_static_size_fn = {
-        match name.as_ref() {
+        match name.as_ref()
+        {
             "le" => get_static_size_builtin_le,
             _ => return None,
         }
@@ -32,8 +36,10 @@ pub fn get_static_size_builtin_fn(
     get_static_size_fn(provider, args)
 }
 
-pub fn get_statically_known_value_builtin_fn(name: &str, _args: &Vec<expr::Expr>) -> bool {
-    match name.as_ref() {
+pub fn get_statically_known_value_builtin_fn(name: &str, _args: &Vec<expr::Expr>) -> bool
+{
+    match name.as_ref()
+    {
         "assert" => false,
         "le" => true,
         "ascii" => true,
@@ -47,9 +53,11 @@ pub fn get_statically_known_value_builtin_fn(name: &str, _args: &Vec<expr::Expr>
     }
 }
 
-pub fn eval_builtin_fn(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()> {
+pub fn eval_builtin_fn(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>
+{
     let builtin_name = {
-        match query.func {
+        match query.func
+        {
             expr::Value::ExprBuiltInFunction(ref name) => name,
             _ => unreachable!(),
         }
@@ -59,14 +67,16 @@ pub fn eval_builtin_fn(query: &mut expr::EvalFunctionQuery) -> Result<expr::Valu
     builtin_fn(query)
 }
 
-pub fn eval_builtin_assert(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()> {
+pub fn eval_builtin_assert(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>
+{
     query.ensure_min_max_arg_number(1, 2)?;
 
     let condition = query.args[0]
         .value
         .expect_bool(query.report, query.args[0].span)?;
 
-    let msg = if query.args.len() >= 2 {
+    let msg = if query.args.len() >= 2
+    {
         diagn::Message::error_span(
             format!(
                 "assertion failed: {}",
@@ -78,27 +88,34 @@ pub fn eval_builtin_assert(query: &mut expr::EvalFunctionQuery) -> Result<expr::
             ),
             query.span,
         )
-    } else {
+    }
+    else
+    {
         diagn::Message::error_span("assertion failed", query.span)
     };
 
-    if condition {
+    if condition
+    {
         Ok(expr::Value::Void)
-    } else {
+    }
+    else
+    {
         Ok(expr::Value::FailedConstraint(
             query.report.wrap_in_parents_capped(msg),
         ))
     }
 }
 
-pub fn eval_builtin_le(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()> {
+pub fn eval_builtin_le(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>
+{
     query.ensure_arg_number(1)?;
 
     let bigint = query.args[0]
         .value
         .expect_sized_bigint(query.report, query.args[0].span)?;
 
-    if bigint.size.unwrap() % 8 != 0 {
+    if bigint.size.unwrap() % 8 != 0
+    {
         query.report.push_parent(
             "argument to `le` must have a size multiple of 8",
             query.args[0].span,
@@ -119,10 +136,14 @@ pub fn eval_builtin_le(query: &mut expr::EvalFunctionQuery) -> Result<expr::Valu
 pub fn get_static_size_builtin_le(
     provider: &expr::StaticallyKnownProvider,
     args: &Vec<expr::Expr>,
-) -> Option<usize> {
-    if args.len() == 1 {
+) -> Option<usize>
+{
+    if args.len() == 1
+    {
         args[0].get_static_size(provider)
-    } else {
+    }
+    else
+    {
         None
     }
 }
@@ -130,7 +151,8 @@ pub fn get_static_size_builtin_le(
 pub fn eval_builtin_string_encoding(
     encoding: &str,
     query: &mut expr::EvalFunctionQuery,
-) -> Result<expr::Value, ()> {
+) -> Result<expr::Value, ()>
+{
     query.ensure_arg_number(1)?;
 
     let s = query.args[0]
@@ -140,31 +162,38 @@ pub fn eval_builtin_string_encoding(
     Ok(expr::Value::make_string(&s.utf8_contents, encoding))
 }
 
-pub fn eval_builtin_ascii(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()> {
+pub fn eval_builtin_ascii(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>
+{
     eval_builtin_string_encoding("ascii", query)
 }
 
-pub fn eval_builtin_utf8(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()> {
+pub fn eval_builtin_utf8(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>
+{
     eval_builtin_string_encoding("utf8", query)
 }
 
-pub fn eval_builtin_utf16be(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()> {
+pub fn eval_builtin_utf16be(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>
+{
     eval_builtin_string_encoding("utf16be", query)
 }
 
-pub fn eval_builtin_utf16le(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()> {
+pub fn eval_builtin_utf16le(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>
+{
     eval_builtin_string_encoding("utf16le", query)
 }
 
-pub fn eval_builtin_utf32be(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()> {
+pub fn eval_builtin_utf32be(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>
+{
     eval_builtin_string_encoding("utf32be", query)
 }
 
-pub fn eval_builtin_utf32le(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()> {
+pub fn eval_builtin_utf32le(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>
+{
     eval_builtin_string_encoding("utf32le", query)
 }
 
-pub fn eval_builtin_strlen(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()> {
+pub fn eval_builtin_strlen(query: &mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>
+{
     query.ensure_arg_number(1)?;
 
     let s = query.args[0]

@@ -1,12 +1,10 @@
 use super::*;
 
-
 pub struct AstFields
 {
     span: diagn::Span,
     fields: Vec<AstField>,
 }
-
 
 #[derive(Debug)]
 pub struct AstField
@@ -16,10 +14,7 @@ pub struct AstField
     pub maybe_expr: Option<expr::Expr>,
 }
 
-
-pub fn parse(
-    report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
+pub fn parse(report: &mut diagn::Report, walker: &mut syntax::TokenWalker)
     -> Result<AstFields, ()>
 {
     let mut fields = AstFields {
@@ -29,25 +24,21 @@ pub fn parse(
 
     while !walker.next_is(0, syntax::TokenKind::BraceClose)
     {
-        let deprecated_hash =
-            walker.maybe_expect(syntax::TokenKind::Hash).is_some();
+        let deprecated_hash = walker.maybe_expect(syntax::TokenKind::Hash).is_some();
 
         let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
         let name = tk_name.excerpt.as_ref().unwrap().clone();
 
         if let Some(_) = fields.fields.iter().find(|f| f.name == name)
         {
-            report.error_span(
-                format!("duplicate field `{}`", name),
-                tk_name.span);
+            report.error_span(format!("duplicate field `{}`", name), tk_name.span);
 
             return Err(());
         }
 
-
         let maybe_expr = {
-            if (deprecated_hash && !walker.next_is_linebreak()) ||
-                walker.maybe_expect(syntax::TokenKind::Equal).is_some()
+            if (deprecated_hash && !walker.next_is_linebreak())
+                || walker.maybe_expect(syntax::TokenKind::Equal).is_some()
             {
                 let expr = expr::parse(report, walker)?;
                 fields.span = fields.span.join(expr.span());
@@ -59,7 +50,6 @@ pub fn parse(
             }
         };
 
-
         fields.span = fields.span.join(tk_name.span);
 
         fields.fields.push(AstField {
@@ -67,10 +57,9 @@ pub fn parse(
             name,
             maybe_expr,
         });
-        
 
-        if !walker.maybe_expect(syntax::TokenKind::Comma).is_some() &&
-            !walker.maybe_expect_linebreak().is_some()
+        if !walker.maybe_expect(syntax::TokenKind::Comma).is_some()
+            && !walker.maybe_expect_linebreak().is_some()
         {
             break;
         }
@@ -79,15 +68,12 @@ pub fn parse(
     Ok(fields)
 }
 
-
 impl AstFields
 {
-    pub fn extract_optional(
-        &mut self,
-        field_name: &str)
-        -> Option<AstField>
+    pub fn extract_optional(&mut self, field_name: &str) -> Option<AstField>
     {
-        let maybe_field = self.fields
+        let maybe_field = self
+            .fields
             .iter()
             .enumerate()
             .find(|f| f.1.name == field_name);
@@ -103,11 +89,7 @@ impl AstFields
         }
     }
 
-
-    pub fn extract(
-        &mut self,
-        report: &mut diagn::Report,
-        field_name: &str)
+    pub fn extract(&mut self, report: &mut diagn::Report, field_name: &str)
         -> Result<AstField, ()>
     {
         match self.extract_optional(field_name)
@@ -115,32 +97,28 @@ impl AstFields
             Some(field) => Ok(field),
             None =>
             {
-                report.error_span(
-                    format!("missing field `{}`", field_name),
-                    self.span);
+                report.error_span(format!("missing field `{}`", field_name), self.span);
 
                 Err(())
             }
         }
     }
 
-
     pub fn extract_as_expr(
         &mut self,
         report: &mut diagn::Report,
-        field_name: &str)
-        -> Result<Option<expr::Expr>, ()>
+        field_name: &str,
+    ) -> Result<Option<expr::Expr>, ()>
     {
         let field = self.extract(report, field_name)?;
         Ok(field.maybe_expr)
     }
 
-
     pub fn extract_as_optional_expr(
         &mut self,
         _report: &mut diagn::Report,
-        field_name: &str)
-        -> Result<Option<expr::Expr>, ()>
+        field_name: &str,
+    ) -> Result<Option<expr::Expr>, ()>
     {
         let maybe_field = self.extract_optional(field_name);
         match maybe_field
@@ -150,12 +128,11 @@ impl AstFields
         }
     }
 
-
     pub fn extract_as_bool(
         &mut self,
         _report: &mut diagn::Report,
-        field_name: &str)
-        -> Result<bool, ()>
+        field_name: &str,
+    ) -> Result<bool, ()>
     {
         let field = self.extract_optional(field_name);
         match field
@@ -165,17 +142,11 @@ impl AstFields
         }
     }
 
-
-    pub fn report_remaining(
-        &self,
-        report: &mut diagn::Report)
-        -> Result<(), ()>
+    pub fn report_remaining(&self, report: &mut diagn::Report) -> Result<(), ()>
     {
         for field in &self.fields
         {
-            report.error_span(
-                format!("invalid field `{}`", field.name),
-                field.span);
+            report.error_span(format!("invalid field `{}`", field.name), field.span);
         }
 
         if self.fields.len() > 0

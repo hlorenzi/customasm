@@ -1,12 +1,5 @@
 mod span;
-pub use self::span::{
-    Span,
-    SpanIndex,
-};
+pub use self::span::{Span, SpanIndex};
 
 mod report;
-pub use self::report::{
-    Report,
-    Message,
-    MessageKind,
-};
+pub use self::report::{Message, MessageKind, Report};

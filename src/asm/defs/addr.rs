@@ -1,6 +1,5 @@
 use crate::*;
 
-
 #[derive(Debug)]
 pub struct AddrDirective
 {
@@ -8,13 +7,12 @@ pub struct AddrDirective
     pub address: util::BigInt,
 }
 
-
 pub fn define(
     _report: &mut diagn::Report,
     ast: &mut asm::AstTopLevel,
     _decls: &mut asm::ItemDecls,
-    defs: &mut asm::ItemDefs)
-    -> Result<(), ()>
+    defs: &mut asm::ItemDefs,
+) -> Result<(), ()>
 {
     for any_node in &mut ast.nodes
     {
@@ -26,13 +24,12 @@ pub fn define(
                 item_ref,
                 address: util::BigInt::new(0, None),
             };
-            
+
             defs.addr_directives.define(item_ref, res);
-                
+
             ast_addr.item_ref = Some(item_ref);
         }
     }
-
 
     Ok(())
 }

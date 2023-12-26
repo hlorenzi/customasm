@@ -1,6 +1,5 @@
 use crate::*;
 
-
 #[derive(Debug)]
 pub struct AstDirectiveRes
 {
@@ -10,12 +9,11 @@ pub struct AstDirectiveRes
     pub item_ref: Option<util::ItemRef<asm::ResDirective>>,
 }
 
-
 pub fn parse(
     report: &mut diagn::Report,
     walker: &mut syntax::TokenWalker,
-    header_span: diagn::Span)
-    -> Result<AstDirectiveRes, ()>
+    header_span: diagn::Span,
+) -> Result<AstDirectiveRes, ()>
 {
     let expr = expr::parse(report, walker)?;
 

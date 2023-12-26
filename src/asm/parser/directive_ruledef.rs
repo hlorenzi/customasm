@@ -1,6 +1,5 @@
 use crate::*;
 
-
 #[derive(Debug)]
 pub struct AstDirectiveRuledef
 {
@@ -10,9 +9,8 @@ pub struct AstDirectiveRuledef
     pub name: Option<String>,
     pub rules: Vec<AstRule>,
 
-    pub item_ref: Option<util::ItemRef::<asm::Ruledef>>,
+    pub item_ref: Option<util::ItemRef<asm::Ruledef>>,
 }
-
 
 #[derive(Debug)]
 pub struct AstRule
@@ -22,7 +20,6 @@ pub struct AstRule
     pub expr: expr::Expr,
 }
 
-
 #[derive(Debug)]
 pub enum AstRulePatternPart
 {
@@ -30,7 +27,6 @@ pub enum AstRulePatternPart
     Exact(char),
     Parameter(AstRuleParameter),
 }
-
 
 #[derive(Debug)]
 pub struct AstRuleParameter
@@ -40,7 +36,6 @@ pub struct AstRuleParameter
     pub name: String,
     pub typ: AstRuleParameterType,
 }
-
 
 #[derive(Debug)]
 pub enum AstRuleParameterType
@@ -52,19 +47,16 @@ pub enum AstRuleParameterType
     Integer(usize),
 }
 
-
 pub fn parse(
     report: &mut diagn::Report,
     walker: &mut syntax::TokenWalker,
     is_subruledef: bool,
-    header_span: diagn::Span)
-    -> Result<AstDirectiveRuledef, ()>
+    header_span: diagn::Span,
+) -> Result<AstDirectiveRuledef, ()>
 {
     let tk_name = walker.maybe_expect(syntax::TokenKind::Identifier);
     let name = tk_name.map(|tk| tk.excerpt.clone().unwrap());
-    let name_span = tk_name
-        .map(|tk| tk.span)
-        .unwrap_or_else(|| header_span);
+    let name_span = tk_name.map(|tk| tk.span).unwrap_or_else(|| header_span);
 
     walker.expect(report, syntax::TokenKind::BraceOpen)?;
 
@@ -72,11 +64,8 @@ pub fn parse(
 
     while !walker.next_is(0, syntax::TokenKind::BraceClose)
     {
-        let rule = parse_rule(
-            report,
-            walker,
-            is_subruledef)?;
-        
+        let rule = parse_rule(report, walker, is_subruledef)?;
+
         walker.expect_linebreak(report)?;
 
         rules.push(rule);
@@ -96,34 +85,29 @@ pub fn parse(
     })
 }
 
-
 fn parse_rule(
     report: &mut diagn::Report,
     walker: &mut syntax::TokenWalker,
-    is_subruledef: bool)
-    -> Result<AstRule, ()>
+    is_subruledef: bool,
+) -> Result<AstRule, ()>
 {
     let mut pattern_span = diagn::Span::new_dummy();
     let mut pattern = Vec::new();
     let mut has_used_empty_specifier = false;
 
-
     // Discard leading whitespace/indentation
     walker.acknowledge_whitespace();
 
-
-    while !walker.is_over() &&
-        !walker.next_is(0, syntax::TokenKind::HeavyArrowRight)
+    while !walker.is_over() && !walker.next_is(0, syntax::TokenKind::HeavyArrowRight)
     {
         let tk = walker.advance();
         pattern_span = pattern_span.join(tk.span);
 
-
         if tk.kind == syntax::TokenKind::BraceOpen
         {
-            if pattern.len() == 0 &&
-                is_subruledef &&
-                walker.maybe_expect(syntax::TokenKind::BraceClose).is_some()
+            if pattern.len() == 0
+                && is_subruledef
+                && walker.maybe_expect(syntax::TokenKind::BraceClose).is_some()
             {
                 has_used_empty_specifier = true;
                 break;
@@ -137,7 +121,6 @@ fn parse_rule(
                 pattern_span = pattern_span.join(tk_close.span);
             }
         }
-        
         else if tk.kind.is_allowed_pattern_token()
         {
             for c in tk.text().chars()
@@ -145,38 +128,30 @@ fn parse_rule(
                 pattern.push(AstRulePatternPart::Exact(c.to_ascii_lowercase()));
             }
         }
-        
         else
         {
-            report.error_span(
-                "invalid pattern token",
-                tk.span);
+            report.error_span("invalid pattern token", tk.span);
 
             return Err(());
         }
 
-
         // Add a whitespace pattern-part if present between tokens,
         // but not at the end before the `=>`
-        if !walker.next_is(0, syntax::TokenKind::HeavyArrowRight) &&
-            walker.maybe_expect_unacknowledged_whitespace().is_some()
+        if !walker.next_is(0, syntax::TokenKind::HeavyArrowRight)
+            && walker.maybe_expect_unacknowledged_whitespace().is_some()
         {
             pattern.push(AstRulePatternPart::Whitespace);
         }
     }
 
-
     let tk_heavy_arrow = walker.expect(report, syntax::TokenKind::HeavyArrowRight)?;
 
     if pattern.len() == 0 && !has_used_empty_specifier
     {
-        report.error_span(
-            "expected pattern",
-            tk_heavy_arrow.span.before());
-        
+        report.error_span("expected pattern", tk_heavy_arrow.span.before());
+
         return Err(());
     }
-
 
     let expr = expr::parse(report, walker)?;
 
@@ -187,11 +162,10 @@ fn parse_rule(
     })
 }
 
-
 fn parse_rule_parameter(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
-    -> Result<AstRuleParameter, ()>
+    walker: &mut syntax::TokenWalker,
+) -> Result<AstRuleParameter, ()>
 {
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
     let name = tk_name.excerpt.as_ref().unwrap().clone();
@@ -219,16 +193,11 @@ fn parse_rule_parameter(
     })
 }
 
-
-fn interpret_typename(
-    typename: &str)
-    -> AstRuleParameterType
+fn interpret_typename(typename: &str) -> AstRuleParameterType
 {
     let first_char = typename.chars().next();
 
-    if first_char == Some('u') ||
-        first_char == Some('s') ||
-        first_char == Some('i')
+    if first_char == Some('u') || first_char == Some('s') || first_char == Some('i')
     {
         if let Ok(size) = usize::from_str_radix(&typename[1..], 10)
         {
@@ -237,7 +206,7 @@ fn interpret_typename(
                 Some('u') => return AstRuleParameterType::Unsigned(size),
                 Some('s') => return AstRuleParameterType::Signed(size),
                 Some('i') => return AstRuleParameterType::Integer(size),
-                _ => unreachable!()
+                _ => unreachable!(),
             }
         }
     }

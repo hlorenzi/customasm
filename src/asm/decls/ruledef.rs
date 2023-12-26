@@ -1,27 +1,28 @@
 use crate::*;
 
-
 pub fn collect(
     report: &mut diagn::Report,
     ast: &mut asm::AstTopLevel,
-    decls: &mut asm::ItemDecls)
-    -> Result<(), ()>
+    decls: &mut asm::ItemDecls,
+) -> Result<(), ()>
 {
     for any_node in &mut ast.nodes
     {
         let asm::AstAny::DirectiveRuledef(ref mut node) = any_node
-            else { continue };
+        else
+        {
+            continue;
+        };
 
         if node.item_ref.is_some()
         {
             continue;
         }
 
-
-        let name = node.name
+        let name = node
+            .name
             .clone()
-            .unwrap_or_else(||
-                decls.ruledefs.generate_anonymous_name());
+            .unwrap_or_else(|| decls.ruledefs.generate_anonymous_name());
 
         let item_ref = decls.ruledefs.declare(
             report,
@@ -29,11 +30,11 @@ pub fn collect(
             &util::SymbolContext::new_global(),
             name,
             0,
-            util::SymbolKind::Other)?;
-            
+            util::SymbolKind::Other,
+        )?;
+
         node.item_ref = Some(item_ref);
     }
-
 
     Ok(())
 }

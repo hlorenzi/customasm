@@ -1,6 +1,5 @@
 use crate::*;
 
-
 #[derive(Debug)]
 pub struct Symbol
 {
@@ -12,26 +11,25 @@ pub struct Symbol
     pub bankdef_ref: Option<util::ItemRef<asm::Bankdef>>,
 }
 
-
 pub fn define(
     _report: &mut diagn::Report,
     ast: &asm::AstTopLevel,
     _decls: &asm::ItemDecls,
-    defs: &mut asm::ItemDefs)
-    -> Result<(), ()>
+    defs: &mut asm::ItemDefs,
+) -> Result<(), ()>
 {
     for any_node in &ast.nodes
     {
         let asm::AstAny::Symbol(node) = any_node
-            else { continue };
+        else
+        {
+            continue;
+        };
 
-        if defs.symbols
-            .maybe_get(node.item_ref.unwrap())
-            .is_some()
+        if defs.symbols.maybe_get(node.item_ref.unwrap()).is_some()
         {
             continue;
         }
-
 
         let item_ref = node.item_ref.unwrap();
 
@@ -42,10 +40,10 @@ pub fn define(
                 {
                     let mut provider = expr::StaticallyKnownProvider::new();
                     provider.query_function = &asm::resolver::get_statically_known_builtin_fn;
-                    
+
                     constant.expr.is_value_statically_known(&provider)
                 }
-                
+
                 _ => false,
             }
         };
@@ -61,7 +59,6 @@ pub fn define(
 
         defs.symbols.define(item_ref, symbol);
     }
-
 
     Ok(())
 }

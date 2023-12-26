@@ -1,11 +1,10 @@
 use crate::*;
 
-
 pub fn check_bank_overlap(
     report: &mut diagn::Report,
     decls: &asm::ItemDecls,
-    defs: &asm::ItemDefs)
-    -> Result<(), ()>
+    defs: &asm::ItemDefs,
+) -> Result<(), ()>
 {
     for i in 1..defs.bankdefs.len()
     {
@@ -36,17 +35,13 @@ pub fn check_bank_overlap(
             let overlap = {
                 match (size1, size2)
                 {
-                    (None, None) =>
-                        true,
+                    (None, None) => true,
 
-                    (Some(size1), None) =>
-                        outp1 + size1 > outp2,
+                    (Some(size1), None) => outp1 + size1 > outp2,
 
-                    (None, Some(size2)) =>
-                        outp2 + size2 > outp1,
+                    (None, Some(size2)) => outp2 + size2 > outp1,
 
-                    (Some(size1), Some(size2)) =>
-                        outp1 + size1 > outp2 && outp2 + size2 > outp1,
+                    (Some(size1), Some(size2)) => outp1 + size1 > outp2 && outp2 + size2 > outp1,
                 }
             };
 
@@ -55,16 +50,13 @@ pub fn check_bank_overlap(
                 report.push_parent(
                     format!(
                         "output of bank `{}` overlaps with bank `{}`",
-                        decl1.name,
-                        decl2.name),
-                    decl1.span);
+                        decl1.name, decl2.name
+                    ),
+                    decl1.span,
+                );
 
-                report.note_span(
-                    format!(
-                        "bank `{}` defined here",
-                        decl2.name),
-                    decl2.span);
-                    
+                report.note_span(format!("bank `{}` defined here", decl2.name), decl2.span);
+
                 return Err(());
             }
         }
@@ -73,27 +65,20 @@ pub fn check_bank_overlap(
     Ok(())
 }
 
-
 pub fn build_output(
     report: &mut diagn::Report,
     ast: &asm::AstTopLevel,
     decls: &asm::ItemDecls,
-    defs: &asm::ItemDefs)
-    -> Result<util::BitVec, ()>
+    defs: &asm::ItemDefs,
+) -> Result<util::BitVec, ()>
 {
     let mut output = util::BitVec::new();
 
     let mut overlap_checker = util::OverlapChecker::new();
 
-    fill_banks(
-        defs,
-        &mut output);
+    fill_banks(defs, &mut output);
 
-    let mut iter = asm::ResolveIterator::new(
-        ast,
-        defs,
-        false,
-        true);
+    let mut iter = asm::ResolveIterator::new(ast, defs, false, true);
 
     while let Some(ctx) = iter.next(report, decls, defs)?
     {
@@ -103,20 +88,9 @@ pub fn build_output(
 
             if let asm::AstSymbolKind::Label = ast_symbol.kind
             {
-                check_bank_usage(
-                    report,
-                    ast_symbol.decl_span,
-                    defs,
-                    &ctx)?;
+                check_bank_usage(report, ast_symbol.decl_span, defs, &ctx)?;
 
-                check_bank_output(
-                    report,
-                    ast_symbol.decl_span,
-                    decls,
-                    defs,
-                    &ctx,
-                    0,
-                    false)?;
+                check_bank_output(report, ast_symbol.decl_span, decls, defs, &ctx, 0, false)?;
 
                 let maybe_pos = ctx.get_output_position(defs);
 
@@ -124,19 +98,15 @@ pub fn build_output(
                     maybe_pos,
                     0,
                     symbol.value.unwrap_bigint().clone(),
-                    ast_symbol.decl_span);
+                    ast_symbol.decl_span,
+                );
             }
         }
-        
         else if let asm::ResolverNode::Instruction(ast_instr) = ctx.node
         {
             let instr = defs.instructions.get(ast_instr.item_ref.unwrap());
 
-            check_bank_usage(
-                report,
-                ast_instr.span,
-                defs,
-                &ctx)?;
+            check_bank_usage(report, ast_instr.span, defs, &ctx)?;
 
             check_bank_output(
                 report,
@@ -145,42 +115,31 @@ pub fn build_output(
                 defs,
                 &ctx,
                 instr.encoding.size.unwrap(),
-                true)?;
-                
+                true,
+            )?;
+
             let addr = ctx
-                .get_address(
-                    report,
-                    ast_instr.span,
-                    defs,
-                    true)?
+                .get_address(report, ast_instr.span, defs, true)?
                 .unwrap();
-            
+
             let pos = ctx.get_output_position(defs).unwrap();
 
             overlap_checker.check_and_insert(
                 report,
-				ast_instr.span,
+                ast_instr.span,
                 pos,
-                instr.encoding.size.unwrap())?;
+                instr.encoding.size.unwrap(),
+            )?;
 
-			output.write_bigint_with_span(
-				ast_instr.span,
-                pos,
-				addr,
-                &instr.encoding);
+            output.write_bigint_with_span(ast_instr.span, pos, addr, &instr.encoding);
         }
-        
         else if let asm::ResolverNode::DataElement(ast_data, elem_index) = ctx.node
         {
             let item_ref = ast_data.item_refs[elem_index];
             let elem = defs.data_elems.get(item_ref);
             let span = ast_data.elems[elem_index].span();
 
-            check_bank_usage(
-                report,
-                span,
-                defs,
-                &ctx)?;
+            check_bank_usage(report, span, defs, &ctx)?;
 
             check_bank_output(
                 report,
@@ -189,40 +148,22 @@ pub fn build_output(
                 defs,
                 &ctx,
                 elem.encoding.size.unwrap(),
-                true)?;
-                
+                true,
+            )?;
+
             let pos = ctx.get_output_position(defs).unwrap();
-            let addr = ctx
-                .get_address(
-                    report,
-                    span,
-                    defs,
-                    true)?
-                .unwrap();
+            let addr = ctx.get_address(report, span, defs, true)?.unwrap();
 
-            overlap_checker.check_and_insert(
-                report,
-                span,
-                pos,
-                elem.encoding.size.unwrap())?;
+            overlap_checker.check_and_insert(report, span, pos, elem.encoding.size.unwrap())?;
 
-            output.write_bigint_with_span(
-                span,
-                pos,
-                addr,
-                &elem.encoding);
+            output.write_bigint_with_span(span, pos, addr, &elem.encoding);
         }
-        
         else if let asm::ResolverNode::Res(ast_res) = ctx.node
         {
             let item_ref = ast_res.item_ref.unwrap();
             let res = defs.res_directives.get(item_ref);
 
-            check_bank_usage(
-                report,
-                ast_res.header_span,
-                defs,
-                &ctx)?;
+            check_bank_usage(report, ast_res.header_span, defs, &ctx)?;
 
             check_bank_output(
                 report,
@@ -231,15 +172,17 @@ pub fn build_output(
                 defs,
                 &ctx,
                 res.reserve_size,
-                false)?;
-                
+                false,
+            )?;
+
             if let Some(pos) = ctx.get_output_position(defs)
             {
                 overlap_checker.check_and_insert(
                     report,
                     ast_res.header_span,
                     pos,
-                    res.reserve_size)?;
+                    res.reserve_size,
+                )?;
             }
         }
     }
@@ -247,10 +190,7 @@ pub fn build_output(
     Ok(output)
 }
 
-
-fn fill_banks(
-    defs: &asm::ItemDefs,
-    output: &mut util::BitVec)
+fn fill_banks(defs: &asm::ItemDefs, output: &mut util::BitVec)
 {
     for i in 0..defs.bankdefs.defs.len()
     {
@@ -260,8 +200,7 @@ fn fill_banks(
             continue;
         }
 
-        if let (Some(size), Some(offset)) =
-            (bankdef.size, bankdef.output_offset)
+        if let (Some(size), Some(offset)) = (bankdef.size, bankdef.output_offset)
         {
             let highest_position = offset + size - 1;
 
@@ -273,13 +212,12 @@ fn fill_banks(
     }
 }
 
-
 fn check_bank_usage(
     report: &mut diagn::Report,
     span: diagn::Span,
     defs: &asm::ItemDefs,
-    ctx: &asm::ResolverContext)
-    -> Result<(), ()>
+    ctx: &asm::ResolverContext,
+) -> Result<(), ()>
 {
     if ctx.bank_ref.0 == 0
     {
@@ -290,14 +228,14 @@ fn check_bank_usage(
 
         report.error_span(
             "usage of the default bank while custom banks are defined",
-            span);
+            span,
+        );
 
         return Err(());
     }
 
     Ok(())
 }
-
 
 fn check_bank_output(
     report: &mut diagn::Report,
@@ -306,8 +244,8 @@ fn check_bank_output(
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
     size: usize,
-    write: bool)
-    -> Result<(), ()>
+    write: bool,
+) -> Result<(), ()>
 {
     let bankdef = defs.bankdefs.get(ctx.bank_ref);
     let bankdef_decl = decls.bankdefs.get(ctx.bank_ref);
@@ -318,17 +256,14 @@ fn check_bank_output(
         if ctx.bank_data.cur_position + size > bank_size
         {
             report.push_parent(
-                format!(
-                    "output out of range for bank `{}`",
-                    bankdef_decl.name),
-                span);
+                format!("output out of range for bank `{}`", bankdef_decl.name),
+                span,
+            );
 
-            report.note_span(
-                "bank defined here:",
-                bankdef_decl.span);
-    
+            report.note_span("bank defined here:", bankdef_decl.span);
+
             report.pop_parent();
-    
+
             return Err(());
         }
     }
@@ -336,14 +271,11 @@ fn check_bank_output(
     if write && bankdef.output_offset.is_none()
     {
         report.push_parent(
-            format!(
-                "output to non-writable bank `{}`",
-                bankdef_decl.name),
-            span);
+            format!("output to non-writable bank `{}`", bankdef_decl.name),
+            span,
+        );
 
-        report.note_span(
-            "no `outp` defined for bank",
-            bankdef_decl.span);
+        report.note_span("no `outp` defined for bank", bankdef_decl.span);
 
         report.pop_parent();
 

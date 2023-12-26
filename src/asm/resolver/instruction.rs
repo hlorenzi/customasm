@@ -1,6 +1,5 @@
 use crate::*;
 
-
 pub fn resolve_instruction(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
@@ -8,8 +7,8 @@ pub fn resolve_instruction(
     ast_instr: &asm::AstInstruction,
     decls: &asm::ItemDecls,
     defs: &mut asm::ItemDefs,
-    ctx: &asm::ResolverContext)
-    -> Result<asm::ResolutionState, ()>
+    ctx: &asm::ResolverContext,
+) -> Result<asm::ResolutionState, ()>
 {
     let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
 
@@ -19,10 +18,8 @@ pub fn resolve_instruction(
     }
 
     // Extract matches to satisfy the borrow checker
-    let mut matches = std::mem::replace(
-        &mut instr.matches,
-        asm::InstructionMatches::new());
-        
+    let mut matches = std::mem::replace(&mut instr.matches, asm::InstructionMatches::new());
+
     let maybe_encodings = resolve_encoding(
         report,
         opts,
@@ -32,26 +29,21 @@ pub fn resolve_instruction(
         decls,
         defs,
         ctx,
-        &mut expr::EvalContext::new())?;
+        &mut expr::EvalContext::new(),
+    )?;
 
-    let has_any_matches =
-        maybe_encodings.is_some();
+    let has_any_matches = maybe_encodings.is_some();
 
-    let has_single_match =
-        maybe_encodings.as_ref().map_or(false, |e| e.len() == 1);
+    let has_single_match = maybe_encodings.as_ref().map_or(false, |e| e.len() == 1);
 
-    let maybe_chosen_encoding =
-        maybe_encodings.as_ref().map(|e| e[0].1.clone());
+    let maybe_chosen_encoding = maybe_encodings.as_ref().map(|e| e[0].1.clone());
 
     // Reassign matches to satisfy the borrow checker
     let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
     instr.matches = matches;
 
-
     // Check for stable resolution
-    let is_stable =
-        Some(&instr.encoding) == maybe_chosen_encoding.as_ref();
-
+    let is_stable = Some(&instr.encoding) == maybe_chosen_encoding.as_ref();
 
     // Update the instruction's encoding if available
     if let Some(encoding) = maybe_chosen_encoding
@@ -61,19 +53,23 @@ pub fn resolve_instruction(
         // Optimize future iterations for the case where it's
         // statically known that the encoding can be resolved
         // in the first pass
-        if opts.optimize_statically_known &&
-            ctx.is_first_iteration &&
-            instr.encoding_statically_known &&
-            has_single_match
+        if opts.optimize_statically_known
+            && ctx.is_first_iteration
+            && instr.encoding_statically_known
+            && has_single_match
         {
             if opts.debug_iterations
             {
-                println!("instr: {} = {:?} [static]",
-                    ast_instr.tokens.iter()
+                println!(
+                    "instr: {} = {:?} [static]",
+                    ast_instr
+                        .tokens
+                        .iter()
                         .map(|t| t.text())
                         .collect::<Vec<_>>()
                         .join(""),
-                    instr.encoding);
+                    instr.encoding
+                );
             }
 
             instr.resolved = true;
@@ -81,35 +77,34 @@ pub fn resolve_instruction(
         }
     }
 
-    
     if !is_stable
     {
         // On the final iteration, unstable guesses become errors.
         // If encodings came out None, an inner error has already been reported.
         if ctx.is_last_iteration && has_any_matches
         {
-            report.error_span(
-                "instruction encoding did not converge",
-                ast_instr.span);
+            report.error_span("instruction encoding did not converge", ast_instr.span);
         }
-        
+
         if opts.debug_iterations
         {
-            println!("instr: {} = {:?}",
-                ast_instr.tokens.iter()
+            println!(
+                "instr: {} = {:?}",
+                ast_instr
+                    .tokens
+                    .iter()
                     .map(|t| t.text())
                     .collect::<Vec<_>>()
                     .join(""),
-                instr.encoding);
+                instr.encoding
+            );
         }
-        
+
         return Ok(asm::ResolutionState::Unresolved);
     }
 
-
     Ok(asm::ResolutionState::Resolved)
 }
-
 
 pub fn resolve_encoding<'encoding>(
     report: &mut diagn::Report,
@@ -120,15 +115,13 @@ pub fn resolve_encoding<'encoding>(
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    arg_eval_ctx: &mut expr::EvalContext)
-    -> Result<Option<Vec<(usize, &'encoding util::BigInt)>>, ()>
+    arg_eval_ctx: &mut expr::EvalContext,
+) -> Result<Option<Vec<(usize, &'encoding util::BigInt)>>, ()>
 {
     report.push_parent_cap();
 
-    report.push_parent(
-        "failed to resolve instruction",
-        instr_span);
-    
+    report.push_parent("failed to resolve instruction", instr_span);
+
     // Try to resolve every match
     let resolved = resolve_instruction_matches(
         report,
@@ -138,19 +131,16 @@ pub fn resolve_encoding<'encoding>(
         decls,
         defs,
         ctx,
-        arg_eval_ctx);
+        arg_eval_ctx,
+    );
 
     report.pop_parent();
     report.pop_parent_cap();
     resolved?;
 
-
     // Print FailedConstraint error messages
     // if no match succeeded
-    let num_encodings_resolved = matches
-        .iter()
-        .filter(|m| m.encoding.is_resolved())
-        .count();
+    let num_encodings_resolved = matches.iter().filter(|m| m.encoding.is_resolved()).count();
 
     if num_encodings_resolved == 0
     {
@@ -167,14 +157,12 @@ pub fn resolve_encoding<'encoding>(
                     msgs.push(msg.clone());
                 }
             }
-            
-            report.message(
-                diagn::Message::fuse_topmost(msgs));
+
+            report.message(diagn::Message::fuse_topmost(msgs));
         }
 
         return Ok(None);
     }
-
 
     // Retain only encodings which are Resolved,
     // and keep their original indices
@@ -197,12 +185,10 @@ pub fn resolve_encoding<'encoding>(
         .filter(|e| e.1.size.unwrap() == smallest_size)
         .copied()
         .collect::<Vec<_>>();
-    
 
     // Expect only a single remaining encoding
     // on the last iteration
-    if ctx.is_last_iteration &&
-        smallest_encodings.len() > 1
+    if ctx.is_last_iteration && smallest_encodings.len() > 1
     {
         let mut notes = Vec::new();
 
@@ -212,12 +198,11 @@ pub fn resolve_encoding<'encoding>(
                 0,
                 &matches[encoding.0],
                 decls,
-                defs));
+                defs,
+            ));
         }
 
-        report.push_parent(
-            "multiple matches with the same encoding size",
-            instr_span);
+        report.push_parent("multiple matches with the same encoding size", instr_span);
 
         report.push_multiple(notes);
 
@@ -226,10 +211,8 @@ pub fn resolve_encoding<'encoding>(
         return Ok(None);
     }
 
-
     return Ok(Some(smallest_encodings));
 }
-
 
 fn resolve_instruction_matches(
     report: &mut diagn::Report,
@@ -239,8 +222,8 @@ fn resolve_instruction_matches(
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    arg_eval_ctx: &mut expr::EvalContext)
-    -> Result<(), ()>
+    arg_eval_ctx: &mut expr::EvalContext,
+) -> Result<(), ()>
 {
     for index in 0..matches.len()
     {
@@ -256,46 +239,40 @@ fn resolve_instruction_matches(
             decls,
             defs,
             ctx,
-            arg_eval_ctx)?;
+            arg_eval_ctx,
+        )?;
 
-        let value_definite = value.expect_error_or_sized_bigint(
-            report,
-            rule.expr.returned_value_span())?;
-
+        let value_definite =
+            value.expect_error_or_sized_bigint(report, rule.expr.returned_value_span())?;
 
         if let expr::Value::Integer(bigint) = value_definite
         {
-            matches[index].encoding =
-                asm::InstructionMatchResolution::Resolved(bigint);
+            matches[index].encoding = asm::InstructionMatchResolution::Resolved(bigint);
         }
         else if let expr::Value::FailedConstraint(msg) = value_definite
         {
-            matches[index].encoding =
-                asm::InstructionMatchResolution::FailedConstraint(msg);
+            matches[index].encoding = asm::InstructionMatchResolution::FailedConstraint(msg);
         }
         else
         {
-            matches[index].encoding =
-                asm::InstructionMatchResolution::Unresolved;
+            matches[index].encoding = asm::InstructionMatchResolution::Unresolved;
         }
     }
 
     Ok(())
 }
 
-
 fn build_recursive_candidate_note(
     depth: usize,
     instr_match: &asm::InstructionMatch,
     decls: &asm::ItemDecls,
-    defs: &asm::ItemDefs)
-    -> diagn::Message
+    defs: &asm::ItemDefs,
+) -> diagn::Message
 {
     let ruledef = &defs.ruledefs.get(instr_match.ruledef_ref);
     let rule = &ruledef.get_rule(instr_match.rule_ref);
 
-    let ruledef_name =
-        &decls.ruledefs.get(instr_match.ruledef_ref).name;
+    let ruledef_name = &decls.ruledefs.get(instr_match.ruledef_ref).name;
 
     let mut msg = {
         if depth == 0
@@ -303,18 +280,20 @@ fn build_recursive_candidate_note(
             diagn::Message::short_note_span(
                 format!(
                     "match on `{}`, rule {}:",
-                    ruledef_name,
-                    instr_match.rule_ref.0),
-                rule.pattern_span)
+                    ruledef_name, instr_match.rule_ref.0
+                ),
+                rule.pattern_span,
+            )
         }
         else
         {
             diagn::Message::short_note_span(
                 format!(
                     "nested match on `{}`, rule {}:",
-                    ruledef_name,
-                    instr_match.rule_ref.0),
-                rule.pattern_span)
+                    ruledef_name, instr_match.rule_ref.0
+                ),
+                rule.pattern_span,
+            )
         }
     };
 
@@ -326,13 +305,13 @@ fn build_recursive_candidate_note(
                 depth + 1,
                 &nested_match,
                 decls,
-                defs));
+                defs,
+            ));
         }
     }
 
     msg
 }
-
 
 fn resolve_instruction_match(
     report: &mut diagn::Report,
@@ -342,19 +321,17 @@ fn resolve_instruction_match(
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    arg_eval_ctx: &mut expr::EvalContext)
-    -> Result<expr::Value, ()>
+    arg_eval_ctx: &mut expr::EvalContext,
+) -> Result<expr::Value, ()>
 {
     let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
     let rule = &ruledef.get_rule(mtch.rule_ref);
     let ruledef_name = &decls.ruledefs.get(mtch.ruledef_ref).name;
 
     report.push_parent_short_note(
-        format!(
-            "within `{}`, rule {}",
-            ruledef_name,
-            mtch.rule_ref.0),
-        rule.pattern_span);
+        format!("within `{}`, rule {}", ruledef_name, mtch.rule_ref.0),
+        rule.pattern_span,
+    );
 
     let maybe_value = resolve_instruction_match_inner(
         report,
@@ -364,13 +341,13 @@ fn resolve_instruction_match(
         decls,
         defs,
         ctx,
-        arg_eval_ctx);
+        arg_eval_ctx,
+    );
 
     report.pop_parent();
 
     maybe_value
 }
-
 
 fn resolve_instruction_match_inner(
     report: &mut diagn::Report,
@@ -380,14 +357,13 @@ fn resolve_instruction_match_inner(
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    arg_eval_ctx: &mut expr::EvalContext)
-    -> Result<expr::Value, ()>
+    arg_eval_ctx: &mut expr::EvalContext,
+) -> Result<expr::Value, ()>
 {
     let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
     let rule = &ruledef.get_rule(mtch.rule_ref);
 
-    let mut eval_ctx = expr::EvalContext::new_deepened(
-        &arg_eval_ctx);
+    let mut eval_ctx = expr::EvalContext::new_deepened(&arg_eval_ctx);
 
     for (index, arg) in mtch.args.iter().enumerate()
     {
@@ -403,7 +379,8 @@ fn resolve_instruction_match_inner(
                     defs,
                     ctx,
                     arg_eval_ctx,
-                    &expr)?;
+                    &expr,
+                )?;
 
                 if arg_value.should_propagate()
                 {
@@ -412,19 +389,12 @@ fn resolve_instruction_match_inner(
 
                 let param = &rule.parameters[index];
 
-                let constrained_arg_value = check_and_constrain_argument(
-                    report,
-                    expr.span(),
-                    arg_value,
-                    param.typ)?;
+                let constrained_arg_value =
+                    check_and_constrain_argument(report, expr.span(), arg_value, param.typ)?;
 
-                eval_ctx.set_local(
-                    &param.name,
-                    constrained_arg_value);
-                
-                eval_ctx.set_token_subst(
-                    &param.name,
-                    arg.tokens.clone());
+                eval_ctx.set_local(&param.name, constrained_arg_value);
+
+                eval_ctx.set_token_subst(&param.name, arg.tokens.clone());
             }
 
             asm::InstructionArgumentKind::Nested(ref nested_match) =>
@@ -437,7 +407,8 @@ fn resolve_instruction_match_inner(
                     decls,
                     defs,
                     ctx,
-                    arg_eval_ctx)?;
+                    arg_eval_ctx,
+                )?;
 
                 if arg_value.should_propagate()
                 {
@@ -446,13 +417,9 @@ fn resolve_instruction_match_inner(
 
                 let param = &rule.parameters[index];
 
-                eval_ctx.set_local(
-                    &param.name,
-                    arg_value);
-                
-                eval_ctx.set_token_subst(
-                    &param.name,
-                    arg.tokens.clone());
+                eval_ctx.set_local(&param.name, arg_value);
+
+                eval_ctx.set_token_subst(&param.name, arg.tokens.clone());
             }
         }
     }
@@ -468,16 +435,16 @@ fn resolve_instruction_match_inner(
         defs,
         &rule_ctx,
         &mut eval_ctx,
-        &rule.expr)
+        &rule.expr,
+    )
 }
-
 
 pub fn check_and_constrain_argument(
     report: &mut diagn::Report,
     span: diagn::Span,
     value: expr::Value,
-    typ: asm::RuleParameterType)
-    -> Result<expr::Value, ()>
+    typ: asm::RuleParameterType,
+) -> Result<expr::Value, ()>
 {
     let bigint = value
         .coallesce_to_integer()
@@ -486,50 +453,34 @@ pub fn check_and_constrain_argument(
 
     match typ
     {
-        asm::RuleParameterType::Unspecified =>
-            Ok(value),
-            
+        asm::RuleParameterType::Unspecified => Ok(value),
+
         asm::RuleParameterType::Unsigned(size) =>
         {
-            check_and_constrain_value_for_integer_type(
-                report,
-                span,
-                size,
-                "u",
-                bigint,
-                |x| x.sign() == -1 ||
-                    x.min_size() > size)
+            check_and_constrain_value_for_integer_type(report, span, size, "u", bigint, |x| {
+                x.sign() == -1 || x.min_size() > size
+            })
         }
 
         asm::RuleParameterType::Signed(size) =>
         {
-            check_and_constrain_value_for_integer_type(
-                report,
-                span,
-                size,
-                "s",
-                bigint,
-                |x| (x.sign() == 0 && size == 0) ||
-                    (x.sign() == 1 && x.min_size() >= size) ||
-                    (x.sign() == -1 && x.min_size() > size))
+            check_and_constrain_value_for_integer_type(report, span, size, "s", bigint, |x| {
+                (x.sign() == 0 && size == 0)
+                    || (x.sign() == 1 && x.min_size() >= size)
+                    || (x.sign() == -1 && x.min_size() > size)
+            })
         }
 
         asm::RuleParameterType::Integer(size) =>
         {
-            check_and_constrain_value_for_integer_type(
-                report,
-                span,
-                size,
-                "i",
-                bigint,
-                |x| x.min_size() > size)
+            check_and_constrain_value_for_integer_type(report, span, size, "i", bigint, |x| {
+                x.min_size() > size
+            })
         }
 
-        asm::RuleParameterType::RuledefRef(_) =>
-            unreachable!(),
+        asm::RuleParameterType::RuledefRef(_) => unreachable!(),
     }
 }
-
 
 fn check_and_constrain_value_for_integer_type(
     report: &mut diagn::Report,
@@ -537,20 +488,20 @@ fn check_and_constrain_value_for_integer_type(
     size: usize,
     typename_prefix: &'static str,
     mut bigint: util::BigInt,
-    failure_check: impl Fn(&util::BigInt) -> bool)
-    -> Result<expr::Value, ()>
+    failure_check: impl Fn(&util::BigInt) -> bool,
+) -> Result<expr::Value, ()>
 {
     if failure_check(&bigint)
     {
         let msg = diagn::Message::error_span(
             format!(
                 "argument out of range for type `{}{}`",
-                typename_prefix,
-                size),
-            span);
-        
-        Ok(expr::Value::FailedConstraint(
-            report.wrap_in_parents(msg)))
+                typename_prefix, size
+            ),
+            span,
+        );
+
+        Ok(expr::Value::FailedConstraint(report.wrap_in_parents(msg)))
     }
     else
     {

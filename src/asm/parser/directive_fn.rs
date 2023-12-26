@@ -1,6 +1,5 @@
 use crate::*;
 
-
 #[derive(Debug)]
 pub struct AstDirectiveFn
 {
@@ -13,19 +12,17 @@ pub struct AstDirectiveFn
     pub item_ref: Option<util::ItemRef<asm::Symbol>>,
 }
 
-
 #[derive(Debug)]
 pub struct AstFnParameter
 {
     pub name: String,
 }
 
-
 pub fn parse(
     report: &mut diagn::Report,
     walker: &mut syntax::TokenWalker,
-    header_span: diagn::Span)
-    -> Result<AstDirectiveFn, ()>
+    header_span: diagn::Span,
+) -> Result<AstDirectiveFn, ()>
 {
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
     let name = tk_name.excerpt.clone().unwrap();
@@ -34,15 +31,12 @@ pub fn parse(
 
     let mut params = Vec::new();
 
-    while !walker.is_over() &&
-        !walker.next_is(0, syntax::TokenKind::ParenClose)
+    while !walker.is_over() && !walker.next_is(0, syntax::TokenKind::ParenClose)
     {
         let tk_param_name = walker.expect(report, syntax::TokenKind::Identifier)?;
         let param_name = tk_param_name.excerpt.clone().unwrap();
-        
-        params.push(AstFnParameter {
-            name: param_name,
-        });
+
+        params.push(AstFnParameter { name: param_name });
 
         walker.maybe_expect(syntax::TokenKind::Comma);
     }

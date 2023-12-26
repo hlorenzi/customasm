@@ -1,6 +1,5 @@
 use super::*;
 
-
 #[derive(Debug)]
 pub struct AstSymbol
 {
@@ -9,10 +8,9 @@ pub struct AstSymbol
     pub name: String,
     pub kind: AstSymbolKind,
     pub no_emit: bool,
-    
-    pub item_ref: Option<util::ItemRef::<asm::Symbol>>,
-}
 
+    pub item_ref: Option<util::ItemRef<asm::Symbol>>,
+}
 
 #[derive(Debug)]
 pub enum AstSymbolKind
@@ -21,22 +19,17 @@ pub enum AstSymbolKind
     Label,
 }
 
-
 #[derive(Debug)]
 pub struct AstSymbolConstant
 {
     pub expr: expr::Expr,
 }
 
-
-pub fn parse(
-    report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
-    -> Result<AstAny, ()>
+pub fn parse(report: &mut diagn::Report, walker: &mut syntax::TokenWalker) -> Result<AstAny, ()>
 {
     let mut decl_span = diagn::Span::new_dummy();
     let mut hierarchy_level = 0;
-    
+
     while let Some(tk_dot) = walker.maybe_expect(syntax::TokenKind::Dot)
     {
         hierarchy_level += 1;
@@ -47,19 +40,16 @@ pub fn parse(
     let name = tk_name.excerpt.clone().unwrap();
     decl_span = decl_span.join(tk_name.span);
 
-
     if walker.maybe_expect(syntax::TokenKind::Equal).is_some()
     {
         let expr = expr::parse(report, walker)?;
         walker.expect_linebreak(report)?;
-        
+
         Ok(AstAny::Symbol(AstSymbol {
             decl_span,
             hierarchy_level,
             name,
-            kind: AstSymbolKind::Constant(AstSymbolConstant {
-                expr,
-            }),
+            kind: AstSymbolKind::Constant(AstSymbolConstant { expr }),
             no_emit: false,
 
             item_ref: None,
@@ -69,7 +59,7 @@ pub fn parse(
     {
         let tk_colon = walker.expect(report, syntax::TokenKind::Colon)?;
         decl_span = decl_span.join(tk_colon.span);
-        
+
         Ok(AstAny::Symbol(AstSymbol {
             decl_span,
             hierarchy_level,

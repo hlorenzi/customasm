@@ -1,6 +1,5 @@
 use crate::*;
 
-
 #[derive(Debug)]
 pub struct AstDirectiveAlign
 {
@@ -10,12 +9,11 @@ pub struct AstDirectiveAlign
     pub item_ref: Option<util::ItemRef<asm::AlignDirective>>,
 }
 
-
 pub fn parse(
     report: &mut diagn::Report,
     walker: &mut syntax::TokenWalker,
-    header_span: diagn::Span)
-    -> Result<AstDirectiveAlign, ()>
+    header_span: diagn::Span,
+) -> Result<AstDirectiveAlign, ()>
 {
     let expr = expr::parse(report, walker)?;
 

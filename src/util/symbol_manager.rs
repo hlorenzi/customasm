@@ -1,6 +1,5 @@
 use crate::*;
 
-
 #[derive(Debug)]
 pub struct SymbolManager<T>
 {
@@ -9,7 +8,6 @@ pub struct SymbolManager<T>
     span_refs: std::collections::HashMap<diagn::Span, util::ItemRef<T>>,
     report_as: &'static str,
 }
-
 
 #[derive(Debug)]
 pub struct SymbolDecl<T>
@@ -23,7 +21,6 @@ pub struct SymbolDecl<T>
     pub(super) children: std::collections::HashMap<String, util::ItemRef<T>>,
 }
 
-
 #[derive(Copy, Clone, Debug)]
 pub enum SymbolKind
 {
@@ -33,13 +30,11 @@ pub enum SymbolKind
     Other,
 }
 
-
 #[derive(Clone, Debug)]
 pub struct SymbolContext
 {
     hierarchy: Vec<String>,
 }
-
 
 impl<T> SymbolManager<T>
 {
@@ -53,13 +48,13 @@ impl<T> SymbolManager<T>
         }
     }
 
-
     fn traverse<S>(
         &self,
         parent_ref: Option<util::ItemRef<T>>,
-        hierarchy: &[S])
-        -> Option<util::ItemRef<T>>
-        where S: std::borrow::Borrow<str>
+        hierarchy: &[S],
+    ) -> Option<util::ItemRef<T>>
+    where
+        S: std::borrow::Borrow<str>,
     {
         if hierarchy.len() == 0
         {
@@ -77,21 +72,19 @@ impl<T> SymbolManager<T>
                 }
                 else
                 {
-                    self.traverse(
-                        Some(*child_ref),
-                        &hierarchy[1..])
+                    self.traverse(Some(*child_ref), &hierarchy[1..])
                 }
             }
         }
     }
 
-
     fn get_parent<S>(
         &self,
         parent_ref: Option<util::ItemRef<T>>,
-        hierarchy: &[S])
-        -> Option<util::ItemRef<T>>
-        where S: std::borrow::Borrow<str>
+        hierarchy: &[S],
+    ) -> Option<util::ItemRef<T>>
+    where
+        S: std::borrow::Borrow<str>,
     {
         if hierarchy.len() == 0
         {
@@ -101,20 +94,14 @@ impl<T> SymbolManager<T>
         match self.get_children(parent_ref).get(hierarchy[0].borrow())
         {
             None => None,
-            Some(child_ref) =>
-            {
-                self.get_parent(
-                    Some(*child_ref),
-                    &hierarchy[1..])
-            }
+            Some(child_ref) => self.get_parent(Some(*child_ref), &hierarchy[1..]),
         }
     }
 
-
     fn get_children(
         &self,
-        parent_ref: Option<util::ItemRef<T>>)
-        -> &std::collections::HashMap<String, util::ItemRef<T>>
+        parent_ref: Option<util::ItemRef<T>>,
+    ) -> &std::collections::HashMap<String, util::ItemRef<T>>
     {
         match parent_ref
         {
@@ -123,11 +110,10 @@ impl<T> SymbolManager<T>
         }
     }
 
-
     fn get_children_mut(
         &mut self,
-        parent_ref: Option<util::ItemRef<T>>)
-        -> &mut std::collections::HashMap<String, util::ItemRef<T>>
+        parent_ref: Option<util::ItemRef<T>>,
+    ) -> &mut std::collections::HashMap<String, util::ItemRef<T>>
     {
         match parent_ref
         {
@@ -136,48 +122,34 @@ impl<T> SymbolManager<T>
         }
     }
 
-
-    pub fn get(
-        &self,
-        item_ref: util::ItemRef<T>)
-        -> &util::SymbolDecl<T>
+    pub fn get(&self, item_ref: util::ItemRef<T>) -> &util::SymbolDecl<T>
     {
         &self.decls[item_ref.0]
     }
 
-
-    pub fn get_mut(
-        &mut self,
-        item_ref: util::ItemRef<T>)
-        -> &mut util::SymbolDecl<T>
+    pub fn get_mut(&mut self, item_ref: util::ItemRef<T>) -> &mut util::SymbolDecl<T>
     {
         &mut self.decls[item_ref.0]
     }
-
 
     pub fn get_by_name_global(
         &self,
         report: &mut diagn::Report,
         span: diagn::Span,
-        name: &str)
-        -> Result<util::ItemRef<T>, ()>
+        name: &str,
+    ) -> Result<util::ItemRef<T>, ()>
     {
-        self.get_by_name(
-            report,
-            span,
-            &SymbolContext::new_global(),
-            0,
-            &[name])
+        self.get_by_name(report, span, &SymbolContext::new_global(), 0, &[name])
     }
-
 
     pub fn try_get_by_name<S>(
         &self,
         ctx: &SymbolContext,
         hierarchy_level: usize,
-        hierarchy: &[S])
-        -> Option<util::ItemRef<T>>
-        where S: std::borrow::Borrow<str> + std::fmt::Debug
+        hierarchy: &[S],
+    ) -> Option<util::ItemRef<T>>
+    where
+        S: std::borrow::Borrow<str> + std::fmt::Debug,
     {
         if hierarchy_level > ctx.hierarchy.len()
         {
@@ -185,16 +157,11 @@ impl<T> SymbolManager<T>
         }
         else
         {
-            let parent = self.get_parent(
-                None,
-                &ctx.hierarchy[0..hierarchy_level]);
-            
-            self.traverse(
-                parent,
-                hierarchy)
+            let parent = self.get_parent(None, &ctx.hierarchy[0..hierarchy_level]);
+
+            self.traverse(parent, hierarchy)
         }
     }
-
 
     pub fn get_by_name<S>(
         &self,
@@ -202,14 +169,12 @@ impl<T> SymbolManager<T>
         span: diagn::Span,
         ctx: &SymbolContext,
         hierarchy_level: usize,
-        hierarchy: &[S])
-        -> Result<util::ItemRef<T>, ()>
-        where S: std::borrow::Borrow<str> + std::fmt::Debug
+        hierarchy: &[S],
+    ) -> Result<util::ItemRef<T>, ()>
+    where
+        S: std::borrow::Borrow<str> + std::fmt::Debug,
     {
-        match self.try_get_by_name(
-            ctx,
-            hierarchy_level,
-            hierarchy)
+        match self.try_get_by_name(ctx, hierarchy_level, hierarchy)
         {
             Some(symbol) => Ok(symbol),
             None =>
@@ -218,42 +183,32 @@ impl<T> SymbolManager<T>
                     .iter()
                     .map(|s| s.borrow().to_string())
                     .collect::<Vec<String>>();
-                
+
                 report.error_span(
-                    format!("unknown {} `{}`",
+                    format!(
+                        "unknown {} `{}`",
                         self.report_as,
-                        self.get_displayable_name(
-                            hierarchy_level,
-                            &hierarchy_string)),
-                    span);
+                        self.get_displayable_name(hierarchy_level, &hierarchy_string)
+                    ),
+                    span,
+                );
 
                 Err(())
             }
         }
     }
 
-
-    pub fn get_displayable_name<S>(
-        &self,
-        hierarchy_level: usize,
-        hierarchy: &[S])
-        -> String
-        where S: std::borrow::Borrow<str>
+    pub fn get_displayable_name<S>(&self, hierarchy_level: usize, hierarchy: &[S]) -> String
+    where
+        S: std::borrow::Borrow<str>,
     {
-        format!("{}{}",
-            ".".repeat(hierarchy_level),
-            hierarchy.join("."))
+        format!("{}{}", ".".repeat(hierarchy_level), hierarchy.join("."))
     }
-
 
     pub fn generate_anonymous_name(&self) -> String
     {
-        format!(
-            "#anonymous_{}_{}",
-            self.report_as,
-            self.decls.len())
+        format!("#anonymous_{}_{}", self.report_as, self.decls.len())
     }
-
 
     pub fn declare(
         &mut self,
@@ -262,59 +217,43 @@ impl<T> SymbolManager<T>
         ctx: &SymbolContext,
         name: String,
         hierarchy_level: usize,
-        kind: SymbolKind)
-        -> Result<util::ItemRef<T>, ()>
+        kind: SymbolKind,
+    ) -> Result<util::ItemRef<T>, ()>
     {
         // Check skips in nesting level
         if hierarchy_level > ctx.hierarchy.len()
         {
-            report.error_span(
-                "symbol declaration skips a nesting level",
-                span);
-            
+            report.error_span("symbol declaration skips a nesting level", span);
+
             return Err(());
         }
 
-
         // Check for duplicates at the same nesting level
-        let parent_ref = self.get_parent(
-            None,
-            &ctx.hierarchy[0..hierarchy_level]);
+        let parent_ref = self.get_parent(None, &ctx.hierarchy[0..hierarchy_level]);
 
         let children = self.get_children(parent_ref);
 
         if let Some(duplicate_ref) = children.get(&name)
         {
-            report.push_parent(
-                format!("duplicate {} `{}`", self.report_as, name),
-                span);
+            report.push_parent(format!("duplicate {} `{}`", self.report_as, name), span);
 
-            report.note_span(
-                "first declared here",
-                self.get(*duplicate_ref).span);
+            report.note_span("first declared here", self.get(*duplicate_ref).span);
 
             report.pop_parent();
 
             return Err(());
         }
 
-
         // Generate the ItemRef
         let index = self.decls.len();
         let item_ref = util::ItemRef::<T>::new(index);
 
-
         // Insert ItemRef into the parent's children-list
-        let parent_ref = self.get_parent(
-            None,
-            &ctx.hierarchy[0..hierarchy_level]);
-        
+        let parent_ref = self.get_parent(None, &ctx.hierarchy[0..hierarchy_level]);
+
         let children = self.get_children_mut(parent_ref);
 
-        children.insert(
-            name.clone(),
-            item_ref);
-
+        children.insert(name.clone(), item_ref);
 
         // Generate new SymbolContext
         let new_ctx = {
@@ -322,14 +261,13 @@ impl<T> SymbolManager<T>
                 .iter()
                 .cloned()
                 .collect::<Vec<_>>();
-            
+
             new_hierarchy.push(name.clone());
 
             SymbolContext {
                 hierarchy: new_hierarchy,
             }
         };
-
 
         // Create a new declaration and add a Span reference
         let full_name = {
@@ -354,24 +292,16 @@ impl<T> SymbolManager<T>
             children: std::collections::HashMap::new(),
         });
 
-        self.span_refs.insert(
-            span,
-            item_ref);
-
+        self.span_refs.insert(span, item_ref);
 
         Ok(item_ref)
     }
 
-
-    pub fn add_span_ref(
-        &mut self,
-        span: diagn::Span,
-        item_ref: util::ItemRef<T>)
+    pub fn add_span_ref(&mut self, span: diagn::Span, item_ref: util::ItemRef<T>)
     {
         self.span_refs.insert(span, item_ref);
     }
 }
-
 
 impl SymbolContext
 {

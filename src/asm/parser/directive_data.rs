@@ -1,6 +1,5 @@
 use crate::*;
 
-
 #[derive(Debug)]
 pub struct AstDirectiveData
 {
@@ -11,13 +10,12 @@ pub struct AstDirectiveData
     pub item_refs: Vec<util::ItemRef<asm::DataElement>>,
 }
 
-
 pub fn parse(
     report: &mut diagn::Report,
     walker: &mut syntax::TokenWalker,
     elem_size: Option<usize>,
-    header_span: diagn::Span)
-    -> Result<AstDirectiveData, ()>
+    header_span: diagn::Span,
+) -> Result<AstDirectiveData, ()>
 {
     let mut elems = Vec::new();
 

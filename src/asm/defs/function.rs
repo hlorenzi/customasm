@@ -1,6 +1,5 @@
 use crate::*;
 
-
 #[derive(Debug)]
 pub struct Function
 {
@@ -10,20 +9,18 @@ pub struct Function
     pub body: expr::Expr,
 }
 
-
 #[derive(Debug)]
 pub struct FunctionParameter
 {
     pub name: String,
 }
 
-
 pub fn define(
     _report: &mut diagn::Report,
     ast: &asm::AstTopLevel,
     _decls: &mut asm::ItemDecls,
-    defs: &mut asm::ItemDefs)
-    -> Result<(), ()>
+    defs: &mut asm::ItemDefs,
+) -> Result<(), ()>
 {
     for any_node in &ast.nodes
     {
@@ -63,7 +60,6 @@ pub fn define(
             defs.symbols.define(item_ref, symbol);
         }
     }
-
 
     Ok(())
 }

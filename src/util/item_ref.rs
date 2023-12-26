@@ -1,8 +1,5 @@
 #[derive(Eq, PartialEq)]
-pub struct ItemRef<T>(
-    pub usize,
-    std::marker::PhantomData<*const T>);
-
+pub struct ItemRef<T>(pub usize, std::marker::PhantomData<*const T>);
 
 impl<T> ItemRef<T>
 {
@@ -12,7 +9,6 @@ impl<T> ItemRef<T>
     }
 }
 
-
 impl<T> Clone for ItemRef<T>
 {
     fn clone(&self) -> Self
@@ -21,9 +17,7 @@ impl<T> Clone for ItemRef<T>
     }
 }
 
-
 impl<T> Copy for ItemRef<T> {}
-
 
 impl<T> std::fmt::Debug for ItemRef<T>
 {
