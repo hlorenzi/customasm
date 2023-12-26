@@ -219,6 +219,29 @@ impl<'a> EvalFunctionQuery<'a>
 			Ok(())
 		}
 	}
+
+	pub fn ensure_min_max_arg_number(
+		&mut self,
+		minimum_expected_arg_number: usize,
+		maximum_expected_arg_number: usize,
+	) -> Result<(), ()> {
+		if !((self.args.len() >= minimum_expected_arg_number)
+			&& (self.args.len() <= maximum_expected_arg_number))
+		{
+			self.report.error_span(
+				format!(
+					"function expected {} to {} arguments (but got {})",
+					minimum_expected_arg_number,
+					maximum_expected_arg_number,
+					self.args.len()
+				),
+				self.span,
+			);
+			Err(())
+		} else {
+			Ok(())
+		}
+	}
 }
 
 
