@@ -83,25 +83,38 @@ pub fn eval_builtin_assert(
     query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>
 {
-    query.ensure_arg_number(1)?;
+    query.ensure_min_max_arg_number(1, 2)?;
 
-    let condition = query.args[0].value.expect_bool(
-        query.report,
-        query.args[0].span)?;
+    let condition = query.args[0]
+        .value
+        .expect_bool(
+            query.report,
+            query.args[0].span)?;
 
-    if condition
+    if !condition
     {
-        Ok(expr::Value::Void)
-    }
-    else
-    {
-        let msg = diagn::Message::error_span(
-            "assertion failed",
-            query.span);
+        let msg = {
+            if query.args.len() == 2
+            {
+                diagn::Message::error_span(
+                    format!(
+                        "assertion failed: {}",
+                        query.args[1]
+                            .value
+                            .expect_string(query.report, query.args[1].span)?
+                            .utf8_contents),
+                    query.span)
+            }
+            else {
+                diagn::Message::error_span("assertion failed", query.span)
+            }
+        };
         
-        Ok(expr::Value::FailedConstraint(
-            query.report.wrap_in_parents_capped(msg)))
+        return Ok(expr::Value::FailedConstraint(
+            query.report.wrap_in_parents_capped(msg)));
     }
+
+    Ok(expr::Value::Void)
 }
 
 
