@@ -22,20 +22,17 @@ pub fn eval_asm(
 
     let mut result = util::BigInt::new(0, Some(0));
     
-    let ast = asm::parser::parse(
-        query.report,
-        query.tokens)?;
-
-    for node in &ast.nodes
+    for node in &query.ast.nodes
     {
         if let asm::AstAny::Instruction(ast_instr) = node
         {
             let substs = parse_substitutions(
                 query.report,
-                &ast_instr.tokens)?;
+                ast_instr.span,
+                &ast_instr.src)?;
 
-            let new_tokens = perform_substitutions(
-                &ast_instr.tokens,
+            let new_excerpt = perform_substitutions(
+                &ast_instr.src,
                 &substs,
                 query)?;
 
@@ -44,7 +41,8 @@ pub fn eval_asm(
             let mut matches = asm::matcher::match_instr(
                 opts,
                 defs,
-                &new_tokens);
+                ast_instr.span,
+                &new_excerpt);
 
 
             let attempted_match_excerpt = {
@@ -56,10 +54,7 @@ pub fn eval_asm(
                 {
                     Some(format!(
                         "match attempted: `{}`",
-                        new_tokens
-                            .iter()
-                            .map(|t| t.text())
-                            .collect::<String>()))
+                        new_excerpt))
                 }
             };
 
@@ -152,42 +147,49 @@ pub fn eval_asm(
 }
 
 
-struct AsmSubstitution<'a>
+struct AsmSubstitution
 {
     pub start: usize,
     pub end: usize,
-    pub name: &'a str,
+    pub name: String,
     pub span: diagn::Span,
 }
 
 
-fn parse_substitutions<'tokens>(
+fn parse_substitutions<'excerpt>(
     report: &mut diagn::Report,
-    tokens: &'tokens [syntax::Token])
-    -> Result<Vec<AsmSubstitution<'tokens>>, ()>
+    span: diagn::Span,
+    excerpt: &'excerpt str)
+    -> Result<Vec<AsmSubstitution>, ()>
 {
     let mut substs = Vec::new();
 
-    let mut walker = syntax::TokenWalker::new(tokens);
+    let mut walker = syntax::Walker::new(
+        excerpt,
+        span.file_handle,
+        span.location().unwrap().0 as usize);
 
     while !walker.is_over()
     {
-        if let Some(_) = walker.maybe_expect(syntax::TokenKind::BraceOpen)
-        {
-            let start = walker.get_previous_token_index();
+        walker.skip_ignorable();
 
+        if let Some(tk_brace_open) = walker.maybe_expect(syntax::TokenKind::BraceOpen)
+        {
+            let start = walker.get_index_at_span_start(
+                tk_brace_open.span);
+            
             let tk_name = walker.expect(
                 report,
                 syntax::TokenKind::Identifier)?;
             
-            let name = tk_name.excerpt.as_ref().unwrap();
+            let name = tk_name.clone().excerpt.unwrap();
             let span = tk_name.span;
 
             walker.expect(
                 report,
                 syntax::TokenKind::BraceClose)?;
             
-            let end = walker.get_previous_token_index() + 1;
+            let end = walker.get_cursor_index();
             
             substs.push(AsmSubstitution {
                 start,
@@ -198,7 +200,7 @@ fn parse_substitutions<'tokens>(
         }
         else
         {
-            walker.advance();
+            walker.skip_to_token_end(&walker.next_token());
         }
     }
 
@@ -206,26 +208,26 @@ fn parse_substitutions<'tokens>(
 }
 
 
-fn perform_substitutions<'tokens>(
-    tokens: &'tokens [syntax::Token],
-    substs: &Vec<AsmSubstitution<'tokens>>,
+fn perform_substitutions<'src>(
+    excerpt: &'src str,
+    substs: &Vec<AsmSubstitution>,
     info: &mut expr::EvalAsmBlockQuery)
-    -> Result<Vec<syntax::Token>, ()>
+    -> Result<String, ()>
 {
-    let mut result: Vec<syntax::Token> = Vec::new();
+    let mut result = String::new();
 
     let mut copied_up_to = 0;
 
     for subst in substs
     {
-        while copied_up_to < subst.start
+        if copied_up_to < subst.start
         {
-            result.push(tokens[copied_up_to].clone());
-            copied_up_to += 1;
+            result.push_str(&excerpt[copied_up_to..subst.start]);
+            copied_up_to = subst.start;
         }
         
-        let token_subst = {
-            match info.eval_ctx.get_token_subst(subst.name)
+        let subst_str = {
+            match info.eval_ctx.get_token_subst(&subst.name)
             {
                 Some(t) => t,
                 None =>
@@ -241,20 +243,14 @@ fn perform_substitutions<'tokens>(
             }
         };
 
-        for token in token_subst.iter()
-        {
-            let mut new_token = token.clone();
-            new_token.span = subst.span;
-            result.push(new_token);
-        }
+        result.push_str(&subst_str);
 
         copied_up_to += subst.end - subst.start;
     }
 
-    while copied_up_to < tokens.len()
+    if copied_up_to < excerpt.len()
     {
-        result.push(tokens[copied_up_to].clone());
-        copied_up_to += 1;
+        result.push_str(&excerpt[copied_up_to..]);
     }
 
     Ok(result)

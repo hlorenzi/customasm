@@ -1,7 +1,7 @@
 use crate::*;
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AstDirectiveFn
 {
     pub header_span: diagn::Span,
@@ -14,7 +14,7 @@ pub struct AstDirectiveFn
 }
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AstFnParameter
 {
     pub name: String,
@@ -23,7 +23,7 @@ pub struct AstFnParameter
 
 pub fn parse(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker,
+    walker: &mut syntax::Walker,
     header_span: diagn::Span)
     -> Result<AstDirectiveFn, ()>
 {
@@ -35,7 +35,7 @@ pub fn parse(
     let mut params = Vec::new();
 
     while !walker.is_over() &&
-        !walker.next_is(0, syntax::TokenKind::ParenClose)
+        !walker.next_useful_is(0, syntax::TokenKind::ParenClose)
     {
         let tk_param_name = walker.expect(report, syntax::TokenKind::Identifier)?;
         let param_name = tk_param_name.excerpt.clone().unwrap();

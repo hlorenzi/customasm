@@ -3,7 +3,7 @@ use super::*;
 
 pub fn parse(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker,
+    walker: &mut syntax::Walker,
     _header_span: diagn::Span)
     -> Result<AstSymbol, ()>
 {

@@ -1,7 +1,7 @@
 use crate::{*, asm::AstTopLevel};
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AstDirectiveIf
 {
     pub header_span: diagn::Span,
@@ -14,7 +14,7 @@ pub struct AstDirectiveIf
 
 pub fn parse(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker,
+    walker: &mut syntax::Walker,
     header_span: diagn::Span)
     -> Result<AstDirectiveIf, ()>
 {
@@ -35,7 +35,7 @@ pub fn parse(
 
 fn parse_braced_block(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
+    walker: &mut syntax::Walker)
     -> Result<AstTopLevel, ()>
 {
     walker.expect(report, syntax::TokenKind::BraceOpen)?;
@@ -52,20 +52,18 @@ fn parse_braced_block(
 
 fn parse_else_blocks(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
+    walker: &mut syntax::Walker)
     -> Result<Option<AstTopLevel>, ()>
 {
-    if !walker.next_is(0, syntax::TokenKind::Hash) ||
-        !walker.next_is(1, syntax::TokenKind::Identifier)
+    if !walker.next_useful_is(0, syntax::TokenKind::Hash) ||
+        !walker.next_useful_is(1, syntax::TokenKind::Identifier)
     {
         return Ok(None);
     }
 
     let directive_name = walker
-        .next_nth(1)
+        .next_nth_useful_token(1)
         .excerpt
-        .as_ref()
-        .map(|s| s.as_str())
         .unwrap();
 
     if directive_name == "else"

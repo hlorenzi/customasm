@@ -3,7 +3,7 @@ use crate::*;
 
 pub fn parse(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
+    walker: &mut syntax::Walker)
     -> Result<expr::Expr, ()>
 {
     ExpressionParser::new(report, walker)
@@ -12,7 +12,7 @@ pub fn parse(
 
 
 pub fn parse_optional(
-    walker: &mut syntax::TokenWalker)
+    walker: &mut syntax::Walker)
     -> Option<expr::Expr>
 {
     let mut dummy_report = diagn::Report::new();
@@ -20,20 +20,20 @@ pub fn parse_optional(
 }
 
 
-struct ExpressionParser<'a, 'tokens: 'a>
+struct ExpressionParser<'a, 'src: 'a>
 {
     report: &'a mut diagn::Report,
-	walker: &'a mut syntax::TokenWalker<'tokens>,
+	walker: &'a mut syntax::Walker<'src>,
 	recursion_depth: usize,
 }
 
 
-impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
+impl<'a, 'src> ExpressionParser<'a, 'src>
 {
 	pub fn new(
         report: &'a mut diagn::Report,
-        walker: &'a mut syntax::TokenWalker<'tokens>)
-        -> ExpressionParser<'a, 'tokens>
+        walker: &'a mut syntax::Walker<'src>)
+        -> ExpressionParser<'a, 'src>
 	{
 		ExpressionParser {
             report,
@@ -50,7 +50,7 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 			self.report.message_with_parents_dedup(
 				diagn::Message::error_span(
 					"expression recursion depth limit reached",
-					self.walker.get_span_after_prev()));
+					self.walker.get_cursor_span()));
 	
 			return Err(());
 		}
@@ -78,7 +78,7 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 		ops: &[(syntax::TokenKind, expr::UnaryOp)],
 		parse_inner: F)
 		-> Result<expr::Expr, ()>
-		where F: Fn(&mut ExpressionParser<'a, 'tokens>) -> Result<expr::Expr, ()>
+		where F: Fn(&mut ExpressionParser<'a, 'src>) -> Result<expr::Expr, ()>
 	{
 		for op in ops
 		{
@@ -114,13 +114,13 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 		ops: &[(syntax::TokenKind, expr::BinaryOp)],
 		parse_inner: F)
 		-> Result<expr::Expr, ()>
-		where F: Fn(&mut ExpressionParser<'a, 'tokens>) -> Result<expr::Expr, ()>
+		where F: Fn(&mut ExpressionParser<'a, 'src>) -> Result<expr::Expr, ()>
 	{
 		let mut lhs = parse_inner(self)?;
 		
 		loop
 		{
-			if self.walker.next_is_linebreak()
+			if self.walker.next_linebreak().is_some()
 				{ break; }
 
 			let mut op_match = None;
@@ -155,7 +155,7 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 	
 
 	fn parse_right_associative_binary_ops<F>(&mut self, ops: &[(syntax::TokenKind, expr::BinaryOp)], parse_inner: F) -> Result<expr::Expr, ()>
-	where F: Fn(&mut ExpressionParser<'a, 'tokens>) -> Result<expr::Expr, ()>
+	where F: Fn(&mut ExpressionParser<'a, 'src>) -> Result<expr::Expr, ()>
 	{
 		let mut lhs = parse_inner(self)?;
 		
@@ -229,7 +229,7 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 	{
 		self.parse_binary_ops(
 			&[
-				(syntax::TokenKind::VerticalBarVerticalBar, expr::BinaryOp::LazyOr)
+				(syntax::TokenKind::DoubleVerticalBar, expr::BinaryOp::LazyOr)
 			],
 			|s| s.parse_lazy_and())
 	}
@@ -239,7 +239,7 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 	{
 		self.parse_binary_ops(
 			&[
-				(syntax::TokenKind::AmpersandAmpersand, expr::BinaryOp::LazyAnd)
+				(syntax::TokenKind::DoubleAmpersand, expr::BinaryOp::LazyAnd)
 			],
 			|s| s.parse_relational())
 	}
@@ -249,7 +249,7 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 	{
 		self.parse_binary_ops(
 			&[
-				(syntax::TokenKind::EqualEqual,       expr::BinaryOp::Eq),
+				(syntax::TokenKind::DoubleEqual,       expr::BinaryOp::Eq),
 				(syntax::TokenKind::ExclamationEqual, expr::BinaryOp::Ne),
 				(syntax::TokenKind::LessThan,         expr::BinaryOp::Lt),
 				(syntax::TokenKind::LessThanEqual,    expr::BinaryOp::Le),
@@ -294,8 +294,8 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 	{
 		self.parse_binary_ops(
 			&[
-				(syntax::TokenKind::LessThanLessThan,       expr::BinaryOp::Shl),
-				(syntax::TokenKind::GreaterThanGreaterThan, expr::BinaryOp::Shr)
+				(syntax::TokenKind::DoubleLessThan,       expr::BinaryOp::Shl),
+				(syntax::TokenKind::DoubleGreaterThan, expr::BinaryOp::Shr)
 			],
 			|s| s.parse_addition())
 	}
@@ -328,7 +328,7 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 	{
 		let inner = self.parse_slice_short()?;
 		
-		if self.walker.next_is_linebreak()
+		if self.walker.next_linebreak().is_some()
 			{ return Ok(inner); }
 
 		let tk_open = match self.walker.maybe_expect(syntax::TokenKind::BracketOpen)
@@ -363,7 +363,7 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 	{
 		let inner = self.parse_unary()?;
 		
-		if self.walker.next_is_linebreak()
+		if self.walker.next_linebreak().is_some()
 			{ return Ok(inner); }
 		
 		let tk_grave_span = match self.walker.maybe_expect(syntax::TokenKind::Grave)
@@ -397,18 +397,18 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 	{
 		let leaf = self.parse_leaf()?;
 		
-		if self.walker.next_is_linebreak()
+		if self.walker.next_linebreak().is_some()
 			{ return Ok(leaf); }
 			
 		if self.walker.maybe_expect(syntax::TokenKind::ParenOpen).is_none()
 			{ return Ok(leaf); }
 			
 		let mut args = Vec::new();
-		while !self.walker.next_is(0, syntax::TokenKind::ParenClose)
+		while !self.walker.next_useful_is(0, syntax::TokenKind::ParenClose)
 		{
 			args.push(self.parse_expr()?);
 			
-			if self.walker.next_is(0, syntax::TokenKind::ParenClose)
+			if self.walker.next_useful_is(0, syntax::TokenKind::ParenClose)
 				{ break; }
 				
 			self.walker.expect(self.report, syntax::TokenKind::Comma)?;
@@ -422,38 +422,38 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 	
 	fn parse_leaf(&mut self) -> Result<expr::Expr, ()>
 	{
-		if self.walker.next_is(0, syntax::TokenKind::BraceOpen)
+		if self.walker.next_useful_is(0, syntax::TokenKind::BraceOpen)
 			{ self.parse_block() }
 	
-		else if self.walker.next_is(0, syntax::TokenKind::ParenOpen)
+		else if self.walker.next_useful_is(0, syntax::TokenKind::ParenOpen)
 			{ self.parse_parenthesized() }
 	
-		else if self.walker.next_is(0, syntax::TokenKind::Identifier)
+		else if self.walker.next_useful_is(0, syntax::TokenKind::Identifier)
 			{ self.parse_variable() }
 			
-		else if self.walker.next_is(0, syntax::TokenKind::Dot)
+		else if self.walker.next_useful_is(0, syntax::TokenKind::Dot)
 			{ self.parse_variable() }
 			
-		else if self.walker.next_is(0, syntax::TokenKind::Number)
+		else if self.walker.next_useful_is(0, syntax::TokenKind::Number)
 			{ self.parse_number() }
 			
-		else if self.walker.next_is(0, syntax::TokenKind::String)
+		else if self.walker.next_useful_is(0, syntax::TokenKind::String)
 			{ self.parse_string() }
 	
-		else if self.walker.next_is(0, syntax::TokenKind::KeywordAsm)
+		else if self.walker.next_useful_is(0, syntax::TokenKind::KeywordAsm)
 			{ self.parse_asm() }
 	
-		else if self.walker.next_is(0, syntax::TokenKind::KeywordTrue)
+		else if self.walker.next_useful_is(0, syntax::TokenKind::KeywordTrue)
 			{ self.parse_boolean_true() }
 	
-		else if self.walker.next_is(0, syntax::TokenKind::KeywordFalse)
+		else if self.walker.next_useful_is(0, syntax::TokenKind::KeywordFalse)
 			{ self.parse_boolean_false() }
 			
 		else
 		{
             self.report.error_span(
                 "expected expression",
-                self.walker.get_span_after_prev());
+                self.walker.get_cursor_span());
             
 			Err(())
 		}
@@ -467,14 +467,14 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
             .span;
 		
 		let mut exprs = Vec::new();
-		while !self.walker.next_is(0, syntax::TokenKind::BraceClose)
+		while !self.walker.next_useful_is(0, syntax::TokenKind::BraceClose)
 		{
 			exprs.push(self.parse_expr()?);
 			
 			if self.walker.maybe_expect_linebreak().is_some()
 				{ continue; }
 				
-			if self.walker.next_is(0, syntax::TokenKind::BraceClose)
+			if self.walker.next_useful_is(0, syntax::TokenKind::BraceClose)
 				{ break; }
 				
 			self.walker.expect(self.report, syntax::TokenKind::Comma)?;
@@ -500,11 +500,9 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 		let mut span = diagn::Span::new_dummy();
 		let mut hierarchy_level = 0;
 
-		self.walker.clear_linebreak();
-		
 		loop
 		{
-			if self.walker.next_is_linebreak()
+			if self.walker.next_linebreak().is_some()
 			{
 				break;
 			}
@@ -523,17 +521,12 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 
 		loop
 		{
-			if self.walker.next_is_linebreak()
-			{
-				break;
-			}
-			
 			let tk_name = self.walker.expect(self.report, syntax::TokenKind::Identifier)?;
 			let name = tk_name.excerpt.clone().unwrap();
 			hierarchy.push(name);
 			span = span.join(tk_name.span);
 
-			if self.walker.next_is_linebreak()
+			if self.walker.next_linebreak().is_some()
 			{
 				break;
 			}
@@ -617,19 +610,28 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 	
 	fn parse_asm(&mut self) -> Result<expr::Expr, ()>
 	{
-		let tk_asm_span = self.walker
-			.expect(self.report, syntax::TokenKind::KeywordAsm)?
-            .span;
+		let tk_asm = self.walker.expect(
+			self.report,
+			syntax::TokenKind::KeywordAsm)?;
     
-		self.walker.expect(self.report, syntax::TokenKind::BraceOpen)?;
+		let _tk_brace_open = self.walker.expect(
+			self.report,
+			syntax::TokenKind::BraceOpen)?;
 
-		let skipped = self.walker.skip_until_token_over_nested_braces(syntax::TokenKind::BraceClose);
+		let mut inner_walker = self.walker
+			.advance_until_closing_brace();
 
-		let tk_brace_close = self.walker.expect(self.report, syntax::TokenKind::BraceClose)?;
+		let ast = asm::parser::parse_nested_toplevel(
+			self.report,
+			&mut inner_walker)?;
+
+		let tk_brace_close = self.walker.expect(
+			self.report,
+			syntax::TokenKind::BraceClose)?;
 
 		let expr = expr::Expr::Asm(
-			tk_asm_span.join(tk_brace_close.span),
-			skipped.get_cloned_tokens());
+			tk_asm.span.join(tk_brace_close.span),
+			ast);
 
 		Ok(expr)
 	}

@@ -1,11 +1,11 @@
 use crate::*;
 
 
-type WorkingMatches<'tokens> = Vec<WorkingMatch<'tokens>>;
+type WorkingMatches<'src> = Vec<WorkingMatch<'src>>;
 
 
-type WorkingMatch<'tokens> =
-    (InstructionMatch, syntax::TokenWalker<'tokens>);
+type WorkingMatch<'src> =
+    (InstructionMatch, syntax::Walker<'src>);
 
 
 pub type InstructionMatches = Vec<InstructionMatch>;
@@ -73,7 +73,8 @@ impl InstructionMatchResolution
 pub struct InstructionArgument
 {
     pub kind: InstructionArgumentKind,
-    pub tokens: Vec<syntax::Token>,
+    pub span: diagn::Span,
+    pub excerpt: String,
 }
 
 
@@ -106,7 +107,8 @@ pub fn match_all(
             let mut matches = match_instr(
                 opts,
                 defs,
-                &ast_instr.tokens);
+                ast_instr.span,
+                &ast_instr.src);
 
             
             if let Err(()) = error_on_no_matches(
@@ -155,10 +157,7 @@ pub fn match_all(
             if opts.debug_iterations
             {
                 println!(" size: {} = {:?}{}",
-                    ast_instr.tokens.iter()
-                        .map(|t| t.text())
-                        .collect::<Vec<_>>()
-                        .join(""),
+                    ast_instr.src,
                     instr.encoding.size.unwrap(),
                     if instr.encoding_statically_known { " [static]" } else { "" });
             }
@@ -336,15 +335,19 @@ fn get_match_static_size(
 
 
 /// Runs the instruction-matching algorithm on the given
-/// Token slice, and returns the matches.
+/// string, and returns the matches.
 pub fn match_instr(
     opts: &asm::AssemblyOptions,
     defs: &asm::ItemDefs,
-    tokens: &[syntax::Token])
+    span: diagn::Span,
+    src: &str)
     -> InstructionMatches
 {
     let mut working_matches = WorkingMatches::new();
-    let mut walker = syntax::TokenWalker::new(tokens);
+    let mut walker = syntax::Walker::new(
+        src,
+        span.file_handle,
+        span.location().unwrap().0 as usize);
 
     if opts.optimize_instruction_matching
     {
@@ -414,10 +417,10 @@ pub fn match_instr(
 }
 
 
-fn match_with_ruledef_map<'tokens>(
+fn match_with_ruledef_map<'src>(
     defs: &asm::ItemDefs,
-    walker: syntax::TokenWalker<'tokens>)
-    -> WorkingMatches<'tokens>
+    walker: syntax::Walker<'src>)
+    -> WorkingMatches<'src>
 {
     let mut matches = WorkingMatches::new();
 
@@ -444,12 +447,12 @@ fn match_with_ruledef_map<'tokens>(
 }
 
 
-fn match_with_ruledef<'tokens>(
+fn match_with_ruledef<'src>(
     defs: &asm::ItemDefs,
     ruledef_ref: util::ItemRef<asm::Ruledef>,
-    walker: &mut syntax::TokenWalker<'tokens>,
+    walker: &mut syntax::Walker<'src>,
     needs_consume_all_tokens: bool)
-    -> WorkingMatches<'tokens>
+    -> WorkingMatches<'src>
 {
     let mut matches = WorkingMatches::new();
 
@@ -474,14 +477,14 @@ fn match_with_ruledef<'tokens>(
 }
 
 
-fn begin_match_with_rule<'tokens>(
+fn begin_match_with_rule<'src>(
     defs: &asm::ItemDefs,
     ruledef_ref: util::ItemRef<asm::Ruledef>,
     rule_ref: util::ItemRef<asm::Rule>,
     rule: &asm::Rule,
-    mut walker: syntax::TokenWalker<'tokens>,
+    mut walker: syntax::Walker<'src>,
     needs_consume_all_tokens: bool)
-    -> WorkingMatches<'tokens>
+    -> WorkingMatches<'src>
 {
     match_with_rule(
         defs,
@@ -501,14 +504,14 @@ fn begin_match_with_rule<'tokens>(
 }
 
 
-fn match_with_rule<'tokens>(
+fn match_with_rule<'src>(
     defs: &asm::ItemDefs,
     rule: &asm::Rule,
-    walker: &mut syntax::TokenWalker<'tokens>,
+    walker: &mut syntax::Walker<'src>,
     needs_consume_all_tokens: bool,
     at_pattern_part: usize,
     match_so_far: &mut InstructionMatch)
-    -> WorkingMatches<'tokens>
+    -> WorkingMatches<'src>
 {
     for part_index in at_pattern_part..rule.pattern.len()
     {
@@ -518,23 +521,15 @@ fn match_with_rule<'tokens>(
         {
             asm::RulePatternPart::Exact(c) =>
             {
-                if walker.next_is_whitespace() &&
-                    !walker.is_whitespace_acknowledged()
+                if !walker.maybe_expect_char(*c)
                 {
                     return vec![];
                 }
-                
-                if walker.next_partial().to_ascii_lowercase() != *c
-                {
-                    return vec![];
-                }
-                
-                walker.advance_partial();
             }
 
             asm::RulePatternPart::Whitespace =>
             {
-                if let None = walker.maybe_expect_whitespace()
+                if walker.next_token().kind != syntax::TokenKind::Whitespace
                 {
                     return vec![];
                 }
@@ -587,62 +582,47 @@ fn match_with_rule<'tokens>(
 }
 
 
-fn match_with_expr<'tokens>(
+fn match_with_expr<'src>(
     defs: &asm::ItemDefs,
     rule: &asm::Rule,
-    walker: &mut syntax::TokenWalker<'tokens>,
+    walker: &mut syntax::Walker<'src>,
     needs_consume_all_tokens: bool,
     at_pattern_part: usize,
     match_so_far: &mut InstructionMatch)
-    -> WorkingMatches<'tokens>
+    -> WorkingMatches<'src>
 {
-    if walker.is_at_partial()
-    {
-        match walker.maybe_expect_partial_usize()
+    let walker_start = walker.next_useful_index();
+
+    let maybe_expr = parse_with_lookahead(
+        &rule.pattern,
+        at_pattern_part,
+        walker,
+        |walker| expr::parse_optional(walker));
+
+    let walker_end = walker.get_cursor_index();
+    let walker_start = std::cmp::min(walker_start, walker_end);
+
+    let expr = {
+        match maybe_expr
         {
-            None =>
-            {
-                return vec![];
-            }
-            Some(value) =>
-            {
-                let expr = expr::Value::make_integer(value)
-                    .make_literal();
-
-                match_so_far.args.push(InstructionArgument {
-                    kind: InstructionArgumentKind::Expr(expr),
-                    tokens: Vec::new(),
-                });
-            }
+            Some(expr) => expr,
+            None => return vec![],
         }
-    }
-    else
-    {
-        let token_start = walker.get_current_token_index();
+    };
 
-        let maybe_expr = parse_with_lookahead(
-            &rule.pattern,
-            at_pattern_part,
-            walker,
-            |walker| expr::parse_optional(walker));
+    let span = walker.get_span(
+        walker_start,
+        walker_end);
 
-        let token_end = walker.get_current_token_index();
+    let excerpt = walker.get_excerpt(
+        walker_start,
+        walker_end);
 
-        let expr = {
-            match maybe_expr
-            {
-                Some(expr) => expr,
-                None => return vec![],
-            }
-        };
-
-        match_so_far.args.push(InstructionArgument {
-            kind: InstructionArgumentKind::Expr(expr),
-            tokens: walker.get_cloned_tokens_by_index(
-                token_start,
-                token_end),
-        });
-    }
+    match_so_far.args.push(InstructionArgument {
+        kind: InstructionArgumentKind::Expr(expr),
+        span,
+        excerpt: excerpt.to_string(),
+    });
 
     match_with_rule(
         defs,
@@ -654,17 +634,18 @@ fn match_with_expr<'tokens>(
 }
 
 
-fn match_with_nested_ruledef<'tokens>(
+fn match_with_nested_ruledef<'src>(
     defs: &asm::ItemDefs,
     nested_ruledef_ref: util::ItemRef<asm::Ruledef>,
     rule: &asm::Rule,
-    walker: &mut syntax::TokenWalker<'tokens>,
+    walker: &mut syntax::Walker<'src>,
     needs_consume_all_tokens: bool,
     at_pattern_part: usize,
     match_so_far: &mut InstructionMatch)
-    -> WorkingMatches<'tokens>
+    -> WorkingMatches<'src>
 {
-    let token_start = walker.get_current_token_index();
+    let walker_start = walker.next_useful_index();
+    let walker_limit_prev = walker.get_cursor_limit();
 
     let nested_matches = parse_with_lookahead(
         &rule.pattern,
@@ -681,20 +662,28 @@ fn match_with_nested_ruledef<'tokens>(
 
     for nested_match in nested_matches
     {
-        let mut walker = walker.clone();
-        walker.copy_state_from(&nested_match.1);
-        
+        let mut walker = nested_match.1;
+        walker.set_cursor_limit(walker_limit_prev);
 
+        let walker_end = walker.get_cursor_index();
+        let walker_start = std::cmp::min(walker_start, walker_end);
+        
         let mut match_so_far = match_so_far.clone();
+
+        let span = walker.get_span(
+            walker_start,
+            walker_end);
+
+        let excerpt = walker.get_excerpt(
+            walker_start,
+            walker_end);
 
         match_so_far.args.push(InstructionArgument {
             kind: InstructionArgumentKind::Nested(nested_match.0),
-            tokens: walker.get_cloned_tokens_by_index(
-                token_start,
-                walker.get_current_token_index()),
+            span,
+            excerpt: excerpt.to_string(),
         });
 
-        
         // Continue matching the current rule
         let resumed_matches = match_with_rule(
             defs,
@@ -737,27 +726,29 @@ fn match_with_nested_ruledef<'tokens>(
 /// In cases where there's no lookahead character, the TokenWalker
 /// isn't cut off, and the expression-parser is allowed to
 /// consume as much as it can.
-fn parse_with_lookahead<'tokens, F, T>(
+fn parse_with_lookahead<'src, F, T>(
     pattern: &asm::RulePattern,
     at_pattern_part: usize,
-    walker: &mut syntax::TokenWalker<'tokens>,
+    walker: &mut syntax::Walker<'src>,
     parse_fn: F)
     -> T
-    where F: FnOnce(&mut syntax::TokenWalker<'tokens>) -> T
+    where F: FnOnce(&mut syntax::Walker<'src>) -> T
 {
-    let maybe_lookahead = find_lookahead_character(
+    let maybe_lookahead_char = find_lookahead_char(
         pattern,
         at_pattern_part);
 
-    if let Some(lookahead) = maybe_lookahead
+    if let Some(lookahead_char) = maybe_lookahead_char
     {
-        let maybe_lookahead_walker = walker
-            .try_lookahead_until_char_over_nested_parens(lookahead);
+        let maybe_limit =
+            walker.find_lookahead_char_index(lookahead_char);
     
-        if let Some(mut lookahead_walker) = maybe_lookahead_walker
+        if let Some(limit) = maybe_limit
         {
-            let result = parse_fn(&mut lookahead_walker);
-            walker.copy_state_from(&lookahead_walker);
+            let prev_limit = walker.get_cursor_limit();
+            walker.set_cursor_limit(limit);
+            let result = parse_fn(walker);
+            walker.set_cursor_limit(prev_limit);
             return result;
         }
     }
@@ -771,7 +762,7 @@ fn parse_with_lookahead<'tokens, F, T>(
 /// 
 /// If the next applicable pattern-part is a parameter,
 /// it returns `None`.
-fn find_lookahead_character(
+fn find_lookahead_char(
     pattern: &[asm::RulePatternPart],
     at_pattern_part: usize)
     -> Option<char>

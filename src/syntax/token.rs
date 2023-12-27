@@ -51,16 +51,16 @@ pub enum TokenKind
 	Tilde,
 	Grave,
 	At,
-	AmpersandAmpersand,
-	VerticalBarVerticalBar,
-	EqualEqual,
+	DoubleAmpersand,
+	DoubleVerticalBar,
+	DoubleEqual,
 	ExclamationEqual,
 	LessThan,
-	LessThanLessThan,
+	DoubleLessThan,
 	LessThanEqual,
 	GreaterThan,
-	GreaterThanGreaterThan,
-	GreaterThanGreaterThanGreaterThan,
+	DoubleGreaterThan,
+	TripleGreaterThan,
 	GreaterThanEqual
 }
 
@@ -157,16 +157,16 @@ impl TokenKind
 			TokenKind::Tilde => "`~`",
 			TokenKind::At => "`@`",
 			TokenKind::Grave => "```",
-			TokenKind::AmpersandAmpersand => "`&&`",
-			TokenKind::VerticalBarVerticalBar => "`||`",
-			TokenKind::EqualEqual => "`==`",
+			TokenKind::DoubleAmpersand => "`&&`",
+			TokenKind::DoubleVerticalBar => "`||`",
+			TokenKind::DoubleEqual => "`==`",
 			TokenKind::ExclamationEqual => "`!=`",
 			TokenKind::LessThan => "`<`",
-			TokenKind::LessThanLessThan => "`<<`",
+			TokenKind::DoubleLessThan => "`<<`",
 			TokenKind::LessThanEqual => "`<=`",
 			TokenKind::GreaterThan => "`>`",
-			TokenKind::GreaterThanGreaterThan => "`>>`",
-			TokenKind::GreaterThanGreaterThanGreaterThan => "`>>>`",
+			TokenKind::DoubleGreaterThan => "`>>`",
+			TokenKind::TripleGreaterThan => "`>>>`",
 			TokenKind::GreaterThanEqual => "`>=`"
 		}
 	}
@@ -223,16 +223,16 @@ impl Token
 			TokenKind::Tilde => "~",
 			TokenKind::At => "@",
 			TokenKind::Grave => "`",
-			TokenKind::AmpersandAmpersand => "&&",
-			TokenKind::VerticalBarVerticalBar => "||",
-			TokenKind::EqualEqual => "==",
+			TokenKind::DoubleAmpersand => "&&",
+			TokenKind::DoubleVerticalBar => "||",
+			TokenKind::DoubleEqual => "==",
 			TokenKind::ExclamationEqual => "!=",
 			TokenKind::LessThan => "<",
-			TokenKind::LessThanLessThan => "<<",
+			TokenKind::DoubleLessThan => "<<",
 			TokenKind::LessThanEqual => "<=",
 			TokenKind::GreaterThan => ">",
-			TokenKind::GreaterThanGreaterThan => ">>",
-			TokenKind::GreaterThanGreaterThanGreaterThan => ">>>",
+			TokenKind::DoubleGreaterThan => ">>",
+			TokenKind::TripleGreaterThan => ">>>",
 			TokenKind::GreaterThanEqual => ">=",
 			_ => self.excerpt.as_ref().unwrap()
 		}
@@ -240,78 +240,17 @@ impl Token
 }
 
 
-pub fn tokenize(
-    report: &mut diagn::Report,
-    src_file_handle: util::FileServerHandle,
-    src: &str)
-    -> Result<Vec<Token>, ()>
+pub fn decide_next_token(
+	src: &str)
+	-> (TokenKind, usize)
 {
-	if let Err(_) = <usize as TryInto::<diagn::SpanIndex>>::try_into(src.len())
-	{
-		report.error_span(
-			"file is too large",
-			diagn::Span::new_dummy());
-
-		return Err(());
-	}
-
-	let mut tokens = Vec::new();
-	let mut index = 0;
-	
-	while index < src.len()
-	{
-		let remaining = &src.get(index..).unwrap();
-
-		// Decide what the next token's kind and length are.
-		let (kind, length) =
-			check_for_whitespace(remaining).unwrap_or_else(||
-			check_for_comment   (remaining).unwrap_or_else(||
-			check_for_number    (remaining).unwrap_or_else(||
-			check_for_identifier(remaining).unwrap_or_else(||
-			check_for_special   (remaining).unwrap_or_else(||
-			check_for_string    (remaining).unwrap_or_else(||
-			(TokenKind::Error, 1)))))));
-		
-		let span = diagn::Span::new(
-			src_file_handle,
-			index as diagn::SpanIndex,
-			(index + length) as diagn::SpanIndex);
-		
-		// Get the source excerpt for variable tokens (e.g. identifiers).
-		let excerpt = {
-            match kind.needs_excerpt()
-            {
-                false => None,
-                true => Some(src
-					.get(index..index + length)
-					.unwrap()
-					.to_string()),
-            }
-        };
-		
-		// Report unexpected characters.
-		if kind == TokenKind::Error
-		{
-			report.error_span(
-                "unexpected character",
-                span);
-
-			return Err(());
-		}
-		
-		// Add to the token list.
-		let token = Token {
-			span,
-			kind,
-			excerpt,
-		};
-		
-		tokens.push(token);
-		
-		index += length;
-	}
-
-	Ok(tokens)
+	check_for_whitespace(src).unwrap_or_else(||
+	check_for_comment   (src).unwrap_or_else(||
+	check_for_number    (src).unwrap_or_else(||
+	check_for_identifier(src).unwrap_or_else(||
+	check_for_special   (src).unwrap_or_else(||
+	check_for_string    (src).unwrap_or_else(||
+	(TokenKind::Error, 1)))))))
 }
 
 
@@ -427,29 +366,6 @@ impl<'a> CharWalker<'a>
 	}
 
 
-	pub fn consume_while_not_followed_by(
-		&mut self,
-		fn_start: fn(char) -> bool,
-		fn_mid: fn(char) -> bool,
-		fn_not_followed_by: fn(char) -> bool)
-		-> bool
-	{
-		if !self.consume_if(fn_start)
-		{
-			return false;
-		}
-
-		while self.consume_if(fn_mid) {}
-
-		if self.consume_if(fn_not_followed_by)
-		{
-			return false;
-		}
-
-		true
-	}
-
-
 	pub fn consume_until_char(&mut self, wanted: char)
 	{
 		while !self.ended() && self.current != wanted
@@ -490,7 +406,7 @@ fn check_for_comment(src: &str) -> Option<(TokenKind, usize)>
 		{
 			if walker.ended()
 			{
-				return None;
+				break;
 			}
 
 			else if walker.consume_str(";*")
@@ -574,10 +490,9 @@ fn check_for_number(src: &str) -> Option<(TokenKind, usize)>
 
 	else if walker.consume_char('$')
 	{
-		if walker.consume_while_not_followed_by(
+		if walker.consume_while(
 			is_hex_number_mid,
-			is_hex_number_mid,
-			cannot_follow_hex_number)
+			is_hex_number_mid)
 		{
 			return Some((TokenKind::Number, walker.length));
 		}
@@ -585,10 +500,9 @@ fn check_for_number(src: &str) -> Option<(TokenKind, usize)>
 
 	else if walker.consume_char('%')
 	{
-		if walker.consume_while_not_followed_by(
+		if walker.consume_while(
 			is_bin_number_mid,
-			is_bin_number_mid,
-			cannot_follow_bin_number)
+			is_bin_number_mid)
 		{
 			return Some((TokenKind::Number, walker.length));
 		}
@@ -642,21 +556,21 @@ fn check_for_special(src: &str) -> Option<(TokenKind, usize)>
 		("~",   TokenKind::Tilde),
 		("@",   TokenKind::At),
 		("`",   TokenKind::Grave),
-		("&&",  TokenKind::AmpersandAmpersand),
+		("&&",  TokenKind::DoubleAmpersand),
 		("&",   TokenKind::Ampersand),
-		("||",  TokenKind::VerticalBarVerticalBar),
+		("||",  TokenKind::DoubleVerticalBar),
 		("|",   TokenKind::VerticalBar),
-		("==",  TokenKind::EqualEqual),
+		("==",  TokenKind::DoubleEqual),
 		("=",   TokenKind::Equal),
 		("?",   TokenKind::Question),
 		("!=",  TokenKind::ExclamationEqual),
 		("!",   TokenKind::Exclamation),
 		("<=",  TokenKind::LessThanEqual),
-		("<<",  TokenKind::LessThanLessThan),
+		("<<",  TokenKind::DoubleLessThan),
 		("<",   TokenKind::LessThan),
 		(">=",  TokenKind::GreaterThanEqual),
-		(">>>", TokenKind::GreaterThanGreaterThanGreaterThan),
-		(">>",  TokenKind::GreaterThanGreaterThan),
+		(">>>", TokenKind::TripleGreaterThan),
+		(">>",  TokenKind::DoubleGreaterThan),
 		(">",   TokenKind::GreaterThan)
 	];
 
@@ -721,25 +635,10 @@ fn is_bin_number_mid(c: char) -> bool
 }
 
 
-fn cannot_follow_bin_number(c: char) -> bool
-{
-	(c >= 'a' && c <= 'z') ||
-	(c >= 'A' && c <= 'Z') ||
-	(c >= '2' && c <= '9')
-}
-
-
 fn is_hex_number_mid(c: char) -> bool
 {
 	(c >= 'a' && c <= 'f') ||
 	(c >= 'A' && c <= 'F') ||
 	(c >= '0' && c <= '9') ||
 	c == '_'
-}
-
-
-fn cannot_follow_hex_number(c: char) -> bool
-{
-	(c >= 'g' && c <= 'z') ||
-	(c >= 'G' && c <= 'Z')
 }

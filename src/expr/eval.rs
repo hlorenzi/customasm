@@ -4,12 +4,12 @@ use crate::*;
 pub struct EvalContext
 {
 	locals: std::collections::HashMap<String, expr::Value>,
-	token_substs: std::collections::HashMap<String, Vec<syntax::Token>>,
+	token_substs: std::collections::HashMap<String, String>,
 	recursion_depth: usize,
 }
 
 
-static ASM_HYGIENIZE_PREFIX: &'static str = ":";
+static ASM_HYGIENIZE_PREFIX: &'static str = "__";
 
 
 impl EvalContext
@@ -79,17 +79,17 @@ impl EvalContext
 	pub fn set_token_subst<S>(
 		&mut self,
 		name: S,
-		tokens: Vec<syntax::Token>)
+		excerpt: String)
 		where S: Into<String>
 	{
-		self.token_substs.insert(name.into(), tokens);
+		self.token_substs.insert(name.into(), excerpt);
 	}
 	
 	
 	pub fn get_token_subst<'a>(
 		&'a self,
 		name: &str)
-		-> Option<std::borrow::Cow<'a, Vec<syntax::Token>>>
+		-> Option<std::borrow::Cow<'a, String>>
 	{
 		if let Some(t) = self.token_substs.get(name)
 		{
@@ -98,14 +98,9 @@ impl EvalContext
 
 		if let Some(_) = self.locals.get(name)
 		{
-			return Some(std::borrow::Cow::Owned(
-				vec![syntax::Token {
-					span: diagn::Span::new_dummy(),
-					kind: syntax::TokenKind::Identifier,
-					excerpt: Some(
-						EvalContext::hygienize_name_for_asm_subst(name)),
-				}]
-			));
+			return Some(
+				std::borrow::Cow::Owned(
+					EvalContext::hygienize_name_for_asm_subst(name)));
 		}
 
 		None
@@ -255,7 +250,7 @@ pub struct EvalFunctionQueryArgument
 pub struct EvalAsmBlockQuery<'a>
 {
 	pub report: &'a mut diagn::Report,
-	pub tokens: &'a [syntax::Token],
+	pub ast: &'a asm::AstTopLevel,
 	pub span: diagn::Span,
 	pub eval_ctx: &'a mut EvalContext,
 }
@@ -747,11 +742,11 @@ impl expr::Expr
 				}
 			}
 			
-			&expr::Expr::Asm(span, ref tokens) =>
+			&expr::Expr::Asm(span, ref ast) =>
 			{
 				let mut query = EvalAsmBlockQuery {
 					report,
-					tokens,
+					ast,
 					span,
 					eval_ctx: ctx,
 				};

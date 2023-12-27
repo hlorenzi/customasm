@@ -2,14 +2,12 @@ mod token;
 pub use self::token::{
     Token,
     TokenKind,
-    tokenize,
+    decide_next_token,
     is_whitespace,
 };
 
-mod token_walker;
-pub use self::token_walker::{
-    TokenWalker,
-};
+mod walker;
+pub use self::walker::Walker;
 
 mod excerpt;
 pub use self::excerpt::{

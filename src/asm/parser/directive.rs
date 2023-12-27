@@ -3,7 +3,7 @@ use crate::*;
 
 pub fn parse(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
+    walker: &mut syntax::Walker)
     -> Result<asm::AstAny, ()>
 {
     let tk_hash = walker.expect(report, syntax::TokenKind::Hash)?;

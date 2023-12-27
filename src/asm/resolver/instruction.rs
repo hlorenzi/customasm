@@ -69,10 +69,7 @@ pub fn resolve_instruction(
             if opts.debug_iterations
             {
                 println!("instr: {} = {:?} [static]",
-                    ast_instr.tokens.iter()
-                        .map(|t| t.text())
-                        .collect::<Vec<_>>()
-                        .join(""),
+                    ast_instr.src,
                     instr.encoding);
             }
 
@@ -96,10 +93,7 @@ pub fn resolve_instruction(
         if opts.debug_iterations
         {
             println!("instr: {} = {:?}",
-                ast_instr.tokens.iter()
-                    .map(|t| t.text())
-                    .collect::<Vec<_>>()
-                    .join(""),
+                ast_instr.src,
                 instr.encoding);
         }
         
@@ -424,7 +418,7 @@ fn resolve_instruction_match_inner(
                 
                 eval_ctx.set_token_subst(
                     &param.name,
-                    arg.tokens.clone());
+                    arg.excerpt.clone());
             }
 
             asm::InstructionArgumentKind::Nested(ref nested_match) =>
@@ -452,7 +446,7 @@ fn resolve_instruction_match_inner(
                 
                 eval_ctx.set_token_subst(
                     &param.name,
-                    arg.tokens.clone());
+                    arg.excerpt.clone());
             }
         }
     }

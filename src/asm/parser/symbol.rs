@@ -1,7 +1,7 @@
 use super::*;
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AstSymbol
 {
     pub decl_span: diagn::Span,
@@ -14,7 +14,7 @@ pub struct AstSymbol
 }
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum AstSymbolKind
 {
     Constant(AstSymbolConstant),
@@ -22,7 +22,7 @@ pub enum AstSymbolKind
 }
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AstSymbolConstant
 {
     pub expr: expr::Expr,
@@ -31,7 +31,7 @@ pub struct AstSymbolConstant
 
 pub fn parse(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
+    walker: &mut syntax::Walker)
     -> Result<AstAny, ()>
 {
     let mut decl_span = diagn::Span::new_dummy();

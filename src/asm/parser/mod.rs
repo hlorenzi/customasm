@@ -4,36 +4,24 @@ use crate::*;
 mod directive;
 
 mod directive_addr;
-pub use directive_addr::{
-    AstDirectiveAddr,
-};
+pub use directive_addr::AstDirectiveAddr;
 
 mod directive_align;
-pub use directive_align::{
-    AstDirectiveAlign,
-};
+pub use directive_align::AstDirectiveAlign;
 
 mod directive_bank;
-pub use directive_bank::{
-    AstDirectiveBank,
-};
+pub use directive_bank::AstDirectiveBank;
 
 mod directive_bankdef;
-pub use directive_bankdef::{
-    AstDirectiveBankdef,
-};
+pub use directive_bankdef::AstDirectiveBankdef;
 
 mod directive_bits;
-pub use directive_bits::{
-    AstDirectiveBits,
-};
+pub use directive_bits::AstDirectiveBits;
 
 mod directive_const;
 
 mod directive_data;
-pub use directive_data::{
-    AstDirectiveData,
-};
+pub use directive_data::AstDirectiveData;
 
 mod directive_fn;
 pub use directive_fn::{
@@ -42,34 +30,22 @@ pub use directive_fn::{
 };
 
 mod directive_if;
-pub use directive_if::{
-    AstDirectiveIf,
-};
+pub use directive_if::AstDirectiveIf;
 
 mod directive_include;
-pub use directive_include::{
-    AstDirectiveInclude,
-};
+pub use directive_include::AstDirectiveInclude;
 
 mod directive_labelalign;
-pub use directive_labelalign::{
-    AstDirectiveLabelAlign,
-};
+pub use directive_labelalign::AstDirectiveLabelAlign;
 
 mod directive_noemit;
-pub use directive_noemit::{
-    AstDirectiveNoEmit,
-};
+pub use directive_noemit::AstDirectiveNoEmit;
 
 mod directive_once;
-pub use directive_once::{
-    AstDirectiveOnce,
-};
+pub use directive_once::AstDirectiveOnce;
 
 mod directive_res;
-pub use directive_res::{
-    AstDirectiveRes,
-};
+pub use directive_res::AstDirectiveRes;
 
 mod directive_ruledef;
 pub use directive_ruledef::{
@@ -87,9 +63,7 @@ pub use fields::{
 };
 
 mod instruction;
-pub use instruction::{
-    AstInstruction,
-};
+pub use instruction::AstInstruction;
 
 mod symbol;
 pub use symbol::{
@@ -99,7 +73,7 @@ pub use symbol::{
 };
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum AstAny
 {
     DirectiveAddr(AstDirectiveAddr),
@@ -121,7 +95,7 @@ pub enum AstAny
 }
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AstTopLevel
 {
     pub nodes: Vec<AstAny>,
@@ -180,17 +154,17 @@ pub fn parse_and_resolve_includes<S>(
         span,
         root_filename.borrow())?;
 
-    let chars = fileserver.get_str(
+    let src = fileserver.get_str(
         report,
         span,
         file_handle)?;
 
-    let tokens = syntax::tokenize(
-        report,
+    let mut walker = syntax::Walker::new(
+        &src,
         file_handle,
-        &chars)?;
+        0);
 
-    let mut root_ast = parse(report, &tokens)?;
+    let mut root_ast = parse(report, &mut walker)?;
 
     // Check presence of an #once directive
     if root_ast.nodes.iter().any(|n| matches!(n, AstAny::DirectiveOnce(_)))
@@ -258,16 +232,14 @@ pub fn parse_and_resolve_includes<S>(
 
 pub fn parse(
     report: &mut diagn::Report,
-    tokens: &[syntax::Token])
+    walker: &mut syntax::Walker)
     -> Result<AstTopLevel, ()>
 {
-    let mut walker = syntax::TokenWalker::new(tokens);
-
     let mut nodes = Vec::new();
     
     while !walker.is_over()
     {
-        if let Some(node) = parse_line(report, &mut walker)?
+        if let Some(node) = parse_line(report, walker)?
         {
             nodes.push(node);
         }
@@ -279,15 +251,15 @@ pub fn parse(
 }
 
 
-fn parse_nested_toplevel(
+pub fn parse_nested_toplevel(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
+    walker: &mut syntax::Walker)
     -> Result<AstTopLevel, ()>
 {
     let mut nodes = Vec::new();
     
     while !walker.is_over() &&
-        !walker.next_is(0, syntax::TokenKind::BraceClose)
+        !walker.next_useful_is(0, syntax::TokenKind::BraceClose)
     {
         if let Some(node) = parse_line(report, walker)?
         {
@@ -303,31 +275,31 @@ fn parse_nested_toplevel(
 
 fn parse_line(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
+    walker: &mut syntax::Walker)
     -> Result<Option<AstAny>, ()>
 {
     // Directives (starting with a hash sign)
-    if walker.next_is(0, syntax::TokenKind::Hash)
+    if walker.next_useful_is(0, syntax::TokenKind::Hash)
     {
         Ok(Some(directive::parse(report, walker)?))
     }
 
     // Global labels (identifiers followed by colons)
-    else if walker.next_is(0, syntax::TokenKind::Identifier) &&
-        walker.next_is(1, syntax::TokenKind::Colon)
+    else if walker.next_useful_is(0, syntax::TokenKind::Identifier) &&
+        walker.next_useful_is(1, syntax::TokenKind::Colon)
     {
         Ok(Some(symbol::parse(report, walker)?))
     }
 
     // Global constants (identifiers followed by equal signs)
-    else if walker.next_is(0, syntax::TokenKind::Identifier) &&
-        walker.next_is(1, syntax::TokenKind::Equal)
+    else if walker.next_useful_is(0, syntax::TokenKind::Identifier) &&
+        walker.next_useful_is(1, syntax::TokenKind::Equal)
     {
         Ok(Some(symbol::parse(report, walker)?))
     }
 
     // Local labels or constants (starting with a dot)
-    else if walker.next_is(0, syntax::TokenKind::Dot)
+    else if walker.next_useful_is(0, syntax::TokenKind::Dot)
     {
         Ok(Some(symbol::parse(report, walker)?))
     }

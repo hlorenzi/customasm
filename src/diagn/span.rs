@@ -8,6 +8,8 @@ pub type SpanIndex = u32;
 pub struct Span
 {
 	pub file_handle: util::FileServerHandle,
+
+	/// Represents byte indices (not UTF-8 char indices)
 	location: (SpanIndex, SpanIndex),
 }
 
@@ -44,6 +46,17 @@ impl Span
 		}
 
 		Some(self.location)
+	}
+
+
+	pub fn length(&self) -> usize
+	{
+		if self.location.0 == SpanIndex::MAX
+		{
+			return 0;
+		}
+
+		(self.location.1 - self.location.0) as usize
 	}
 	
 	

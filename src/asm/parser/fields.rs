@@ -19,7 +19,7 @@ pub struct AstField
 
 pub fn parse(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
+    walker: &mut syntax::Walker)
     -> Result<AstFields, ()>
 {
     let mut fields = AstFields {
@@ -27,7 +27,7 @@ pub fn parse(
         fields: Vec::new(),
     };
 
-    while !walker.next_is(0, syntax::TokenKind::BraceClose)
+    while !walker.next_useful_is(0, syntax::TokenKind::BraceClose)
     {
         let deprecated_hash =
             walker.maybe_expect(syntax::TokenKind::Hash).is_some();
@@ -46,7 +46,7 @@ pub fn parse(
 
 
         let maybe_expr = {
-            if (deprecated_hash && !walker.next_is_linebreak()) ||
+            if (deprecated_hash && !walker.next_linebreak().is_some()) ||
                 walker.maybe_expect(syntax::TokenKind::Equal).is_some()
             {
                 let expr = expr::parse(report, walker)?;

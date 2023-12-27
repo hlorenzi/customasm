@@ -1,1 +1,1 @@
-#d8 0 ;* ; error: unexpected
+#d8 12 ;* ; = 0x0c

@@ -102,7 +102,7 @@ impl RuledefMap
 
 
     pub fn parse_prefix(
-        walker: &syntax::TokenWalker)
+        walker: &syntax::Walker)
         -> RuledefMapPrefix
     {
         let mut prefix: RuledefMapPrefix = ['\0'; MAX_PREFIX_SIZE];
@@ -112,7 +112,7 @@ impl RuledefMap
 
         while prefix_index < MAX_PREFIX_SIZE
         {
-            let token = walker.next_nth(walker_index);
+            let token = walker.next_nth_token(walker_index);
             walker_index += 1;
 
             if token.kind.is_allowed_pattern_token()

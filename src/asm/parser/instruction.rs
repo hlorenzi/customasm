@@ -1,11 +1,11 @@
 use crate::*;
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AstInstruction
 {
     pub span: diagn::Span,
-    pub tokens: Vec<syntax::Token>,
+    pub src: String,
 
     pub item_ref: Option<util::ItemRef<asm::Instruction>>,
 }
@@ -13,17 +13,18 @@ pub struct AstInstruction
 
 pub fn parse(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker)
+    walker: &mut syntax::Walker)
     -> Result<AstInstruction, ()>
 {
-    let skipped = walker
-        .skip_until_linebreak_over_nested_braces();
+    walker.skip_ignorable();
+    
+    let line = walker.advance_until_linebreak();
 
     walker.expect_linebreak(report)?;
     
     Ok(AstInstruction {
-        span: skipped.get_full_span(),
-        tokens: skipped.get_cloned_tokens(),
+        span: line.get_full_span(),
+        src: line.get_full_excerpt().to_string(),
 
         item_ref: None,
     })

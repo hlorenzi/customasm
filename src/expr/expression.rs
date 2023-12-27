@@ -13,7 +13,7 @@ pub enum Expr
 	SliceShort(diagn::Span, diagn::Span, Box<Expr>, Box<Expr>),
 	Block(diagn::Span, Vec<Expr>),
 	Call(diagn::Span, Box<Expr>, Vec<Expr>),
-	Asm(diagn::Span, Vec<syntax::Token>),
+	Asm(diagn::Span, asm::AstTopLevel),
 }
 
 

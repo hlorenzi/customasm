@@ -1,7 +1,7 @@
 use crate::*;
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AstDirectiveOnce
 {
     pub header_span: diagn::Span,
@@ -10,7 +10,7 @@ pub struct AstDirectiveOnce
 
 pub fn parse(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker,
+    walker: &mut syntax::Walker,
     header_span: diagn::Span)
     -> Result<AstDirectiveOnce, ()>
 {

@@ -1,7 +1,7 @@
 use crate::*;
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AstDirectiveData
 {
     pub header_span: diagn::Span,
@@ -14,7 +14,7 @@ pub struct AstDirectiveData
 
 pub fn parse(
     report: &mut diagn::Report,
-    walker: &mut syntax::TokenWalker,
+    walker: &mut syntax::Walker,
     elem_size: Option<usize>,
     header_span: diagn::Span)
     -> Result<AstDirectiveData, ()>
@@ -30,7 +30,7 @@ pub fn parse(
             break;
         }
 
-        if walker.next_is_linebreak()
+        if walker.next_linebreak().is_some()
         {
             break;
         }
