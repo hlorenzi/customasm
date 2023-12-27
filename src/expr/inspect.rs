@@ -94,9 +94,6 @@ impl expr::Expr
 			
 			expr::Expr::BitSlice(_, _, left, right, _) =>
 				Some(left - right),
-
-			expr::Expr::SoftSlice(_, _, left, right, _) =>
-				Some(left - right),
 			
 			expr::Expr::TernaryOp(_, _, ref true_branch, ref false_branch) =>
 			{
@@ -179,9 +176,6 @@ impl expr::Expr
 			}
 			
 			expr::Expr::BitSlice(_, _, _, _, ref expr) =>
-				expr.is_value_statically_known(provider),
-
-			expr::Expr::SoftSlice(_, _, _, _, ref expr) =>
 				expr.is_value_statically_known(provider),
 			
 			expr::Expr::TernaryOp(_, ref condition, ref true_branch, ref false_branch) =>

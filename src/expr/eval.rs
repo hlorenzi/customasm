@@ -646,11 +646,6 @@ impl expr::Expr
 				}
 			}
 			
-			&expr::Expr::SoftSlice(_, _, _, _, ref inner) =>
-			{
-				inner.eval_with_ctx(report, ctx, provider)
-			}
-			
 			&expr::Expr::Block(_, ref exprs) =>
 			{
 				let mut result = expr::Value::Void;
