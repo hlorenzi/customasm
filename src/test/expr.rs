@@ -275,8 +275,8 @@ fn test_ops_slice()
 	test("-1[1000:1000]", Pass(expr::Value::make_integer(util::BigInt::new(1, Some(1)))));
 	
 	test("0x00[0:7]", Fail(("test", 1, "invalid")));
-	test("0x00`{}", Fail(("test", 1, "expected integer")));
-	test("0x00`(1 == 2)", Fail(("test", 1, "expected integer")));
+	test("0x00`{}", Fail(("test", 1, "expected non-negative integer")));
+	test("0x00`(1 == 2)", Fail(("test", 1, "expected non-negative integer")));
 	test("0x00`-1", Fail(("test", 1, "expected expression")));
 	test("0x00`(-1)", Fail(("test", 1, "out of supported range")));
 	test("0x00[7:-1]", Fail(("test", 1, "out of supported range")));

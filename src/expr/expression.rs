@@ -361,7 +361,7 @@ impl Value
 			_ =>
 			{
 				report.error_span(
-					"expected integer",
+					"expected non-negative integer",
 					span);
 
 				Err(())
@@ -394,7 +394,7 @@ impl Value
 			_ =>
 			{
 				report.error_span(
-					"expected integer",
+					"expected non-negative integer",
 					span);
 
 				Err(())
@@ -430,7 +430,7 @@ impl Value
 			_ =>
 			{
 				report.error_span(
-					"expected integer",
+					"expected positive integer",
 					span);
 
 				Err(())

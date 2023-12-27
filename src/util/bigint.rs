@@ -341,9 +341,19 @@ impl BigInt
             panic!("invalid slice range");
         }
 
+        if let Some(size) = self.size
+        {
+            if self.bigint.sign() != num_bigint::Sign::Minus &&
+                left == size &&
+                right == 0
+            {
+                return self.clone();
+            }
+        }
+
         let mut result = BigInt::from(0);
 
-        for i in 0..(left - right)
+        for i in (0..(left - right)).rev()
         {
             result.set_bit(
                 i,

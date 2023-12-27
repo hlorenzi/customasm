@@ -123,7 +123,7 @@ fn eval_builtin_incbin(
     query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>
 {
-    query.ensure_arg_number(1)?;
+    query.ensure_min_max_arg_number(1, 3)?;
 
     let relative_filename = query.args[0].value.expect_string(
         query.report,
@@ -148,8 +148,59 @@ fn eval_builtin_incbin(
         Some(query.args[0].span),
         file_handle)?;
 
+    let start = {
+        if query.args.len() >= 2
+        {
+            query.args[1].value.expect_usize(
+                query.report,
+                query.args[1].span)?
+        }
+        else
+        {
+            0
+        }
+    };
+
+    let end = {
+        if query.args.len() >= 3
+        {
+            let size = query.args[2].value.expect_usize(
+                query.report,
+                query.args[2].span)?;
+
+            start + size
+        }
+        else
+        {
+            bytes.len()
+        }
+    };
+
+    if start >= bytes.len()
+    {
+        query.report.error_span(
+            format!(
+                "`incbin` range starts after EOF ({} >= {})",
+                start,
+                bytes.len()),
+            query.args[1].span);
+        return Err(());
+    }
+
+    if end > bytes.len()
+    {
+        query.report.error_span(
+            format!(
+                "`incbin` range ends after EOF ({} + {} > {})",
+                start,
+                end - start,
+                bytes.len()),
+            query.args[2].span);
+        return Err(());
+    }
+
     Ok(expr::Value::make_integer(
-        util::BigInt::from_bytes_be(&bytes)))
+        util::BigInt::from_bytes_be(&bytes[start..end])))
 }
 
 
@@ -167,7 +218,8 @@ fn eval_builtin_incbinstr(
         decls,
         defs,
         ctx,
-        query)
+        query,
+        "incbinstr")
 }
 
 
@@ -185,7 +237,8 @@ fn eval_builtin_inchexstr(
         decls,
         defs,
         ctx,
-        query)
+        query,
+        "inchexstr")
 }
 
 
@@ -195,10 +248,11 @@ fn eval_builtin_incstr(
     _decls: &asm::ItemDecls,
     _defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
-    query: &mut expr::EvalFunctionQuery)
+    query: &mut expr::EvalFunctionQuery,
+    funcname: &str)
     -> Result<expr::Value, ()>
 {
-    query.ensure_arg_number(1)?;
+    query.ensure_min_max_arg_number(1, 3)?;
 
     let relative_filename = query.args[0].value.expect_string(
         query.report,
@@ -258,5 +312,65 @@ fn eval_builtin_incstr(
         }
     }
 
-    Ok(expr::Value::make_integer(bitvec.to_bigint()))
+    let bigint = bitvec.to_bigint();
+
+    let bigint_size = bigint.size.unwrap();
+
+    let start = {
+        if query.args.len() >= 2
+        {
+            query.args[1].value.expect_usize(
+                query.report,
+                query.args[1].span)?
+        }
+        else
+        {
+            0
+        }
+    };
+
+    let end = {
+        if query.args.len() >= 3
+        {
+            let size = query.args[2].value.expect_usize(
+                query.report,
+                query.args[2].span)?;
+
+            start + size
+        }
+        else
+        {
+            bigint_size / bits_per_char
+        }
+    };
+
+    if (start * bits_per_char) >= bigint_size
+    {
+        query.report.error_span(
+            format!(
+                "`{}` range starts after EOF ({} >= {})",
+                funcname,
+                start,
+                bigint_size / bits_per_char),
+            query.args[1].span);
+        return Err(());
+    }
+
+    if (end * bits_per_char) > bigint_size
+    {
+        query.report.error_span(
+            format!(
+                "`{}` range ends after EOF ({} + {} > {})",
+                funcname,
+                start,
+                end - start,
+                bigint_size / bits_per_char),
+            query.args[2].span);
+        return Err(());
+    }
+
+    Ok(expr::Value::make_integer(
+        bigint.slice(
+            bigint_size - (start * bits_per_char),
+            bigint_size - (end * bits_per_char))))
 }
