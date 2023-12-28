@@ -352,6 +352,44 @@ impl expr::Expr
 	}
 
 
+	pub fn eval_usize_with_ctx<'provider>(
+		&self,
+		report: &mut diagn::Report,
+		ctx: &mut EvalContext,
+		provider: EvalProvider)
+		-> Result<usize, ()>
+	{
+        self
+			.eval_with_ctx(
+				report,
+				ctx,
+				provider)?
+			.expect_usize(
+				report,
+				self.span())
+	}
+
+
+	pub fn try_eval_usize<'provider>(
+		&self)
+		-> Option<usize>
+	{
+        let value = self.eval_with_ctx(
+			&mut diagn::Report::new(),
+			&mut EvalContext::new(),
+			&mut dummy_eval_query);
+
+		if let Ok(expr::Value::Integer(bigint)) = value
+		{
+			bigint.maybe_into::<usize>()
+		}
+		else
+		{
+			None
+		}
+	}
+
+
 	pub fn eval_nonzero_usize<'provider>(
 		&self,
 		report: &mut diagn::Report,
@@ -636,12 +674,43 @@ impl expr::Expr
 				}
 			}
 			
-			&expr::Expr::BitSlice(span, _, left, right, ref inner) =>
+			&expr::Expr::Slice(span, _, ref left_expr, ref right_expr, ref inner) =>
 			{
 				match propagate!(
 					inner.eval_with_ctx(report, ctx, provider)?).get_bigint()
 				{
-					Some(ref x) => Ok(expr::Value::make_integer(x.slice(left, right))),
+					Some(ref x) =>
+					{
+						let left = left_expr.eval_usize_with_ctx(report, ctx, provider)? + 1;
+						let right = right_expr.eval_usize_with_ctx(report, ctx, provider)?;
+
+						Ok(expr::Value::make_integer(
+							x.checked_slice(
+								report,
+								span,
+								left,
+								right)?))
+					}
+					None => Err(report.error_span("invalid argument type to slice", span))
+				}
+			}
+			
+			&expr::Expr::SliceShort(span, _, ref size_expr, ref inner) =>
+			{
+				match propagate!(
+					inner.eval_with_ctx(report, ctx, provider)?).get_bigint()
+				{
+					Some(ref x) =>
+					{
+						let size = size_expr.eval_usize_with_ctx(report, ctx, provider)?;
+						
+						Ok(expr::Value::make_integer(
+							x.checked_slice(
+								report,
+								span,
+								size,
+								0)?))
+					}
 					None => Err(report.error_span("invalid argument type to slice", span))
 				}
 			}

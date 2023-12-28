@@ -230,6 +230,10 @@ fn test_ops_slice()
 	test("0xff`8",  Pass(expr::Value::make_integer(util::BigInt::new(0xff, Some(8)))));
 	test("0x101`8", Pass(expr::Value::make_integer(util::BigInt::new(0x1, Some(8)))));
 	
+	test("0x101`8 + 1", Pass(expr::Value::make_integer(util::BigInt::new(0x2, None))));
+	test("0x101`(4 + 4)", Pass(expr::Value::make_integer(util::BigInt::new(0x1, Some(8)))));
+	test("0x101`0x8", Pass(expr::Value::make_integer(util::BigInt::new(0x1, Some(8)))));
+	
 	test("0`0",  Pass(expr::Value::make_integer(util::BigInt::new(0, Some(0)))));
 	test("0x0`0",  Pass(expr::Value::make_integer(util::BigInt::new(0, Some(0)))));
 	test("0x100`0",  Pass(expr::Value::make_integer(util::BigInt::new(0, Some(0)))));
@@ -246,6 +250,10 @@ fn test_ops_slice()
 	test("0x00[8:1]", Pass(expr::Value::make_integer(util::BigInt::new(0, Some(8)))));
 	test("0x0f[8:1]", Pass(expr::Value::make_integer(util::BigInt::new(0x7, Some(8)))));
 	test("0xff[8:1]", Pass(expr::Value::make_integer(util::BigInt::new(0x7f, Some(8)))));
+	
+	test("0x101[4 + 3:1 - 1]", Pass(expr::Value::make_integer(util::BigInt::new(0x1, Some(8)))));
+	test("0x101[(4 + 3):(1 - 1)]", Pass(expr::Value::make_integer(util::BigInt::new(0x1, Some(8)))));
+	test("0x101[0x7:0x0]", Pass(expr::Value::make_integer(util::BigInt::new(0x1, Some(8)))));
 	
 	test("0x12345678[ 3: 0]", Pass(expr::Value::make_integer(util::BigInt::new(0x8, Some(4)))));
 	test("0x12345678[ 7: 4]", Pass(expr::Value::make_integer(util::BigInt::new(0x7, Some(4)))));
@@ -267,8 +275,13 @@ fn test_ops_slice()
 	test("-1[1000:1000]", Pass(expr::Value::make_integer(util::BigInt::new(1, Some(1)))));
 	
 	test("0x00[0:7]", Fail(("test", 1, "invalid")));
-	
-	test("0x00[0x1_ffff_ffff_ffff_ffff:7]", Fail(("test", 1, "large")));
+	test("0x00`{}", Fail(("test", 1, "expected integer")));
+	test("0x00`(1 == 2)", Fail(("test", 1, "expected integer")));
+	test("0x00`-1", Fail(("test", 1, "expected expression")));
+	test("0x00`(-1)", Fail(("test", 1, "out of supported range")));
+	test("0x00[7:-1]", Fail(("test", 1, "out of supported range")));
+	test("0x00[-1:-2]", Fail(("test", 1, "out of supported range")));
+	test("0x00[0x1_ffff_ffff_ffff_ffff:7]", Fail(("test", 1, "out of supported range")));
 }
 
 

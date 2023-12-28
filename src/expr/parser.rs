@@ -320,13 +320,13 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 				(syntax::TokenKind::Slash,    expr::BinaryOp::Div),
 				(syntax::TokenKind::Percent,  expr::BinaryOp::Mod)
 			],
-			|s| s.parse_bitslice())
+			|s| s.parse_slice())
 	}
 	
 	
-	fn parse_bitslice(&mut self) -> Result<expr::Expr, ()>
+	fn parse_slice(&mut self) -> Result<expr::Expr, ()>
 	{
-		let inner = self.parse_size()?;
+		let inner = self.parse_slice_short()?;
 		
 		if self.walker.next_is_linebreak()
 			{ return Ok(inner); }
@@ -337,46 +337,29 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 			None => return Ok(inner)
 		};
 			
-		let leftmost = {
-		    let tk_leftmost = self.walker.expect(self.report, syntax::TokenKind::Number)?;
-            syntax::excerpt_as_usize(
-				self.report,
-				tk_leftmost.span,
-				tk_leftmost.excerpt.as_ref().unwrap())?
-        };
+		let leftmost = self.parse_expr()?;
 
         self.walker.expect(self.report, syntax::TokenKind::Colon)?;
 		
-		let rightmost = {
-            let tk_rightmost = self.walker.expect(self.report, syntax::TokenKind::Number)?;
-            syntax::excerpt_as_usize(
-				self.report,
-				tk_rightmost.span,
-				tk_rightmost.excerpt.as_ref().unwrap())?
-        };
+		let rightmost = self.parse_expr()?;
 
         let tk_close_span = self.walker
 			.expect(self.report, syntax::TokenKind::BracketClose)?
             .span;
 		
-		
 		let slice_span = tk_open.span.join(tk_close_span);
 		let span = inner.span().join(tk_close_span);
 		
-		if leftmost < rightmost
-		{
-			self.report.error_span(
-                "invalid bit slice range",
-                slice_span);
-            
-			return Err(());
-		}
-			
-		Ok(expr::Expr::BitSlice(span, slice_span, leftmost + 1, rightmost, Box::new(inner)))
+		Ok(expr::Expr::Slice(
+			span,
+			slice_span,
+			Box::new(leftmost),
+			Box::new(rightmost),
+			Box::new(inner)))
 	}
 	
 	
-	fn parse_size(&mut self) -> Result<expr::Expr, ()>
+	fn parse_slice_short(&mut self) -> Result<expr::Expr, ()>
 	{
 		let inner = self.parse_unary()?;
 		
@@ -389,16 +372,13 @@ impl<'a, 'tokens> ExpressionParser<'a, 'tokens>
 			None => return Ok(inner)
 		};
 
-		let tk_size = self.walker.expect(self.report, syntax::TokenKind::Number)?;
-		let size = syntax::excerpt_as_usize(
-			self.report,
-			tk_size.span,
-			tk_size.excerpt.as_ref().unwrap())?;
+		let size = self.parse_leaf()?;
 
-		let span = inner.span().join(tk_size.span);
-		let size_span = tk_grave_span.join(tk_size.span);
-
-		Ok(expr::Expr::BitSlice(span, size_span, size, 0, Box::new(inner)))
+		Ok(expr::Expr::SliceShort(
+			tk_grave_span.join(size.span()),
+			size.span(),
+			Box::new(size),
+			Box::new(inner)))
 	}
 	
 	

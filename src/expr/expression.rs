@@ -9,7 +9,8 @@ pub enum Expr
 	UnaryOp(diagn::Span, diagn::Span, UnaryOp, Box<Expr>),
 	BinaryOp(diagn::Span, diagn::Span, BinaryOp, Box<Expr>, Box<Expr>),
 	TernaryOp(diagn::Span, Box<Expr>, Box<Expr>, Box<Expr>),
-	BitSlice(diagn::Span, diagn::Span, usize, usize, Box<Expr>),
+	Slice(diagn::Span, diagn::Span, Box<Expr>, Box<Expr>, Box<Expr>),
+	SliceShort(diagn::Span, diagn::Span, Box<Expr>, Box<Expr>),
 	Block(diagn::Span, Vec<Expr>),
 	Call(diagn::Span, Box<Expr>, Vec<Expr>),
 	Asm(diagn::Span, Vec<syntax::Token>),
@@ -78,15 +79,16 @@ impl Expr
 	{
 		match self
 		{
-			&Expr::Literal  (span, ..) => span,
-			&Expr::Variable (span, ..) => span,
-			&Expr::UnaryOp  (span, ..) => span,
-			&Expr::BinaryOp (span, ..) => span,
-			&Expr::TernaryOp(span, ..) => span,
-			&Expr::BitSlice (span, ..) => span,
-			&Expr::Block    (span, ..) => span,
-			&Expr::Call     (span, ..) => span,
-			&Expr::Asm      (span, ..) => span,
+			&Expr::Literal   (span, ..) => span,
+			&Expr::Variable  (span, ..) => span,
+			&Expr::UnaryOp   (span, ..) => span,
+			&Expr::BinaryOp  (span, ..) => span,
+			&Expr::TernaryOp (span, ..) => span,
+			&Expr::Slice     (span, ..) => span,
+			&Expr::SliceShort(span, ..) => span,
+			&Expr::Block     (span, ..) => span,
+			&Expr::Call      (span, ..) => span,
+			&Expr::Asm       (span, ..) => span,
 		}
 	}
 }

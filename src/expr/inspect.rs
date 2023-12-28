@@ -83,6 +83,10 @@ impl expr::Expr
 			
 			expr::Expr::Literal(_, expr::Value::Integer(util::BigInt { size: Some(size), .. })) =>
 				Some(*size),
+
+			expr::Expr::Literal(..) => None,
+
+			expr::Expr::UnaryOp(..) => None,
 			
 			expr::Expr::BinaryOp(_, _, expr::BinaryOp::Concat, ref lhs, ref rhs) =>
 			{
@@ -91,9 +95,28 @@ impl expr::Expr
 
 				Some(lhs_size + rhs_size)
 			}
+
+			expr::Expr::BinaryOp(..) => None,
 			
-			expr::Expr::BitSlice(_, _, left, right, _) =>
-				Some(left - right),
+			expr::Expr::Slice(_, _, left_expr, right_expr, _) =>
+			{
+				let left = left_expr.try_eval_usize()? + 1;
+				let right = right_expr.try_eval_usize()?;
+
+				if right > left
+				{
+					return None;
+				}
+
+				Some(left - right)
+			}
+			
+			expr::Expr::SliceShort(_, _, size_expr, _) =>
+			{
+				let size = size_expr.try_eval_usize()?;
+
+				Some(size)
+			}
 			
 			expr::Expr::TernaryOp(_, _, ref true_branch, ref false_branch) =>
 			{
@@ -134,8 +157,8 @@ impl expr::Expr
 					None
 				}
 			}
-			
-			_ => None
+
+			expr::Expr::Asm(..) => None,
 		}
 	}
 
@@ -166,6 +189,8 @@ impl expr::Expr
 			}
 			
 			expr::Expr::Literal(_, _) => true,
+
+			expr::Expr::UnaryOp(..) => false,
 			
 			expr::Expr::BinaryOp(_, _, _, ref lhs, ref rhs) =>
 			{
@@ -175,7 +200,13 @@ impl expr::Expr
 				lhs_known && rhs_known
 			}
 			
-			expr::Expr::BitSlice(_, _, _, _, ref expr) =>
+			expr::Expr::Slice(_, _, ref left_expr, ref right_expr, ref expr) =>
+				left_expr.is_value_statically_known(provider) &&
+				right_expr.is_value_statically_known(provider) &&
+				expr.is_value_statically_known(provider),
+			
+			expr::Expr::SliceShort(_, _, ref size_expr, ref expr) =>
+				size_expr.is_value_statically_known(provider) &&
 				expr.is_value_statically_known(provider),
 			
 			expr::Expr::TernaryOp(_, ref condition, ref true_branch, ref false_branch) =>
@@ -238,8 +269,8 @@ impl expr::Expr
 					false
 				}
 			}
-			
-			_ => false
+
+			expr::Expr::Asm(..) => false,
 		}
 	}
 	

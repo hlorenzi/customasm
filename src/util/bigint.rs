@@ -336,6 +336,11 @@ impl BigInt
         right: usize)
         -> BigInt
     {
+        if left < right
+        {
+            panic!("invalid slice range");
+        }
+
         let mut result = BigInt::from(0);
 
         for i in 0..(left - right)
@@ -347,6 +352,27 @@ impl BigInt
 
         result.size = Some(left - right);
         result
+    }
+    
+    
+    pub fn checked_slice(
+        &self,
+        report: &mut diagn::Report,
+        span: diagn::Span,
+        left: usize,
+        right: usize)
+        -> Result<BigInt, ()>
+    {
+        if left < right
+        {
+            report.error_span(
+                "invalid slice range",
+                span);
+            
+            return Err(());
+        }
+
+        Ok(self.slice(left, right))
     }
     
     
