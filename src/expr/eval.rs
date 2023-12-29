@@ -335,41 +335,6 @@ macro_rules! propagate {
 
 impl expr::Expr
 {
-	pub fn eval_usize<'provider>(
-		&self,
-		report: &mut diagn::Report,
-		provider: EvalProvider)
-		-> Result<usize, ()>
-	{
-        self
-			.eval_with_ctx(
-				report,
-				&mut EvalContext::new(),
-				provider)?
-			.expect_usize(
-				report,
-				self.span())
-	}
-
-
-	pub fn eval_usize_with_ctx<'provider>(
-		&self,
-		report: &mut diagn::Report,
-		ctx: &mut EvalContext,
-		provider: EvalProvider)
-		-> Result<usize, ()>
-	{
-        self
-			.eval_with_ctx(
-				report,
-				ctx,
-				provider)?
-			.expect_usize(
-				report,
-				self.span())
-	}
-
-
 	pub fn try_eval_usize<'provider>(
 		&self)
 		-> Option<usize>
@@ -664,7 +629,8 @@ impl expr::Expr
 			
 			&expr::Expr::TernaryOp(_, ref cond, ref true_branch, ref false_branch) =>
 			{
-				match cond.eval_with_ctx(report, ctx, provider)?
+				match propagate!(
+					cond.eval_with_ctx(report, ctx, provider)?)
 				{
 					expr::Value::Bool(true)  => Ok(propagate!(
 						true_branch.eval_with_ctx(report, ctx, provider)?)),
@@ -681,15 +647,21 @@ impl expr::Expr
 				{
 					Some(ref x) =>
 					{
-						let left = left_expr.eval_usize_with_ctx(report, ctx, provider)? + 1;
-						let right = right_expr.eval_usize_with_ctx(report, ctx, provider)?;
+						let left = propagate!(
+							left_expr.eval_with_ctx(report, ctx, provider)?);
+
+						let right = propagate!(
+							right_expr.eval_with_ctx(report, ctx, provider)?);
+
+						let left_usize = left.expect_usize(report, span)? + 1;
+						let right_usize = right.expect_usize(report, span)?;
 
 						Ok(expr::Value::make_integer(
 							x.checked_slice(
 								report,
 								span,
-								left,
-								right)?))
+								left_usize,
+								right_usize)?))
 					}
 					None => Err(report.error_span("invalid argument type to slice", span))
 				}
@@ -702,13 +674,16 @@ impl expr::Expr
 				{
 					Some(ref x) =>
 					{
-						let size = size_expr.eval_usize_with_ctx(report, ctx, provider)?;
+						let size = propagate!(
+							size_expr.eval_with_ctx(report, ctx, provider)?);
+
+						let size_usize = size.expect_usize(report, span)?;
 						
 						Ok(expr::Value::make_integer(
 							x.checked_slice(
 								report,
 								span,
-								size,
+								size_usize,
 								0)?))
 					}
 					None => Err(report.error_span("invalid argument type to slice", span))

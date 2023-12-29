@@ -1,0 +1,2 @@
+#d 0xffff`(16 / size) ; = 0xff
+size = 2
