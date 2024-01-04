@@ -10,6 +10,7 @@ you just implemented in an FPGA chip!
 [![Releases][badge-downloads-img]][badge-downloads-url]
 
 [![Discord][badge-discord-img]][badge-discord-url]
+[![GitHub Sponsor][badge-github-sponsor-img]][badge-github-sponsor-url]
 
 [badge-cratesio-img]: https://img.shields.io/crates/v/customasm
 [badge-cratesio-url]: https://crates.io/crates/customasm
@@ -19,6 +20,9 @@ you just implemented in an FPGA chip!
 
 [badge-downloads-img]: https://img.shields.io/github/downloads/hlorenzi/customasm/total
 [badge-downloads-url]: https://github.com/hlorenzi/customasm/releases
+
+[badge-github-sponsor-img]: https://img.shields.io/github/sponsors/hlorenzi?label=GitHub%20Sponsors&logo=GitHub
+[badge-github-sponsor-url]: https://github.com/sponsors/hlorenzi
 
 [badge-discord-img]: https://img.shields.io/discord/394999035540275222?label=Join%20the%20Discord%20server!&logo=discord
 [badge-discord-url]: https://discord.com/invite/pXeDXGD
