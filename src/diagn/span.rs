@@ -1,16 +1,14 @@
 use crate::*;
 
 
-pub type SpanIndex = u32;
-
-
 #[derive(Copy, Clone, Hash, Eq)]
 pub struct Span
 {
 	pub file_handle: util::FileServerHandle,
 
-	/// Represents byte indices (not UTF-8 char indices)
-	location: (SpanIndex, SpanIndex),
+	/// Represents byte indices into the file contents
+	/// (as opposed to UTF-8 char boundaries).
+	location: (usize, usize),
 }
 
 
@@ -18,8 +16,8 @@ impl Span
 {
 	pub fn new(
 		file_handle: util::FileServerHandle,
-		start: SpanIndex,
-		end: SpanIndex)
+		start: usize,
+		end: usize)
 		-> Span
 	{
 		Span {
@@ -33,14 +31,14 @@ impl Span
 	{
 		Span {
 			file_handle: 0,
-			location: (SpanIndex::MAX, SpanIndex::MAX),
+			location: (usize::MAX, usize::MAX),
 		}
 	}
 
 
-	pub fn location(&self) -> Option<(SpanIndex, SpanIndex)>
+	pub fn location(&self) -> Option<(usize, usize)>
 	{
-		if self.location.0 == SpanIndex::MAX
+		if self.location.0 == usize::MAX
 		{
 			return None;
 		}
@@ -51,18 +49,18 @@ impl Span
 
 	pub fn length(&self) -> usize
 	{
-		if self.location.0 == SpanIndex::MAX
+		if self.location.0 == usize::MAX
 		{
 			return 0;
 		}
 
-		(self.location.1 - self.location.0) as usize
+		self.location.1 - self.location.0
 	}
 	
 	
 	pub fn before(&self) -> Span
 	{
-		if self.location.0 == SpanIndex::MAX
+		if self.location.0 == usize::MAX
 		{
 			*self
 		}
@@ -81,7 +79,7 @@ impl Span
 	
 	pub fn after(&self) -> Span
 	{
-		if self.location.0 == SpanIndex::MAX
+		if self.location.0 == usize::MAX
 		{
 			*self
 		}
@@ -102,8 +100,8 @@ impl Span
 	{
 		match (self.location, other.location)
 		{
-			(_, (SpanIndex::MAX, _)) => *self,
-			((SpanIndex::MAX, _), _) => other,
+			(_, (usize::MAX, _)) => *self,
+			((usize::MAX, _), _) => other,
 			(self_loc, other_loc) =>
 			{
 				assert!(
@@ -145,12 +143,12 @@ impl std::fmt::Debug for Span
         f.write_str("Span(")?;
 		write!(f, "file#{:?}", &self.file_handle)?;
 
-		if self.location.0 != SpanIndex::MAX
+		if self.location.0 != usize::MAX
 		{
 			f.write_str("[")?;
-			<SpanIndex as std::fmt::Debug>::fmt(&self.location.0, f)?;
+			<usize as std::fmt::Debug>::fmt(&self.location.0, f)?;
 			f.write_str("..")?;
-			<SpanIndex as std::fmt::Debug>::fmt(&self.location.1, f)?;
+			<usize as std::fmt::Debug>::fmt(&self.location.1, f)?;
 			f.write_str("]")?;
 		}
 

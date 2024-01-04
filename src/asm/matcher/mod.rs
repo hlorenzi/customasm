@@ -347,7 +347,7 @@ pub fn match_instr(
     let mut walker = syntax::Walker::new(
         src,
         span.file_handle,
-        span.location().unwrap().0 as usize);
+        span.location().unwrap().0);
 
     if opts.optimize_instruction_matching
     {

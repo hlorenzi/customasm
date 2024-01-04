@@ -117,7 +117,7 @@ impl RuledefMap
 
             if token.kind.is_allowed_pattern_token()
             {
-                for c in token.text().chars()
+                for c in walker.get_span_excerpt(token.span).chars()
                 {
                     if prefix_index >= MAX_PREFIX_SIZE
                     {

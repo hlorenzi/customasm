@@ -61,10 +61,8 @@ fn parse_else_blocks(
         return Ok(None);
     }
 
-    let directive_name = walker
-        .next_nth_useful_token(1)
-        .excerpt
-        .unwrap();
+    let token = walker.next_nth_useful_token(1);
+    let directive_name = walker.get_span_excerpt(token.span);
 
     if directive_name == "else"
     {

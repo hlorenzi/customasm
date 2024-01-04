@@ -522,7 +522,7 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 		loop
 		{
 			let tk_name = self.walker.expect(self.report, syntax::TokenKind::Identifier)?;
-			let name = tk_name.excerpt.clone().unwrap();
+			let name = self.walker.get_span_excerpt(tk_name.span).to_string();
 			hierarchy.push(name);
 			span = span.join(tk_name.span);
 
@@ -544,12 +544,12 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 	fn parse_number(&mut self) -> Result<expr::Expr, ()>
 	{
 		let tk_number = self.walker.expect(self.report, syntax::TokenKind::Number)?;
-		let number = tk_number.excerpt.clone().unwrap();
+		let number = self.walker.get_span_excerpt(tk_number.span);
 		
 		let bigint = syntax::excerpt_as_bigint(
 			Some(self.report),
 			tk_number.span,
-			&number)?;
+			number)?;
 		
 		let expr = expr::Expr::Literal(
 			tk_number.span,
@@ -594,7 +594,7 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 		let string = syntax::excerpt_as_string_contents(
 			self.report,
 			tk_str.span,
-			tk_str.excerpt.as_ref().unwrap())?;
+			self.walker.get_span_excerpt(tk_str.span))?;
 		
 		let expr = expr::Expr::Literal(
 			tk_str.span,

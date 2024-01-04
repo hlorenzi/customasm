@@ -27,7 +27,7 @@ pub fn parse(
     -> Result<AstDirectiveBankdef, ()>
 {
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
-    let name = tk_name.excerpt.clone().unwrap();
+    let name = walker.get_span_excerpt(tk_name.span).to_string();
     let name_span = tk_name.span;
 
     walker.expect(report, syntax::TokenKind::BraceOpen)?;

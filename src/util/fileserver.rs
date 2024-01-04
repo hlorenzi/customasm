@@ -1,7 +1,7 @@
 use crate::*;
 
 
-pub type FileServerHandle = u16;
+pub type FileServerHandle = usize;
 
 
 pub const FILESERVER_MOCK_WRITE_FILENAME_SUFFIX: &str = "_written";
@@ -172,14 +172,14 @@ impl FileServerMock
 			.entry(filename.clone())
 			.or_insert(next_index.try_into().unwrap());
 
-		while handle as usize >= self.files.len()
+		while handle >= self.files.len()
 		{
 			self.handles_to_filename.push("".to_string());
 			self.files.push(Vec::new());
 		}
 
-		self.handles_to_filename[handle as usize] = filename;
-		self.files[handle as usize] = contents.into();
+		self.handles_to_filename[handle] = filename;
+		self.files[handle] = contents.into();
 	}
 }
 
@@ -221,14 +221,14 @@ impl FileServerReal
 			.entry(filename.clone())
 			.or_insert(next_index.try_into().unwrap());
 
-		while handle as usize >= self.std_files.len()
+		while handle >= self.std_files.len()
 		{
 			self.handles_to_filename.push("".to_string());
 			self.std_files.push(None);
 		}
 
-		self.handles_to_filename[handle as usize] = filename;
-		self.std_files[handle as usize] = Some(contents);
+		self.handles_to_filename[handle] = filename;
+		self.std_files[handle] = Some(contents);
 	}
 }
 
@@ -242,7 +242,7 @@ impl FileServer for FileServerMock
 		filename: &str)
 		-> Result<FileServerHandle, ()>
 	{
-		if self.handles.len() == FileServerHandle::MAX as usize
+		if self.handles.len() == FileServerHandle::MAX
 		{
 			report_error(
 				report,
@@ -275,7 +275,7 @@ impl FileServer for FileServerMock
 		file_handle: FileServerHandle)
 		-> &str
 	{
-		&self.handles_to_filename[file_handle as usize]
+		&self.handles_to_filename[file_handle]
 	}
 
 
@@ -286,7 +286,7 @@ impl FileServer for FileServerMock
 		file_handle: FileServerHandle)
 		-> Result<Vec<u8>, ()>
 	{
-		Ok(self.files[file_handle as usize].clone())
+		Ok(self.files[file_handle].clone())
 	}
 	
 	
@@ -309,12 +309,12 @@ impl FileServer for FileServerMock
 			.entry(mock_filename)
 			.or_insert(new_index.try_into().unwrap());
 
-		while handle as usize >= self.files.len()
+		while handle >= self.files.len()
 		{
 			self.files.push(Vec::new());
 		}
 
-		self.files[handle as usize] = data.clone();
+		self.files[handle] = data.clone();
 		
 		Ok(())
 	}
@@ -349,7 +349,7 @@ impl FileServer for FileServerReal
 			return Err(());
 		}
 		
-		if self.handles.len() == FileServerHandle::MAX as usize
+		if self.handles.len() == FileServerHandle::MAX
 		{
 			report_error(
 				report,
@@ -368,8 +368,8 @@ impl FileServer for FileServerReal
 			Some(handle) => Ok(*handle),
 			None =>
 			{
-				let handle =
-					self.handles.len() as FileServerHandle;
+				let handle: FileServerHandle =
+					self.handles.len();
 
 				self.handles.insert(
 					filename_path_str.clone(),
@@ -389,7 +389,7 @@ impl FileServer for FileServerReal
 		file_handle: FileServerHandle)
 		-> &str
 	{
-		&self.handles_to_filename[file_handle as usize]
+		&self.handles_to_filename[file_handle]
 	}
 
 
@@ -400,12 +400,12 @@ impl FileServer for FileServerReal
 		file_handle: FileServerHandle)
 		-> Result<Vec<u8>, ()>
 	{
-		if let Some(Some(std_contents)) = self.std_files.get(file_handle as usize)
+		if let Some(Some(std_contents)) = self.std_files.get(file_handle)
 		{
 			return Ok(std_contents.as_bytes().iter().copied().collect());
 		}
 		
-		let filename = &self.handles_to_filename[file_handle as usize];
+		let filename = &self.handles_to_filename[file_handle];
 		let filename_path = &std::path::Path::new(filename);
 		
 		let mut file = {

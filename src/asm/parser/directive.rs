@@ -10,7 +10,7 @@ pub fn parse(
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
     let header_span = tk_hash.span.join(tk_name.span);
 
-    let name = tk_name.excerpt.as_ref().unwrap().to_ascii_lowercase();
+    let name = walker.get_span_excerpt(tk_name.span).to_ascii_lowercase();
 
     if name.chars().next() == Some('d')
     {

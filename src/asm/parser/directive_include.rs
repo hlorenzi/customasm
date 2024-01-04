@@ -21,7 +21,7 @@ pub fn parse(
     let filename = syntax::excerpt_as_string_contents(
         report,
         tk_filename.span,
-        tk_filename.excerpt.as_ref().unwrap())?;
+        walker.get_span_excerpt(tk_filename.span))?;
 
     walker.expect_linebreak(report)?;
 

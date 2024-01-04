@@ -1,6 +1,3 @@
-use crate::*;
-
-
 pub struct CharCounter<'a>
 {
 	src: &'a str,
@@ -21,11 +18,11 @@ impl<'a> CharCounter<'a>
 	
 	pub fn get_excerpt(
 		&self,
-		start: diagn::SpanIndex,
-		end: diagn::SpanIndex)
+		start: usize,
+		end: usize)
 		-> &str
 	{
-		self.src.get((start as usize)..(end as usize)).unwrap()
+		self.src.get(start..end).unwrap()
 	}
 	
 	
@@ -45,14 +42,14 @@ impl<'a> CharCounter<'a>
 	
 	pub fn get_line_column_at_index(
 		&self,
-		index: diagn::SpanIndex)
+		index: usize)
 		-> (usize, usize)
 	{
 		let mut line = 0;
 		let mut column = 0;
 		
 		let mut i = 0;
-		while i < index as usize && i < self.chars.len()
+		while i < index && i < self.chars.len()
 		{
 			if self.chars[i] == '\n'
 			{
@@ -72,7 +69,7 @@ impl<'a> CharCounter<'a>
 	pub fn get_index_range_of_line(
 		&self,
 		line: usize)
-		-> (diagn::SpanIndex, diagn::SpanIndex)
+		-> (usize, usize)
 	{
 		let mut line_count = 0;
 		let mut line_begin = 0;

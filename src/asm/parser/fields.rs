@@ -33,7 +33,7 @@ pub fn parse(
             walker.maybe_expect(syntax::TokenKind::Hash).is_some();
 
         let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
-        let name = tk_name.excerpt.as_ref().unwrap().clone();
+        let name = walker.get_span_excerpt(tk_name.span).to_string();
 
         if let Some(_) = fields.fields.iter().find(|f| f.name == name)
         {

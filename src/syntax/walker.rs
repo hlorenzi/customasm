@@ -10,7 +10,7 @@ pub struct Walker<'src>
 
     /// The current byte index into the `src` string.
     cursor_index: usize,
-    /// The walker cannot see any characters past this byte index.
+    /// The walker ignores characters from this byte index onward.
     cursor_limit: usize,
 }
 
@@ -63,21 +63,11 @@ impl<'src> Walker<'src>
 	}
 
 
-    fn advance(
-        &mut self,
-        bytes: usize)
-    {
-        self.cursor_index += bytes;
-    }
-
-
-    pub fn skip_to_token_end(
+    pub fn advance_to_token_end(
         &mut self,
         token: &syntax::Token)
     {
-        self.cursor_index =
-            token.span.location().unwrap().1 as usize -
-            self.span_offset;
+        self.cursor_index = self.get_index_at_span_end(token.span);
     }
 	
 	
@@ -93,7 +83,7 @@ impl<'src> Walker<'src>
             if !token.kind.is_ignorable()
                 { break; }
 
-            self.skip_to_token_end(&token);
+            self.advance_to_token_end(&token);
         }
 	}
 
@@ -109,7 +99,16 @@ impl<'src> Walker<'src>
         span: diagn::Span)
         -> usize
     {
-        span.location().unwrap().0 as usize - self.span_offset
+        span.location().unwrap().0 - self.span_offset
+    }
+
+
+    pub fn get_index_at_span_end(
+        &self,
+        span: diagn::Span)
+        -> usize
+    {
+        span.location().unwrap().1 - self.span_offset
     }
 
 
@@ -127,10 +126,10 @@ impl<'src> Walker<'src>
         -> diagn::Span
     {
         let start =
-            (self.span_offset + start_byte_index) as diagn::SpanIndex;
+            self.span_offset + start_byte_index;
         
         let end =
-            (self.span_offset + end_byte_index) as diagn::SpanIndex;
+            self.span_offset + end_byte_index;
         
         diagn::Span::new(
             self.file_handle,
@@ -164,6 +163,17 @@ impl<'src> Walker<'src>
     pub fn get_full_excerpt(&self) -> &'src str
     {
         &self.src[0..self.cursor_limit]
+    }
+
+
+    pub fn get_span_excerpt(
+        &self,
+        span: diagn::Span)
+        -> &'src str
+    {
+        let start = self.get_index_at_span_start(span);
+        let end = self.get_index_at_span_end(span);
+        &self.src[start..end]
     }
 
 
@@ -218,7 +228,7 @@ impl<'src> Walker<'src>
         if byte_index >= self.cursor_limit
         {
             let span_index =
-                (self.span_offset + self.cursor_limit) as diagn::SpanIndex;
+                self.span_offset + self.cursor_limit;
             
             let span = diagn::Span::new(
                 self.file_handle,
@@ -228,7 +238,6 @@ impl<'src> Walker<'src>
             return syntax::Token {
                 kind: syntax::TokenKind::LineBreak,
                 span,
-                excerpt: None,
             };
         }
 
@@ -239,20 +248,12 @@ impl<'src> Walker<'src>
 
         let span = diagn::Span::new(
             self.file_handle,
-            (self.span_offset + byte_index) as diagn::SpanIndex,
-            (self.span_offset + end) as diagn::SpanIndex);
+            self.span_offset + byte_index,
+            self.span_offset + end);
         
-        let excerpt = {
-            match kind.needs_excerpt() {
-                true => Some(self.src[byte_index..end].to_string()),
-                false => None,
-            }
-        };
-
         syntax::Token {
             kind,
             span,
-            excerpt,
         }
     }
 
@@ -364,8 +365,7 @@ impl<'src> Walker<'src>
         if token.kind == kind
 		{
             let token = token.clone();
-			//self.acknowledge_whitespace();
-            self.skip_to_token_end(&token);
+            self.advance_to_token_end(&token);
 			Some(token)
 		}
 		else
@@ -389,6 +389,7 @@ impl<'src> Walker<'src>
 				report.error_span(
                     format!("expected {}", kind.printable()),
                     self.get_cursor_span());
+                
 				Err(())
 			}
 		}
@@ -430,8 +431,11 @@ impl<'src> Walker<'src>
 			None =>
 			{
 				report.error_span(
-                    format!("expected line break"),
+                    format!(
+                        "expected {}",
+                        syntax::TokenKind::LineBreak.printable()),
                     self.get_cursor_span());
+                
 				Err(())
 			}
 		}
@@ -442,7 +446,7 @@ impl<'src> Walker<'src>
 	{
 		if let Some(token) = self.next_linebreak()
 		{
-            self.skip_to_token_end(&token);
+            self.advance_to_token_end(&token);
 			Some(())
 		}
 		else
@@ -476,7 +480,7 @@ impl<'src> Walker<'src>
 				brace_nesting -= 1;
 			}
 
-            self.advance(c.len_utf8());
+            self.cursor_index += c.len_utf8();
 		}
 
 		let end = self.cursor_index;
@@ -515,7 +519,7 @@ impl<'src> Walker<'src>
 				brace_nesting -= 1;
 			}
 
-            self.skip_to_token_end(&token);
+            self.advance_to_token_end(&token);
 
             if !token.kind.is_ignorable()
             {

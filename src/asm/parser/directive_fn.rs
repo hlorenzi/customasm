@@ -28,7 +28,7 @@ pub fn parse(
     -> Result<AstDirectiveFn, ()>
 {
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
-    let name = tk_name.excerpt.clone().unwrap();
+    let name = walker.get_span_excerpt(tk_name.span).to_string();
 
     walker.expect(report, syntax::TokenKind::ParenOpen)?;
 
@@ -38,7 +38,7 @@ pub fn parse(
         !walker.next_useful_is(0, syntax::TokenKind::ParenClose)
     {
         let tk_param_name = walker.expect(report, syntax::TokenKind::Identifier)?;
-        let param_name = tk_param_name.excerpt.clone().unwrap();
+        let param_name = walker.get_span_excerpt(tk_param_name.span).to_string();
         
         params.push(AstFnParameter {
             name: param_name,

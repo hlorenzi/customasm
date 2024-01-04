@@ -61,7 +61,7 @@ pub fn parse(
     -> Result<AstDirectiveRuledef, ()>
 {
     let tk_name = walker.maybe_expect(syntax::TokenKind::Identifier);
-    let name = tk_name.clone().map(|tk| tk.excerpt.clone().unwrap());
+    let name = tk_name.clone().map(|tk| walker.get_span_excerpt(tk.span).to_string());
     let name_span = tk_name
         .map(|tk| tk.span)
         .unwrap_or_else(|| header_span);
@@ -116,7 +116,7 @@ fn parse_rule(
         !walker.next_useful_is(0, syntax::TokenKind::HeavyArrowRight)
     {
         let tk = walker.next_token();
-        walker.skip_to_token_end(&tk);
+        walker.advance_to_token_end(&tk);
         
         pattern_span = pattern_span.join(tk.span);
 
@@ -142,7 +142,7 @@ fn parse_rule(
         
         else if tk.kind.is_allowed_pattern_token()
         {
-            for c in tk.text().chars()
+            for c in walker.get_span_excerpt(tk.span).chars()
             {
                 pattern.push(AstRulePatternPart::Exact(c.to_ascii_lowercase()));
             }
@@ -192,15 +192,15 @@ fn parse_rule_parameter(
     -> Result<AstRuleParameter, ()>
 {
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
-    let name = tk_name.excerpt.as_ref().unwrap().clone();
+    let name = walker.get_span_excerpt(tk_name.span).to_string();
     let name_span = tk_name.span;
 
     let (typ, type_span) = {
         if walker.maybe_expect(syntax::TokenKind::Colon).is_some()
         {
             let tk_typename = walker.expect(report, syntax::TokenKind::Identifier)?;
-            let typename = tk_typename.excerpt.as_ref().unwrap().clone();
-            let typ = interpret_typename(&typename);
+            let typename = walker.get_span_excerpt(tk_typename.span);
+            let typ = interpret_typename(typename);
             (typ, tk_typename.span)
         }
         else

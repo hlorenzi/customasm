@@ -12,7 +12,7 @@ pub fn parse(
     if let Some(_) = walker.maybe_expect(syntax::TokenKind::ParenOpen)
     {
         let tk_attrb = walker.expect(report, syntax::TokenKind::Identifier)?;
-        let attrb = tk_attrb.excerpt.as_ref().unwrap();
+        let attrb = walker.get_span_excerpt(tk_attrb.span);
 
         match attrb.as_ref()
         {
@@ -41,7 +41,7 @@ pub fn parse(
     }
 
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
-    let name = tk_name.excerpt.clone().unwrap();
+    let name = walker.get_span_excerpt(tk_name.span).to_string();
     decl_span = decl_span.join(tk_name.span);
 
 

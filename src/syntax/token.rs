@@ -6,7 +6,6 @@ pub struct Token
 {
 	pub span: diagn::Span,
 	pub kind: TokenKind,
-	pub excerpt: Option<String>,
 }
 
 
@@ -67,14 +66,6 @@ pub enum TokenKind
 
 impl TokenKind
 {
-	pub fn needs_excerpt(self) -> bool
-	{
-		self == TokenKind::Identifier ||
-		self == TokenKind::Number ||
-		self == TokenKind::String
-	}
-	
-	
 	pub fn is_ignorable(self) -> bool
 	{
 		self == TokenKind::Whitespace ||
@@ -168,73 +159,6 @@ impl TokenKind
 			TokenKind::DoubleGreaterThan => "`>>`",
 			TokenKind::TripleGreaterThan => "`>>>`",
 			TokenKind::GreaterThanEqual => "`>=`"
-		}
-	}
-	
-	
-	pub fn printable_excerpt(self, excerpt: Option<&str>) -> String
-	{
-		if self.needs_excerpt()
-			{ format!("`{}`", excerpt.unwrap()) }
-		else
-			{ self.printable().to_string() }
-	}
-}
-
-
-impl Token
-{
-	pub fn text(&self) -> &str
-	{
-		match self.kind
-		{
-			TokenKind::Error => "�",
-			TokenKind::Comment => ";* *;",
-			TokenKind::Whitespace => " ",
-			TokenKind::LineBreak => "\\n",
-			TokenKind::KeywordAsm => "asm",
-			TokenKind::KeywordTrue => "true",
-			TokenKind::KeywordFalse => "false",
-			TokenKind::ParenOpen => "(",
-			TokenKind::ParenClose => ")",
-			TokenKind::BracketOpen => "[",
-			TokenKind::BracketClose => "]",
-			TokenKind::BraceOpen => "{",
-			TokenKind::BraceClose => "}",
-			TokenKind::Dot => ".",
-			TokenKind::Comma => ",",
-			TokenKind::Colon => ":",
-			TokenKind::ColonColon => "::",
-			TokenKind::ArrowRight => "->",
-			TokenKind::ArrowLeft => "<-",
-			TokenKind::HeavyArrowRight => "=>",
-			TokenKind::Hash => "#",
-			TokenKind::Equal => "=",
-			TokenKind::Plus => "+",
-			TokenKind::Minus => "-",
-			TokenKind::Asterisk => "*",
-			TokenKind::Slash => "/",
-			TokenKind::Percent => "%",
-			TokenKind::Question => "?",
-			TokenKind::Exclamation => "!",
-			TokenKind::Ampersand => "&",
-			TokenKind::VerticalBar => "|",
-			TokenKind::Circumflex => "^",
-			TokenKind::Tilde => "~",
-			TokenKind::At => "@",
-			TokenKind::Grave => "`",
-			TokenKind::DoubleAmpersand => "&&",
-			TokenKind::DoubleVerticalBar => "||",
-			TokenKind::DoubleEqual => "==",
-			TokenKind::ExclamationEqual => "!=",
-			TokenKind::LessThan => "<",
-			TokenKind::DoubleLessThan => "<<",
-			TokenKind::LessThanEqual => "<=",
-			TokenKind::GreaterThan => ">",
-			TokenKind::DoubleGreaterThan => ">>",
-			TokenKind::TripleGreaterThan => ">>>",
-			TokenKind::GreaterThanEqual => ">=",
-			_ => self.excerpt.as_ref().unwrap()
 		}
 	}
 }

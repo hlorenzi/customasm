@@ -44,7 +44,7 @@ pub fn parse(
     }
 
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
-    let name = tk_name.excerpt.clone().unwrap();
+    let name = walker.get_span_excerpt(tk_name.span).to_string();
     decl_span = decl_span.join(tk_name.span);
 
 

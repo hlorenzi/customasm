@@ -167,7 +167,7 @@ fn parse_substitutions<'excerpt>(
     let mut walker = syntax::Walker::new(
         excerpt,
         span.file_handle,
-        span.location().unwrap().0 as usize);
+        span.location().unwrap().0);
 
     while !walker.is_over()
     {
@@ -182,7 +182,7 @@ fn parse_substitutions<'excerpt>(
                 report,
                 syntax::TokenKind::Identifier)?;
             
-            let name = tk_name.clone().excerpt.unwrap();
+            let name = walker.get_span_excerpt(tk_name.span).to_string();
             let span = tk_name.span;
 
             walker.expect(
@@ -200,7 +200,7 @@ fn parse_substitutions<'excerpt>(
         }
         else
         {
-            walker.skip_to_token_end(&walker.next_token());
+            walker.advance_to_token_end(&walker.next_token());
         }
     }
 
