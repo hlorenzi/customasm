@@ -211,41 +211,78 @@ impl util::BitVec
 	{	
 		let mut result = String::new();
 
-		let mut bytes_left = self.len() / 8 + if self.len() % 8 != 0 { 1 } else { 0 };
+		let mut read_index = 0;
 
-		let mut index = 0;
-		while index < self.len()
+		let mut accum_index = 0;
+		let mut accum_bytes = Vec::<u8>::new();
+
+		let mut flush_bytes = |
+			read_index: usize,
+			accum_index: &mut usize,
+			accum_bytes: &mut Vec::<u8>|
 		{
-			let bytes_in_row = if bytes_left > 32 { 32 } else { bytes_left };
-
-			result.push(':');
-			result.push_str(&format!("{:02X}", bytes_in_row));
-			result.push_str(&format!("{:04X}", index / address_unit));
-			result.push_str("00");
-
-			let mut checksum = 0_u8;
-			checksum = checksum.wrapping_add(bytes_in_row as u8);
-			checksum = checksum.wrapping_add(((index / address_unit) >> 8) as u8);
-			checksum = checksum.wrapping_add((index / address_unit) as u8);
-
-			for _ in 0..bytes_in_row
+			while let Some(0_u8) = accum_bytes.last()
 			{
-				let mut byte: u8 = 0;
-				for _ in 0..8
-				{
-					byte <<= 1;
-					byte |= if self.read_bit(index) { 1 } else { 0 };
-					index += 1;
-				}
-
-				result.push_str(&format!("{:02X}", byte));
-				checksum = checksum.wrapping_add(byte);
+				accum_bytes.pop();
 			}
 
-			bytes_left -= bytes_in_row;
-			result.push_str(&format!("{:02X}", (!checksum).wrapping_add(1)));
-			result.push('\n');
+			while let Some(0_u8) = accum_bytes.first()
+			{
+				accum_bytes.remove(0);
+				*accum_index += 8;
+			}
+
+			let length = accum_bytes.len() as u8;
+
+			if length > 0
+			{
+				let addr_hi = ((*accum_index / address_unit) >> 8) as u8;
+				let addr_lo = (*accum_index / address_unit) as u8;
+
+				result.push(':');
+				result.push_str(&format!("{:02X}", length));
+				result.push_str(&format!("{:02X}", addr_hi));
+				result.push_str(&format!("{:02X}", addr_lo));
+				result.push_str("00");
+
+				let mut checksum = 0_u8;
+				checksum = checksum.wrapping_add(length);
+				checksum = checksum.wrapping_add(addr_hi);
+				checksum = checksum.wrapping_add(addr_lo);
+
+				for byte in accum_bytes.iter().copied()
+				{
+					result.push_str(&format!("{:02X}", byte));
+					checksum = checksum.wrapping_add(byte);
+				}
+				
+				result.push_str(&format!("{:02X}", (!checksum).wrapping_add(1)));
+				result.push('\n');
+			}
+
+			accum_bytes.clear();
+			*accum_index = read_index;
+		};
+
+		while read_index < self.len()
+		{
+			let mut byte: u8 = 0;
+			for _ in 0..8
+			{
+				byte <<= 1;
+				byte |= if self.read_bit(read_index) { 1 } else { 0 };
+				read_index += 1;
+			}
+
+			accum_bytes.push(byte);
+
+			if accum_bytes.len() >= 32
+			{
+				flush_bytes(read_index, &mut accum_index, &mut accum_bytes);
+			}
 		}
+
+		flush_bytes(read_index, &mut accum_index, &mut accum_bytes);
 
 		result.push_str(":00000001FF");
 		result
