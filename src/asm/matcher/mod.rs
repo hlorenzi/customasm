@@ -433,8 +433,20 @@ pub fn match_instr(
         .collect::<Vec<_>>();
 
 
-    // Identical duplicate matches are already sorted consecutively
-    matches.dedup_by(|a, b| a.is_same(b));
+    // Remove duplicate matches
+    for i in (0..matches.len()).rev()
+    {
+        let mut duplicate = false;
+        for j in 0..i
+        {
+            duplicate |= matches[i].is_same(&matches[j]);
+        }
+
+        if duplicate
+        {
+            matches.remove(i);
+        }
+    }
 
 
     // Calculate recursive "exact" pattern-part count for
