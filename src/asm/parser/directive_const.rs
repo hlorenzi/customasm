@@ -1,11 +1,11 @@
-use super::*;
+use crate::*;
 
 
 pub fn parse(
     report: &mut diagn::Report,
     walker: &mut syntax::Walker,
     _header_span: diagn::Span)
-    -> Result<AstSymbol, ()>
+    -> Result<asm::AstSymbol, ()>
 {
     let mut no_emit = false;
 
@@ -50,11 +50,11 @@ pub fn parse(
     let expr = expr::parse(report, walker)?;
     walker.expect_linebreak(report)?;
     
-    Ok(AstSymbol {
+    Ok(asm::AstSymbol {
         decl_span,
         hierarchy_level,
         name,
-        kind: AstSymbolKind::Constant(AstSymbolConstant {
+        kind: asm::AstSymbolKind::Constant(asm::AstSymbolConstant {
             expr,
         }),
         no_emit,

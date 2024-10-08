@@ -1,4 +1,4 @@
-use crate::{*, asm::AstTopLevel};
+use crate::*;
 
 
 #[derive(Clone, Debug)]
@@ -36,7 +36,7 @@ pub fn parse(
 fn parse_braced_block(
     report: &mut diagn::Report,
     walker: &mut syntax::Walker)
-    -> Result<AstTopLevel, ()>
+    -> Result<asm::AstTopLevel, ()>
 {
     walker.expect(report, syntax::TokenKind::BraceOpen)?;
 
@@ -53,7 +53,7 @@ fn parse_braced_block(
 fn parse_else_blocks(
     report: &mut diagn::Report,
     walker: &mut syntax::Walker)
-    -> Result<Option<AstTopLevel>, ()>
+    -> Result<Option<asm::AstTopLevel>, ()>
 {
     if !walker.next_useful_is(0, syntax::TokenKind::Hash) ||
         !walker.next_useful_is(1, syntax::TokenKind::Identifier)
@@ -93,7 +93,7 @@ fn parse_else_blocks(
             walker,
             header_span)?;
 
-        let ast_toplevel = AstTopLevel {
+        let ast_toplevel = asm::AstTopLevel {
             nodes: vec![asm::AstAny::DirectiveIf(ast_if)],
         };
 

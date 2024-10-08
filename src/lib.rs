@@ -30,7 +30,7 @@ pub fn assemble_str_to_binary(
 
 	let mut report = diagn::Report::new();
 	let mut fileserver = util::FileServerMock::new();
-	fileserver.add(virtual_filename, src.clone());
+	fileserver.add(virtual_filename, src);
 
 	let opts = asm::AssemblyOptions::new();
 

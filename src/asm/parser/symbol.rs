@@ -1,4 +1,4 @@
-use super::*;
+use crate::*;
 
 
 #[derive(Clone, Debug)]
@@ -32,7 +32,7 @@ pub struct AstSymbolConstant
 pub fn parse(
     report: &mut diagn::Report,
     walker: &mut syntax::Walker)
-    -> Result<AstAny, ()>
+    -> Result<asm::AstAny, ()>
 {
     let mut decl_span = diagn::Span::new_dummy();
     let mut hierarchy_level = 0;
@@ -53,7 +53,7 @@ pub fn parse(
         let expr = expr::parse(report, walker)?;
         walker.expect_linebreak(report)?;
         
-        Ok(AstAny::Symbol(AstSymbol {
+        Ok(asm::AstAny::Symbol(AstSymbol {
             decl_span,
             hierarchy_level,
             name,
@@ -70,7 +70,7 @@ pub fn parse(
         let tk_colon = walker.expect(report, syntax::TokenKind::Colon)?;
         decl_span = decl_span.join(tk_colon.span);
         
-        Ok(AstAny::Symbol(AstSymbol {
+        Ok(asm::AstAny::Symbol(AstSymbol {
             decl_span,
             hierarchy_level,
             name,
