@@ -9,6 +9,9 @@ pub use directive_addr::AstDirectiveAddr;
 mod directive_align;
 pub use directive_align::AstDirectiveAlign;
 
+mod directive_assert;
+pub use directive_assert::AstDirectiveAssert;
+
 mod directive_bank;
 pub use directive_bank::AstDirectiveBank;
 
@@ -78,6 +81,7 @@ pub enum AstAny
 {
     DirectiveAddr(AstDirectiveAddr),
     DirectiveAlign(AstDirectiveAlign),
+    DirectiveAssert(AstDirectiveAssert),
     DirectiveBank(AstDirectiveBank),
     DirectiveBankdef(AstDirectiveBankdef),
     DirectiveBits(AstDirectiveBits),
@@ -327,6 +331,7 @@ impl AstAny
         {
             AstAny::DirectiveAddr(node) => node.header_span,
             AstAny::DirectiveAlign(node) => node.header_span,
+            AstAny::DirectiveAssert(node) => node.header_span,
             AstAny::DirectiveBank(node) => node.header_span,
             AstAny::DirectiveBankdef(node) => node.header_span,
             AstAny::DirectiveBits(node) => node.header_span,

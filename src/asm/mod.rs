@@ -6,6 +6,7 @@ pub use parser::{
     AstAny,
     AstDirectiveAddr,
     AstDirectiveAlign,
+    AstDirectiveAssert,
     AstDirectiveBank,
     AstDirectiveBankdef,
     AstDirectiveBits,

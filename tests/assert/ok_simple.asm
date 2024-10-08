@@ -1,0 +1,2 @@
+#d 0xff ; = 0xff
+#assert 1 + 1 == 2

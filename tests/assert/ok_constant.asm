@@ -1,0 +1,3 @@
+x = 0xff
+#d x ; = 0xff
+#assert x == 0xff

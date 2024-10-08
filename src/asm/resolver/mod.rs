@@ -21,6 +21,7 @@ mod data_block;
 mod res;
 mod align;
 mod addr;
+mod assert;
 
 mod directive_if;
 pub use directive_if::{
@@ -259,6 +260,19 @@ pub fn resolve_once(
                         opts,
                         fileserver,
                         ast_addr,
+                        decls,
+                        defs,
+                        &ctx)?);
+            }
+        
+            asm::ResolverNode::Assert(ast_assert) =>
+            {
+                resolution_state.merge(
+                    assert::resolve_assert(
+                        report,
+                        opts,
+                        fileserver,
+                        ast_assert,
                         decls,
                         defs,
                         &ctx)?);

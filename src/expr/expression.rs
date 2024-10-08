@@ -324,6 +324,33 @@ impl Value
 	}
 
 
+	pub fn expect_error_or_bool(
+		self,
+		report: &mut diagn::Report,
+		span: diagn::Span)
+		-> Result<expr::Value, ()>
+	{
+		match self.coallesce_to_integer().as_ref()
+		{
+			value @ expr::Value::Unknown |
+			value @ expr::Value::FailedConstraint(_) =>
+				Ok(value.to_owned()),
+
+			value @ expr::Value::Bool(_) =>
+				Ok(value.to_owned()),
+
+			_ =>
+			{
+				report.error_span(
+					"expected boolean",
+					span);
+
+				Err(())
+			}
+		}
+	}
+
+
 	pub fn as_usize(&self) -> Option<usize>
 	{
 		match self

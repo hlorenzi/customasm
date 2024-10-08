@@ -81,6 +81,9 @@ pub fn parse(
         "subruledef" => Ok(asm::AstAny::DirectiveRuledef(
             asm::parser::directive_ruledef::parse(report, walker, true, header_span)?)),
         
+        "assert" => Ok(asm::AstAny::DirectiveAssert(
+            asm::parser::directive_assert::parse(report, walker, header_span)?)),
+        
         _ =>
         {
             report.error_span(

@@ -43,6 +43,7 @@ pub enum ResolverNode<'ast>
     Res(&'ast asm::AstDirectiveRes),
     Align(&'ast asm::AstDirectiveAlign),
     Addr(&'ast asm::AstDirectiveAddr),
+    Assert(&'ast asm::AstDirectiveAssert),
 }
 
 
@@ -205,7 +206,21 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 file_handle_ctx = Some(ast_addr.header_span.file_handle);
             }
 
-            _ =>
+            asm::AstAny::DirectiveAssert(ast_assert) =>
+            {
+                self.index += 1;
+                node = ResolverNode::Assert(ast_assert);
+                file_handle_ctx = Some(ast_assert.header_span.file_handle);
+            }
+
+            asm::AstAny::DirectiveBits(..) |
+            asm::AstAny::DirectiveFn(..) |
+            asm::AstAny::DirectiveIf(..) |
+            asm::AstAny::DirectiveInclude(..) |
+            asm::AstAny::DirectiveLabelAlign(..) |
+            asm::AstAny::DirectiveNoEmit(..) |
+            asm::AstAny::DirectiveOnce(..) |
+            asm::AstAny::DirectiveRuledef(..) =>
             {
                 self.index += 1;
                 node = ResolverNode::None;

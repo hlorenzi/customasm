@@ -1,0 +1,1 @@
+#assert x ; error: unknown symbol
