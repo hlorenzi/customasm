@@ -220,7 +220,8 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
             asm::AstAny::DirectiveLabelAlign(..) |
             asm::AstAny::DirectiveNoEmit(..) |
             asm::AstAny::DirectiveOnce(..) |
-            asm::AstAny::DirectiveRuledef(..) =>
+            asm::AstAny::DirectiveRuledef(..) |
+            asm::AstAny::DirectiveMacro(..) =>
             {
                 self.index += 1;
                 node = ResolverNode::None;

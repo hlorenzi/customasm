@@ -20,7 +20,7 @@ pub fn parse(
 {
     let expr = expr::parse(report, walker)?;
 
-    let true_arm = parse_braced_block(report, walker)?;
+    let true_arm = asm::parser::parse_braced_toplevel(report, walker)?;
     let false_arm = parse_else_blocks(report, walker)?;
 
     Ok(AstDirectiveIf {
@@ -30,23 +30,6 @@ pub fn parse(
         true_arm,
         false_arm,
     })
-}
-
-
-fn parse_braced_block(
-    report: &mut diagn::Report,
-    walker: &mut syntax::Walker)
-    -> Result<asm::AstTopLevel, ()>
-{
-    walker.expect(report, syntax::TokenKind::BraceOpen)?;
-
-    let block = asm::parser::parse_nested_toplevel(
-        report,
-        walker)?;
-
-    walker.expect(report, syntax::TokenKind::BraceClose)?;
-
-    Ok(block)
 }
 
 
@@ -74,7 +57,7 @@ fn parse_else_blocks(
             report,
             syntax::TokenKind::Identifier)?;
         
-        Ok(Some(parse_braced_block(report, walker)?))
+        Ok(Some(asm::parser::parse_braced_toplevel(report, walker)?))
     }
     else if directive_name == "elif"
     {

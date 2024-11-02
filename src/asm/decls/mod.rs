@@ -4,6 +4,7 @@ use crate::*;
 mod bank;
 mod bankdef;
 mod ruledef;
+mod macros;
 mod symbol;
 mod function;
 
@@ -50,6 +51,7 @@ pub fn collect(
     bankdef::collect(report, ast, decls)?;
     bank::collect(report, ast, decls)?;
     ruledef::collect(report, ast, decls)?;
+    macros::collect(report, ast, decls)?;
     symbol::collect(report, ast, decls)?;
     function::collect(report, ast, decls)?;
 

@@ -53,6 +53,7 @@ pub use directive_res::AstDirectiveRes;
 mod directive_ruledef;
 pub use directive_ruledef::{
     AstDirectiveRuledef,
+    AstDirectiveMacro,
     AstRule,
     AstRulePatternPart,
     AstRuleParameter,
@@ -90,6 +91,7 @@ pub enum AstAny
     DirectiveIf(AstDirectiveIf),
     DirectiveInclude(AstDirectiveInclude),
     DirectiveLabelAlign(AstDirectiveLabelAlign),
+    DirectiveMacro(AstDirectiveMacro),
     DirectiveNoEmit(AstDirectiveNoEmit),
     DirectiveOnce(AstDirectiveOnce),
     DirectiveRes(AstDirectiveRes),
@@ -255,6 +257,23 @@ pub fn parse(
 }
 
 
+pub fn parse_braced_toplevel(
+    report: &mut diagn::Report,
+    walker: &mut syntax::Walker)
+    -> Result<AstTopLevel, ()>
+{
+    walker.expect(report, syntax::TokenKind::BraceOpen)?;
+
+    let block = parse_nested_toplevel(
+        report,
+        walker)?;
+
+    walker.expect(report, syntax::TokenKind::BraceClose)?;
+
+    Ok(block)
+}
+
+
 pub fn parse_nested_toplevel(
     report: &mut diagn::Report,
     walker: &mut syntax::Walker)
@@ -344,6 +363,7 @@ impl AstAny
             AstAny::DirectiveOnce(node) => node.header_span,
             AstAny::DirectiveRes(node) => node.header_span,
             AstAny::DirectiveRuledef(node) => node.header_span,
+            AstAny::DirectiveMacro(node) => node.header_span,
             AstAny::Instruction(node) => node.span,
             AstAny::Symbol(node) => node.decl_span,
         }

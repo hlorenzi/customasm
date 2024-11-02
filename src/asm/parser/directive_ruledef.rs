@@ -2,6 +2,17 @@ use crate::*;
 
 
 #[derive(Clone, Debug)]
+pub struct AstDirectiveMacro
+{
+    pub header_span: diagn::Span,
+    pub pattern: AstMatchPattern,
+    pub contents: asm::AstTopLevel,
+
+    pub item_ref: Option<util::ItemRef::<asm::Ruledef>>,
+}
+
+
+#[derive(Clone, Debug)]
 pub struct AstDirectiveRuledef
 {
     pub header_span: diagn::Span,
@@ -15,10 +26,17 @@ pub struct AstDirectiveRuledef
 
 
 #[derive(Clone, Debug)]
+pub struct AstMatchPattern
+{
+    pub span: diagn::Span,
+    pub parts: Vec<AstRulePatternPart>,
+}
+
+
+#[derive(Clone, Debug)]
 pub struct AstRule
 {
-    pub pattern_span: diagn::Span,
-    pub pattern: Vec<AstRulePatternPart>,
+    pub pattern: AstMatchPattern,
     pub expr: expr::Expr,
 }
 
@@ -97,13 +115,60 @@ pub fn parse(
 }
 
 
+pub fn parse_macro(
+    report: &mut diagn::Report,
+    walker: &mut syntax::Walker,
+    header_span: diagn::Span)
+    -> Result<AstDirectiveMacro, ()>
+{
+    let pattern = parse_match_pattern(
+        report,
+        walker,
+        false)?;
+
+    let contents = asm::parser::parse_braced_toplevel(
+        report,
+        walker)?;
+        
+    walker.expect_linebreak(report)?;
+    
+    Ok(AstDirectiveMacro {
+        header_span,
+        pattern,
+        contents,
+
+        item_ref: None,
+    })
+}
+
+
 fn parse_rule(
     report: &mut diagn::Report,
     walker: &mut syntax::Walker,
     is_subruledef: bool)
     -> Result<AstRule, ()>
 {
-    let mut pattern_span = diagn::Span::new_dummy();
+    let pattern = parse_match_pattern(
+        report,
+        walker,
+        is_subruledef)?;
+
+    let expr = expr::parse(report, walker)?;
+
+    Ok(AstRule {
+        pattern,
+        expr,
+    })
+}
+
+
+fn parse_match_pattern(
+    report: &mut diagn::Report,
+    walker: &mut syntax::Walker,
+    is_subruledef: bool)
+    -> Result<AstMatchPattern, ()>
+{
+    let mut span = diagn::Span::new_dummy();
     let mut pattern = Vec::new();
     let mut has_used_empty_specifier = false;
 
@@ -118,7 +183,7 @@ fn parse_rule(
         let tk = walker.next_token();
         walker.advance_to_token_end(&tk);
         
-        pattern_span = pattern_span.join(tk.span);
+        span = span.join(tk.span);
 
 
         if tk.kind == syntax::TokenKind::BraceOpen
@@ -136,7 +201,7 @@ fn parse_rule(
                 pattern.push(AstRulePatternPart::Parameter(param));
 
                 let tk_close = walker.expect(report, syntax::TokenKind::BraceClose)?;
-                pattern_span = pattern_span.join(tk_close.span);
+                span = span.join(tk_close.span);
             }
         }
         
@@ -163,7 +228,6 @@ fn parse_rule(
         }
     }
 
-
     let tk_heavy_arrow = walker.expect(report, syntax::TokenKind::HeavyArrowRight)?;
 
     if pattern.len() == 0 && !has_used_empty_specifier
@@ -175,13 +239,9 @@ fn parse_rule(
         return Err(());
     }
 
-
-    let expr = expr::parse(report, walker)?;
-
-    Ok(AstRule {
-        pattern_span,
-        pattern,
-        expr,
+    Ok(AstMatchPattern {
+        span,
+        parts: pattern,
     })
 }
 
