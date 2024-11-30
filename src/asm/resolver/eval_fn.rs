@@ -176,6 +176,11 @@ fn eval_builtin_incbin(
         }
     };
 
+    if bytes.len() == 0
+    {
+        return Ok(expr::Value::make_integer(util::BigInt::from_bytes_be(&[])));
+    }
+
     if start >= bytes.len()
     {
         query.report.error_span(
