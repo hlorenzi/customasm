@@ -586,7 +586,8 @@ fn match_with_rule<'src>(
 
             asm::RulePatternPart::Whitespace =>
             {
-                if walker.next_token().kind != syntax::TokenKind::Whitespace
+                if !walker.is_over() &&
+                    walker.next_token().kind != syntax::TokenKind::Whitespace
                 {
                     return vec![];
                 }
