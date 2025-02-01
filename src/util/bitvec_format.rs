@@ -211,27 +211,11 @@ impl util::BitVec
 	{	
 		let mut result = String::new();
 
-		let mut read_index = 0;
-
-		let mut accum_index = 0;
-		let mut accum_bytes = Vec::<u8>::new();
-
 		let mut flush_bytes = |
 			read_index: usize,
 			accum_index: &mut usize,
 			accum_bytes: &mut Vec::<u8>|
 		{
-			while let Some(0_u8) = accum_bytes.last()
-			{
-				accum_bytes.pop();
-			}
-
-			while let Some(0_u8) = accum_bytes.first()
-			{
-				accum_bytes.remove(0);
-				*accum_index += 8;
-			}
-
 			let length = accum_bytes.len() as u8;
 
 			if length > 0
@@ -264,25 +248,32 @@ impl util::BitVec
 			*accum_index = read_index;
 		};
 
-		while read_index < self.len()
+		for block in self.get_blocks()
 		{
-			let mut byte: u8 = 0;
-			for _ in 0..8
+			let mut read_index = block.offset;
+			let mut accum_index = block.offset;
+			let mut accum_bytes = Vec::<u8>::new();
+	
+			while read_index < block.offset + block.size
 			{
-				byte <<= 1;
-				byte |= if self.read_bit(read_index) { 1 } else { 0 };
-				read_index += 1;
+				let mut byte: u8 = 0;
+				for _ in 0..8
+				{
+					byte <<= 1;
+					byte |= if self.read_bit(read_index) { 1 } else { 0 };
+					read_index += 1;
+				}
+
+				accum_bytes.push(byte);
+
+				if accum_bytes.len() >= 32
+				{
+					flush_bytes(read_index, &mut accum_index, &mut accum_bytes);
+				}
 			}
 
-			accum_bytes.push(byte);
-
-			if accum_bytes.len() >= 32
-			{
-				flush_bytes(read_index, &mut accum_index, &mut accum_bytes);
-			}
+			flush_bytes(read_index, &mut accum_index, &mut accum_bytes);
 		}
-
-		flush_bytes(read_index, &mut accum_index, &mut accum_bytes);
 
 		result.push_str(":00000001FF");
 		result

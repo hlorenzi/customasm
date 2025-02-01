@@ -20,6 +20,14 @@ pub struct BitVecSpan
 }
 
 
+#[derive(Clone, Debug)]
+pub struct BitVecBlock
+{
+    pub offset: usize,
+    pub size: usize,
+}
+
+
 impl BitVec
 {
 	pub fn new() -> BitVec
@@ -127,6 +135,61 @@ impl BitVec
 
         bigint.size = Some(self.len);
         bigint
+    }
+
+
+    pub fn get_blocks(&self) -> Vec<BitVecBlock>
+    {
+        let mut result = Vec::new();
+
+		let mut sorted_spans = self.spans.clone();
+        sorted_spans.sort_by(|a, b| a.offset.cmp(&b.offset));
+
+        let mut current_origin: Option<usize> = None;
+        let mut current_size = 0;
+
+        for span in &sorted_spans
+        {
+            let Some(span_offset) = span.offset
+                else { continue };
+            
+            if let Some(origin) = current_origin
+            {
+                if span_offset != origin + current_size
+                {
+                    if current_size != 0
+                    {
+                        result.push(BitVecBlock {
+                            offset: origin,
+                            size: current_size,
+                        });
+                    }
+                    
+                    current_origin = None;
+                }
+            }
+            
+            if let None = current_origin
+            {
+                current_origin = Some(span_offset);
+                current_size = 0;
+            }
+
+            current_size += span.size;
+        }
+
+        if let Some(origin) = current_origin
+        {
+            if current_size != 0
+            {
+                result.push(BitVecBlock {
+                    offset: origin,
+                    size: current_size,
+                });
+            }
+        }
+        
+        result
     }
 }
 
