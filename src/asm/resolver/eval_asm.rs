@@ -17,14 +17,195 @@ pub fn eval_asm(
 
     // Keep the current position to advance
     // between instructions
-    let mut cur_position = ctx.bank_data.cur_position;
+    let position_at_start = ctx.bank_data.cur_position;
 
 
+    let mut labels = std::collections::HashMap::<String, expr::Value>::new();
+    for node in &query.ast.nodes
+    {
+        if let asm::AstAny::Symbol(ast_symbol) = node
+        {
+            if !matches!(ast_symbol.kind, asm::AstSymbolKind::Label)
+            {
+                query.report.error_span(
+                    "only labels are permitted in `asm` blocks",
+                    node.span());
+    
+                return Err(());
+            }
+
+            if ast_symbol.hierarchy_level != 0
+            {
+                query.report.error_span(
+                    "only top-level labels are permitted in `asm` blocks",
+                    node.span());
+    
+                return Err(());
+            }
+
+            labels.insert(
+                ast_symbol.name.clone(),
+                expr::Value::Unknown);
+        }
+
+        else if let asm::AstAny::Instruction(_) = node
+        {
+            continue;
+        }
+
+        else
+        {
+            query.report.error_span(
+                "invalid content for `asm` block",
+                node.span());
+
+            return Err(());
+        }
+    }
+
+    resolve_iteratively(
+        opts,
+        fileserver,
+        decls,
+        defs,
+        ctx,
+        query,
+        position_at_start,
+        &mut labels)
+}
+
+
+fn resolve_iteratively(
+    opts: &asm::AssemblyOptions,
+    fileserver: &mut dyn util::FileServer,
+    decls: &asm::ItemDecls,
+    defs: &asm::ItemDefs,
+    ctx: &asm::ResolverContext,
+    query: &mut expr::EvalAsmBlockQuery,
+    position_at_start: usize,
+    labels: &mut std::collections::HashMap::<String, expr::Value>)
+    -> Result<expr::Value, ()>
+{
+    let mut iter_count = 0;
+    let max_iterations = opts.max_iterations;
+
+    while iter_count < max_iterations
+    {
+        iter_count += 1;
+
+        let is_first_iteration = iter_count == 1;
+        let is_last_iteration = iter_count == max_iterations;
+
+        let result = resolve_once(
+            opts,
+            fileserver,
+            decls,
+            defs,
+            ctx,
+            query,
+            position_at_start,
+            labels,
+            is_first_iteration,
+            is_last_iteration)?;
+
+        if !result.unstable
+        {
+            break;
+        }
+    }
+
+    let result = resolve_once(
+        opts,
+        fileserver,
+        decls,
+        defs,
+        ctx,
+        query,
+        position_at_start,
+        labels,
+        false,
+        true)?;
+
+    if !result.unstable
+    {
+        return Ok(result.value);
+    }
+    
+    if ctx.can_guess()
+    {
+        return Ok(expr::Value::Unknown);
+    }
+
+    query.report.error_span(
+        "`asm` block did not converge",
+        query.span);
+
+    return Err(());
+}
+
+
+struct AsmBlockResult
+{
+    value: expr::Value,
+    unstable: bool,
+}
+
+
+fn resolve_once(
+    opts: &asm::AssemblyOptions,
+    fileserver: &mut dyn util::FileServer,
+    decls: &asm::ItemDecls,
+    defs: &asm::ItemDefs,
+    ctx: &asm::ResolverContext,
+    query: &mut expr::EvalAsmBlockQuery,
+    position_at_start: usize,
+    labels: &mut std::collections::HashMap::<String, expr::Value>,
+    is_first_iteration: bool,
+    is_last_iteration: bool)
+    -> Result<AsmBlockResult, ()>
+{
     let mut result = util::BigInt::new(0, Some(0));
+    let mut cur_position = position_at_start;
+    let mut unstable = false;
     
     for node in &query.ast.nodes
     {
-        if let asm::AstAny::Instruction(ast_instr) = node
+        // Clone the context to use our own position
+        let new_bank_datum = asm::resolver::BankData {
+            cur_position,
+        };
+
+        let mut inner_ctx = ctx.clone();
+        inner_ctx.bank_data = &new_bank_datum;
+        inner_ctx.is_first_iteration = is_first_iteration;
+        inner_ctx.is_last_iteration = is_last_iteration;
+
+
+        if let asm::AstAny::Symbol(ast_symbol) = node
+        {
+            let cur_address = inner_ctx.eval_address(
+                query.report,
+                query.span,
+                defs,
+                true)?;
+
+            let new_value = expr::Value::make_integer(cur_address);
+            
+            let maybe_prev_value = labels.get(&ast_symbol.name);
+            if let Some(prev_value) = maybe_prev_value
+            {
+                if prev_value != &new_value
+                {
+                    unstable = true;
+                }
+            }
+
+            labels.insert(
+                ast_symbol.name.clone(),
+                new_value);
+        }
+
+        else if let asm::AstAny::Instruction(ast_instr) = node
         {
             let substs = parse_substitutions(
                 query.report,
@@ -77,19 +258,15 @@ pub fn eval_asm(
 
             maybe_no_matches?;
             
-            
-            // Clone the context to use our own position
-            let new_bank_datum = asm::resolver::BankData {
-                cur_position,
-            };
-
-            let mut inner_ctx = ctx.clone();
-            inner_ctx.bank_data = &new_bank_datum;
-
 
             // Try to resolve the encoding
             let mut new_eval_ctx = query.eval_ctx
                 .hygienize_locals_for_asm_subst();
+
+            for (label_name, label_value) in labels.iter()
+            {
+                new_eval_ctx.set_local(label_name, label_value.clone());
+            }
 
             if let Some(ref s) = attempted_match_excerpt
             {
@@ -97,7 +274,7 @@ pub fn eval_asm(
                     s,
                     ast_instr.span);
             }
-                    
+            
             let maybe_encodings = asm::resolver::instruction::resolve_encoding(
                 query.report,
                 opts,
@@ -108,7 +285,7 @@ pub fn eval_asm(
                 defs,
                 &mut inner_ctx,
                 &mut new_eval_ctx);
-
+                
             if let Some(_) = attempted_match_excerpt
             {
                 query.report.pop_parent();
@@ -127,23 +304,22 @@ pub fn eval_asm(
                     &encodings[0].1,
                     (size, 0));
             }
-            else if !ctx.can_guess()
+            else 
             {
-                return Err(());
+                unstable = true;
+
+                if !inner_ctx.can_guess()
+                {
+                    return Err(());
+                }
             }
-        }
-
-        else
-        {
-            query.report.error_span(
-                "invalid content for `asm` block",
-                node.span());
-
-            return Err(());
         }
     }
 
-    Ok(expr::Value::make_integer(result))
+    Ok(AsmBlockResult {
+        value: expr::Value::make_integer(result),
+        unstable,
+    })
 }
 
 

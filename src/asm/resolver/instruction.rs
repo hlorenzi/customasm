@@ -148,7 +148,7 @@ pub fn resolve_encoding<'encoding>(
 
     if num_encodings_resolved == 0
     {
-        if ctx.is_last_iteration
+        if !ctx.can_guess()
         {
             let mut msgs = Vec::new();
 
@@ -195,7 +195,7 @@ pub fn resolve_encoding<'encoding>(
 
     // Expect only a single remaining encoding
     // on the last iteration
-    if ctx.is_last_iteration &&
+    if !ctx.can_guess() &&
         smallest_encodings.len() > 1
     {
         let mut notes = Vec::new();
