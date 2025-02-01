@@ -150,11 +150,25 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 {
                     if decl.depth == 0
                     {
+                        let span = ast_symbol.decl_span;
+                        let bank = defs.bankdefs.get(self.bank_ref);
                         let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
-
+        
+                        let cur_address_in_bits = bank.addr_start
+                            .checked_mul(
+                                report,
+                                span,
+                                &util::BigInt::from(bank.addr_unit))?
+                            .checked_add(
+                                report,
+                                span,
+                                &util::BigInt::from(cur_bank_data.cur_position))?;
+    
                         cur_bank_data.cur_position += bits_until_alignment(
-                            cur_bank_data.cur_position,
-                            label_align);
+                            report,
+                            span,
+                            cur_address_in_bits,
+                            label_align)?;
                     }
                 }
 
@@ -363,12 +377,26 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
             {
                 let item_ref = ast_align.item_ref.unwrap();
                 let align = defs.align_directives.get(item_ref);
+                let span = ast_align.expr.span();
 
+                let bank = defs.bankdefs.get(self.bank_ref);
                 let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
 
+                let cur_address_in_bits = bank.addr_start
+                    .checked_mul(
+                        report,
+                        span,
+                        &util::BigInt::from(bank.addr_unit))?
+                    .checked_add(
+                        report,
+                        span,
+                        &util::BigInt::from(cur_bank_data.cur_position))?;
+
                 cur_bank_data.cur_position += bits_until_alignment(
-                    cur_bank_data.cur_position,
-                    align.align_size);
+                    report,
+                    span,
+                    cur_address_in_bits,
+                    align.align_size)?;
             }
 
             asm::AstAny::DirectiveAddr(ast_addr) =>
@@ -408,24 +436,33 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
 
 fn bits_until_alignment(
-    position: usize,
+    report: &mut diagn::Report,
+    span: diagn::Span,
+    cur_address_in_bits: util::BigInt,
     alignment: usize)
-    -> usize
+    -> Result<usize, ()>
 {
     if alignment == 0
     {
-        return 0;
+        return Ok(0);
     }
 
-    let excess_bits = position % alignment;
+    let excess_bits_bigint = cur_address_in_bits.checked_mod(
+        report,
+        span,
+        &util::BigInt::new(alignment, None))?;
+
+    let excess_bits = excess_bits_bigint.checked_into::<usize>(
+        report,
+        span)?;
         
     if excess_bits != 0
     {
-        alignment - excess_bits
+        Ok(alignment - excess_bits)
     }
     else
     {
-        0
+        Ok(0)
     }
 }
 
