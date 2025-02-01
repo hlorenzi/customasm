@@ -24,11 +24,11 @@ pub use self::fileserver::{
     FILESERVER_MOCK_WRITE_FILENAME_SUFFIX,
 };
 
-mod filename;
-pub use self::filename::{
+mod file_navigation;
+pub use self::file_navigation::{
     STD_PATH_PREFIX,
     is_std_path,
-    filename_validate,
+    filename_validate_relative,
     filename_navigate,
 };
 

@@ -5,6 +5,7 @@ mod examples;
 mod excerpt;
 mod expr;
 mod file;
+mod file_navigation;
 mod lib;
 
 

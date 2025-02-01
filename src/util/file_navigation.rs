@@ -12,7 +12,7 @@ pub fn is_std_path(
 }
 
 
-pub fn filename_validate(
+pub fn filename_validate_relative(
 	report: &mut diagn::Report,
 	span: diagn::Span,
 	filename: &str)
@@ -48,18 +48,18 @@ pub fn filename_navigate(
 	report: &mut diagn::Report,
 	span: diagn::Span,
 	current: &str,
-	nav: &str)
+	relative: &str)
 	-> Result<String, ()>
 {
-	if is_std_path(nav)
+	if is_std_path(relative)
 	{
-		return Ok(nav.to_string());
+		return Ok(relative.to_string());
 	}
 
 	let current = current.replace("\\", "/");
-	let nav = nav.replace("\\", "/");
+	let nav = relative.replace("\\", "/");
 
-	filename_validate(
+	filename_validate_relative(
 		report,
 		span,
 		&nav)?;
@@ -79,14 +79,25 @@ pub fn filename_navigate(
 		path_components.clear();
 	}
 
-	// Add the new path components
-	for split in nav.split("/")
+	// Add the new path components, collapsing `.` and empty components
+	let relative_components: Vec<&str> = nav
+		.split("/")
+		.filter(|s| s.len() > 0 && s != &".")
+		.collect();
+
+	if relative_components.len() == 0
+	{
+		report.error_span(
+			"invalid filename",
+			span);
+		
+		return Err(());
+	}
+		
+	for split in relative_components
 	{
 		path_components.push(split);
 	}
-
-	// Collapse `.` and empty components
-	path_components.retain(|s| s.len() > 0 && s != &".");
 
 	// Collapse `..` components
 	let mut new_path_components = Vec::new();
@@ -117,6 +128,18 @@ pub fn filename_navigate(
 		{
 			new_filename.push_str("/");
 		}
+	}
+
+	if new_path_components.len() == 0 ||
+		new_filename == "" ||
+		new_filename == "." ||
+		new_filename == "/"
+	{
+		report.error_span(
+			"invalid filename",
+			span);
+		
+		return Err(());
 	}
 
 	Ok(new_filename)
