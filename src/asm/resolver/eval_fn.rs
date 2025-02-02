@@ -58,13 +58,12 @@ pub fn eval_fn(
             ctx,
             query)
     }
-    else if let expr::Value::Function(fn_index) = query.func
+    else if let expr::Value::Function(fn_ref) = query.func
     {
         query.eval_ctx.check_recursion_depth_limit(
             query.report,
             query.span)?;
         
-        let fn_ref = util::ItemRef::<asm::Function>::new(fn_index);
         let function = defs.functions.get(fn_ref);
         let symbol_decl = decls.symbols.get(function.item_ref);
         

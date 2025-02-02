@@ -16,12 +16,26 @@ pub fn eval(
     {
         match query
         {
+            expr::EvalQuery::CtxLabel(query_ctxlabel) =>
+                asm::resolver::eval_ctxlabel(
+                    decls,
+                    defs,
+                    ctx,
+                    query_ctxlabel),
+                    
             expr::EvalQuery::Variable(query_var) =>
                 asm::resolver::eval_variable(
                     decls,
                     defs,
                     ctx,
                     query_var),
+                    
+            expr::EvalQuery::Member(query_member) =>
+                asm::resolver::eval_member(
+                    decls,
+                    defs,
+                    Some(ctx),
+                    query_member),
                     
             expr::EvalQuery::Function(query_fn) =>
                 asm::resolver::eval_fn(
@@ -64,11 +78,21 @@ pub fn eval_simple(
     {
         match query
         {
+            expr::EvalQuery::CtxLabel(_) =>
+                Ok(expr::Value::Unknown),
+                
             expr::EvalQuery::Variable(query_var) =>
                 asm::resolver::eval_variable_simple(
                     decls,
                     defs,
                     query_var),
+                    
+            expr::EvalQuery::Member(query_member) =>
+                asm::resolver::eval_member(
+                    decls,
+                    defs,
+                    None,
+                    query_member),
                     
             expr::EvalQuery::Function(_) =>
                 Ok(expr::Value::Unknown),
@@ -107,11 +131,21 @@ pub fn eval_certain(
     {
         match query
         {
+            expr::EvalQuery::CtxLabel(_) =>
+                Ok(expr::Value::Unknown),
+                
             expr::EvalQuery::Variable(query_var) =>
                 asm::resolver::eval_variable_certain(
                     decls,
                     defs,
                     query_var),
+                    
+            expr::EvalQuery::Member(query_member) =>
+                asm::resolver::eval_member(
+                    decls,
+                    defs,
+                    None,
+                    query_member),
                     
             expr::EvalQuery::Function(_) =>
                 Ok(expr::Value::Unknown),
@@ -148,6 +182,39 @@ pub fn eval_certain(
 }
 
 
+pub fn eval_ctxlabel(
+    decls: &asm::ItemDecls,
+    defs: &asm::ItemDefs,
+    ctx: &asm::ResolverContext,
+    query: &mut expr::EvalCtxLabelQuery)
+    -> Result<expr::Value, ()>
+{
+    let symbol_ref = decls.symbols.get_current_label(
+        query.report,
+        query.span,
+        ctx.symbol_ctx,
+        query.nesting_level)?;
+
+    let symbol = defs.symbols.get(symbol_ref);
+
+    if symbol.value.is_unknown() &&
+        !ctx.can_guess()
+    {
+        query.report.error_span(
+            format!(
+                "unresolved symbol `{}`",
+                decls.symbols.get_displayable_name(
+                    0,
+                    ctx.symbol_ctx.get_hierarchy())),
+            query.span);
+
+        return Err(());
+    }
+
+    Ok(symbol.value.clone())
+}
+
+
 pub fn eval_variable(
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -179,32 +246,21 @@ pub fn eval_variable(
 
     let symbol = defs.symbols.get(symbol_ref);
 
-    let value = {
-        match symbol.value.clone()
-        {
-            value @ expr::Value::Unknown =>
-            {
-                if !ctx.can_guess()
-                {
-                    query.report.error_span(
-                        format!(
-                            "unresolved symbol `{}`",
-                            decls.symbols.get_displayable_name(
-                                query.hierarchy_level,
-                                query.hierarchy)),
-                        query.span);
-            
-                    return Err(());
-                }
+    if symbol.value.is_unknown() &&
+        !ctx.can_guess()
+    {
+        query.report.error_span(
+            format!(
+                "unresolved symbol `{}`",
+                decls.symbols.get_displayable_name(
+                    query.hierarchy_level,
+                    query.hierarchy)),
+            query.span);
 
-                value
-            }
+        return Err(());
+    }
 
-            value => value,
-        }
-    };
-
-    Ok(value)
+    Ok(symbol.value.clone())
 }
 
 
@@ -270,28 +326,22 @@ pub fn eval_variable_certain(
         query.hierarchy_level,
         query.hierarchy)?;
 
-    let maybe_symbol = defs.symbols.maybe_get(symbol_ref);
+    let value = defs.symbols
+        .maybe_get(symbol_ref)
+        .map_or(expr::Value::Unknown, |s| s.value.clone());
 
-    let value = {
-        match maybe_symbol.map(|s| s.value.clone())
-        {
-            None |
-            Some(expr::Value::Unknown) =>
-            {
-                query.report.error_span(
-                    format!(
-                        "unresolved symbol `{}`",
-                        decls.symbols.get_displayable_name(
-                            query.hierarchy_level,
-                            query.hierarchy)),
-                    query.span);
-        
-                return Err(());
-            }
+    if value.is_unknown()
+    {
+        query.report.error_span(
+            format!(
+                "unresolved symbol `{}`",
+                decls.symbols.get_displayable_name(
+                    query.hierarchy_level,
+                    query.hierarchy)),
+            query.span);
 
-            Some(value) => value,
-        }
-    };
+        return Err(());
+    }
 
     Ok(value)
 }
@@ -328,4 +378,48 @@ fn eval_builtin_symbol(
             }
         }
     }
+}
+
+
+pub fn eval_member(
+    decls: &asm::ItemDecls,
+    defs: &asm::ItemDefs,
+    _ctx: Option<&asm::ResolverContext>,
+    query: &mut expr::EvalMemberQuery)
+    -> Result<expr::Value, ()>
+{
+    if let expr::Value::Symbol(symbol_ref, ..) = query.value
+    {
+        let subsymbol_ref = decls.symbols.traverse(
+            Some(symbol_ref),
+            &[query.member_name]);
+
+        match subsymbol_ref
+        {
+            Some(subsymbol_ref) =>
+            {
+                let subsymbol = defs.symbols.get(subsymbol_ref);
+                return Ok(subsymbol.value.clone());
+            }
+            None =>
+            {
+                query.report.error_span(
+                    format!(
+                        "unknown nested label `{}`",
+                        query.member_name),
+                    query.span);
+                
+                return Err(());
+            }
+        }
+    }
+    
+    query.report.error_span(
+        format!(
+            "unknown member `{}` in {}",
+            query.member_name,
+            query.value.type_name()),
+        query.span);
+
+    Err(())
 }

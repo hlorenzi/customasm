@@ -23,7 +23,8 @@ pub fn resolve_ifs(
                 report,
                 decls,
                 defs,
-                &node.condition_expr)?;
+                &node.condition_expr)?
+            .get_value();
 
         let expr::Value::Bool(condition_result) = condition_result
             else { continue };

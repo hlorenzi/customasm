@@ -5,7 +5,16 @@ use crate::*;
 pub enum Expr
 {
 	Literal(diagn::Span, Value),
-	Variable(diagn::Span, usize, Vec<String>),
+	Variable(diagn::Span, String),
+	NestingLevel {
+		span: diagn::Span,
+		nesting_level: usize,
+	},
+	MemberAccess {
+		span: diagn::Span,
+		lhs: Box<Expr>,
+		member_name: String,
+	},
 	UnaryOp(diagn::Span, diagn::Span, UnaryOp, Box<Expr>),
 	BinaryOp(diagn::Span, diagn::Span, BinaryOp, Box<Expr>, Box<Expr>),
 	TernaryOp(diagn::Span, Box<Expr>, Box<Expr>, Box<Expr>),
@@ -17,7 +26,7 @@ pub enum Expr
 }
 
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value
 {
 	Unknown,
@@ -26,9 +35,10 @@ pub enum Value
 	Integer(util::BigInt),
 	String(ExprString),
 	Bool(bool),
+	Symbol(util::ItemRef<asm::Symbol>, Box<Value>),
 	ExprBuiltInFunction(String),
 	AsmBuiltInFunction(String),
-	Function(usize /*util::ItemRef<asm2::Function>*/),
+	Function(util::ItemRef<asm::Function>),
 }
 
 
@@ -79,16 +89,18 @@ impl Expr
 	{
 		match self
 		{
-			&Expr::Literal   (span, ..) => span,
-			&Expr::Variable  (span, ..) => span,
-			&Expr::UnaryOp   (span, ..) => span,
-			&Expr::BinaryOp  (span, ..) => span,
-			&Expr::TernaryOp (span, ..) => span,
-			&Expr::Slice     (span, ..) => span,
-			&Expr::SliceShort(span, ..) => span,
-			&Expr::Block     (span, ..) => span,
-			&Expr::Call      (span, ..) => span,
-			&Expr::Asm       (span, ..) => span,
+			&Expr::Literal      (span, ..) => span,
+			&Expr::Variable     (span, ..) => span,
+			&Expr::NestingLevel { span, .. } => span,
+			&Expr::MemberAccess { span, .. } => span,
+			&Expr::UnaryOp      (span, ..) => span,
+			&Expr::BinaryOp     (span, ..) => span,
+			&Expr::TernaryOp    (span, ..) => span,
+			&Expr::Slice        (span, ..) => span,
+			&Expr::SliceShort   (span, ..) => span,
+			&Expr::Block        (span, ..) => span,
+			&Expr::Call         (span, ..) => span,
+			&Expr::Asm          (span, ..) => span,
 		}
 	}
 }
@@ -96,9 +108,27 @@ impl Expr
 
 impl Value
 {
-	pub fn is_unknown(&self) -> bool
+	pub fn type_name(&self) -> &str
 	{
 		match self
+		{
+			Value::Unknown => "unknown",
+			Value::FailedConstraint(..) => "failed constraint",
+			Value::Void => "void",
+			Value::Integer(..) => "integer",
+			Value::String(..) => "string",
+			Value::Bool(..) => "bool",
+			Value::Symbol(..) => "symbol",
+			Value::ExprBuiltInFunction(..) => "built-in function",
+			Value::AsmBuiltInFunction(..) => "built-in function",
+			Value::Function(..) => "function",
+		}
+	}
+
+
+	pub fn is_unknown(&self) -> bool
+	{
+		match self.get_value_ref()
 		{
 			Value::Unknown => true,
 			_ => false,
@@ -108,7 +138,7 @@ impl Value
 
 	pub fn should_propagate(&self) -> bool
 	{
-		match self
+		match self.get_value_ref()
 		{
 			Value::Unknown => true,
 			Value::FailedConstraint(_) => true,
@@ -145,9 +175,39 @@ impl Value
 	}
 
 
-	pub fn get_bigint(&self) -> Option<util::BigInt>
+	pub fn get_value(self) -> expr::Value
 	{
 		match self
+		{
+			Value::Symbol(_, value) => *value,
+			_ => self,
+		}
+	}
+
+
+	pub fn get_value_ref(&self) -> &expr::Value
+	{
+		match self
+		{
+			Value::Symbol(_, value) => value,
+			_ => self,
+		}
+	}
+
+
+	pub fn get_value_mut(&mut self) -> &mut expr::Value
+	{
+		match self
+		{
+			Value::Symbol(_, value) => value,
+			_ => self,
+		}
+	}
+
+
+	pub fn get_bigint(&self) -> Option<util::BigInt>
+	{
+		match self.get_value_ref()
 		{
 			&Value::Integer(ref bigint) => Some(bigint.clone()),
 			&Value::String(ref s) => Some(s.to_bigint()),
@@ -160,13 +220,13 @@ impl Value
 		&'a self)
 		-> std::borrow::Cow<'a, expr::Value>
 	{
-		match self
+		match self.get_value_ref()
 		{
 			Value::String(ref s) =>
 				std::borrow::Cow::Owned(
 					expr::Value::Integer(s.to_bigint())),
 
-			_ => std::borrow::Cow::Borrowed(self),
+			value => std::borrow::Cow::Borrowed(value),
 		}
 	}
 
@@ -175,7 +235,7 @@ impl Value
 		&self)
 		-> &util::BigInt
 	{
-		match self
+		match self.get_value_ref()
 		{
 			Value::Integer(bigint) => bigint,
 			_ => panic!(),
@@ -189,7 +249,7 @@ impl Value
 		span: diagn::Span)
 		-> Result<&util::BigInt, ()>
 	{
-		match self
+		match self.get_value_ref()
 		{
 			Value::Integer(bigint) => Ok(bigint),
 
@@ -202,10 +262,12 @@ impl Value
 				Err(())
 			}
 
-			_ =>
+			value =>
 			{
 				report.error_span(
-					"expected integer",
+					format!(
+						"expected integer, got {}",
+						value.type_name()),
 					span);
 
 				Err(())
@@ -220,10 +282,10 @@ impl Value
 		span: diagn::Span)
 		-> Result<&mut util::BigInt, ()>
 	{
-		match self
+		match self.get_value_mut()
 		{
 			Value::Integer(ref mut bigint) => Ok(bigint),
-			
+
 			Value::Unknown =>
 			{
 				report.error_span(
@@ -233,10 +295,12 @@ impl Value
 				Err(())
 			}
 
-			_ =>
+			value =>
 			{
 				report.error_span(
-					"expected integer",
+					format!(
+						"expected integer, got {}",
+						value.get_value_ref().type_name()),
 					span);
 
 				Err(())
@@ -260,7 +324,9 @@ impl Value
 			None =>
 			{
 				report.error_span(
-					"expected integer with definite size",
+					format!(
+						"expected integer with definite size, got {}",
+						self.get_value_ref().type_name()),
 					span);
 
 				Err(())
@@ -284,10 +350,12 @@ impl Value
 			value @ expr::Value::Integer(_) =>
 				Ok(value.to_owned()),
 
-			_ =>
+			value =>
 			{
 				report.error_span(
-					"expected integer",
+					format!(
+						"expected integer, got {}",
+						value.type_name()),
 					span);
 
 				Err(())
@@ -312,10 +380,12 @@ impl Value
 				if bigint.size.is_some() =>
 				Ok(expr::Value::Integer(bigint.to_owned())),
 
-			_ =>
+			value =>
 			{
 				report.error_span(
-					"expected integer with definite size",
+					format!(
+						"expected integer with definite size, got {}",
+						value.type_name()),
 					span);
 
 				Err(())
@@ -339,10 +409,12 @@ impl Value
 			value @ expr::Value::Bool(_) =>
 				Ok(value.to_owned()),
 
-			_ =>
+			value =>
 			{
 				report.error_span(
-					"expected boolean",
+					format!(
+						"expected boolean, got {}",
+						value.type_name()),
 					span);
 
 				Err(())
@@ -353,7 +425,7 @@ impl Value
 
 	pub fn as_usize(&self) -> Option<usize>
 	{
-		match self
+		match self.get_value_ref()
 		{
 			Value::Integer(ref bigint) =>
 				bigint.maybe_into::<usize>(),
@@ -369,7 +441,7 @@ impl Value
 		span: diagn::Span)
 		-> Result<usize, ()>
 	{
-		match self
+		match self.get_value_ref()
 		{
 			Value::Integer(ref bigint) =>
 				bigint.checked_into::<usize>(
@@ -385,10 +457,12 @@ impl Value
 				Err(())
 			}
 
-			_ =>
+			value =>
 			{
 				report.error_span(
-					"expected non-negative integer",
+					format!(
+						"expected non-negative integer, got {}",
+						value.type_name()),
 					span);
 
 				Err(())
@@ -403,25 +477,27 @@ impl Value
 		span: diagn::Span)
 		-> Result<expr::Value, ()>
 	{
-		match &self
+		match self.get_value_ref()
 		{
-			expr::Value::Unknown |
-			expr::Value::FailedConstraint(_) =>
-				Ok(self),
-
-			Value::Integer(ref bigint) =>
+			value @ expr::Value::Unknown |
+			value @ expr::Value::FailedConstraint(_) =>
+				Ok(value.clone()),
+				
+			value @ expr::Value::Integer(ref bigint) =>
 			{
 				bigint.checked_into::<usize>(
 					report,
 					span)?;
 
-				Ok(self)
+				Ok(value.clone())
 			}
 
-			_ =>
+			value =>
 			{
 				report.error_span(
-					"expected non-negative integer",
+					format!(
+						"expected non-negative integer, got {}",
+						value.type_name()),
 					span);
 
 				Err(())
@@ -436,7 +512,7 @@ impl Value
 		span: diagn::Span)
 		-> Result<usize, ()>
 	{
-		match self
+		match self.get_value_ref()
 		{
 			Value::Integer(ref bigint) =>
 			{
@@ -454,10 +530,12 @@ impl Value
 				Err(())
 			}
 
-			_ =>
+			value =>
 			{
 				report.error_span(
-					"expected positive integer",
+					format!(
+						"expected positive integer, got {}",
+						value.type_name()),
 					span);
 
 				Err(())
@@ -472,13 +550,16 @@ impl Value
 		span: diagn::Span)
 		-> Result<bool, ()>
 	{
-		match self
+		match self.get_value_ref()
 		{
 			expr::Value::Bool(value) => Ok(*value),
-			_ =>
+
+			value =>
 			{
 				report.error_span(
-					"expected boolean",
+					format!(
+						"expected boolean, got {}",
+						value.type_name()),
 					span);
 
 				Err(())
@@ -493,13 +574,16 @@ impl Value
 		span: diagn::Span)
 		-> Result<&ExprString, ()>
 	{
-		match self
+		match self.get_value_ref()
 		{
 			expr::Value::String(value) => Ok(value),
-			_ =>
+
+			value =>
 			{
 				report.error_span(
-					"expected string",
+					format!(
+						"expected string, got {}",
+						value.type_name()),
 					span);
 
 				Err(())

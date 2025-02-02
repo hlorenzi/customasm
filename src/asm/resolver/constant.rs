@@ -70,7 +70,9 @@ fn resolve_constant_simple(
         .find(|s| s.name == symbol_decl.name)
     {
         let symbol = defs.symbols.get_mut(item_ref);
-        symbol.value = driver_def.value.clone();
+        symbol.value = expr::Value::Symbol(
+            item_ref,
+            Box::new(driver_def.value.clone()));
         symbol.resolved = true;
         return Ok(asm::ResolutionState::Resolved);
     }
@@ -84,10 +86,12 @@ fn resolve_constant_simple(
 
 
     let symbol = defs.symbols.get_mut(item_ref);
-    symbol.value = value;
+    symbol.value = expr::Value::Symbol(
+        item_ref,
+        Box::new(value.get_value()));
 
 
-    if symbol.value.is_unknown()
+    if symbol.value.get_value_ref().is_unknown()
     {
         return Ok(asm::ResolutionState::Unresolved);
     }
@@ -103,7 +107,7 @@ fn resolve_constant_simple(
         {
             println!("const: {} = {:?} [static]",
                 ast_symbol.name,
-                symbol.value);
+                symbol.value.get_value_ref());
         }
 
         symbol.resolved = true;
@@ -115,7 +119,7 @@ fn resolve_constant_simple(
     {
         println!("const: {} = {:?}",
             ast_symbol.name,
-            symbol.value);
+            symbol.value.get_value_ref());
     }
     
     Ok(asm::ResolutionState::Resolved)
@@ -156,7 +160,9 @@ pub fn resolve_constant(
 
     let symbol = defs.symbols.get_mut(item_ref);
     let prev_value = symbol.value.clone();
-    symbol.value = value;
+    symbol.value = expr::Value::Symbol(
+        item_ref,
+        Box::new(value.get_value()));
 
     
     // Optimize future iterations for the case where it's
@@ -170,7 +176,7 @@ pub fn resolve_constant(
         {
             println!("const: {} = {:?} [static]",
                 ast_symbol.name,
-                symbol.value);
+                symbol.value.get_value_ref());
         }
 
         symbol.resolved = true;
@@ -178,7 +184,7 @@ pub fn resolve_constant(
     }
 
 
-    if symbol.value != prev_value
+    if symbol.value.get_value_ref() != prev_value.get_value_ref()
     {
         // On the final iteration, unstable guesses become errors
         if ctx.is_last_iteration
@@ -192,7 +198,7 @@ pub fn resolve_constant(
         {
             println!("const: {} = {:?}",
                 ast_symbol.name,
-                symbol.value);
+                symbol.value.get_value_ref());
         }
 
         return Ok(asm::ResolutionState::Unresolved);

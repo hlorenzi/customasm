@@ -454,15 +454,16 @@ fn resolve_instruction_match_inner(
     let mut rule_ctx = (*ctx).clone();
     rule_ctx.file_handle_ctx = Some(rule.expr.span().file_handle);
 
-    asm::resolver::eval(
-        report,
-        opts,
-        fileserver,
-        decls,
-        defs,
-        &rule_ctx,
-        &mut eval_ctx,
-        &rule.expr)
+    Ok(asm::resolver::eval(
+            report,
+            opts,
+            fileserver,
+            decls,
+            defs,
+            &rule_ctx,
+            &mut eval_ctx,
+            &rule.expr)?
+        .get_value())
 }
 
 

@@ -131,7 +131,7 @@ impl util::SymbolManager<asm::Symbol>
 
             if !symbol.no_emit
             {
-                match symbol.value
+                match symbol.value.get_value_ref()
                 {
                     expr::Value::Integer(ref bigint) =>
                     {

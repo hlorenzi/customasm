@@ -23,11 +23,13 @@ pub fn resolve_label(
 
         let symbol = defs.symbols.get_mut(item_ref);
         let prev_value = symbol.value.clone();
-        symbol.value = expr::Value::Integer(value);
+        symbol.value = expr::Value::Symbol(
+            item_ref,
+            Box::new(expr::Value::Integer(value)));
         symbol.bankdef_ref = Some(ctx.bank_ref);
 
 
-        if symbol.value != prev_value
+        if symbol.value.get_value_ref() != prev_value.get_value_ref()
         {
             // On the final iteration, unstable guesses become errors
             if ctx.is_last_iteration
@@ -41,7 +43,7 @@ pub fn resolve_label(
             {
                 println!("label: {} = {:?}",
                     ast_symbol.name,
-                    symbol.value);
+                    symbol.value.get_value_ref());
             }
             
             return Ok(asm::ResolutionState::Unresolved);
