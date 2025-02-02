@@ -34,9 +34,11 @@ pub use eval::{
     eval,
     eval_simple,
     eval_certain,
+    eval_ctxlabel,
     eval_variable,
     eval_variable_simple,
     eval_variable_certain,
+    eval_member,
 };
 
 mod eval_asm;

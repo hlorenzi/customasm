@@ -30,7 +30,7 @@ pub fn resolve_addr(
     let value = {
         match value
         {
-            expr::Value::Integer(bigint) => bigint,
+            expr::Value::Integer(_, bigint) => bigint,
             _ => util::BigInt::new(0, None),
         }
     };

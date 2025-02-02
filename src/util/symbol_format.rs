@@ -133,7 +133,7 @@ impl util::SymbolManager<asm::Symbol>
             {
                 match symbol.value
                 {
-                    expr::Value::Integer(ref bigint) =>
+                    expr::Value::Integer(_, ref bigint) =>
                     {
                         let mut name = String::new();
 

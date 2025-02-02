@@ -1,0 +1,1 @@
+#d 123.size ; error: failed / error: definite size

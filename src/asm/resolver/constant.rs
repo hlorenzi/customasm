@@ -71,6 +71,7 @@ fn resolve_constant_simple(
     {
         let symbol = defs.symbols.get_mut(item_ref);
         symbol.value = driver_def.value.clone();
+        symbol.value.get_mut_metadata().symbol_ref = Some(item_ref);
         symbol.resolved = true;
         return Ok(asm::ResolutionState::Resolved);
     }
@@ -85,6 +86,7 @@ fn resolve_constant_simple(
 
     let symbol = defs.symbols.get_mut(item_ref);
     symbol.value = value;
+    symbol.value.get_mut_metadata().symbol_ref = Some(item_ref);
 
 
     if symbol.value.is_unknown()
@@ -157,6 +159,7 @@ pub fn resolve_constant(
     let symbol = defs.symbols.get_mut(item_ref);
     let prev_value = symbol.value.clone();
     symbol.value = value;
+    symbol.value.get_mut_metadata().symbol_ref = Some(item_ref);
 
     
     // Optimize future iterations for the case where it's

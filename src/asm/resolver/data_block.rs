@@ -45,9 +45,9 @@ pub fn resolve_data_element(
             report,
             expr.span())?
         {
-            expr::Value::Integer(i) => Some(i),
+            expr::Value::Integer(_, i) => Some(i),
 
-            expr::Value::Unknown =>
+            expr::Value::Unknown(_) =>
             {
                 if ctx.is_last_iteration ||
                     data_elem.encoding_statically_known
@@ -62,7 +62,7 @@ pub fn resolve_data_element(
                 None
             }
 
-            expr::Value::FailedConstraint(msg) =>
+            expr::Value::FailedConstraint(_, msg) =>
             {
                 if ctx.is_last_iteration ||
                     data_elem.encoding_statically_known

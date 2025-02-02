@@ -1,4 +1,3 @@
-#[derive(Eq, PartialEq)]
 pub struct ItemRef<T>(
     pub usize,
     std::marker::PhantomData<*const T>);
@@ -23,6 +22,15 @@ impl<T> Clone for ItemRef<T>
 
 
 impl<T> Copy for ItemRef<T> {}
+
+
+impl<T> PartialEq for ItemRef<T>
+{
+    fn eq(&self, other: &Self) -> bool
+    {
+        self.0 == other.0
+    }
+}
 
 
 impl<T> std::fmt::Debug for ItemRef<T>

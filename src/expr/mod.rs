@@ -2,6 +2,7 @@ mod expression;
 pub use self::expression::{
     Expr,
     Value,
+    ValueMetadata,
     ExprString,
     UnaryOp,
     BinaryOp,
@@ -26,14 +27,21 @@ pub use self::eval::{
     EvalContext,
     EvalProvider,
     EvalQuery,
+    EvalCtxLabelQuery,
     EvalVariableQuery,
+    EvalMemberQuery,
     EvalFunctionQuery,
     EvalAsmBlockQuery,
     dummy_eval_query,
+    dummy_eval_ctxlabel,
     dummy_eval_var,
+    dummy_eval_member,
     dummy_eval_fn,
     dummy_eval_asm,
 };
+
+mod builtin_member;
+pub use self::builtin_member::resolve_builtin_member;
 
 mod builtin_fn;
 pub use self::builtin_fn::{

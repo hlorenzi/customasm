@@ -4,8 +4,16 @@ use crate::*;
 pub struct StaticallyKnownProvider<'a>
 {
 	pub locals: std::collections::HashMap<String, StaticallyKnownLocal>,
+	pub query_nesting_level: &'a dyn Fn(&StaticallyKnownNestingLevelQuery) -> bool,
 	pub query_variable: &'a dyn Fn(&StaticallyKnownVariableQuery) -> bool,
+	pub query_member: &'a dyn Fn(&StaticallyKnownMemberQuery) -> bool,
 	pub query_function: &'a dyn Fn(&StaticallyKnownFunctionQuery) -> bool,
+}
+
+
+pub struct StaticallyKnownNestingLevelQuery
+{
+	pub hierarchy_level: usize,
 }
 
 
@@ -13,6 +21,13 @@ pub struct StaticallyKnownVariableQuery<'a>
 {
 	pub hierarchy_level: usize,
 	pub hierarchy: &'a Vec<String>,
+}
+
+
+pub struct StaticallyKnownMemberQuery<'a>
+{
+	pub value: &'a expr::Expr,
+	pub member_name: &'a String,
 }
 
 
@@ -29,7 +44,9 @@ impl<'a> StaticallyKnownProvider<'a>
 	{
 		StaticallyKnownProvider {
 			locals: std::collections::HashMap::new(),
+			query_nesting_level: &|_| false,
 			query_variable: &|_| false,
+			query_member: &|_| false,
 			query_function: &|_| false,
 		}
 	}
@@ -64,24 +81,20 @@ impl expr::Expr
 	{
 		match self
 		{
-			expr::Expr::Variable(_, hierarchy_level, ref hierarchy) =>
+			expr::Expr::Variable(_, ref name) =>
 			{
-				if *hierarchy_level != 0 ||
-					hierarchy.len() != 1
-				{
-					return None;
-				}
-
-				if let Some(StaticallyKnownLocal { size: Some(size), .. }) =
-					provider.locals.get(&hierarchy[0])
+				if let Some(StaticallyKnownLocal { size: Some(size), .. }) = provider.locals.get(name)
 				{
 					return Some(*size);
 				}
 
 				None
 			}
+
+			expr::Expr::NestingLevel { .. } => None,
+			expr::Expr::MemberAccess { .. } => None,
 			
-			expr::Expr::Literal(_, expr::Value::Integer(util::BigInt { size: Some(size), .. })) =>
+			expr::Expr::Literal(_, expr::Value::Integer(_, util::BigInt { size: Some(size), .. })) =>
 				Some(*size),
 
 			expr::Expr::Literal(..) => None,
@@ -138,19 +151,12 @@ impl expr::Expr
 
 			expr::Expr::Call(_, func, args) =>
 			{
-				if let expr::Expr::Variable(_, 0, ref names) = *func.as_ref()
+				if let expr::Expr::Variable(_, ref name) = *func.as_ref()
 				{
-					if names.len() == 1
-					{
-						expr::get_static_size_builtin_fn(
-							&names[0],
-							provider,
-							&args)
-					}
-					else
-					{
-						None
-					}
+					expr::get_static_size_builtin_fn(
+						name,
+						provider,
+						&args)
 				}
 				else
 				{
@@ -170,23 +176,51 @@ impl expr::Expr
 	{
 		match self
 		{
-			expr::Expr::Variable(_, hierarchy_level, ref hierarchy) =>
+			expr::Expr::Variable(_, ref name) =>
 			{
-				if *hierarchy_level == 0 && hierarchy.len() == 1
+				if let Some(var) = provider.locals.get(name)
 				{
-					if let Some(var) = provider.locals.get(&hierarchy[0])
-					{
-						return var.value_known;
-					}
+					return var.value_known;
 				}
 
 				let query = StaticallyKnownVariableQuery {
-					hierarchy,
-					hierarchy_level: *hierarchy_level,
+					hierarchy: &vec![name.clone()],
+					hierarchy_level: 0,
 				};
 
 				(provider.query_variable)(&query)
 			}
+
+			expr::Expr::NestingLevel { .. } => false,
+			expr::Expr::MemberAccess { .. } => false,
+
+			/* TODO
+			
+			&expr::Expr::NestingLevel { span, nesting_level } =>
+			{
+				let mut query = EvalCtxLabelQuery {
+					report,
+					span,
+					nesting_level,
+				};
+
+				provider(EvalQuery::CtxLabel(&mut query))
+			}	
+
+			&expr::Expr::MemberAccess { span, ref lhs, ref member_name } =>
+			{
+				let value = propagate!(lhs
+					.eval_with_ctx(report, ctx, provider)?);
+
+				let mut query = EvalMemberQuery {
+					report,
+					span,
+					value,
+					member_name,
+				};
+
+				provider(EvalQuery::Member(&mut query))
+			}*/
 			
 			expr::Expr::Literal(_, _) => true,
 
@@ -233,7 +267,7 @@ impl expr::Expr
 
 			expr::Expr::Call(_, func, args) =>
 			{
-				if let expr::Expr::Variable(_, 0, ref names) = *func.as_ref()
+				if let expr::Expr::Variable(_, ref name) = *func.as_ref()
 				{
 					for arg in args
 					{
@@ -243,26 +277,19 @@ impl expr::Expr
 						}
 					}
 					
-					if names.len() == 1
+					if expr::get_statically_known_value_builtin_fn(
+						name,
+						&args)
 					{
-						if expr::get_statically_known_value_builtin_fn(
-							&names[0],
-							&args)
-						{
-							return true;
-						}
-							
-						let query = StaticallyKnownFunctionQuery {
-							func: &names[0],
-							args,
-						};
+						return true;
+					}
+						
+					let query = StaticallyKnownFunctionQuery {
+						func: name,
+						args,
+					};
 
-						(provider.query_function)(&query)
-					}
-					else
-					{
-						false
-					}
+					(provider.query_function)(&query)
 				}
 				else
 				{

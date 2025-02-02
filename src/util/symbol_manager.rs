@@ -41,6 +41,15 @@ pub struct SymbolContext
 }
 
 
+impl SymbolContext
+{
+    pub fn get_hierarchy(&self) -> &[String]
+    {
+        &self.hierarchy
+    }
+}
+
+
 impl<T> SymbolManager<T>
 {
     pub fn new(report_as: &'static str) -> SymbolManager<T>
@@ -54,7 +63,7 @@ impl<T> SymbolManager<T>
     }
 
 
-    fn traverse<S>(
+    pub fn traverse<S>(
         &self,
         parent_ref: Option<util::ItemRef<T>>,
         hierarchy: &[S])
@@ -228,6 +237,42 @@ impl<T> SymbolManager<T>
                     span);
 
                 Err(())
+            }
+        }
+    }
+
+
+    pub fn get_current_label(
+        &self,
+        report: &mut diagn::Report,
+        span: diagn::Span,
+        ctx: &SymbolContext,
+        hierarchy_level: usize)
+        -> Result<util::ItemRef<T>, ()>
+    {
+        if hierarchy_level > ctx.hierarchy.len()
+        {
+            report.error_span(
+                "invalid label hierarchy",
+                span);
+            
+            return Err(());
+        }
+        
+        let maybe_label = self.get_parent(
+            None,
+            &ctx.hierarchy[0..hierarchy_level]);
+
+        match maybe_label
+        {
+            Some(label) => Ok(label),
+            None =>
+            {
+                report.error_span(
+                    "invalid label hierarchy",
+                    span);
+                
+                return Err(());
             }
         }
     }

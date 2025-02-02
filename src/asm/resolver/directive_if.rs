@@ -25,7 +25,7 @@ pub fn resolve_ifs(
                 defs,
                 &node.condition_expr)?;
 
-        let expr::Value::Bool(condition_result) = condition_result
+        let expr::Value::Bool(_, condition_result) = condition_result
             else { continue };
             
         if opts.debug_iterations

@@ -158,9 +158,19 @@ pub type EvalProvider<'provider> =
 
 pub enum EvalQuery<'a>
 {
+	CtxLabel(&'a mut EvalCtxLabelQuery<'a>),
 	Variable(&'a mut EvalVariableQuery<'a>),
+	Member(&'a mut EvalMemberQuery<'a>),
 	Function(&'a mut EvalFunctionQuery<'a>),
 	AsmBlock(&'a mut EvalAsmBlockQuery<'a>),
+}
+
+
+pub struct EvalCtxLabelQuery<'a>
+{
+	pub report: &'a mut diagn::Report,
+	pub nesting_level: usize,
+	pub span: diagn::Span,
 }
 
 
@@ -169,6 +179,15 @@ pub struct EvalVariableQuery<'a>
 	pub report: &'a mut diagn::Report,
 	pub hierarchy_level: usize,
 	pub hierarchy: &'a Vec<String>,
+	pub span: diagn::Span,
+}
+
+
+pub struct EvalMemberQuery<'a>
+{
+	pub report: &'a mut diagn::Report,
+	pub value: expr::Value,
+	pub member_name: &'a str,
 	pub span: diagn::Span,
 }
 
@@ -262,8 +281,14 @@ pub fn dummy_eval_query(
 {
 	match query
 	{
+		expr::EvalQuery::CtxLabel(query_ctxlabel) =>
+			expr::dummy_eval_ctxlabel(query_ctxlabel),
+		
 		expr::EvalQuery::Variable(query_var) =>
 			expr::dummy_eval_var(query_var),
+		
+		expr::EvalQuery::Member(query_member) =>
+			expr::dummy_eval_member(query_member),
 		
 		expr::EvalQuery::Function(query_fn) =>
 			expr::dummy_eval_fn(query_fn),
@@ -274,12 +299,41 @@ pub fn dummy_eval_query(
 }
 
 
+pub fn dummy_eval_ctxlabel(
+	query: &mut EvalCtxLabelQuery)
+	-> Result<expr::Value, ()>
+{
+	query.report.error_span(
+		"cannot reference contextual labels in this context",
+		query.span);
+		
+	Err(())
+}
+
+
 pub fn dummy_eval_var(
 	query: &mut EvalVariableQuery)
 	-> Result<expr::Value, ()>
 {
 	query.report.error_span(
 		"cannot reference variables in this context",
+		query.span);
+		
+	Err(())
+}
+
+
+pub fn dummy_eval_member(
+	query: &mut EvalMemberQuery)
+	-> Result<expr::Value, ()>
+{
+	if let Some(value) = expr::resolve_builtin_member(query)?
+	{
+		return Ok(value);
+	}
+
+	query.report.error_span(
+		"cannot access members in this context",
 		query.span);
 		
 	Err(())
@@ -339,7 +393,7 @@ impl expr::Expr
 			&mut EvalContext::new(),
 			&mut dummy_eval_query);
 
-		if let Ok(expr::Value::Integer(bigint)) = value
+		if let Ok(expr::Value::Integer(_, bigint)) = value
 		{
 			bigint.maybe_into::<usize>()
 		}
@@ -410,46 +464,70 @@ impl expr::Expr
 		{
 			&expr::Expr::Literal(_, ref value) => Ok(value.clone()),
 			
-			&expr::Expr::Variable(span, hierarchy_level, ref hierarchy) =>
+			&expr::Expr::Variable(span, ref name) =>
 			{
-				let mut query = EvalVariableQuery {
-					report,
-					hierarchy_level,
-					hierarchy,
-					span,
-				};
-
-				if hierarchy_level == 0 && hierarchy.len() == 1
+				if let Some(_) = expr::resolve_builtin_fn(name)
 				{
-					if let Some(_) = expr::resolve_builtin_fn(&hierarchy[0])
-					{
-						return Ok(expr::Value::ExprBuiltInFunction(
-							hierarchy[0].clone()));
-					}
-
-					if let Ok(local_value) = ctx.get_local(&hierarchy[0])
-					{
-						return Ok(local_value);
-					}
+					return Ok(expr::Value::ExprBuiltInFunction(expr::Value::make_metadata(), name.clone()));
 				}
 
+				if let Ok(local_value) = ctx.get_local(name)
+				{
+					return Ok(local_value);
+				}
+
+				let mut query = EvalVariableQuery {
+					report,
+					span,
+					hierarchy_level: 0,
+					hierarchy: &vec![name.clone()],
+				};
+
 				provider(EvalQuery::Variable(&mut query))
+			}
+
+			&expr::Expr::NestingLevel { span, nesting_level } =>
+			{
+				let mut query = EvalCtxLabelQuery {
+					report,
+					span,
+					nesting_level,
+				};
+
+				provider(EvalQuery::CtxLabel(&mut query))
+			}	
+
+			&expr::Expr::MemberAccess { span, ref lhs, ref member_name } =>
+			{
+				let value = propagate!(lhs
+					.eval_with_ctx(report, ctx, provider)?);
+
+				let mut query = EvalMemberQuery {
+					report,
+					span,
+					value,
+					member_name,
+				};
+
+				provider(EvalQuery::Member(&mut query))
 			}
 			
 			&expr::Expr::UnaryOp(span, _, op, ref inner_expr) =>
 			{
-				match propagate!(
-					inner_expr.eval_with_ctx(report, ctx, provider)?)
+				let lhs = propagate!(inner_expr
+					.eval_with_ctx(report, ctx, provider)?);
+
+				match lhs
 				{
-					expr::Value::Integer(ref x) => match op
+					expr::Value::Integer(_, ref x) => match op
 					{
 						expr::UnaryOp::Neg => Ok(expr::Value::make_integer(-x)),
 						expr::UnaryOp::Not => Ok(expr::Value::make_integer(!x))
 					},
 					
-					expr::Value::Bool(b) => match op
+					expr::Value::Bool(_, b) => match op
 					{
-						expr::UnaryOp::Not => Ok(expr::Value::Bool(!b)),
+						expr::UnaryOp::Not => Ok(expr::Value::make_bool(!b)),
 						_ => Err(report.error_span("invalid argument type to operator", span))
 					},
 					
@@ -465,17 +543,13 @@ impl expr::Expr
 					
 					match lhs_expr.deref()
 					{
-						&expr::Expr::Variable(_, hierarchy_level, ref hierarchy) =>
+						&expr::Expr::Variable(_, ref name) =>
 						{
-							if hierarchy_level == 0 && hierarchy.len() == 1
-							{
-								let value = propagate!(
-									rhs_expr.eval_with_ctx(report, ctx, provider)?);
-								ctx.set_local(hierarchy[0].clone(), value);
-								return Ok(expr::Value::Void);
-							}
+							let value = propagate!(rhs_expr
+								.eval_with_ctx(report, ctx, provider)?);
 							
-							Err(report.error_span("symbol cannot be assigned to", lhs_expr.span()))
+							ctx.set_local(name.clone(), value);
+							return Ok(expr::Value::make_void());
 						}
 						
 						_ => Err(report.error_span("invalid assignment destination", lhs_expr.span()))
@@ -484,50 +558,50 @@ impl expr::Expr
 				
 				else if op == expr::BinaryOp::LazyOr || op == expr::BinaryOp::LazyAnd
 				{
-					let lhs = propagate!(
-						lhs_expr.eval_with_ctx(report, ctx, provider)?);
+					let lhs = propagate!(lhs_expr
+						.eval_with_ctx(report, ctx, provider)?);
 					
 					match (op, &lhs)
 					{
-						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(true))  => return Ok(lhs),
-						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(false)) => return Ok(lhs),
-						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(false)) => { }
-						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(true))  => { }
+						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(_, true))  => return Ok(lhs),
+						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(_, false)) => return Ok(lhs),
+						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(_, false)) => { }
+						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(_, true))  => { }
 						_ => return Err(report.error_span("invalid argument type to operator", lhs_expr.span()))
 					}
 					
-					let rhs = propagate!(
-						rhs_expr.eval_with_ctx(report, ctx, provider)?);
+					let rhs = propagate!(rhs_expr
+						.eval_with_ctx(report, ctx, provider)?);
 					
 					match (op, &rhs)
 					{
-						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(true))  => Ok(rhs),
-						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(false)) => Ok(rhs),
-						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(false)) => Ok(rhs),
-						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(true))  => Ok(rhs),
+						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(_, true))  => Ok(rhs),
+						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(_, false)) => Ok(rhs),
+						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(_, false)) => Ok(rhs),
+						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(_, true))  => Ok(rhs),
 						_ => Err(report.error_span("invalid argument type to operator", rhs_expr.span()))
 					}
 				}
 				
 				else
 				{
-					let lhs = propagate!(
-						lhs_expr.eval_with_ctx(report, ctx, provider)?);
+					let lhs = propagate!(lhs_expr
+						.eval_with_ctx(report, ctx, provider)?);
 
-					let rhs = propagate!(
-						rhs_expr.eval_with_ctx(report, ctx, provider)?);
+					let rhs = propagate!(rhs_expr
+						.eval_with_ctx(report, ctx, provider)?);
 
 					match (&lhs, &rhs)
 					{
-						(expr::Value::Bool(lhs), expr::Value::Bool(rhs)) =>
+						(expr::Value::Bool(_, lhs), expr::Value::Bool(_, rhs)) =>
 						{
 							return match op
 							{
-								expr::BinaryOp::And => Ok(expr::Value::Bool(lhs & rhs)),
-								expr::BinaryOp::Or  => Ok(expr::Value::Bool(lhs | rhs)),
-								expr::BinaryOp::Xor => Ok(expr::Value::Bool(lhs ^ rhs)),
-								expr::BinaryOp::Eq  => Ok(expr::Value::Bool(lhs == rhs)),
-								expr::BinaryOp::Ne  => Ok(expr::Value::Bool(lhs != rhs)),
+								expr::BinaryOp::And => Ok(expr::Value::make_bool(lhs & rhs)),
+								expr::BinaryOp::Or  => Ok(expr::Value::make_bool(lhs | rhs)),
+								expr::BinaryOp::Xor => Ok(expr::Value::make_bool(lhs ^ rhs)),
+								expr::BinaryOp::Eq  => Ok(expr::Value::make_bool(lhs == rhs)),
+								expr::BinaryOp::Ne  => Ok(expr::Value::make_bool(lhs != rhs)),
 								_ => Err(report.error_span("invalid argument types to operator", span))
 							}
 						}
@@ -596,12 +670,12 @@ impl expr::Expr
 								expr::BinaryOp::And  => Ok(expr::Value::make_integer(lhs & rhs)),
 								expr::BinaryOp::Or   => Ok(expr::Value::make_integer(lhs | rhs)),
 								expr::BinaryOp::Xor  => Ok(expr::Value::make_integer(lhs ^ rhs)),
-								expr::BinaryOp::Eq   => Ok(expr::Value::Bool(lhs == rhs)),
-								expr::BinaryOp::Ne   => Ok(expr::Value::Bool(lhs != rhs)),
-								expr::BinaryOp::Lt   => Ok(expr::Value::Bool(lhs <  rhs)),
-								expr::BinaryOp::Le   => Ok(expr::Value::Bool(lhs <= rhs)),
-								expr::BinaryOp::Gt   => Ok(expr::Value::Bool(lhs >  rhs)),
-								expr::BinaryOp::Ge   => Ok(expr::Value::Bool(lhs >= rhs)),
+								expr::BinaryOp::Eq   => Ok(expr::Value::make_bool(lhs == rhs)),
+								expr::BinaryOp::Ne   => Ok(expr::Value::make_bool(lhs != rhs)),
+								expr::BinaryOp::Lt   => Ok(expr::Value::make_bool(lhs <  rhs)),
+								expr::BinaryOp::Le   => Ok(expr::Value::make_bool(lhs <= rhs)),
+								expr::BinaryOp::Gt   => Ok(expr::Value::make_bool(lhs >  rhs)),
+								expr::BinaryOp::Ge   => Ok(expr::Value::make_bool(lhs >= rhs)),
 								
 								expr::BinaryOp::Concat =>
 								{
@@ -624,12 +698,12 @@ impl expr::Expr
 			
 			&expr::Expr::TernaryOp(_, ref cond, ref true_branch, ref false_branch) =>
 			{
-				match propagate!(
-					cond.eval_with_ctx(report, ctx, provider)?)
+				match propagate!(cond
+					.eval_with_ctx(report, ctx, provider)?)
 				{
-					expr::Value::Bool(true)  => Ok(propagate!(
+					expr::Value::Bool(_, true)  => Ok(propagate!(
 						true_branch.eval_with_ctx(report, ctx, provider)?)),
-					expr::Value::Bool(false) => Ok(propagate!(
+					expr::Value::Bool(_, false) => Ok(propagate!(
 						false_branch.eval_with_ctx(report, ctx, provider)?)),
 					_ => Err(report.error_span("invalid condition type", cond.span()))
 				}
@@ -637,16 +711,17 @@ impl expr::Expr
 			
 			&expr::Expr::Slice(span, _, ref left_expr, ref right_expr, ref inner) =>
 			{
-				match propagate!(
-					inner.eval_with_ctx(report, ctx, provider)?).get_bigint()
+				match propagate!(inner
+					.eval_with_ctx(report, ctx, provider)?)
+					.get_bigint()
 				{
 					Some(ref x) =>
 					{
-						let left = propagate!(
-							left_expr.eval_with_ctx(report, ctx, provider)?);
+						let left = propagate!(left_expr
+							.eval_with_ctx(report, ctx, provider)?);
 
-						let right = propagate!(
-							right_expr.eval_with_ctx(report, ctx, provider)?);
+						let right = propagate!(right_expr
+							.eval_with_ctx(report, ctx, provider)?);
 
 						let left_usize = left.expect_usize(report, span)? + 1;
 						let right_usize = right.expect_usize(report, span)?;
@@ -664,13 +739,14 @@ impl expr::Expr
 			
 			&expr::Expr::SliceShort(span, _, ref size_expr, ref inner) =>
 			{
-				match propagate!(
-					inner.eval_with_ctx(report, ctx, provider)?).get_bigint()
+				match propagate!(inner
+					.eval_with_ctx(report, ctx, provider)?)
+					.get_bigint()
 				{
 					Some(ref x) =>
 					{
-						let size = propagate!(
-							size_expr.eval_with_ctx(report, ctx, provider)?);
+						let size = propagate!(size_expr
+							.eval_with_ctx(report, ctx, provider)?);
 
 						let size_usize = size.expect_usize(report, span)?;
 						
@@ -687,7 +763,7 @@ impl expr::Expr
 			
 			&expr::Expr::Block(_, ref exprs) =>
 			{
-				let mut result = expr::Value::Void;
+				let mut result = expr::Value::make_void();
 				
 				for expr in exprs
 				{
@@ -700,14 +776,14 @@ impl expr::Expr
 			
 			&expr::Expr::Call(span, ref target, ref arg_exprs) =>
 			{
-				let func = propagate!(
-					target.eval_with_ctx(report, ctx, provider)?);
+				let func = propagate!(target
+					.eval_with_ctx(report, ctx, provider)?);
 
 				let mut args = Vec::with_capacity(arg_exprs.len());
 				for expr in arg_exprs
 				{
-					let value = propagate!(
-						expr.eval_with_ctx(report, ctx, provider)?);
+					let value = propagate!(expr
+						.eval_with_ctx(report, ctx, provider)?);
 					
 					args.push(EvalFunctionQueryArgument {
 						value,
@@ -725,16 +801,16 @@ impl expr::Expr
 
 				match query.func
 				{
-					expr::Value::ExprBuiltInFunction(_) =>
+					expr::Value::ExprBuiltInFunction(_, _) =>
 						expr::eval_builtin_fn(&mut query),
 
-					expr::Value::AsmBuiltInFunction(_) =>
+					expr::Value::AsmBuiltInFunction(_, _) =>
 						provider(EvalQuery::Function(&mut query)),
 
-					expr::Value::Function(_) =>
+					expr::Value::Function(_, _) =>
 						provider(EvalQuery::Function(&mut query)),
 
-					expr::Value::Unknown =>
+					expr::Value::Unknown(_) =>
 						Err(report.error_span("unknown function", target.span())),
 					
 					_ =>
@@ -764,7 +840,7 @@ impl expr::Value
 	{
 		match &self
 		{
-			&expr::Value::Integer(bigint) => bigint.min_size(),
+			&expr::Value::Integer(_, bigint) => bigint.min_size(),
 			_ => panic!("not an integer")
 		}
 	}
@@ -774,7 +850,7 @@ impl expr::Value
 	{
 		match self
 		{
-			&expr::Value::Integer(ref bigint) => bigint.get_bit(index),
+			&expr::Value::Integer(_, ref bigint) => bigint.get_bit(index),
 			_ => panic!("not an integer")
 		}
 	}

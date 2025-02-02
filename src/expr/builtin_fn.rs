@@ -72,7 +72,7 @@ pub fn eval_builtin_fn(
     let builtin_name = {
         match query.func
         {
-            expr::Value::ExprBuiltInFunction(ref name) => name,
+            expr::Value::ExprBuiltInFunction(_, ref name) => name,
             _ => unreachable!(),
         }
     };
@@ -114,10 +114,11 @@ pub fn eval_builtin_assert(
         };
         
         return Ok(expr::Value::FailedConstraint(
+            expr::Value::make_metadata(),
             query.report.wrap_in_parents_capped(msg)));
     }
 
-    Ok(expr::Value::Void)
+    Ok(expr::Value::make_void())
 }
 
 

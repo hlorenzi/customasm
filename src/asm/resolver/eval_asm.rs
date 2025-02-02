@@ -45,7 +45,7 @@ pub fn eval_asm(
 
             labels.insert(
                 ast_symbol.name.clone(),
-                expr::Value::Unknown);
+                expr::Value::make_unknown());
         }
 
         else if let asm::AstAny::Instruction(_) = node
@@ -135,7 +135,7 @@ fn resolve_iteratively(
     
     if ctx.can_guess()
     {
-        return Ok(expr::Value::Unknown);
+        return Ok(expr::Value::make_unknown());
     }
 
     query.report.error_span(

@@ -30,7 +30,7 @@ pub fn resolve_res(
     let value = {
         match value
         {
-            expr::Value::Integer(bigint) =>
+            expr::Value::Integer(_, bigint) =>
                 bigint.checked_into::<u32>(
                     report,
                     ast_res.expr.span())?,

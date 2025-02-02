@@ -221,7 +221,10 @@ pub fn test_file(filepath: &str)
         }
         else
         {
-            let opts = asm::AssemblyOptions::new();
+            let opts = asm::AssemblyOptions {
+                debug_iterations: true,
+                ..asm::AssemblyOptions::new()
+            };
 
             Ok(asm::assemble(
                 &mut report,

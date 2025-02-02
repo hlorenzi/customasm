@@ -23,7 +23,8 @@ pub fn resolve_label(
 
         let symbol = defs.symbols.get_mut(item_ref);
         let prev_value = symbol.value.clone();
-        symbol.value = expr::Value::Integer(value);
+        symbol.value = expr::Value::make_integer(value);
+        symbol.value.get_mut_metadata().symbol_ref = Some(item_ref);
         symbol.bankdef_ref = Some(ctx.bank_ref);
 
 

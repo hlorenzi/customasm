@@ -30,7 +30,7 @@ pub fn resolve_align(
     let value = {
         match value
         {
-            expr::Value::Integer(bigint) =>
+            expr::Value::Integer(_, bigint) =>
                 bigint.checked_into::<usize>(
                     report,
                     ast_align.header_span)?,
@@ -40,7 +40,7 @@ pub fn resolve_align(
     };
 
     let align = defs.align_directives.get_mut(item_ref);
-    let prev_value = align.align_size.clone();
+    let prev_value = align.align_size;
     align.align_size = value;
 
 

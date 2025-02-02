@@ -395,7 +395,7 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 	
 	fn parse_call(&mut self) -> Result<expr::Expr, ()>
 	{
-		let leaf = self.parse_leaf()?;
+		let leaf = self.parse_member_access()?;
 		
 		if self.walker.next_linebreak().is_some()
 			{ return Ok(leaf); }
@@ -419,6 +419,37 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 		Ok(expr::Expr::Call(leaf.span().join(tk_close.span), Box::new(leaf), args))
 	}
 	
+
+	fn parse_member_access(&mut self) -> Result<expr::Expr, ()>
+	{
+		let mut lhs = self.parse_leaf()?;
+		
+		loop
+		{
+			if self.walker.next_linebreak().is_some()
+				{ break; }
+
+			if let Some(_) = self.walker.maybe_expect(syntax::TokenKind::Dot)
+			{
+				let tk_member = self.walker.expect(self.report, syntax::TokenKind::Identifier)?;
+				let member_name = self.walker.get_span_excerpt(tk_member.span).to_string();
+				let span = lhs.span().join(tk_member.span);
+				
+				lhs = expr::Expr::MemberAccess {
+					span,
+					lhs: Box::new(lhs),
+					member_name,
+				};
+			}
+			else
+			{
+				break;
+			}
+		}
+		
+		Ok(lhs)
+	}
+	
 	
 	fn parse_leaf(&mut self) -> Result<expr::Expr, ()>
 	{
@@ -432,7 +463,7 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 			{ self.parse_variable() }
 			
 		else if self.walker.next_useful_is(0, syntax::TokenKind::Dot)
-			{ self.parse_variable() }
+			{ self.parse_nested_label() }
 			
 		else if self.walker.next_useful_is(0, syntax::TokenKind::Number)
 			{ self.parse_number() }
@@ -497,8 +528,19 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 	
 	fn parse_variable(&mut self) -> Result<expr::Expr, ()>
 	{
-		let mut span = diagn::Span::new_dummy();
-		let mut hierarchy_level = 0;
+		let tk_name = self.walker.expect(self.report, syntax::TokenKind::Identifier)?;
+		let name = self.walker.get_span_excerpt(tk_name.span).to_string();
+		
+		Ok(expr::Expr::Variable(
+			tk_name.span,
+			name))
+	}
+		
+	fn parse_nested_label(&mut self) -> Result<expr::Expr, ()>
+	{
+		let tk_dot = self.walker.expect(self.report, syntax::TokenKind::Dot)?;
+		let mut nesting_span = tk_dot.span;
+		let mut hierarchy_level = 1;
 
 		loop
 		{
@@ -510,34 +552,25 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 			if let Some(tk_dot) = self.walker.maybe_expect(syntax::TokenKind::Dot)
 			{
 				hierarchy_level += 1;
-				span = span.join(tk_dot.span);
+				nesting_span = nesting_span.join(tk_dot.span);
 				continue;
 			}
 
 			break;
 		}
 
-		let mut hierarchy = Vec::new();
-
-		loop
-		{
-			let tk_name = self.walker.expect(self.report, syntax::TokenKind::Identifier)?;
-			let name = self.walker.get_span_excerpt(tk_name.span).to_string();
-			hierarchy.push(name);
-			span = span.join(tk_name.span);
-
-			if self.walker.next_linebreak().is_some()
-			{
-				break;
-			}
-			
-			if self.walker.maybe_expect(syntax::TokenKind::Dot).is_none()
-			{
-				break;
-			}
-		}
+		let tk_member = self.walker.expect(self.report, syntax::TokenKind::Identifier)?;
+		let member_name = self.walker.get_span_excerpt(tk_member.span).to_string();
+		let member_span = nesting_span.join(tk_member.span);
 		
-		Ok(expr::Expr::Variable(span, hierarchy_level, hierarchy))
+		Ok(expr::Expr::MemberAccess {
+			span: member_span,
+			lhs: Box::new(expr::Expr::NestingLevel {
+				span: nesting_span,
+				nesting_level: hierarchy_level,
+			}),
+			member_name,
+		})
 	}
 	
 	
@@ -553,7 +586,7 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 		
 		let expr = expr::Expr::Literal(
 			tk_number.span,
-			expr::Value::Integer(bigint));
+			expr::Value::make_integer(bigint));
 
 		Ok(expr)
 	}
@@ -567,7 +600,7 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 
 		let expr = expr::Expr::Literal(
 			tk_true.span,
-			expr::Value::Bool(true));
+			expr::Value::make_bool(true));
 
 		Ok(expr)
 	}
@@ -581,7 +614,7 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 
 		let expr = expr::Expr::Literal(
 			tk_true.span,
-			expr::Value::Bool(false));
+			expr::Value::make_bool(false));
 
 		Ok(expr)
 	}
@@ -598,11 +631,12 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 		
 		let expr = expr::Expr::Literal(
 			tk_str.span,
-			expr::Value::String(expr::ExprString
-			{
-				utf8_contents: string,
-				encoding: "utf8".to_string(),
-			}));
+			expr::Value::String(
+				expr::Value::make_metadata(),
+				expr::ExprString {
+					utf8_contents: string,
+					encoding: "utf8".to_string(),
+				}));
 
 		Ok(expr)
 	}

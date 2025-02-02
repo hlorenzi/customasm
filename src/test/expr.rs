@@ -317,97 +317,97 @@ fn test_ops_concat()
 #[test]
 fn test_ops_relational_int()
 {
-	test("0 == 0", Pass(expr::Value::Bool(true)));
-	test("0 != 0", Pass(expr::Value::Bool(false)));
-	test("0 == 1", Pass(expr::Value::Bool(false)));
-	test("0 != 1", Pass(expr::Value::Bool(true)));
+	test("0 == 0", Pass(expr::Value::make_bool(true)));
+	test("0 != 0", Pass(expr::Value::make_bool(false)));
+	test("0 == 1", Pass(expr::Value::make_bool(false)));
+	test("0 != 1", Pass(expr::Value::make_bool(true)));
 	
-	test("(0xff & 0xff) == 0xff", Pass(expr::Value::Bool(true)));
-	test("(0xff & 0xff) != 0xff", Pass(expr::Value::Bool(false)));
-	test("(0xff & 0xff) == 0xee", Pass(expr::Value::Bool(false)));
-	test("(0xff & 0xff) != 0xee", Pass(expr::Value::Bool(true)));
+	test("(0xff & 0xff) == 0xff", Pass(expr::Value::make_bool(true)));
+	test("(0xff & 0xff) != 0xff", Pass(expr::Value::make_bool(false)));
+	test("(0xff & 0xff) == 0xee", Pass(expr::Value::make_bool(false)));
+	test("(0xff & 0xff) != 0xee", Pass(expr::Value::make_bool(true)));
 
-	test("1 <  2", Pass(expr::Value::Bool(true)));
-	test("1 <= 2", Pass(expr::Value::Bool(true)));
-	test("2 <  1", Pass(expr::Value::Bool(false)));
-	test("2 <= 1", Pass(expr::Value::Bool(false)));
-	test("1 >  2", Pass(expr::Value::Bool(false)));
-	test("1 >= 2", Pass(expr::Value::Bool(false)));
-	test("2 >  1", Pass(expr::Value::Bool(true)));
-	test("2 >= 1", Pass(expr::Value::Bool(true)));
+	test("1 <  2", Pass(expr::Value::make_bool(true)));
+	test("1 <= 2", Pass(expr::Value::make_bool(true)));
+	test("2 <  1", Pass(expr::Value::make_bool(false)));
+	test("2 <= 1", Pass(expr::Value::make_bool(false)));
+	test("1 >  2", Pass(expr::Value::make_bool(false)));
+	test("1 >= 2", Pass(expr::Value::make_bool(false)));
+	test("2 >  1", Pass(expr::Value::make_bool(true)));
+	test("2 >= 1", Pass(expr::Value::make_bool(true)));
 	
-	test("-1 == -1", Pass(expr::Value::Bool(true)));
-	test("-1 <  -2", Pass(expr::Value::Bool(false)));
-	test("-1 <= -2", Pass(expr::Value::Bool(false)));
-	test("-2 <  -1", Pass(expr::Value::Bool(true)));
-	test("-2 <= -1", Pass(expr::Value::Bool(true)));
-	test("-1 >  -2", Pass(expr::Value::Bool(true)));
-	test("-1 >= -2", Pass(expr::Value::Bool(true)));
-	test("-2 >  -1", Pass(expr::Value::Bool(false)));
-	test("-2 >= -1", Pass(expr::Value::Bool(false)));
+	test("-1 == -1", Pass(expr::Value::make_bool(true)));
+	test("-1 <  -2", Pass(expr::Value::make_bool(false)));
+	test("-1 <= -2", Pass(expr::Value::make_bool(false)));
+	test("-2 <  -1", Pass(expr::Value::make_bool(true)));
+	test("-2 <= -1", Pass(expr::Value::make_bool(true)));
+	test("-1 >  -2", Pass(expr::Value::make_bool(true)));
+	test("-1 >= -2", Pass(expr::Value::make_bool(true)));
+	test("-2 >  -1", Pass(expr::Value::make_bool(false)));
+	test("-2 >= -1", Pass(expr::Value::make_bool(false)));
 	
-	test("2 <  2", Pass(expr::Value::Bool(false)));
-	test("2 <= 2", Pass(expr::Value::Bool(true)));
-	test("2 >  2", Pass(expr::Value::Bool(false)));
-	test("2 >= 2", Pass(expr::Value::Bool(true)));
+	test("2 <  2", Pass(expr::Value::make_bool(false)));
+	test("2 <= 2", Pass(expr::Value::make_bool(true)));
+	test("2 >  2", Pass(expr::Value::make_bool(false)));
+	test("2 >= 2", Pass(expr::Value::make_bool(true)));
 	
-	test(" !(1 == 1)", Pass(expr::Value::Bool(false)));
-	test(" !(1 != 1)", Pass(expr::Value::Bool(true)));
-	test("!!(1 == 1)", Pass(expr::Value::Bool(true)));
-	test("!!(1 != 1)", Pass(expr::Value::Bool(false)));
+	test(" !(1 == 1)", Pass(expr::Value::make_bool(false)));
+	test(" !(1 != 1)", Pass(expr::Value::make_bool(true)));
+	test("!!(1 == 1)", Pass(expr::Value::make_bool(true)));
+	test("!!(1 != 1)", Pass(expr::Value::make_bool(false)));
 }
 
 
 #[test]
 fn test_ops_relational_bool()
 {
-	test("(1 == 1) & (1 == 1)", Pass(expr::Value::Bool(true)));
-	test("(1 == 1) & (1 == 0)", Pass(expr::Value::Bool(false)));
-	test("(1 == 0) & (1 == 1)", Pass(expr::Value::Bool(false)));
-	test("(1 == 0) & (1 == 0)", Pass(expr::Value::Bool(false)));
+	test("(1 == 1) & (1 == 1)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 1) & (1 == 0)", Pass(expr::Value::make_bool(false)));
+	test("(1 == 0) & (1 == 1)", Pass(expr::Value::make_bool(false)));
+	test("(1 == 0) & (1 == 0)", Pass(expr::Value::make_bool(false)));
 	
-	test("(1 == 1) | (1 == 1)", Pass(expr::Value::Bool(true)));
-	test("(1 == 1) | (1 == 0)", Pass(expr::Value::Bool(true)));
-	test("(1 == 0) | (1 == 1)", Pass(expr::Value::Bool(true)));
-	test("(1 == 0) | (1 == 0)", Pass(expr::Value::Bool(false)));
+	test("(1 == 1) | (1 == 1)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 1) | (1 == 0)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 0) | (1 == 1)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 0) | (1 == 0)", Pass(expr::Value::make_bool(false)));
 	
-	test("(1 == 1) ^ (1 == 1)", Pass(expr::Value::Bool(false)));
-	test("(1 == 1) ^ (1 == 0)", Pass(expr::Value::Bool(true)));
-	test("(1 == 0) ^ (1 == 1)", Pass(expr::Value::Bool(true)));
-	test("(1 == 0) ^ (1 == 0)", Pass(expr::Value::Bool(false)));
+	test("(1 == 1) ^ (1 == 1)", Pass(expr::Value::make_bool(false)));
+	test("(1 == 1) ^ (1 == 0)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 0) ^ (1 == 1)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 0) ^ (1 == 0)", Pass(expr::Value::make_bool(false)));
 	
-	test("(1 == 1) == (1 == 1)", Pass(expr::Value::Bool(true)));
-	test("(1 == 1) == (1 == 0)", Pass(expr::Value::Bool(false)));
-	test("(1 == 0) == (1 == 1)", Pass(expr::Value::Bool(false)));
-	test("(1 == 0) == (1 == 0)", Pass(expr::Value::Bool(true)));
+	test("(1 == 1) == (1 == 1)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 1) == (1 == 0)", Pass(expr::Value::make_bool(false)));
+	test("(1 == 0) == (1 == 1)", Pass(expr::Value::make_bool(false)));
+	test("(1 == 0) == (1 == 0)", Pass(expr::Value::make_bool(true)));
 	
-	test("(1 == 1) != (1 == 1)", Pass(expr::Value::Bool(false)));
-	test("(1 == 1) != (1 == 0)", Pass(expr::Value::Bool(true)));
-	test("(1 == 0) != (1 == 1)", Pass(expr::Value::Bool(true)));
-	test("(1 == 0) != (1 == 0)", Pass(expr::Value::Bool(false)));
+	test("(1 == 1) != (1 == 1)", Pass(expr::Value::make_bool(false)));
+	test("(1 == 1) != (1 == 0)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 0) != (1 == 1)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 0) != (1 == 0)", Pass(expr::Value::make_bool(false)));
 }
 
 
 #[test]
 fn test_ops_lazy()
 {
-	test("(1 == 1) && (1 == 1)", Pass(expr::Value::Bool(true)));
-	test("(1 == 1) && (1 == 0)", Pass(expr::Value::Bool(false)));
-	test("(1 == 0) && (1 == 1)", Pass(expr::Value::Bool(false)));
-	test("(1 == 0) && (1 == 0)", Pass(expr::Value::Bool(false)));
+	test("(1 == 1) && (1 == 1)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 1) && (1 == 0)", Pass(expr::Value::make_bool(false)));
+	test("(1 == 0) && (1 == 1)", Pass(expr::Value::make_bool(false)));
+	test("(1 == 0) && (1 == 0)", Pass(expr::Value::make_bool(false)));
 	
-	test("(1 == 1) || (1 == 1)", Pass(expr::Value::Bool(true)));
-	test("(1 == 1) || (1 == 0)", Pass(expr::Value::Bool(true)));
-	test("(1 == 0) || (1 == 1)", Pass(expr::Value::Bool(true)));
-	test("(1 == 0) || (1 == 0)", Pass(expr::Value::Bool(false)));
+	test("(1 == 1) || (1 == 1)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 1) || (1 == 0)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 0) || (1 == 1)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 0) || (1 == 0)", Pass(expr::Value::make_bool(false)));
 	
 	test("(1 == 1) && 123",     Fail(("test", 1, "type")));
 	test("(1 == 1) && (1 / 0)", Fail(("test", 1, "zero")));
-	test("(1 == 0) && 123",     Pass(expr::Value::Bool(false)));
-	test("(1 == 0) && (1 / 0)", Pass(expr::Value::Bool(false)));
+	test("(1 == 0) && 123",     Pass(expr::Value::make_bool(false)));
+	test("(1 == 0) && (1 / 0)", Pass(expr::Value::make_bool(false)));
 	
-	test("(1 == 1) || 123",     Pass(expr::Value::Bool(true)));
-	test("(1 == 1) || (1 / 0)", Pass(expr::Value::Bool(true)));
+	test("(1 == 1) || 123",     Pass(expr::Value::make_bool(true)));
+	test("(1 == 1) || (1 / 0)", Pass(expr::Value::make_bool(true)));
 	test("(1 == 0) || 123",     Fail(("test", 1, "type")));
 	test("(1 == 0) || (1 / 0)", Fail(("test", 1, "zero")));
 }
@@ -417,7 +417,7 @@ fn test_ops_lazy()
 fn test_ops_ternary()
 {
 	test("(1 == 1) ? 123", Pass(expr::Value::make_integer(util::BigInt::new(123, None))));
-	test("(1 == 0) ? 123", Pass(expr::Value::Void));
+	test("(1 == 0) ? 123", Pass(expr::Value::make_void()));
 	
 	test("(1 == 1) ? 123 : 456", Pass(expr::Value::make_integer(util::BigInt::new(123, None))));
 	test("(1 == 0) ? 123 : 456", Pass(expr::Value::make_integer(util::BigInt::new(456, None))));
@@ -427,8 +427,8 @@ fn test_ops_ternary()
 	test("(1 == 0) ? 123 : (1 == 0) ? 456 : 789", Pass(expr::Value::make_integer(util::BigInt::new(789, None))));
 	
 	test("(1 == 1) ? 123 : (1 == 1)", Pass(expr::Value::make_integer(util::BigInt::new(123, None))));
-	test("(1 == 0) ? 123 : (1 == 1)", Pass(expr::Value::Bool(true)));
-	test("(1 == 1) ? (1 == 1) : 123", Pass(expr::Value::Bool(true)));
+	test("(1 == 0) ? 123 : (1 == 1)", Pass(expr::Value::make_bool(true)));
+	test("(1 == 1) ? (1 == 1) : 123", Pass(expr::Value::make_bool(true)));
 	test("(1 == 0) ? (1 == 1) : 123", Pass(expr::Value::make_integer(util::BigInt::new(123, None))));
 	
 	test("(1 == 1) ? 123 : (1 / 0)", Pass(expr::Value::make_integer(util::BigInt::new(123, None))));
@@ -472,16 +472,16 @@ fn test_precedence()
 	test(" 2 + (2  * 2)", Pass(expr::Value::make_integer(util::BigInt::new(6, None))));
 	test("(2 +  2) * 2 ", Pass(expr::Value::make_integer(util::BigInt::new(8, None))));
 	
-	test("1 + 2 == 2 + 1", Pass(expr::Value::Bool(true)));
-	test("1 + 2 != 2 + 1", Pass(expr::Value::Bool(false)));
-	test("1 + 2 >  2 + 1", Pass(expr::Value::Bool(false)));
-	test("1 + 2 >= 2 + 1", Pass(expr::Value::Bool(true)));
-	test("1 + 2 <  2 + 1", Pass(expr::Value::Bool(false)));
-	test("1 + 2 <= 2 + 1", Pass(expr::Value::Bool(true)));
+	test("1 + 2 == 2 + 1", Pass(expr::Value::make_bool(true)));
+	test("1 + 2 != 2 + 1", Pass(expr::Value::make_bool(false)));
+	test("1 + 2 >  2 + 1", Pass(expr::Value::make_bool(false)));
+	test("1 + 2 >= 2 + 1", Pass(expr::Value::make_bool(true)));
+	test("1 + 2 <  2 + 1", Pass(expr::Value::make_bool(false)));
+	test("1 + 2 <= 2 + 1", Pass(expr::Value::make_bool(true)));
 	
-	test("0b110 == 0b110 && 0b11 == 0b11", Pass(expr::Value::Bool(true)));
+	test("0b110 == 0b110 && 0b11 == 0b11", Pass(expr::Value::make_bool(true)));
 	test("0b110 == 0b110 &  0b11 == 0b11", Fail(("test", 1, "argument")));
-	test("0b110 == 0b110 || 0b11 == 0b11", Pass(expr::Value::Bool(true)));
+	test("0b110 == 0b110 || 0b11 == 0b11", Pass(expr::Value::make_bool(true)));
 	test("0b110 == 0b110 |  0b11 == 0b11", Fail(("test", 1, "argument")));
 }
 
@@ -489,7 +489,7 @@ fn test_precedence()
 #[test]
 fn test_blocks()
 {
-	test("{}",       Pass(expr::Value::Void));
+	test("{}",       Pass(expr::Value::make_void()));
 	test("{0}",      Pass(expr::Value::make_integer(util::BigInt::new(0, None))));
 	test("{0,}",     Pass(expr::Value::make_integer(util::BigInt::new(0, None))));
 	test("{0 \n }",  Pass(expr::Value::make_integer(util::BigInt::new(0, None))));
@@ -514,7 +514,7 @@ fn test_calls()
 #[test]
 fn test_assignment()
 {
-	test("   x  = 123",      Pass(expr::Value::Void));
+	test("   x  = 123",      Pass(expr::Value::make_void()));
 	test("{  x  = 123, x }", Pass(expr::Value::make_integer(util::BigInt::new(123, None))));
 	test("{ (x) = 123, x }", Pass(expr::Value::make_integer(util::BigInt::new(123, None))));
 	

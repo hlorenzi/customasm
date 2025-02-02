@@ -54,7 +54,9 @@ pub fn define(
                 item_ref,
                 no_emit: true,
                 value_statically_known: true,
-                value: expr::Value::Function(fn_ref.0),
+                value: expr::Value::Function(
+                    expr::Value::make_metadata(),
+                    fn_ref),
                 resolved: true,
                 bankdef_ref: None,
             };

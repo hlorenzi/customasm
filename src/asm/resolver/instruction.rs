@@ -257,12 +257,12 @@ fn resolve_instruction_matches(
             rule.expr.returned_value_span())?;
 
 
-        if let expr::Value::Integer(bigint) = value_definite
+        if let expr::Value::Integer(_, bigint) = value_definite
         {
             matches[index].encoding =
                 asm::InstructionMatchResolution::Resolved(bigint);
         }
-        else if let expr::Value::FailedConstraint(msg) = value_definite
+        else if let expr::Value::FailedConstraint(_, msg) = value_definite
         {
             matches[index].encoding =
                 asm::InstructionMatchResolution::FailedConstraint(msg);
@@ -454,15 +454,15 @@ fn resolve_instruction_match_inner(
     let mut rule_ctx = (*ctx).clone();
     rule_ctx.file_handle_ctx = Some(rule.expr.span().file_handle);
 
-    asm::resolver::eval(
-        report,
-        opts,
-        fileserver,
-        decls,
-        defs,
-        &rule_ctx,
-        &mut eval_ctx,
-        &rule.expr)
+    Ok(asm::resolver::eval(
+            report,
+            opts,
+            fileserver,
+            decls,
+            defs,
+            &rule_ctx,
+            &mut eval_ctx,
+            &rule.expr)?)
 }
 
 
@@ -544,6 +544,7 @@ fn check_and_constrain_value_for_integer_type(
             span);
         
         Ok(expr::Value::FailedConstraint(
+            expr::Value::make_metadata(),
             report.wrap_in_parents(msg)))
     }
     else
