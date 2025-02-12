@@ -388,10 +388,10 @@ pub fn eval_member(
     query: &mut expr::EvalMemberQuery)
     -> Result<expr::Value, ()>
 {
-    if let expr::Value::Symbol(symbol_ref, ..) = query.value
+    if let expr::Value::Symbol { item_ref, .. } = query.value
     {
         let subsymbol_ref = decls.symbols.traverse(
-            Some(symbol_ref),
+            Some(item_ref),
             &[query.member_name]);
 
         match subsymbol_ref
@@ -414,6 +414,11 @@ pub fn eval_member(
         }
     }
     
+	if let Some(value) = expr::resolve_builtin_member(query)?
+	{
+		return Ok(value);
+	}
+
     query.report.error_span(
         format!(
             "unknown member `{}` in {}",

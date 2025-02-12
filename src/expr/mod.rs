@@ -39,6 +39,9 @@ pub use self::eval::{
     dummy_eval_asm,
 };
 
+mod builtin_member;
+pub use self::builtin_member::resolve_builtin_member;
+
 mod builtin_fn;
 pub use self::builtin_fn::{
     resolve_builtin_fn,

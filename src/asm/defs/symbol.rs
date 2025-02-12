@@ -54,9 +54,10 @@ pub fn define(
             item_ref,
             no_emit: node.no_emit,
             value_statically_known,
-            value: expr::Value::Symbol(
+            value: expr::Value::Symbol {
                 item_ref,
-                Box::new(expr::Value::Unknown)),
+                value: Box::new(expr::Value::Unknown),
+            },
             resolved: false,
             bankdef_ref: None,
         };

@@ -327,6 +327,11 @@ pub fn dummy_eval_member(
 	query: &mut EvalMemberQuery)
 	-> Result<expr::Value, ()>
 {
+	if let Some(value) = expr::resolve_builtin_member(query)?
+	{
+		return Ok(value);
+	}
+
 	query.report.error_span(
 		"cannot access members in this context",
 		query.span);

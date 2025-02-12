@@ -70,9 +70,10 @@ fn resolve_constant_simple(
         .find(|s| s.name == symbol_decl.name)
     {
         let symbol = defs.symbols.get_mut(item_ref);
-        symbol.value = expr::Value::Symbol(
+        symbol.value = expr::Value::Symbol {
             item_ref,
-            Box::new(driver_def.value.clone()));
+            value: Box::new(driver_def.value.clone()),
+        };
         symbol.resolved = true;
         return Ok(asm::ResolutionState::Resolved);
     }
@@ -86,9 +87,10 @@ fn resolve_constant_simple(
 
 
     let symbol = defs.symbols.get_mut(item_ref);
-    symbol.value = expr::Value::Symbol(
+    symbol.value = expr::Value::Symbol {
         item_ref,
-        Box::new(value.get_value()));
+        value: Box::new(value.get_value()),
+    };
 
 
     if symbol.value.get_value_ref().is_unknown()
@@ -160,9 +162,10 @@ pub fn resolve_constant(
 
     let symbol = defs.symbols.get_mut(item_ref);
     let prev_value = symbol.value.clone();
-    symbol.value = expr::Value::Symbol(
+    symbol.value = expr::Value::Symbol {
         item_ref,
-        Box::new(value.get_value()));
+        value: Box::new(value.get_value()),
+    };
 
     
     // Optimize future iterations for the case where it's

@@ -35,7 +35,10 @@ pub enum Value
 	Integer(util::BigInt),
 	String(ExprString),
 	Bool(bool),
-	Symbol(util::ItemRef<asm::Symbol>, Box<Value>),
+	Symbol {
+		item_ref: util::ItemRef<asm::Symbol>,
+		value: Box<Value>,
+	},
 	ExprBuiltInFunction(String),
 	AsmBuiltInFunction(String),
 	Function(util::ItemRef<asm::Function>),
@@ -118,7 +121,7 @@ impl Value
 			Value::Integer(..) => "integer",
 			Value::String(..) => "string",
 			Value::Bool(..) => "bool",
-			Value::Symbol(..) => "symbol",
+			Value::Symbol { .. } => "symbol",
 			Value::ExprBuiltInFunction(..) => "built-in function",
 			Value::AsmBuiltInFunction(..) => "built-in function",
 			Value::Function(..) => "function",
@@ -179,7 +182,7 @@ impl Value
 	{
 		match self
 		{
-			Value::Symbol(_, value) => *value,
+			Value::Symbol { value, .. } => *value,
 			_ => self,
 		}
 	}
@@ -189,7 +192,7 @@ impl Value
 	{
 		match self
 		{
-			Value::Symbol(_, value) => value,
+			Value::Symbol { value, .. } => value,
 			_ => self,
 		}
 	}
@@ -199,7 +202,7 @@ impl Value
 	{
 		match self
 		{
-			Value::Symbol(_, value) => value,
+			Value::Symbol { value, .. } => value,
 			_ => self,
 		}
 	}
@@ -332,6 +335,36 @@ impl Value
 				Err(())
 			}
 		}
+	}
+
+
+	pub fn expect_sized_integerlike(
+		&self,
+		report: &mut diagn::Report,
+		span: diagn::Span)
+		-> Result<(util::BigInt, usize), ()>
+	{
+		if let Some(bigint) = self.coallesce_to_integer().get_bigint()
+		{
+			if let Some(size) = bigint.size
+			{
+				return Ok((bigint, size));
+			}
+
+			report.error_span(
+				"value has no definite size",
+				span);
+			
+			return Err(());
+		}
+
+		report.error_span(
+			format!(
+				"expected integer-like value with definite size, got {}",
+				self.get_value_ref().type_name()),
+			span);
+
+		Err(())
 	}
 
 

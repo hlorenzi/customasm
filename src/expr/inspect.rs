@@ -4,8 +4,16 @@ use crate::*;
 pub struct StaticallyKnownProvider<'a>
 {
 	pub locals: std::collections::HashMap<String, StaticallyKnownLocal>,
+	pub query_nesting_level: &'a dyn Fn(&StaticallyKnownNestingLevelQuery) -> bool,
 	pub query_variable: &'a dyn Fn(&StaticallyKnownVariableQuery) -> bool,
+	pub query_member: &'a dyn Fn(&StaticallyKnownMemberQuery) -> bool,
 	pub query_function: &'a dyn Fn(&StaticallyKnownFunctionQuery) -> bool,
+}
+
+
+pub struct StaticallyKnownNestingLevelQuery
+{
+	pub hierarchy_level: usize,
 }
 
 
@@ -13,6 +21,13 @@ pub struct StaticallyKnownVariableQuery<'a>
 {
 	pub hierarchy_level: usize,
 	pub hierarchy: &'a Vec<String>,
+}
+
+
+pub struct StaticallyKnownMemberQuery<'a>
+{
+	pub value: &'a expr::Expr,
+	pub member_name: &'a String,
 }
 
 
@@ -29,7 +44,9 @@ impl<'a> StaticallyKnownProvider<'a>
 	{
 		StaticallyKnownProvider {
 			locals: std::collections::HashMap::new(),
+			query_nesting_level: &|_| false,
 			query_variable: &|_| false,
+			query_member: &|_| false,
 			query_function: &|_| false,
 		}
 	}
