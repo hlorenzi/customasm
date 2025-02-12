@@ -8,6 +8,7 @@ pub fn resolve_builtin_fn(
     match name.as_ref()
     {
         "assert" => Some(eval_builtin_assert),
+        "sizeof" => Some(eval_builtin_sizeof),
         "le" => Some(eval_builtin_le),
         "ascii" => Some(eval_builtin_ascii),
         "utf8" => Some(eval_builtin_utf8),
@@ -30,6 +31,7 @@ pub fn get_static_size_builtin_fn(
     let get_static_size_fn = {
         match name.as_ref()
         {
+            "sizeof" => get_static_size_builtin_sizeof,
             "le" => get_static_size_builtin_le,
             _ => return None,
         }
@@ -49,6 +51,7 @@ pub fn get_statically_known_value_builtin_fn(
     match name.as_ref()
     {
         "assert" => false,
+        "sizeof" => true,
         "le" => true,
         "ascii" => true,
         "utf8" => true,
@@ -118,6 +121,20 @@ pub fn eval_builtin_assert(
 }
 
 
+pub fn eval_builtin_sizeof(
+    query: &mut expr::EvalFunctionQuery)
+    -> Result<expr::Value, ()>
+{
+    query.ensure_arg_number(1)?;
+
+    let (_bigint, size) = query.args[0].value.expect_sized_integerlike(
+        query.report,
+        query.args[0].span)?;
+    
+    Ok(expr::Value::make_integer(size))
+}
+
+
 pub fn eval_builtin_le(
     query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>
@@ -144,6 +161,22 @@ pub fn eval_builtin_le(
     }
 
     Ok(expr::Value::make_integer(bigint.convert_le()))
+}
+
+
+pub fn get_static_size_builtin_sizeof(
+    provider: &expr::StaticallyKnownProvider,
+    args: &Vec<expr::Expr>)
+    -> Option<usize>
+{
+    if args.len() == 1
+    {
+        args[0].get_static_size(provider)
+    }
+    else
+    {
+        None
+    }
 }
 
 

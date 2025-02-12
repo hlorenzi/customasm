@@ -1,0 +1,1 @@
+#d sizeof(123) ; error: failed / error: definite size

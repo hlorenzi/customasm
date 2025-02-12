@@ -269,6 +269,34 @@ impl Value
 	}
 
 
+	pub fn expect_sized_integerlike(
+		&self,
+		report: &mut diagn::Report,
+		span: diagn::Span)
+		-> Result<(util::BigInt, usize), ()>
+	{
+		if let Some(bigint) = self.coallesce_to_integer().get_bigint()
+		{
+			if let Some(size) = bigint.size
+			{
+				return Ok((bigint, size));
+			}
+
+			report.error_span(
+				"value has no definite size",
+				span);
+			
+			return Err(());
+		}
+
+		report.error_span(
+			"expected integer-like value with definite size",
+			span);
+
+		Err(())
+	}
+
+
 	pub fn expect_error_or_bigint(
 		self,
 		report: &mut diagn::Report,
