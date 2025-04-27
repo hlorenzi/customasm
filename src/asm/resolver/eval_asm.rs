@@ -94,7 +94,9 @@ fn resolve_iteratively(
         iter_count += 1;
 
         let is_first_iteration = iter_count == 1;
-        let is_last_iteration = iter_count == max_iterations;
+        let is_last_iteration =
+            iter_count == max_iterations &&
+            ctx.is_last_iteration;
 
         let result = resolve_once(
             opts,
@@ -124,7 +126,7 @@ fn resolve_iteratively(
         position_at_start,
         labels,
         false,
-        true)?;
+        ctx.is_last_iteration)?;
 
     if !result.unstable
     {
