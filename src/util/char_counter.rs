@@ -7,7 +7,7 @@ pub struct CharCounter<'a>
 
 impl<'a> CharCounter<'a>
 {
-	pub fn new(src: &'a str) -> CharCounter
+	pub fn new(src: &'a str) -> CharCounter<'a>
 	{
 		CharCounter {
 			src,
