@@ -54,7 +54,7 @@ pub unsafe extern fn wasm_assemble(
 		&assembly.decls.as_ref().unwrap(),
 		&assembly.defs.as_ref().unwrap(),
 		&output,
-		format);
+		&format);
 
 	wasm_string_new_with(String::from_utf8_lossy(&formatted))
 }

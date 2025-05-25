@@ -9,10 +9,23 @@ pub fn excerpt_as_string_contents(
 {
 	assert!(excerpt.len() >= 2);
 	
-	let mut chars = excerpt[1..(excerpt.len() - 1)].chars().peekable();
-	
+	let without_quotes = &excerpt[1..(excerpt.len() - 1)];
+
+	unescape_string(report, span, without_quotes)
+}
+
+
+
+pub fn unescape_string(
+	report: &mut diagn::Report,
+	span: diagn::Span,
+	original_str: &str)
+	-> Result<String, ()>
+{
 	let mut result = String::new();
-	
+
+	let mut chars = original_str.chars().peekable();
+
 	while let Some(c) = chars.peek().map(|c| *c)
 	{
 		chars.next();

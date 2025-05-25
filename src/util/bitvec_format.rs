@@ -1,6 +1,18 @@
 use crate::*;
 
 
+pub struct FormatListOptions
+{
+	pub base: usize,
+	pub digits_per_group: usize,
+	pub groups_per_group2: usize,
+	pub str_before: String,
+	pub str_after: String,
+	pub str_between_groups: String,
+	pub str_between_groups2: String,
+}
+
+
 impl util::BitVec
 {
 	pub fn format_binary(&self) -> Vec<u8>
@@ -276,6 +288,59 @@ impl util::BitVec
 		}
 
 		result.push_str(":00000001FF");
+		result
+	}
+
+
+	pub fn format_list(&self, opts: &FormatListOptions) -> String
+	{
+		let mut result = String::new();
+		result.push_str(&opts.str_before);
+
+		let bits_per_digit = (opts.base - 1).count_ones() as usize;
+
+		let mut index = 0;
+		let mut groups_output = 0;
+		while index < self.len()
+		{
+			for _ in 0..opts.digits_per_group
+			{
+				let mut digit: u8 = 0;
+				for _ in 0..bits_per_digit
+				{
+					digit <<= 1;
+					digit |= if self.read_bit(index) { 1 } else { 0 };
+					index += 1;
+				}
+
+				let c = {
+					if digit < 10
+						{ ('0' as u8 + digit) as char }
+					else
+						{ ('a' as u8 + digit - 10) as char }
+				};
+				
+				result.push(c);
+			}
+
+			if index < self.len()
+			{
+				groups_output += 1;
+
+				if opts.str_between_groups2.len() > 0 &&
+					groups_output % opts.groups_per_group2 == 0
+				{
+					result.push_str(&opts.str_between_groups2);
+				}
+				else
+				{
+					result.push_str(&opts.str_between_groups);
+				}
+			}
+		}
+
+		result.push_str(&opts.str_after);
+
 		result
 	}
 

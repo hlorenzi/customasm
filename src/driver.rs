@@ -21,7 +21,6 @@ struct CommandOutput
 }
 
 
-#[derive(Copy, Clone)]
 pub enum OutputFormat
 {
 	Binary,
@@ -37,6 +36,7 @@ pub enum OutputFormat
 	IntelHex {
 		address_unit: usize,
 	},
+	List(util::FormatListOptions),
 	DecComma,
 	HexComma,
 	DecSpace,
@@ -164,7 +164,7 @@ fn assemble_with_command(
 
 	for output_group in &command.output_groups
 	{
-		if let Some(format) = output_group.format
+		if let Some(format) = &output_group.format
 		{
 			let formatted = format_output(
 				fileserver,
@@ -435,7 +435,7 @@ fn parse_command(
 		{
 			group.output_filename = Some(derive_output_filename(
 				report,
-				group.format.unwrap(),
+				&group.format.as_ref().unwrap(),
 				&command.input_filenames[0])?);
 		}
 	}
@@ -447,7 +447,7 @@ fn parse_command(
 
 fn derive_output_filename(
 	report: &mut diagn::Report,
-	format: OutputFormat,
+	format: &OutputFormat,
 	input_filename: &str)
 	-> Result<String, ()>
 {
@@ -518,7 +518,45 @@ pub fn parse_output_format(
 		}
 	}
 
+	let get_arg_str = &mut |
+		params: &mut std::collections::HashMap::<String, String>,
+		report: &mut diagn::Report,
+		param_id: &str,
+		def: &str|
+	{
+		match params.get(param_id)
+		{
+			None => Ok(def.to_string()),
+			Some(value) =>
+			{
+				if value.starts_with('\"') &&
+					value.ends_with('\"')
+				{
+					if let Ok(string) = syntax::excerpt_as_string_contents(
+						&mut diagn::Report::new(),
+						diagn::Span::new_dummy(),
+						&value)
+					{
+						params.remove(param_id);
+						return Ok(string);
+					}
+				}
+				
+				report.error(
+					format!(
+						"invalid format argument `{},{}:{}`",
+						format_id,
+						param_id,
+						value));
+
+				Err(())
+			}
+		}
+	};
+
 	let get_arg_usize = &mut |
+		params: &mut std::collections::HashMap::<String, String>,
+		report: &mut diagn::Report,
 		param_id: &str,
 		def: usize,
 		validate: &mut dyn FnMut(usize)
@@ -580,8 +618,8 @@ pub fn parse_output_format(
 			"binary" => OutputFormat::Binary,
 
 			"annotated" => OutputFormat::Annotated {
-				base: get_arg_usize("base", 16, check_valid_base)?,
-				group: get_arg_usize("group", 2, check_nonzero)?,
+				base: get_arg_usize(&mut params, report, "base", 16, check_valid_base)?,
+				group: get_arg_usize(&mut params, report, "group", 2, check_nonzero)?,
 			},
 
 			"annotatedhex" => OutputFormat::Annotated {
@@ -602,8 +640,18 @@ pub fn parse_output_format(
 
 			"mif" => OutputFormat::Mif,
 			"intelhex" => OutputFormat::IntelHex {
-				address_unit: get_arg_usize("addr_unit", 8, check_8_16_or_32)?,
+				address_unit: get_arg_usize(&mut params, report, "addr_unit", 8, check_8_16_or_32)?,
 			},
+
+			"list" => OutputFormat::List(util::FormatListOptions {
+				base: get_arg_usize(&mut params, report, "base", 16, check_valid_base)?,
+				digits_per_group: get_arg_usize(&mut params, report, "group", 2, check_nonzero)?,
+				groups_per_group2: get_arg_usize(&mut params, report, "group2", 16, check_nonzero)?,
+				str_before: get_arg_str(&mut params, report, "before", "")?,
+				str_after: get_arg_str(&mut params, report, "after", "")?,
+				str_between_groups: get_arg_str(&mut params, report, "between", "")?,
+				str_between_groups2: get_arg_str(&mut params, report, "between2", "")?,
+			}),
 
 			"deccomma" => OutputFormat::DecComma,
 			"hexcomma" => OutputFormat::HexComma,
@@ -620,8 +668,8 @@ pub fn parse_output_format(
 			"addrspan" => OutputFormat::AddressSpan,
 
 			"tcgame" => OutputFormat::TCGame {
-				base: get_arg_usize("base", 16, check_2_or_16)?,
-				group: get_arg_usize("group", 2, check_nonzero)?,
+				base: get_arg_usize(&mut params, report, "base", 16, check_2_or_16)?,
+				group: get_arg_usize(&mut params, report, "group", 2, check_nonzero)?,
 			},
 
 			"tcgamebin" => OutputFormat::TCGame {
@@ -646,14 +694,17 @@ pub fn parse_output_format(
 
 
 	// Error on remaining parameters that were not handled
-	for entry in params
+	for entry in &params
 	{
 		report.error(
 			format!(
 				"unknown format argument `{},{}`",
 				format_id,
 				entry.0));
+	}
 
+	if params.len() > 0
+	{
 		return Err(());
 	}
 
@@ -746,7 +797,7 @@ pub fn format_output(
 	decls: &asm::ItemDecls,
 	defs: &asm::ItemDefs,
 	output: &util::BitVec,
-	format: OutputFormat)
+	format: &OutputFormat)
 	-> Vec<u8>
 {
 	let text = {
@@ -756,10 +807,10 @@ pub fn format_output(
 				return output.format_binary(),
 
 			OutputFormat::Annotated { base, group } =>
-				output.format_annotated(fileserver, base, group),
+				output.format_annotated(fileserver, *base, *group),
 
 			OutputFormat::TCGame { base, group } =>
-				output.format_tcgame(fileserver, base, group),
+				output.format_tcgame(fileserver, *base, *group),
 
 			OutputFormat::BinStr => output.format_binstr(),
 			OutputFormat::HexStr => output.format_hexstr(),
@@ -769,7 +820,9 @@ pub fn format_output(
 
 			OutputFormat::Mif => output.format_mif(),
 			OutputFormat::IntelHex { address_unit } =>
-				output.format_intelhex(address_unit),
+				output.format_intelhex(*address_unit),
+
+			OutputFormat::List(opts) => output.format_list(opts),
 
 			OutputFormat::DecComma => output.format_separator(10, ", "),
 			OutputFormat::HexComma => output.format_separator(16, ", "),

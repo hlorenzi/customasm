@@ -11,6 +11,7 @@ pub use self::walker::Walker;
 
 mod excerpt;
 pub use self::excerpt::{
+    unescape_string,
     excerpt_as_string_contents,
     excerpt_as_usize,
     excerpt_as_bigint,
