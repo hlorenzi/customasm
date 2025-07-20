@@ -907,25 +907,18 @@ fn print_usage(use_colors: bool)
 
 fn print_version_short()
 {
-	let mut version = env!("VERGEN_SEMVER_LIGHTWEIGHT").to_string();
-	if version == "UNKNOWN"
-	{
-		version = format!("v{}", env!("CARGO_PKG_VERSION"));
-	}
+	let version = env!("CUSTOMASM_VERSION");
+	let target = env!("CUSTOMASM_TARGET");
+	let commit_hash = env!("CUSTOMASM_COMMIT_HASH");
+	let commit_date = env!("CUSTOMASM_COMMIT_DATE");
 
-
-	let mut date = format!("{}, ", env!("VERGEN_COMMIT_DATE"));
-	if date == "UNKNOWN, "
-	{
-		date = "".to_string();
-	}
-
-
-	println!("{} {} ({}{})",
+	println!(
+		"{} {} ({}, {}, {})",
 		env!("CARGO_PKG_NAME"),
 		version,
-		date,
-		env!("VERGEN_TARGET_TRIPLE"));
+		commit_date,
+		commit_hash,
+		target);
 }
 
 

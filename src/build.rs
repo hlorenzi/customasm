@@ -1,18 +1,66 @@
-use vergen::{ConstantsFlags, generate_cargo_keys};
+use std::process::Command;
 
 
 fn main()
 {
-    let mut flags = ConstantsFlags::empty();
-    flags.toggle(ConstantsFlags::REBUILD_ON_HEAD_CHANGE);
-    flags.toggle(ConstantsFlags::SEMVER_LIGHTWEIGHT);
-    flags.toggle(ConstantsFlags::COMMIT_DATE);
-    flags.toggle(ConstantsFlags::TARGET_TRIPLE);
-    
-    generate_cargo_keys(flags).expect("Unable to generate the cargo keys!");
+    println!(
+        "cargo:rustc-env=CUSTOMASM_VERSION=v{}",
+        env!("CARGO_PKG_VERSION"));
+        
+    println!(
+        "cargo:rustc-env=CUSTOMASM_TARGET={}",
+        std::env::var("TARGET").unwrap());
 
+    generate_git_info();
     generate_std();
     generate_tests();
+}
+
+
+pub fn generate_git_info()
+{
+    let mut command_hash = Command::new("git");
+    command_hash
+        .arg("show")
+        .arg("--pretty=format:%h")
+        .arg("--no-patch");
+
+    let hash = run_command_and_get_output(&mut command_hash)
+        .unwrap_or("??????".to_string());
+
+    println!("cargo:rustc-env=CUSTOMASM_COMMIT_HASH={}", hash);
+
+    let mut command_date = Command::new("git");
+    command_date
+        .arg("show")
+        .arg("--pretty=format:%cs")
+        .arg("--no-patch");
+
+    let date = run_command_and_get_output(&mut command_date)
+        .unwrap_or("????-??-??".to_string());
+    
+    println!("cargo:rustc-env=CUSTOMASM_COMMIT_DATE={}", date);
+}
+
+
+fn run_command_and_get_output(
+    command: &mut std::process::Command)
+    -> Result<String, ()>
+{
+	let output = command
+		.stdout(std::process::Stdio::piped())
+		.stderr(std::process::Stdio::piped())
+		.spawn()
+		.map_err(|_| ())?
+		.wait_with_output()
+		.map_err(|_| ())?;
+
+    if output.status.success()
+    {
+        return Ok(String::from_utf8(output.stdout).map_err(|_| ())?);
+    }
+
+    Err(())
 }
 
 

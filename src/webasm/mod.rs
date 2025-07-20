@@ -63,7 +63,10 @@ pub unsafe extern fn wasm_assemble(
 #[no_mangle]
 pub unsafe extern fn wasm_get_version() -> *mut String
 {
-	wasm_string_new_with(format!("v{}", env!("CARGO_PKG_VERSION")))
+	wasm_string_new_with(format!(
+		"{} ({})",
+		env!("CUSTOMASM_VERSION"),
+		env!("CUSTOMASM_COMMIT_HASH")))
 }
 
 

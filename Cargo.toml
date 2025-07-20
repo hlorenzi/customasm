@@ -23,11 +23,8 @@ name = "customasm"
 path = "src/main.rs"
 
 [dependencies]
-getopts = "0.2.17"
+getopts = "0.2"
 num-bigint = "0.4"
 
 [dev-dependencies]
-sha2 = "0.9.1"
-
-[build-dependencies]
-vergen = "3.1.0"
+sha2 = "0.9"
