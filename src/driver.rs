@@ -909,16 +909,20 @@ fn print_version_short()
 {
 	let version = env!("CUSTOMASM_VERSION");
 	let target = env!("CUSTOMASM_TARGET");
-	let commit_hash = env!("CUSTOMASM_COMMIT_HASH");
-	let commit_date = env!("CUSTOMASM_COMMIT_DATE");
+	let commit_hash = option_env!("CUSTOMASM_COMMIT_HASH");
+	let commit_date = option_env!("CUSTOMASM_COMMIT_DATE");
+
+	let detail = [commit_date, commit_hash, Some(target)]
+		.into_iter()
+		.flatten()
+		.collect::<Vec::<_>>()
+		.join(", ");
 
 	println!(
-		"{} {} ({}, {}, {})",
+		"{} {} ({})",
 		env!("CARGO_PKG_NAME"),
 		version,
-		commit_date,
-		commit_hash,
-		target);
+		detail);
 }
 
 

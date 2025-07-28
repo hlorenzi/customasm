@@ -63,10 +63,17 @@ pub unsafe extern fn wasm_assemble(
 #[no_mangle]
 pub unsafe extern fn wasm_get_version() -> *mut String
 {
-	wasm_string_new_with(format!(
-		"{} ({})",
-		env!("CUSTOMASM_VERSION"),
-		env!("CUSTOMASM_COMMIT_HASH")))
+	let version =
+		if let Some(hash) = option_env!("CUSTOMASM_COMMIT_HASH") {
+			format!(
+				"{} ({})",
+				env!("CUSTOMASM_VERSION"),
+				hash)
+		}
+		else {
+			env!("CUSTOMASM_VERSION").to_string()
+		};
+	wasm_string_new_with(version)
 }
 
 
