@@ -243,8 +243,8 @@ impl Value
 	{
 		match &self
 		{
-			&Value::Integer(_, ref bigint) => Some(bigint.clone()),
-			&Value::String(_, ref s) => Some(s.to_bigint()),
+			&Value::Integer(_, bigint) => Some(bigint.clone()),
+			&Value::String(_, s) => Some(s.to_bigint()),
 			_ => None,
 		}
 	}
@@ -256,7 +256,7 @@ impl Value
 	{
 		match self
 		{
-			Value::String(_, ref s) =>
+			Value::String(_, s) =>
 				std::borrow::Cow::Owned(
 					expr::Value::make_integer(s.to_bigint())),
 
@@ -318,7 +318,7 @@ impl Value
 	{
 		match self
 		{
-			Value::Integer(_, ref mut bigint) => Ok(bigint),
+			Value::Integer(_, bigint) => Ok(bigint),
 
 			Value::Unknown(_) =>
 			{
@@ -497,7 +497,7 @@ impl Value
 	{
 		match &self
 		{
-			Value::Integer(_, ref bigint) =>
+			Value::Integer(_, bigint) =>
 				bigint.maybe_into::<usize>(),
 
 			_ => None,
@@ -513,7 +513,7 @@ impl Value
 	{
 		match &self
 		{
-			Value::Integer(_, ref bigint) =>
+			Value::Integer(_, bigint) =>
 				bigint.checked_into::<usize>(
 					report,
 					span),
@@ -553,7 +553,7 @@ impl Value
 			expr::Value::FailedConstraint(_, _) =>
 				Ok(self.clone()),
 				
-			expr::Value::Integer(_, ref bigint) =>
+			expr::Value::Integer(_, bigint) =>
 			{
 				bigint.checked_into::<usize>(
 					report,
@@ -584,7 +584,7 @@ impl Value
 	{
 		match &self
 		{
-			Value::Integer(_, ref bigint) =>
+			Value::Integer(_, bigint) =>
 			{
 				bigint.checked_into_nonzero_usize(
 					report,

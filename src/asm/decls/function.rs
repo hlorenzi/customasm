@@ -9,7 +9,7 @@ pub fn collect(
 {
     for any_node in &mut ast.nodes
     {
-        let asm::AstAny::DirectiveFn(ref mut node) = any_node
+        let asm::AstAny::DirectiveFn(node) = any_node
             else { continue };
 
         if node.item_ref.is_some()

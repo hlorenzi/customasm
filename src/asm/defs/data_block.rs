@@ -21,7 +21,7 @@ pub fn define(
 {
     for any_node in &mut ast.nodes
     {
-        if let asm::AstAny::DirectiveData(ref mut ast_data) = any_node
+        if let asm::AstAny::DirectiveData(ast_data) = any_node
         {
             for expr in &ast_data.elems
             {

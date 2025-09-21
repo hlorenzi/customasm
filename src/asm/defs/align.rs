@@ -18,7 +18,7 @@ pub fn define(
 {
     for any_node in &mut ast.nodes
     {
-        if let asm::AstAny::DirectiveAlign(ref mut ast_align) = any_node
+        if let asm::AstAny::DirectiveAlign(ast_align) = any_node
         {
             let item_ref = defs.align_directives.next_item_ref();
 

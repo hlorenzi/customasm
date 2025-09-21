@@ -156,7 +156,7 @@ pub fn resolve_encoding<'encoding>(
             {
                 let encoding = &mtch.encoding;
 
-                if let asm::InstructionMatchResolution::FailedConstraint(ref msg) = encoding
+                if let asm::InstructionMatchResolution::FailedConstraint(msg) = encoding
                 {
                     msgs.push(msg.clone());
                 }

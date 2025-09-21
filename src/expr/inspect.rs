@@ -81,7 +81,7 @@ impl expr::Expr
 	{
 		match self
 		{
-			expr::Expr::Variable(_, ref name) =>
+			expr::Expr::Variable(_, name) =>
 			{
 				if let Some(StaticallyKnownLocal { size: Some(size), .. }) = provider.locals.get(name)
 				{
@@ -101,7 +101,7 @@ impl expr::Expr
 
 			expr::Expr::UnaryOp(..) => None,
 			
-			expr::Expr::BinaryOp(_, _, expr::BinaryOp::Concat, ref lhs, ref rhs) =>
+			expr::Expr::BinaryOp(_, _, expr::BinaryOp::Concat, lhs, rhs) =>
 			{
 				let lhs_size = lhs.get_static_size(provider)?;
 				let rhs_size = rhs.get_static_size(provider)?;
@@ -131,7 +131,7 @@ impl expr::Expr
 				Some(size)
 			}
 			
-			expr::Expr::TernaryOp(_, _, ref true_branch, ref false_branch) =>
+			expr::Expr::TernaryOp(_, _, true_branch, false_branch) =>
 			{
 				let true_size = true_branch.get_static_size(provider)?;
 				let false_size = false_branch.get_static_size(provider)?;
@@ -146,7 +146,7 @@ impl expr::Expr
 				}
 			}
 			
-			expr::Expr::Block(_, ref exprs) =>
+			expr::Expr::Block(_, exprs) =>
 				exprs.last()?.get_static_size(provider),
 
 			expr::Expr::Call(_, func, args) =>
@@ -176,7 +176,7 @@ impl expr::Expr
 	{
 		match self
 		{
-			expr::Expr::Variable(_, ref name) =>
+			expr::Expr::Variable(_, name) =>
 			{
 				if let Some(var) = provider.locals.get(name)
 				{
@@ -226,7 +226,7 @@ impl expr::Expr
 
 			expr::Expr::UnaryOp(..) => false,
 			
-			expr::Expr::BinaryOp(_, _, _, ref lhs, ref rhs) =>
+			expr::Expr::BinaryOp(_, _, _, lhs, rhs) =>
 			{
 				let lhs_known = lhs.is_value_statically_known(provider);
 				let rhs_known = rhs.is_value_statically_known(provider);
@@ -234,16 +234,16 @@ impl expr::Expr
 				lhs_known && rhs_known
 			}
 			
-			expr::Expr::Slice(_, _, ref left_expr, ref right_expr, ref expr) =>
+			expr::Expr::Slice(_, _, left_expr, right_expr, expr) =>
 				left_expr.is_value_statically_known(provider) &&
 				right_expr.is_value_statically_known(provider) &&
 				expr.is_value_statically_known(provider),
 			
-			expr::Expr::SliceShort(_, _, ref size_expr, ref expr) =>
+			expr::Expr::SliceShort(_, _, size_expr, expr) =>
 				size_expr.is_value_statically_known(provider) &&
 				expr.is_value_statically_known(provider),
 			
-			expr::Expr::TernaryOp(_, ref condition, ref true_branch, ref false_branch) =>
+			expr::Expr::TernaryOp(_, condition, true_branch, false_branch) =>
 			{
 				let condition_known = condition.is_value_statically_known(provider);
 				let true_known = true_branch.is_value_statically_known(provider);
@@ -252,7 +252,7 @@ impl expr::Expr
 				condition_known && true_known && false_known
 			}
 			
-			expr::Expr::Block(_, ref exprs) =>
+			expr::Expr::Block(_, exprs) =>
 			{
 				for expr in exprs
 				{

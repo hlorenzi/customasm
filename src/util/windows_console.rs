@@ -12,10 +12,10 @@ pub fn enable_windows_ansi_support()
 pub fn enable_windows_ansi_support()
 {
     #[link(name = "kernel32")]
-    extern
+    unsafe extern "C"
 	{
-        fn GetStdHandle(handle: u64) -> *const i32;
-        fn SetConsoleMode(handle: *const i32, mode: u32) -> bool;
+        unsafe fn GetStdHandle(handle: u64) -> *const i32;
+        unsafe fn SetConsoleMode(handle: *const i32, mode: u32) -> bool;
     }
 	
     unsafe

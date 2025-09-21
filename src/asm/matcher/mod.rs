@@ -76,7 +76,7 @@ impl InstructionMatchResolution
     {
         match self
         {
-            InstructionMatchResolution::Resolved(ref bigint) => bigint,
+            InstructionMatchResolution::Resolved(bigint) => bigint,
             InstructionMatchResolution::FailedConstraint(_) => panic!(),
             InstructionMatchResolution::Unresolved => panic!(),
         }
@@ -108,8 +108,8 @@ impl InstructionArgument
             InstructionArgumentKind::Expr(_)) =>
                 true,
 
-            (InstructionArgumentKind::Nested(ref a),
-            InstructionArgumentKind::Nested(ref b)) =>
+            (InstructionArgumentKind::Nested(a),
+            InstructionArgumentKind::Nested(b)) =>
                 a.is_same(b),
             
             _ =>

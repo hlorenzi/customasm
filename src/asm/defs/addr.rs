@@ -18,7 +18,7 @@ pub fn define(
 {
     for any_node in &mut ast.nodes
     {
-        if let asm::AstAny::DirectiveAddr(ref mut ast_addr) = any_node
+        if let asm::AstAny::DirectiveAddr(ast_addr) = any_node
         {
             let item_ref = defs.addr_directives.next_item_ref();
 

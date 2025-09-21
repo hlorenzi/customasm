@@ -21,7 +21,7 @@ pub fn define(
 {
     for any_node in &mut ast.nodes
     {
-        if let asm::AstAny::Instruction(ref mut ast_instr) = any_node
+        if let asm::AstAny::Instruction(ast_instr) = any_node
         {
             let item_ref = defs.instructions.next_item_ref();
 
