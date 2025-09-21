@@ -392,27 +392,16 @@ pub fn eval_member(
 {
     if let Some(item_ref) = query.value.get_metadata().symbol_ref
     {
+        decls.symbols.get(item_ref);
+
         let subsymbol_ref = decls.symbols.traverse(
             Some(item_ref),
             &[query.member_name]);
 
-        match subsymbol_ref
+        if let Some(subsymbol_ref) = subsymbol_ref
         {
-            Some(subsymbol_ref) =>
-            {
-                let subsymbol = defs.symbols.get(subsymbol_ref);
-                return Ok(subsymbol.value.clone());
-            }
-            None =>
-            {
-                query.report.error_span(
-                    format!(
-                        "unknown nested label `{}`",
-                        query.member_name),
-                    query.span);
-                
-                return Err(());
-            }
+            let subsymbol = defs.symbols.get(subsymbol_ref);
+            return Ok(subsymbol.value.clone());
         }
     }
     
@@ -423,9 +412,8 @@ pub fn eval_member(
 
     query.report.error_span(
         format!(
-            "unknown member `{}` in {}",
-            query.member_name,
-            query.value.type_name()),
+            "unknown symbol `{}`",
+            query.member_name),
         query.span);
 
     Err(())

@@ -20,6 +20,7 @@ pub enum TokenKind
 	Number,
 	String,
 	KeywordAsm,
+	KeywordStruct,
 	KeywordTrue,
 	KeywordFalse,
 	ParenOpen,
@@ -79,6 +80,7 @@ impl TokenKind
 		self == TokenKind::Identifier ||
 		self == TokenKind::Number ||
 		self == TokenKind::KeywordAsm ||
+		self == TokenKind::KeywordStruct ||
 		self == TokenKind::KeywordTrue ||
 		self == TokenKind::KeywordFalse ||
 		self == TokenKind::ParenOpen ||
@@ -118,6 +120,7 @@ impl TokenKind
 			TokenKind::Number => "number",
 			TokenKind::String => "string",
 			TokenKind::KeywordAsm => "`asm` keyword",
+			TokenKind::KeywordStruct => "`struct` keyword",
 			TokenKind::KeywordTrue => "`true` keyword",
 			TokenKind::KeywordFalse => "`false` keyword",
 			TokenKind::ParenOpen => "`(`",
@@ -382,9 +385,10 @@ fn check_for_identifier(src: &str) -> Option<(TokenKind, usize)>
 
 	let ident = src.get(0..length).unwrap();
 
-	static KEYWORDS: [(&str, TokenKind); 3] =
+	static KEYWORDS: [(&str, TokenKind); 4] =
 	[
 		("asm", TokenKind::KeywordAsm),
+		("struct", TokenKind::KeywordStruct),
 		("true", TokenKind::KeywordTrue),
 		("false", TokenKind::KeywordFalse),
 	];

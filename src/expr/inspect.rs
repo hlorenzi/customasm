@@ -91,6 +91,7 @@ impl expr::Expr
 				None
 			}
 
+			expr::Expr::StructInit { .. } => None,
 			expr::Expr::NestingLevel { .. } => None,
 			expr::Expr::MemberAccess { .. } => None,
 			
@@ -189,6 +190,19 @@ impl expr::Expr
 				};
 
 				(provider.query_variable)(&query)
+			}
+
+			expr::Expr::StructInit { members_init, .. } =>
+			{
+				for member_init in members_init
+				{
+					if !member_init.value.is_value_statically_known(provider)
+					{
+						return false;
+					}
+				}
+				
+				true
 			}
 
 			expr::Expr::NestingLevel { .. } => false,

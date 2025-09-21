@@ -6,4 +6,4 @@
 
 global1:
 .local1:
-    ld .local3 ; error: failed / note:_:3: within / error: unknown
+    ld .local3 ; error: failed / note:_:3: within / error: unknown symbol `local3`

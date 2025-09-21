@@ -486,6 +486,27 @@ impl expr::Expr
 				provider(EvalQuery::Variable(&mut query))
 			}
 
+			&expr::Expr::StructInit { ref members_init, .. } =>
+			{
+				let mut members = Vec::with_capacity(members_init.len());
+				for member_init in members_init
+				{
+					let value = propagate!(member_init.value
+						.eval_with_ctx(report, ctx, provider)?);
+					
+					members.push(expr::ValueStructMember {
+						name: member_init.name.clone(),
+						value,
+					});
+				}
+
+				Ok(expr::Value::Struct(
+					expr::Value::make_metadata(),
+					expr::ValueStruct {
+						members,
+					}))
+			}
+
 			&expr::Expr::NestingLevel { span, nesting_level } =>
 			{
 				let mut query = EvalCtxLabelQuery {

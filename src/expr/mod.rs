@@ -1,9 +1,12 @@
 mod expression;
 pub use self::expression::{
     Expr,
+    ExprStructMemberInit,
     Value,
     ValueMetadata,
-    ExprString,
+    ValueString,
+    ValueStruct,
+    ValueStructMember,
     UnaryOp,
     BinaryOp,
 };

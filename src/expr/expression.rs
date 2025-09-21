@@ -6,6 +6,10 @@ pub enum Expr
 {
 	Literal(diagn::Span, Value),
 	Variable(diagn::Span, String),
+	StructInit {
+		span: diagn::Span,
+		members_init: Vec<ExprStructMemberInit>,
+	},
 	NestingLevel {
 		span: diagn::Span,
 		nesting_level: usize,
@@ -27,14 +31,24 @@ pub enum Expr
 
 
 #[derive(Clone, Debug)]
+pub struct ExprStructMemberInit
+{
+	pub span: diagn::Span,
+	pub name: String,
+	pub value: Expr,
+}
+
+
+#[derive(Clone, Debug)]
 pub enum Value
 {
 	Unknown(ValueMetadata),
 	FailedConstraint(ValueMetadata, diagn::Message),
 	Void(ValueMetadata),
 	Integer(ValueMetadata, util::BigInt),
-	String(ValueMetadata, ExprString),
+	String(ValueMetadata, ValueString),
 	Bool(ValueMetadata, bool),
+	Struct(ValueMetadata, ValueStruct),
 	ExprBuiltInFunction(ValueMetadata, String),
 	AsmBuiltInFunction(ValueMetadata, String),
 	Function(ValueMetadata, util::ItemRef<asm::Function>),
@@ -48,11 +62,26 @@ pub struct ValueMetadata
 }
 
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ExprString
+#[derive(Clone, Debug, PartialEq)]
+pub struct ValueString
 {
 	pub utf8_contents: String,
 	pub encoding: String,
+}
+
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ValueStruct
+{
+	pub members: Vec<ValueStructMember>,
+}
+
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ValueStructMember
+{
+	pub name: String,
+	pub value: Value,
 }
 
 
@@ -97,6 +126,7 @@ impl Expr
 		{
 			&Expr::Literal      (span, ..) => span,
 			&Expr::Variable     (span, ..) => span,
+			&Expr::StructInit   { span, .. } => span,
 			&Expr::NestingLevel { span, .. } => span,
 			&Expr::MemberAccess { span, .. } => span,
 			&Expr::UnaryOp      (span, ..) => span,
@@ -124,6 +154,7 @@ impl Value
 			Value::Integer(..) => "integer",
 			Value::String(..) => "string",
 			Value::Bool(..) => "bool",
+			Value::Struct(..) => "struct",
 			Value::ExprBuiltInFunction(..) => "built-in function",
 			Value::AsmBuiltInFunction(..) => "built-in function",
 			Value::Function(..) => "function",
@@ -190,7 +221,7 @@ impl Value
 	{
 		Value::String(
 			Value::make_metadata(),
-			ExprString {
+			ValueString {
 				utf8_contents: value.into(),
 				encoding: encoding.into(),
 			})
@@ -215,6 +246,7 @@ impl Value
 			Value::Integer(meta, ..) => meta,
 			Value::String(meta, ..) => meta,
 			Value::Bool(meta, ..) => meta,
+			Value::Struct(meta, ..) => meta,
 			Value::ExprBuiltInFunction(meta, ..) => meta,
 			Value::AsmBuiltInFunction(meta, ..) => meta,
 			Value::Function(meta, ..) => meta,
@@ -232,6 +264,7 @@ impl Value
 			Value::Integer(meta, ..) => meta,
 			Value::String(meta, ..) => meta,
 			Value::Bool(meta, ..) => meta,
+			Value::Struct(meta, ..) => meta,
 			Value::ExprBuiltInFunction(meta, ..) => meta,
 			Value::AsmBuiltInFunction(meta, ..) => meta,
 			Value::Function(meta, ..) => meta,
@@ -642,7 +675,7 @@ impl Value
 		&self,
 		report: &mut diagn::Report,
 		span: diagn::Span)
-		-> Result<&ExprString, ()>
+		-> Result<&ValueString, ()>
 	{
 		match &self
 		{
@@ -667,42 +700,74 @@ impl std::cmp::PartialEq for Value
 {
 	fn eq(&self, other: &Value) -> bool
 	{
-		match (self, other)
+		// Ignore the values' metadata in comparisons.
+		match self
 		{
-			(Value::Unknown(_),
-				Value::Unknown(_)) => true,
+			Value::Unknown(_) => match other
+			{
+				Value::Unknown(_) => true,
+				_ => false,
+			}
 
-			(Value::FailedConstraint(_, _),
-				Value::FailedConstraint(_, _)) => false,
+			Value::FailedConstraint(_, _) => match other
+			{
+				Value::FailedConstraint(_, _) => true,
+				_ => false,
+			}
 
-			(Value::Void(_),
-				Value::Void(_)) => true,
-				
-			(Value::Integer(_, a),
-				Value::Integer(_, b)) => a == b,
-				
-			(Value::Bool(_, a),
-				Value::Bool(_, b)) => a == b,
-				
-			(Value::String(_, a),
-				Value::String(_, b)) => a == b,
-				
-			(Value::ExprBuiltInFunction(_, a),
-				Value::ExprBuiltInFunction(_, b)) => a == b,
-				
-			(Value::AsmBuiltInFunction(_, a),
-				Value::AsmBuiltInFunction(_, b)) => a == b,
-				
-			(Value::Function(_, a),
-				Value::Function(_, b)) => a == b,
+			Value::Void(_) => match other
+			{
+				Value::Void(_) => true,
+				_ => false,
+			}
 
-			_ => false,
+			Value::Integer(_, a) => match other
+			{
+				Value::Integer(_, b) => a == b,
+				_ => false,
+			}
+
+			Value::Bool(_, a) => match other
+			{
+				Value::Bool(_, b) => a == b,
+				_ => false,
+			}
+
+			Value::String(_, a) => match other
+			{
+				Value::String(_, b) => a == b,
+				_ => false,
+			}
+
+			Value::Struct(_, a) => match other
+			{
+				Value::Struct(_, b) => a == b,
+				_ => false,
+			}
+
+			Value::ExprBuiltInFunction(_, a) => match other
+			{
+				Value::ExprBuiltInFunction(_, b) => a == b,
+				_ => false,
+			}
+
+			Value::AsmBuiltInFunction(_, a) => match other
+			{
+				Value::AsmBuiltInFunction(_, b) => a == b,
+				_ => false,
+			}
+
+			Value::Function(_, a) => match other
+			{
+				Value::Function(_, b) => a == b,
+				_ => false,
+			}
 		}
 	}
 }
 
 
-impl ExprString
+impl ValueString
 {
 	pub fn to_bigint(&self) -> util::BigInt
 	{

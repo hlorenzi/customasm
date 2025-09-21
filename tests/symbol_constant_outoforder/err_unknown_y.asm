@@ -1,3 +1,3 @@
-x = y + y ; error: unknown
+x = y + y ; error: unknown symbol `y`
 
 #d8 x

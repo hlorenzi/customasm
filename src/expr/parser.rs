@@ -389,40 +389,13 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 				(syntax::TokenKind::Exclamation, expr::UnaryOp::Not),
 				(syntax::TokenKind::Minus,       expr::UnaryOp::Neg)
 			],
-			|s| s.parse_call())
-	}
-	
-	
-	fn parse_call(&mut self) -> Result<expr::Expr, ()>
-	{
-		let leaf = self.parse_member_access()?;
-		
-		if self.walker.next_linebreak().is_some()
-			{ return Ok(leaf); }
-			
-		if self.walker.maybe_expect(syntax::TokenKind::ParenOpen).is_none()
-			{ return Ok(leaf); }
-			
-		let mut args = Vec::new();
-		while !self.walker.next_useful_is(0, syntax::TokenKind::ParenClose)
-		{
-			args.push(self.parse_expr()?);
-			
-			if self.walker.next_useful_is(0, syntax::TokenKind::ParenClose)
-				{ break; }
-				
-			self.walker.expect(self.report, syntax::TokenKind::Comma)?;
-		}
-		
-		let tk_close = self.walker.expect(self.report, syntax::TokenKind::ParenClose)?;
-		
-		Ok(expr::Expr::Call(leaf.span().join(tk_close.span), Box::new(leaf), args))
+			|s| s.parse_member_access())
 	}
 	
 
 	fn parse_member_access(&mut self) -> Result<expr::Expr, ()>
 	{
-		let mut lhs = self.parse_leaf()?;
+		let mut lhs = self.parse_call()?;
 		
 		loop
 		{
@@ -451,33 +424,65 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 	}
 	
 	
+	fn parse_call(&mut self) -> Result<expr::Expr, ()>
+	{
+		let leaf = self.parse_leaf()?;
+		
+		if self.walker.next_linebreak().is_some()
+			{ return Ok(leaf); }
+			
+		if self.walker.maybe_expect(syntax::TokenKind::ParenOpen).is_none()
+			{ return Ok(leaf); }
+			
+		let mut args = Vec::new();
+		while !self.walker.next_useful_is(0, syntax::TokenKind::ParenClose)
+		{
+			args.push(self.parse_expr()?);
+			
+			if self.walker.next_useful_is(0, syntax::TokenKind::ParenClose)
+				{ break; }
+				
+			self.walker.expect(self.report, syntax::TokenKind::Comma)?;
+		}
+		
+		let tk_close = self.walker.expect(self.report, syntax::TokenKind::ParenClose)?;
+		
+		Ok(expr::Expr::Call(leaf.span().join(tk_close.span), Box::new(leaf), args))
+	}
+	
+	
 	fn parse_leaf(&mut self) -> Result<expr::Expr, ()>
 	{
-		if self.walker.next_useful_is(0, syntax::TokenKind::BraceOpen)
+		let next_token = self.walker.next_nth_useful_token(0);
+
+		if next_token.kind == syntax::TokenKind::BraceOpen
 			{ self.parse_block() }
 	
-		else if self.walker.next_useful_is(0, syntax::TokenKind::ParenOpen)
+		else if next_token.kind == syntax::TokenKind::ParenOpen
 			{ self.parse_parenthesized() }
 	
-		else if self.walker.next_useful_is(0, syntax::TokenKind::Identifier)
+		else if next_token.kind == syntax::TokenKind::Identifier
 			{ self.parse_variable() }
 			
-		else if self.walker.next_useful_is(0, syntax::TokenKind::Dot)
+		else if next_token.kind == syntax::TokenKind::Dot
 			{ self.parse_nested_label() }
 			
-		else if self.walker.next_useful_is(0, syntax::TokenKind::Number)
+		else if next_token.kind == syntax::TokenKind::Number
 			{ self.parse_number() }
 			
-		else if self.walker.next_useful_is(0, syntax::TokenKind::String)
+		else if next_token.kind == syntax::TokenKind::String
 			{ self.parse_string() }
 	
-		else if self.walker.next_useful_is(0, syntax::TokenKind::KeywordAsm)
+		else if next_token.kind == syntax::TokenKind::KeywordAsm
 			{ self.parse_asm() }
 	
-		else if self.walker.next_useful_is(0, syntax::TokenKind::KeywordTrue)
+		else if next_token.kind == syntax::TokenKind::KeywordStruct
+			{ self.parse_struct_init() }
+	
+		else if next_token.kind == syntax::TokenKind::KeywordTrue
 			{ self.parse_boolean_true() }
 	
-		else if self.walker.next_useful_is(0, syntax::TokenKind::KeywordFalse)
+		else if next_token.kind == syntax::TokenKind::KeywordFalse
 			{ self.parse_boolean_false() }
 			
 		else
@@ -633,7 +638,7 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 			tk_str.span,
 			expr::Value::String(
 				expr::Value::make_metadata(),
-				expr::ExprString {
+				expr::ValueString {
 					utf8_contents: string,
 					encoding: "utf8".to_string(),
 				}));
@@ -666,6 +671,57 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 		let expr = expr::Expr::Asm(
 			tk_asm.span.join(tk_brace_close.span),
 			ast);
+
+		Ok(expr)
+	}
+	
+	
+	fn parse_struct_init(&mut self) -> Result<expr::Expr, ()>
+	{
+		let tk_new = self.walker.expect(
+			self.report,
+			syntax::TokenKind::KeywordStruct)?;
+    
+		let _tk_brace_open = self.walker.expect(
+			self.report,
+			syntax::TokenKind::BraceOpen)?;
+
+		let mut members = Vec::new();
+		while !self.walker.next_useful_is(0, syntax::TokenKind::BraceClose)
+		{
+			let tk_member_name = self.walker.expect(
+				self.report,
+				syntax::TokenKind::Identifier)?;
+
+			let _tk_equals = self.walker.expect(
+				self.report,
+				syntax::TokenKind::Equal)?;
+
+			let member_value = self.parse_expr()?;
+			
+			members.push(expr::ExprStructMemberInit {
+				span: tk_member_name.span.join(member_value.span()),
+				name: self.walker.get_span_excerpt(tk_member_name.span).to_string(),
+				value: member_value,
+			});
+
+			if self.walker.maybe_expect_linebreak().is_some()
+				{ continue; }
+			
+			if self.walker.next_useful_is(0, syntax::TokenKind::BraceClose)
+				{ break; }
+				
+			self.walker.expect(self.report, syntax::TokenKind::Comma)?;
+		}
+
+		let tk_brace_close = self.walker.expect(
+			self.report,
+			syntax::TokenKind::BraceClose)?;
+
+		let expr = expr::Expr::StructInit {
+			span: tk_new.span.join(tk_brace_close.span),
+			members_init: members,
+		};
 
 		Ok(expr)
 	}

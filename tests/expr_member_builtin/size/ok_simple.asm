@@ -17,3 +17,6 @@ ld 0xeeeee ; = 0xff_eeeee_14
 
 #d8 0x1234.size ; = 0x10
 #d8 "hello".size ; = 0x28
+#d8 ascii("hello").size ; = 0x28
+#d8 utf16be("hello").size ; = 0x50
+#d8 utf32be("hello").size ; = 0xa0
