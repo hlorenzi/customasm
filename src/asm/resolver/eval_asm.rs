@@ -187,9 +187,9 @@ fn resolve_once(
         {
             let cur_address = inner_ctx.eval_address(
                 query.report,
-                query.span,
+                ast_symbol.decl_span,
                 defs,
-                true)?;
+                inner_ctx.can_guess())?;
 
             let new_value = expr::Value::make_integer(cur_address);
             
