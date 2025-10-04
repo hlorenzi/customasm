@@ -15,6 +15,7 @@ pub struct AstDirectiveBankdef
 	pub addr_size: Option<expr::Expr>,
 	pub output_offset: Option<expr::Expr>,
 	pub fill: bool,
+	pub userdata: Option<expr::Expr>,
     
     pub item_ref: Option<util::ItemRef::<asm::Bankdef>>,
 }
@@ -61,6 +62,10 @@ pub fn parse(
     let fill = fields.extract_as_bool(
         report,
         "fill")?;
+        
+    let userdata = fields.extract_as_optional_expr(
+        report,
+        "data")?;
 
     fields.report_remaining(report)?;
 
@@ -79,6 +84,7 @@ pub fn parse(
         addr_size,
         output_offset,
         fill,
+        userdata,
 
         item_ref: None,
     })

@@ -8,9 +8,11 @@ pub struct Bankdef
     pub addr_unit: usize,
     pub label_align: Option<usize>,
 	pub addr_start: util::BigInt,
-    pub size: Option<usize>,
+    pub size_in_units: Option<usize>,
+    pub size_in_bits: Option<usize>,
 	pub output_offset: Option<usize>,
 	pub fill: bool,
+	pub userdata: expr::Value,
 }
 
 
@@ -28,9 +30,11 @@ pub fn define(
         addr_unit: 8,
         label_align: None,
         addr_start: util::BigInt::new(0, None),
-        size: None,
+        size_in_units: None,
+        size_in_bits: None,
         output_offset: Some(0),
         fill: false,
+        userdata: expr::Value::make_void(),
     };
 
     defs.bankdefs.define(initial_item_ref, initial_bankdef);
@@ -132,9 +136,26 @@ pub fn define(
                 }
             };
 
-            // FIXME: Multiplication can overflow
-            let size = addr_size
-                .map(|s| s * addr_unit);
+            let size_in_units = addr_size;
+            
+            let size_in_bits = {
+                if let Some(addr_size) = addr_size
+                {
+                    match addr_size.checked_mul(addr_unit)
+                    {
+                        Some(s) => Some(s),
+                        None =>
+                        {
+                            report.error_span(
+                                "value is out of supported range",
+                                node.addr_size.as_ref().unwrap().span());
+
+                            return Err(());
+                        }
+                    }
+                }
+                else { None }
+            };
             
             let output_offset = match &node.output_offset
             {
@@ -149,15 +170,26 @@ pub fn define(
             };
 
             let fill = node.fill;
+            
+            let userdata = match &node.userdata {
+                None => expr::Value::make_void(),
+                Some(expr) => asm::resolver::eval_certain(
+                    report,
+                    decls,
+                    defs,
+                    expr)?,
+            };
 
             let bankdef = Bankdef {
                 item_ref,
                 addr_unit,
                 label_align,
                 addr_start,
-                size,
+                size_in_units,
+                size_in_bits,
                 output_offset,
                 fill,
+                userdata,
             };
 
             defs.bankdefs.define(item_ref, bankdef);

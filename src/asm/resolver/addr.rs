@@ -88,7 +88,7 @@ pub fn resolve_addr(
                 ast_addr.header_span)?;
 
 
-        if let Some(size) = bank.size
+        if let Some(size) = bank.size_in_bits
         {
             if addr_delta >= size
             {

@@ -30,8 +30,8 @@ pub fn check_bank_overlap(
             let outp1 = bankdef1.output_offset.unwrap();
             let outp2 = bankdef2.output_offset.unwrap();
 
-            let size1 = bankdef1.size;
-            let size2 = bankdef2.size;
+            let size1 = bankdef1.size_in_bits;
+            let size2 = bankdef2.size_in_bits;
 
             let overlap = {
                 match (size1, size2)
@@ -261,7 +261,7 @@ fn fill_banks(
         }
 
         if let (Some(size), Some(offset)) =
-            (bankdef.size, bankdef.output_offset)
+            (bankdef.size_in_bits, bankdef.output_offset)
         {
             let highest_position = offset + size - 1;
 
@@ -312,7 +312,7 @@ fn check_bank_output(
     let bankdef = defs.bankdefs.get(ctx.bank_ref);
     let bankdef_decl = decls.bankdefs.get(ctx.bank_ref);
 
-    if let Some(bank_size) = bankdef.size
+    if let Some(bank_size) = bankdef.size_in_bits
     {
         // FIXME: Addition can overflow
         if ctx.bank_data.cur_position + size > bank_size

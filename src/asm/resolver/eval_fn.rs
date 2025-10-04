@@ -19,6 +19,7 @@ pub fn resolve_builtin_fn(
         "incbin" => Some(eval_builtin_incbin),
         "incbinstr" => Some(eval_builtin_incbinstr),
         "inchexstr" => Some(eval_builtin_inchexstr),
+        "bankof" => Some(eval_builtin_bankof),
         _ => None,
     }
 }
@@ -33,6 +34,7 @@ pub fn get_statically_known_builtin_fn(
         "incbin" => true,
         "incbinstr" => true,
         "inchexstr" => true,
+        "bankof" => false,
         _ => false,
     }
 }
@@ -377,4 +379,47 @@ fn eval_builtin_incstr(
         bigint.slice(
             bigint_size - (start * bits_per_char),
             bigint_size - (end * bits_per_char))))
+}
+
+
+fn eval_builtin_bankof(
+    _fileserver: &mut dyn util::FileServer,
+    decls: &asm::ItemDecls,
+    _defs: &asm::ItemDefs,
+    _ctx: &asm::ResolverContext,
+    query: &mut expr::EvalFunctionQuery)
+    -> Result<expr::Value, ()>
+{
+    query.ensure_arg_number(1)?;
+
+    let metadata = query.args[0].value.get_metadata();
+
+    if let Some(bank_ref) = metadata.bank_ref
+    {
+        Ok(expr::Value::make_bankdef(bank_ref))
+    }
+    else
+    {
+        let Some(symbol_ref) = metadata.symbol_ref
+            else {
+                query.report.error_span(
+                    "argument to `bankof` must have an associated symbol",
+                    query.args[0].span);
+                
+                return Err(());
+            };
+
+        let symbol = decls.symbols.get(symbol_ref);
+
+        let Some(bank_ref) = symbol.bank_ref
+            else {
+                query.report.error_span(
+                    "argument to `bankof` must have an associated symbol",
+                    query.args[0].span);
+                
+                return Err(());
+            };
+
+        Ok(expr::Value::make_bankdef(bank_ref))
+    }
 }

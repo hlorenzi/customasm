@@ -52,6 +52,7 @@ pub enum Value
 	ExprBuiltInFunction(ValueMetadata, String),
 	AsmBuiltInFunction(ValueMetadata, String),
 	Function(ValueMetadata, util::ItemRef<asm::Function>),
+	Bankdef(ValueMetadata, util::ItemRef<asm::Bankdef>),
 }
 
 
@@ -59,6 +60,7 @@ pub enum Value
 pub struct ValueMetadata
 {
 	pub symbol_ref: Option<util::ItemRef<asm::Symbol>>,
+	pub bank_ref: Option<util::ItemRef<asm::Bankdef>>,
 }
 
 
@@ -158,6 +160,7 @@ impl Value
 			Value::ExprBuiltInFunction(..) => "built-in function",
 			Value::AsmBuiltInFunction(..) => "built-in function",
 			Value::Function(..) => "function",
+			Value::Bankdef(..) => "bankdef",
 		}
 	}
 
@@ -209,6 +212,21 @@ impl Value
 	}
 
 
+	pub fn make_maybe_integer<T: Into<util::BigInt>>(maybe_value: Option<T>) -> Value
+	{
+		if let Some(value) = maybe_value
+		{
+			Value::Integer(
+				Value::make_metadata(),
+				value.into())
+		}
+		else
+		{
+			Value::make_void()
+		}
+	}
+
+
 	pub fn make_bool(value: bool) -> Value
 	{
 		Value::Bool(
@@ -227,12 +245,43 @@ impl Value
 			})
 	}
 
+
+	pub fn make_struct(value: ValueStruct) -> Value
+	{
+		Value::Struct(
+			Value::make_metadata(),
+			value)
+	}
+
+
+	pub fn make_bankdef(value: util::ItemRef<asm::Bankdef>) -> Value
+	{
+		Value::Bankdef(
+			Value::make_metadata(),
+			value)
+	}
+
 	
 	pub fn make_metadata() -> ValueMetadata
 	{
 		ValueMetadata {
 			symbol_ref: None,
+			bank_ref: None,
 		}
+	}
+
+
+	pub fn with_symbol_ref(mut self, symbol_ref: util::ItemRef<asm::Symbol>) -> Value
+	{
+		self.get_mut_metadata().symbol_ref = Some(symbol_ref);
+		self
+	}
+
+
+	pub fn with_bank_ref(mut self, bank_ref: util::ItemRef<asm::Bankdef>) -> Value
+	{
+		self.get_mut_metadata().bank_ref = Some(bank_ref);
+		self
 	}
 
 
@@ -250,6 +299,7 @@ impl Value
 			Value::ExprBuiltInFunction(meta, ..) => meta,
 			Value::AsmBuiltInFunction(meta, ..) => meta,
 			Value::Function(meta, ..) => meta,
+			Value::Bankdef(meta, ..) => meta,
 		}
 	}
 
@@ -268,6 +318,7 @@ impl Value
 			Value::ExprBuiltInFunction(meta, ..) => meta,
 			Value::AsmBuiltInFunction(meta, ..) => meta,
 			Value::Function(meta, ..) => meta,
+			Value::Bankdef(meta, ..) => meta,
 		}
 	}
 
@@ -760,6 +811,12 @@ impl std::cmp::PartialEq for Value
 			Value::Function(_, a) => match other
 			{
 				Value::Function(_, b) => a == b,
+				_ => false,
+			}
+
+			Value::Bankdef(_, a) => match other
+			{
+				Value::Bankdef(_, b) => a == b,
 				_ => false,
 			}
 		}

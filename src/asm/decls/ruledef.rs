@@ -27,6 +27,7 @@ pub fn collect(
             report,
             node.name_span,
             &util::SymbolContext::new_global(),
+            None,
             name,
             0,
             util::SymbolKind::Other)?;

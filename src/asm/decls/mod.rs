@@ -31,6 +31,7 @@ pub fn init(
         report,
         diagn::Span::new_dummy(),
         &util::SymbolContext::new_global(),
+        None,
         "#global_bankdef".to_string(),
         0,
         util::SymbolKind::Other)?;

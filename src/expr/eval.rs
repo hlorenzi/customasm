@@ -612,6 +612,16 @@ impl expr::Expr
 					let rhs = propagate!(rhs_expr
 						.eval_with_ctx(report, ctx, provider)?);
 
+					if std::mem::discriminant(&lhs) == std::mem::discriminant(&rhs)
+					{
+						match op
+						{
+							expr::BinaryOp::Eq => return Ok(expr::Value::make_bool(lhs == rhs)),
+							expr::BinaryOp::Ne => return Ok(expr::Value::make_bool(lhs != rhs)),
+							_ => {},
+						}
+					}
+
 					match (&lhs, &rhs)
 					{
 						(expr::Value::Bool(_, lhs), expr::Value::Bool(_, rhs)) =>
@@ -621,8 +631,6 @@ impl expr::Expr
 								expr::BinaryOp::And => Ok(expr::Value::make_bool(lhs & rhs)),
 								expr::BinaryOp::Or  => Ok(expr::Value::make_bool(lhs | rhs)),
 								expr::BinaryOp::Xor => Ok(expr::Value::make_bool(lhs ^ rhs)),
-								expr::BinaryOp::Eq  => Ok(expr::Value::make_bool(lhs == rhs)),
-								expr::BinaryOp::Ne  => Ok(expr::Value::make_bool(lhs != rhs)),
 								_ => Err(report.error_span("invalid argument types to operator", span))
 							}
 						}
@@ -691,8 +699,6 @@ impl expr::Expr
 								expr::BinaryOp::And  => Ok(expr::Value::make_integer(lhs & rhs)),
 								expr::BinaryOp::Or   => Ok(expr::Value::make_integer(lhs | rhs)),
 								expr::BinaryOp::Xor  => Ok(expr::Value::make_integer(lhs ^ rhs)),
-								expr::BinaryOp::Eq   => Ok(expr::Value::make_bool(lhs == rhs)),
-								expr::BinaryOp::Ne   => Ok(expr::Value::make_bool(lhs != rhs)),
 								expr::BinaryOp::Lt   => Ok(expr::Value::make_bool(lhs <  rhs)),
 								expr::BinaryOp::Le   => Ok(expr::Value::make_bool(lhs <= rhs)),
 								expr::BinaryOp::Gt   => Ok(expr::Value::make_bool(lhs >  rhs)),

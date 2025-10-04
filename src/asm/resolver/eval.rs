@@ -359,11 +359,14 @@ fn eval_builtin_symbol(
     {
         "$" | "pc" =>
         {
-            Ok(Some(expr::Value::make_integer(ctx.eval_address(
+            let addr = ctx.eval_address(
                 query.report,
                 query.span,
                 defs,
-                ctx.can_guess())?)))
+                ctx.can_guess())?;
+            
+            Ok(Some(expr::Value::make_integer(addr)
+                .with_bank_ref(ctx.bank_ref)))
         }
 
         _ =>
@@ -404,6 +407,11 @@ pub fn eval_member(
             return Ok(subsymbol.value.clone());
         }
     }
+
+    if let Some(value) = eval_member_bankdef(decls, defs, _ctx, query)?
+    {
+        return Ok(value);
+    }
     
 	if let Some(value) = expr::resolve_builtin_member(query)?
 	{
@@ -417,4 +425,29 @@ pub fn eval_member(
         query.span);
 
     Err(())
+}
+
+
+pub fn eval_member_bankdef(
+    _decls: &asm::ItemDecls,
+    defs: &asm::ItemDefs,
+    _ctx: Option<&asm::ResolverContext>,
+    query: &mut expr::EvalMemberQuery)
+    -> Result<Option<expr::Value>, ()>
+{
+    let expr::Value::Bankdef(_, bank_ref) = query.value
+        else { return Ok(None); };
+
+    let bank = defs.bankdefs.get(bank_ref);
+
+    match query.member_name
+    {
+        "bits" => Ok(Some(expr::Value::make_integer(bank.addr_unit))),
+        "addr" => Ok(Some(expr::Value::make_integer(bank.addr_start.clone()))),
+        "outp" => Ok(Some(expr::Value::make_maybe_integer(bank.output_offset))),
+        "size" => Ok(Some(expr::Value::make_maybe_integer(bank.size_in_units))),
+        "size_b" => Ok(Some(expr::Value::make_maybe_integer(bank.size_in_bits))),
+        "data" => Ok(Some(bank.userdata.clone())),
+        _ => Ok(None)
+    }
 }

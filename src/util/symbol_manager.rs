@@ -19,6 +19,7 @@ pub struct SymbolDecl<T>
     pub kind: SymbolKind,
     pub depth: usize,
     pub ctx: SymbolContext,
+    pub bank_ref: Option<util::ItemRef<asm::Bankdef>>,
     pub item_ref: util::ItemRef<T>,
     pub(super) children: std::collections::HashMap<String, util::ItemRef<T>>,
 }
@@ -305,6 +306,7 @@ impl<T> SymbolManager<T>
         report: &mut diagn::Report,
         span: diagn::Span,
         ctx: &SymbolContext,
+        bank_ref: Option<util::ItemRef<asm::Bankdef>>,
         name: String,
         hierarchy_level: usize,
         kind: SymbolKind)
@@ -395,6 +397,7 @@ impl<T> SymbolManager<T>
             kind,
             depth: hierarchy_level,
             ctx: new_ctx.clone(),
+            bank_ref,
             item_ref,
             children: std::collections::HashMap::new(),
         });

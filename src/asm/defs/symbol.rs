@@ -54,10 +54,8 @@ pub fn define(
             item_ref,
             no_emit: node.no_emit,
             value_statically_known,
-            value: expr::Value::Unknown(
-                expr::ValueMetadata {
-                    symbol_ref: Some(item_ref),
-                }),
+            value: expr::Value::make_unknown()
+                .with_symbol_ref(item_ref),
             resolved: false,
             bankdef_ref: None,
         };
