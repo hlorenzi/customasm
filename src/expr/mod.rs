@@ -55,5 +55,5 @@ pub use self::builtin_fn::{
 };
 
 
-pub const PARSE_RECURSION_DEPTH_MAX: usize = 50;
+pub const PARSE_RECURSION_DEPTH_MAX: usize = 25;
 pub const EVAL_RECURSION_DEPTH_MAX: usize = 25;
