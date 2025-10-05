@@ -53,15 +53,18 @@ Use the format names below with or without
 the extra parameters, separated by commas,
 with no whitespace in between.
 
-If the argument is a string, escape characters
-incompatible with the command-line. For example,
-spaces can be escaped as `\x20`.
+If the argument is a string, you'll need to
+escape characters incompatible with your
+command-line shell. For example, spaces can
+be escaped as `\x20`. The use of surrounding
+double-quotes is optional, for convenience.
 
 Examples:  
 * `-f annotated`  
 * `-f annotated,group:4`  
 * `-f annotated,base:8,group:3`  
 * `-f list,before:"begin\x20data\n"`  
+* `-f list,before:begin\x20data\n,between:\n`  
 
 ## Formats:
 * `binary`  

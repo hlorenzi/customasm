@@ -540,6 +540,18 @@ pub fn parse_output_format(
 						return Ok(string);
 					}
 				}
+				else if !value.starts_with('\"') &&
+					!value.ends_with('\"')
+				{
+					if let Ok(string) = syntax::unescape_string(
+						&mut diagn::Report::new(),
+						diagn::Span::new_dummy(),
+						value)
+					{
+						params.remove(param_id);
+						return Ok(string);
+					}
+				}
 				
 				report.error(
 					format!(
