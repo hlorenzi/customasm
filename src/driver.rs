@@ -24,10 +24,7 @@ struct CommandOutput
 pub enum OutputFormat
 {
 	Binary,
-	Annotated {
-		base: usize,
-		group: usize,
-	},
+	Annotated(util::FormatAnnotatedOptions),
 	BinStr,
 	HexStr,
 	BinDump,
@@ -418,10 +415,12 @@ fn parse_command(
 		{
 			if group.printout
 			{
-				group.format = Some(OutputFormat::Annotated {
+				group.format = Some(OutputFormat::Annotated(util::FormatAnnotatedOptions {
 					base: 16,
-					group: 2,
-				});
+					addr_base: 16,
+					digits_per_group: 2,
+					display_labels: true,
+				}));
 			}
 			else
 			{
@@ -554,6 +553,40 @@ pub fn parse_output_format(
 		}
 	};
 
+	let get_arg_bool = &mut |
+		params: &mut std::collections::HashMap::<String, String>,
+		report: &mut diagn::Report,
+		param_id: &str,
+		def: bool|
+	{
+		match params.get(param_id)
+		{
+			None => Ok(def),
+			Some(value) =>
+			{
+				if value == "true"
+				{
+					params.remove(param_id);
+					return Ok(true);
+				}
+				else if value == "false"
+				{
+					params.remove(param_id);
+					return Ok(false);
+				}
+				
+				report.error(
+					format!(
+						"invalid format argument `{},{}:{}`",
+						format_id,
+						param_id,
+						value));
+
+				Err(())
+			}
+		}
+	};
+
 	let get_arg_usize = &mut |
 		params: &mut std::collections::HashMap::<String, String>,
 		report: &mut diagn::Report,
@@ -599,7 +632,7 @@ pub fn parse_output_format(
 
 	let check_valid_base = &mut |base: usize| -> bool
 	{
-		[2, 4, 8, 16, 32, 64, 128].contains(&base)
+		[2, 4, 8, 16, 32].contains(&base)
 	};
 
 	let check_2_or_16 = &mut |base: usize| -> bool
@@ -617,20 +650,26 @@ pub fn parse_output_format(
 		{
 			"binary" => OutputFormat::Binary,
 
-			"annotated" => OutputFormat::Annotated {
+			"annotated" => OutputFormat::Annotated(util::FormatAnnotatedOptions {
 				base: get_arg_usize(&mut params, report, "base", 16, check_valid_base)?,
-				group: get_arg_usize(&mut params, report, "group", 2, check_nonzero)?,
-			},
+				addr_base: get_arg_usize(&mut params, report, "addr_base", 16, check_valid_base)?,
+				digits_per_group: get_arg_usize(&mut params, report, "group", 2, check_nonzero)?,
+				display_labels: get_arg_bool(&mut params, report, "labels", true)?,
+			}),
 
-			"annotatedhex" => OutputFormat::Annotated {
+			"annotatedhex" => OutputFormat::Annotated(util::FormatAnnotatedOptions {
 				base: 16,
-				group: 2,
-			},
+				addr_base: 16,
+				digits_per_group: 2,
+				display_labels: true,
+			}),
 
-			"annotatedbin" => OutputFormat::Annotated {
+			"annotatedbin" => OutputFormat::Annotated(util::FormatAnnotatedOptions {
 				base: 2,
-				group: 8,
-			},
+				addr_base: 16,
+				digits_per_group: 8,
+				display_labels: true,
+			}),
 
 			"binstr" => OutputFormat::BinStr,
 			"hexstr" => OutputFormat::HexStr,
@@ -806,8 +845,8 @@ pub fn format_output(
 			OutputFormat::Binary =>
 				return output.format_binary(),
 
-			OutputFormat::Annotated { base, group } =>
-				output.format_annotated(fileserver, *base, *group),
+			OutputFormat::Annotated(opts) =>
+				output.format_annotated(fileserver, opts),
 
 			OutputFormat::TCGame { base, group } =>
 				output.format_tcgame(fileserver, *base, *group),

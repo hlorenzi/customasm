@@ -1,4 +1,8 @@
  outp | addr | data (base 16)
 
+  0:0 |    0 |    ; label1:
   0:0 |    0 | 55 ; halt
   1:0 |    1 | 55 ; halt
+  2:0 |    2 |    ; label2:
+  2:0 |    2 | 55 ; halt
+  3:0 |    3 | 55 ; halt

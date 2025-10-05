@@ -33,6 +33,12 @@ impl BigInt
     }
 
 
+    pub fn to_str_radix(&self, radix: usize) -> String
+    {
+        self.bigint.to_str_radix(radix as u32)
+    }
+
+
     pub fn from_bytes_be(bytes: &[u8]) -> BigInt
     {
         let bigint = num_bigint::BigInt::from_signed_bytes_be(&bytes);

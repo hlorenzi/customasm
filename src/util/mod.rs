@@ -11,7 +11,10 @@ pub use self::bitvec::{
 };
 
 mod bitvec_format;
-pub use self::bitvec_format::FormatListOptions;
+pub use self::bitvec_format::{
+    FormatListOptions,
+    FormatAnnotatedOptions,
+};
 
 mod overlap_checker;
 pub use self::overlap_checker::OverlapChecker;

@@ -67,7 +67,7 @@ Examples:
 * `binary`  
     Code compatible with your target machine.
 
-* `annotated,base:16,group:2`  
+* `annotated,base:16,group:2,addr_base:16,labels:true`  
     Annotates the output data with excerpts
     from the source code.
 * `annotatedbin`  

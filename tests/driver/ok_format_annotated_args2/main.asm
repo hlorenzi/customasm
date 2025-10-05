@@ -10,5 +10,5 @@ label2:
 halt
 halt
 
-; command: main.asm -f annotated -o out.txt
+; command: main.asm -f annotated,base:2,addr_base:2,group:4,labels:false -o out.txt
 ; output: out.txt

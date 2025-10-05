@@ -13,6 +13,44 @@ pub struct FormatListOptions
 }
 
 
+pub struct FormatAnnotatedOptions
+{
+	pub base: usize,
+	pub addr_base: usize,
+	pub digits_per_group: usize,
+	pub display_labels: bool,
+}
+
+
+fn to_str_radix(mut value: usize, radix: usize) -> String
+{
+	let orig = value;
+	let mut result = Vec::new();
+
+	if value == 0
+	{
+		return "0".to_string();
+	}
+
+	while value != 0
+	{
+		let digit = (value % radix) as u8;
+		value /= radix;
+
+		let c = if digit < 10
+			{ ('0' as u8 + digit) as char }
+		else
+			{ ('a' as u8 + digit - 10) as char };
+
+		result.push(c);
+	}
+
+	println!("value: {} = {}", orig, result.iter().rev().collect::<String>());
+
+	result.into_iter().rev().collect()
+}
+
+
 impl util::BitVec
 {
 	pub fn format_binary(&self) -> Vec<u8>
@@ -454,19 +492,24 @@ impl util::BitVec
 	pub fn format_annotated(
 		&self,
 		fileserver: &dyn util::FileServer,
-		base: usize,
-		digits_per_group: usize)
+		options: &FormatAnnotatedOptions)
 		-> String
 	{
 		let mut result = String::new();
 
-		let bits_per_digit = (base - 1).count_ones() as usize;
-		let bits_per_group = digits_per_group * bits_per_digit;
+		let bits_per_digit = (options.base - 1).count_ones() as usize;
+		let output_fractional_bits = 8;
 
 		let mut outp_width = 2;
 		let mut outp_bit_width = 1;
-		let mut addr_width = 4;
-		let mut content_width = (digits_per_group + 1) * 1 - 1;
+		let mut addr_width = {
+			if options.addr_base == 16
+				{ "addr".len() }
+			else
+				{ format!("addr (base {})", options.addr_base).len() }
+		};
+
+		let mut content_width = (options.digits_per_group + 1) * 1 - 1;
 
 		let mut sorted_spans = self.spans.clone();
         sorted_spans.sort_by(|a, b|
@@ -478,20 +521,20 @@ impl util::BitVec
             {
                 outp_width = std::cmp::max(
                     outp_width,
-                    format!("{:x}", offset / bits_per_group).len());
+                    format!("{:}", to_str_radix(offset / output_fractional_bits, options.addr_base)).len());
 
 				outp_bit_width = std::cmp::max(
 					outp_bit_width,
-					format!("{:x}", offset % bits_per_group).len());
+					format!("{:}", to_str_radix(offset % output_fractional_bits, options.addr_base)).len());
 
                 addr_width = std::cmp::max(
                     addr_width,
-                    format!("{:x}", span.addr).len());
+                    format!("{:}", span.addr.to_str_radix(options.addr_base)).len());
 
                 let data_digits = span.size / bits_per_digit + if span.size % bits_per_digit == 0 { 0 } else { 1 };
-				let this_content_width = data_digits + data_digits / digits_per_group;
+				let this_content_width = data_digits + data_digits / options.digits_per_group;
 
-				if this_content_width > 1 && this_content_width <= (digits_per_group + 1) * 5
+				if this_content_width > 1 && this_content_width <= (options.digits_per_group + 1) * 5
 				{
 					content_width = std::cmp::max(
 						content_width,
@@ -501,8 +544,13 @@ impl util::BitVec
 		}
 
 		result.push_str(&format!(" {:>1$} |", "outp", outp_width + outp_bit_width + 1));
-		result.push_str(&format!(" {:>1$} |", "addr", addr_width));
-		result.push_str(&format!(" data (base {})", base));
+		
+		if options.addr_base == 16
+			{ result.push_str(&format!(" {:>1$} |", "addr", addr_width)); }
+		else
+			{ result.push_str(&format!(" {:>1$} |", format!("addr (base {})", options.addr_base), addr_width)); }
+		
+		result.push_str(&format!(" data (base {})", options.base));
 		result.push_str("\n");
 		result.push_str("\n");
 
@@ -511,10 +559,16 @@ impl util::BitVec
 
         for span in &sorted_spans
         {
+			if !options.display_labels &&
+				span.size == 0
+			{
+				continue;
+			}
+
             if let Some(offset) = span.offset
             {
-                result.push_str(&format!(" {:1$x}", offset / bits_per_group, outp_width));
-                result.push_str(&format!(":{:1$x} | ", offset % bits_per_group, outp_bit_width));
+                result.push_str(&format!(" {:>1$}", to_str_radix(offset / output_fractional_bits, options.addr_base), outp_width));
+                result.push_str(&format!(":{:>1$} | ", to_str_radix(offset % output_fractional_bits, options.addr_base), outp_bit_width));
             }
             else
             {
@@ -522,14 +576,14 @@ impl util::BitVec
                 result.push_str(&format!(":{:>1$} | ", "-", outp_bit_width));
             }
 
-            result.push_str(&format!("{:1$x} | ", span.addr, addr_width));
+            result.push_str(&format!("{:>1$} | ", span.addr.to_str_radix(options.addr_base), addr_width));
 
             let mut contents_str = String::new();
 
             let digit_num = span.size / bits_per_digit + if span.size % bits_per_digit == 0 { 0 } else { 1 };
             for digit_index in 0..digit_num
             {
-                if digit_index > 0 && digit_index % digits_per_group == 0
+                if digit_index > 0 && digit_index % options.digits_per_group == 0
                     { contents_str.push_str(" "); }
 
                 let mut digit = 0;

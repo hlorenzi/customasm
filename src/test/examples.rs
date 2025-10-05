@@ -32,7 +32,12 @@ fn test_example(filename: &str, hash: &[u8])
 
     println!(
         "{}",
-        output.format_annotated(&fileserver, 16, 2));
+        output.format_annotated(&fileserver, &util::FormatAnnotatedOptions {
+            base: 16,
+            addr_base: 16,
+            digits_per_group: 2,
+            display_labels: true,
+        }));
     
     assert_eq!(output_hash[..], *hash);
 }
