@@ -17,17 +17,51 @@ jobs:
     - name: Install Mingw for Windows cross-compilation
       run: sudo apt-get install -y gcc-mingw-w64-x86-64
 
+    - name: Install musl
+      run: sudo apt-get install -y musl-dev musl-tools
+
     - name: Install latest Rust stable
       uses: dtolnay/rust-toolchain@stable
       with:
           toolchain: stable
-          targets: x86_64-pc-windows-gnu
+          targets: x86_64-pc-windows-gnu,x86_64-unknown-linux-musl
 
     - name: Run tests
       run: cargo test --release --verbose
 
-    - name: Build
+    - name: Build for Windows
       run: cargo build --release --verbose --target=x86_64-pc-windows-gnu
+
+    - name: Build for Linux with musl
+      run: cargo build --release --verbose --target=x86_64-unknown-linux-musl
+
+    - name: Prepare Release asset for Windows
+      env:
+        TARGET_EXE: ./target/x86_64-pc-windows-gnu/release/customasm.exe
+      run: |
+        mkdir ./pkg
+        cp $TARGET_EXE ./pkg/customasm.exe
+        cp -r ./examples ./pkg/examples
+        cp ./README_PKG.txt ./pkg/README.txt
+        cd ./pkg
+        zip -r pkg.zip .
+        cd ..
+        mv ./pkg/pkg.zip ./pkg_win64.zip
+        rm -rf ./pkg
+
+    - name: Prepare Release asset for Linux with musl
+      env:
+        TARGET_EXE: ./target/x86_64-unknown-linux-musl/release/customasm
+      run: |
+        mkdir ./pkg
+        cp $TARGET_EXE ./pkg/customasm
+        cp -r ./examples ./pkg/examples
+        cp ./README_PKG.txt ./pkg/README.txt
+        cd ./pkg
+        zip -r pkg.zip .
+        cd ..
+        mv ./pkg/pkg.zip ./pkg_linux_musl.zip
+        rm -rf ./pkg
 
     - name: Create Release
       id: create_release
@@ -37,27 +71,26 @@ jobs:
       with:
         tag_name: ${{ github.ref }}
         release_name: ${{ github.ref }}
-        body: Here's a new release! [Check out the changelog!](https://github.com/hlorenzi/customasm/wiki/Changelog)
+        body: Here's a new automated release! [Check out the changelog!](https://github.com/hlorenzi/customasm/wiki/Changelog)
         draft: false
         prerelease: false
 
-    - name: Prepare Release asset
-      env:
-        TARGET_EXE: ./target/x86_64-pc-windows-gnu/release/customasm.exe
-      run: |
-        mkdir ./pkg
-        mv $TARGET_EXE ./pkg/customasm.exe
-        mv ./examples ./pkg/examples
-        mv ./README_PKG.txt ./pkg/README.txt
-        cd ./pkg
-        zip -r pkg.zip .
-
-    - name: Upload Release asset
+    - name: Upload Release asset for Windows
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./pkg/pkg.zip
-        asset_name: customasm_win64.zip
+        asset_path: ./pkg_win64.zip
+        asset_name: customasm_${{github.ref_name}}_win64.zip
+        asset_content_type: application/zip
+
+    - name: Upload Release asset for Linux with musl
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./pkg_linux_musl.zip
+        asset_name: customasm_${{github.ref_name}}_linux_musl.zip
         asset_content_type: application/zip
