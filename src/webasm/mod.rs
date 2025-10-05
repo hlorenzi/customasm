@@ -5,16 +5,16 @@ use crate::*;
 include!(concat!(env!("OUT_DIR"), "/std_files.rs"));
 
 
-#[no_mangle]
-pub unsafe extern fn wasm_assemble(
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wasm_assemble(
 	format_str: *const String,
 	src: *mut String)
 	-> *mut String
 {
 	let virtual_filename = "asm";
 
-	let format_str = std::mem::transmute::<_, &String>(format_str);
-	let src = std::mem::transmute::<_, &String>(src);
+	let format_str = unsafe { std::mem::transmute::<_, &String>(format_str) };
+	let src = unsafe { std::mem::transmute::<_, &String>(src) };
 			
 	let mut report = diagn::Report::new();
 
@@ -38,8 +38,8 @@ pub unsafe extern fn wasm_assemble(
 			{
 				let mut err = Vec::<u8>::new();
 				report.print_all(&mut err, &fileserver, true);
-				return wasm_string_new_with(
-					String::from_utf8(err).unwrap());
+				return unsafe { wasm_string_new_with(
+					String::from_utf8(err).unwrap()) };
 			}
 		}
 	};
@@ -56,12 +56,12 @@ pub unsafe extern fn wasm_assemble(
 		&output,
 		&format);
 
-	wasm_string_new_with(String::from_utf8_lossy(&formatted))
+	unsafe { wasm_string_new_with(String::from_utf8_lossy(&formatted)) }
 }
 
 
-#[no_mangle]
-pub unsafe extern fn wasm_get_version() -> *mut String
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wasm_get_version() -> *mut String
 {
 	let version =
 		if let Some(hash) = option_env!("CUSTOMASM_COMMIT_HASH") {
@@ -73,12 +73,12 @@ pub unsafe extern fn wasm_get_version() -> *mut String
 		else {
 			env!("CUSTOMASM_VERSION").to_string()
 		};
-	wasm_string_new_with(version)
+	unsafe { wasm_string_new_with(version) }
 }
 
 
-#[no_mangle]
-pub unsafe extern fn wasm_string_new(len: u32) -> *mut String
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wasm_string_new(len: u32) -> *mut String
 {
 	let mut s = Box::new(String::new());
 	for _ in 0..len
@@ -98,37 +98,41 @@ where S: Into<String>
 }
 
 
-#[no_mangle]
-pub unsafe extern fn wasm_string_drop(s: *mut String)
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wasm_string_drop(s: *mut String)
 {
-	let s = Box::from_raw(s);
+	let s = unsafe { Box::from_raw(s) };
 	drop(s);
 }
 
 
-#[no_mangle]
-pub unsafe extern fn wasm_string_get_len(s: *mut String) -> u32
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wasm_string_get_len(s: *mut String) -> u32
 {
-	std::mem::transmute::<_, &mut String>(s).len() as u32
+	unsafe { std::mem::transmute::<_, &mut String>(s) }.len() as u32
 }
 
 
-#[no_mangle]
-pub unsafe extern fn wasm_string_get_byte(s: *mut String, index: u32) -> u8
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wasm_string_get_byte(s: *mut String, index: u32) -> u8
 {
-	std::ptr::read(
-		std::mem::transmute::<_, &mut String>(s)
-			.as_ptr()
-			.offset(index as isize))
+	unsafe {
+		std::ptr::read(
+			std::mem::transmute::<_, &mut String>(s)
+				.as_ptr()
+				.offset(index as isize))
+	}
 }
 
 
-#[no_mangle]
-pub unsafe extern fn wasm_string_set_byte(s: *mut String, index: u32, value: u8)
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn wasm_string_set_byte(s: *mut String, index: u32, value: u8)
 {
-	let bytes = std::mem::transmute::<_, &mut String>(s).as_ptr();
-	std::ptr::write(
-		std::mem::transmute::<_, *mut u8>(bytes)
-			.offset(index as isize),
-		value)
+	let bytes = unsafe { std::mem::transmute::<_, &mut String>(s) }.as_ptr();
+	unsafe { 
+		std::ptr::write(
+			std::mem::transmute::<_, *mut u8>(bytes)
+				.offset(index as isize),
+			value)
+	}
 }
