@@ -385,7 +385,7 @@ pub fn match_instr(
     -> InstructionMatches
 {
     let mut working_matches = WorkingMatches::new();
-    let mut walker = syntax::Walker::new(
+    let walker = syntax::Walker::new(
         src,
         span.file_handle,
         span.location().unwrap().0);
@@ -414,7 +414,7 @@ pub fn match_instr(
             let ruledef_matches = match_with_ruledef(
                 defs,
                 ruledef_ref,
-                &mut walker,
+                walker.clone(),
                 true);
 
             working_matches.extend(ruledef_matches);
@@ -431,23 +431,6 @@ pub fn match_instr(
         .into_iter()
         .map(|m| m.0)
         .collect::<Vec<_>>();
-
-
-    // Remove duplicate matches
-    for i in (0..matches.len()).rev()
-    {
-        let mut duplicate = false;
-        for j in 0..i
-        {
-            duplicate |= matches[i].is_same(&matches[j]);
-        }
-
-        if duplicate
-        {
-            matches.remove(i);
-        }
-    }
-
 
     // Calculate recursive "exact" pattern-part count for
     // each match
@@ -507,7 +490,7 @@ fn match_with_ruledef_map<'src>(
 fn match_with_ruledef<'src>(
     defs: &asm::ItemDefs,
     ruledef_ref: util::ItemRef<asm::Ruledef>,
-    walker: &mut syntax::Walker<'src>,
+    walker: syntax::Walker<'src>,
     needs_consume_all_tokens: bool)
     -> WorkingMatches<'src>
 {
@@ -539,14 +522,14 @@ fn begin_match_with_rule<'src>(
     ruledef_ref: util::ItemRef<asm::Ruledef>,
     rule_ref: util::ItemRef<asm::Rule>,
     rule: &asm::Rule,
-    mut walker: syntax::Walker<'src>,
+    walker: syntax::Walker<'src>,
     needs_consume_all_tokens: bool)
     -> WorkingMatches<'src>
 {
     match_with_rule(
         defs,
         rule,
-        &mut walker,
+        walker,
         needs_consume_all_tokens,
         0,
         &mut InstructionMatch {
@@ -564,7 +547,7 @@ fn begin_match_with_rule<'src>(
 fn match_with_rule<'src>(
     defs: &asm::ItemDefs,
     rule: &asm::Rule,
-    walker: &mut syntax::Walker<'src>,
+    mut walker: syntax::Walker<'src>,
     needs_consume_all_tokens: bool,
     at_pattern_part: usize,
     match_so_far: &mut InstructionMatch)
@@ -604,45 +587,25 @@ fn match_with_rule<'src>(
                     asm::RuleParameterType::Signed(_) |
                     asm::RuleParameterType::Integer(_) =>
                     {
-                        let mut result = vec![];
-
-                        // Try both with and without lookahead character
-                        for enable_lookahead in [false, true]
-                        {
-                            result.extend(
-                                match_with_expr(
-                                    defs,
-                                    rule,
-                                    walker.clone(),
-                                    needs_consume_all_tokens,
-                                    part_index,
-                                    enable_lookahead,
-                                    match_so_far.clone()));
-                        }
-
-                        return result;
+                        return match_with_expr(
+                            defs,
+                            rule,
+                            walker.clone(),
+                            needs_consume_all_tokens,
+                            part_index,
+                            match_so_far.clone());
                     }
 
                     asm::RuleParameterType::RuledefRef(ruledef_ref) =>
                     {
-                        let mut result = vec![];
-                        
-                        // Try both with and without lookahead character
-                        for enable_lookahead in [false, true]
-                        {
-                            result.extend(
-                                match_with_nested_ruledef(
-                                    defs,
-                                    ruledef_ref,
-                                    rule,
-                                    walker.clone(),
-                                    needs_consume_all_tokens,
-                                    part_index,
-                                    enable_lookahead,
-                                    match_so_far.clone()));
-                        }
-
-                        return result;
+                        return match_with_nested_ruledef(
+                            defs,
+                            ruledef_ref,
+                            rule,
+                            walker.clone(),
+                            needs_consume_all_tokens,
+                            part_index,
+                            match_so_far.clone());
                     }
                 }
             }
@@ -663,56 +626,60 @@ fn match_with_rule<'src>(
 fn match_with_expr<'src>(
     defs: &asm::ItemDefs,
     rule: &asm::Rule,
-    mut walker: syntax::Walker<'src>,
+    walker: syntax::Walker<'src>,
     needs_consume_all_tokens: bool,
     at_pattern_part: usize,
-    enable_lookahead: bool,
-    mut match_so_far: InstructionMatch)
+    match_so_far: InstructionMatch)
     -> WorkingMatches<'src>
 {
     let walker_start = walker.next_useful_index();
 
-    let Some(maybe_expr) =
-        parse_with_lookahead(
-            &rule.pattern,
-            at_pattern_part,
-            enable_lookahead,
-            &mut walker,
-            |walker| expr::parse_optional(walker))
-        else { return vec![] };
+    let exprs = parse_with_and_without_lookahead(
+        &rule.pattern,
+        at_pattern_part,
+        walker,
+        |mut walker| {
+            if let Some(expr) = expr::parse_optional(&mut walker)
+                { vec![(expr, walker)] }
+            else
+                { vec![] }
+        },
+        |a, b| a.1.next_useful_index() == b.1.next_useful_index());
 
-    let walker_end = walker.get_cursor_index();
-    let walker_start = std::cmp::min(walker_start, walker_end);
+    let mut results = WorkingMatches::new();
 
-    let expr = {
-        match maybe_expr
-        {
-            Some(expr) => expr,
-            None => return vec![],
-        }
-    };
+    for (expr, inner_walker) in exprs
+    {
+        let walker_end = inner_walker.get_cursor_index();
+        let walker_start = std::cmp::min(walker_start, walker_end);
 
-    let span = walker.get_span(
-        walker_start,
-        walker_end);
+        let span = inner_walker.get_span(
+            walker_start,
+            walker_end);
 
-    let excerpt = walker.get_excerpt(
-        walker_start,
-        walker_end);
+        let excerpt = inner_walker.get_excerpt(
+            walker_start,
+            walker_end);
 
-    match_so_far.args.push(InstructionArgument {
-        kind: InstructionArgumentKind::Expr(expr),
-        span,
-        excerpt: excerpt.to_string(),
-    });
+        let mut match_so_far = match_so_far.clone();
 
-    match_with_rule(
-        defs,
-        rule,
-        &mut walker,
-        needs_consume_all_tokens,
-        at_pattern_part + 1,
-        &mut match_so_far)
+        match_so_far.args.push(InstructionArgument {
+            kind: InstructionArgumentKind::Expr(expr),
+            span,
+            excerpt: excerpt.to_string(),
+        });
+
+        results.extend(
+            match_with_rule(
+                defs,
+                rule,
+                inner_walker,
+                needs_consume_all_tokens,
+                at_pattern_part + 1,
+                &mut match_so_far));
+    }
+
+    results
 }
 
 
@@ -720,35 +687,32 @@ fn match_with_nested_ruledef<'src>(
     defs: &asm::ItemDefs,
     nested_ruledef_ref: util::ItemRef<asm::Ruledef>,
     rule: &asm::Rule,
-    mut walker: syntax::Walker<'src>,
+    walker: syntax::Walker<'src>,
     needs_consume_all_tokens: bool,
     at_pattern_part: usize,
-    enable_lookahead: bool,
     match_so_far: InstructionMatch)
     -> WorkingMatches<'src>
 {
     let walker_start = walker.next_useful_index();
     let walker_limit_prev = walker.get_cursor_limit();
 
-    let Some(nested_matches) =
-        parse_with_lookahead(
+    let inner_matches =
+        parse_with_and_without_lookahead(
             &rule.pattern,
             at_pattern_part,
-            enable_lookahead,
-            &mut walker,
+            walker,
             |walker| match_with_ruledef(
                 defs,
                 nested_ruledef_ref,
-                walker,
-                false))
-        else { return vec![] };
-
+                walker.clone(),
+                false),
+            |a, b| a.0.is_same(&b.0));
     
-    let mut matches = WorkingMatches::new();
+    let mut results = WorkingMatches::new();
 
-    for nested_match in nested_matches
+    for inner_match in inner_matches
     {
-        let mut walker = nested_match.1;
+        let mut walker = inner_match.1;
         walker.set_cursor_limit(walker_limit_prev);
 
         let walker_end = walker.get_cursor_index();
@@ -765,7 +729,7 @@ fn match_with_nested_ruledef<'src>(
             walker_end);
 
         match_so_far.args.push(InstructionArgument {
-            kind: InstructionArgumentKind::Nested(nested_match.0),
+            kind: InstructionArgumentKind::Nested(inner_match.0),
             span,
             excerpt: excerpt.to_string(),
         });
@@ -774,15 +738,51 @@ fn match_with_nested_ruledef<'src>(
         let resumed_matches = match_with_rule(
             defs,
             rule,
-            &mut walker,
+            walker,
             needs_consume_all_tokens,
             at_pattern_part + 1,
             &mut match_so_far);
             
-        matches.extend(resumed_matches);
+        results.extend(resumed_matches);
     }
 
-    matches
+    results
+}
+
+
+fn parse_with_and_without_lookahead<'src, FnParse, FnDup, T>(
+    pattern: &asm::RulePattern,
+    at_pattern_part: usize,
+    walker: syntax::Walker<'src>,
+    mut parse_fn: FnParse,
+    mut is_duplicate_fn: FnDup)
+    -> Vec<(T, syntax::Walker<'src>)>
+    where FnParse: FnMut(syntax::Walker<'src>) -> Vec<(T, syntax::Walker<'src>)>,
+        FnDup: FnMut(&(T, syntax::Walker<'src>), &(T, syntax::Walker<'src>)) -> bool
+{
+    let mut results = parse_fn(walker.clone());
+
+    results.extend(
+        parse_with_lookahead(
+            pattern,
+            at_pattern_part,
+            walker.clone(),
+            parse_fn));
+    
+    // Remove duplicate matches
+    for i in (0..results.len()).rev()
+    {
+        let duplicate = results[0..i]
+            .iter()
+            .any(|r| is_duplicate_fn(r, &results[i]));
+
+        if duplicate
+        {
+            results.remove(i);
+        }
+    }
+    
+    results
 }
 
 
@@ -812,20 +812,14 @@ fn match_with_nested_ruledef<'src>(
 /// In cases where there's no lookahead character, the TokenWalker
 /// isn't cut off, and the expression-parser is allowed to
 /// consume as much as it can.
-fn parse_with_lookahead<'src, F, T>(
+fn parse_with_lookahead<'src, FnParse, T>(
     pattern: &asm::RulePattern,
     at_pattern_part: usize,
-    enable_lookahead: bool,
-    walker: &mut syntax::Walker<'src>,
-    parse_fn: F)
-    -> Option<T>
-    where F: FnOnce(&mut syntax::Walker<'src>) -> T
+    mut walker: syntax::Walker<'src>,
+    parse_fn: FnParse)
+    -> Vec<(T, syntax::Walker<'src>)>
+    where FnParse: FnOnce(syntax::Walker<'src>) -> Vec<(T, syntax::Walker<'src>)>
 {
-    if !enable_lookahead
-    {
-        return Some(parse_fn(walker));
-    }
-
     let maybe_lookahead_char = find_lookahead_char(
         pattern,
         at_pattern_part);
@@ -839,13 +833,18 @@ fn parse_with_lookahead<'src, F, T>(
         {
             let prev_limit = walker.get_cursor_limit();
             walker.set_cursor_limit(limit);
-            let result = parse_fn(walker);
-            walker.set_cursor_limit(prev_limit);
-            return Some(result);
+
+            let mut results = parse_fn(walker);
+
+            results.iter_mut().for_each(|r| {
+                r.1.set_cursor_limit(prev_limit);
+            });
+
+            return results;
         }
     }
 
-    None
+    vec![]
 }
 
 
