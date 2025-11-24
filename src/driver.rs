@@ -27,6 +27,8 @@ pub enum OutputFormat
 	Annotated(util::FormatAnnotatedOptions),
 	BinStr,
 	HexStr,
+	ReadMemB(util::FormatReadMemOptions),
+	ReadMemH(util::FormatReadMemOptions),
 	BinDump,
 	HexDump,
 	Mif,
@@ -686,6 +688,13 @@ pub fn parse_output_format(
 			"binstr" => OutputFormat::BinStr,
 			"hexstr" => OutputFormat::HexStr,
 
+			"readmemb" => OutputFormat::ReadMemB(util::FormatReadMemOptions {
+			    width: get_arg_usize(&mut params, report, "width", 8, check_nonzero)?
+			}),
+			"readmemh" => OutputFormat::ReadMemH(util::FormatReadMemOptions {
+			    width: get_arg_usize(&mut params, report, "width", 8, check_nonzero)?
+			}),
+
 			"bindump" => OutputFormat::BinDump,
 			"hexdump" => OutputFormat::HexDump,
 
@@ -865,6 +874,9 @@ pub fn format_output(
 
 			OutputFormat::BinStr => output.format_binstr(),
 			OutputFormat::HexStr => output.format_hexstr(),
+
+			OutputFormat::ReadMemB(opts) => output.format_readmemb(opts),
+			OutputFormat::ReadMemH(opts) => output.format_readmemh(opts),
 
 			OutputFormat::BinDump => output.format_bindump(),
 			OutputFormat::HexDump => output.format_hexdump(),
