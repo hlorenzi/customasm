@@ -80,6 +80,7 @@ Examples:
     Uninterrupted string of binary digits.
 * `hexstr`  
     Uninterrupted string of hexadecimal digits.
+
 * `bindump`  
     Memory-dump style encoded as binary digits.
 * `hexdump`  
@@ -89,6 +90,13 @@ Examples:
     Memory Initialization File format.
 * `intelhex,addr_unit:8`  
     Intel HEX format. `addr_unit` can be 8, 16, or 32.
+
+* `readmemb,width:8`
+    Verilog $readmemb format. `width` controls the
+    number of bits emitted per line.
+* `readmemh,width:8`
+    Verilog $readmemh format. `width` controls the
+    number of bits emitted per line.
 
 * `list,base:16,group:2,between:"",group2:16,between2:"",before:"",after:""`  
     Customizable list format. Digits of the selected `base`

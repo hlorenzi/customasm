@@ -21,6 +21,10 @@ pub struct FormatAnnotatedOptions
 	pub display_labels: bool,
 }
 
+pub struct FormatReadMemOptions{
+    pub width: usize
+}
+
 
 fn to_str_radix(mut value: usize, radix: usize) -> String
 {
@@ -811,6 +815,78 @@ impl util::BitVec
             result.push_str("\n");
         }
 
+        result
+    }
+
+
+    pub fn format_readmemb(&self, opts: &FormatReadMemOptions) -> String
+	{
+        // Format bits for `$readmemb` output: each line is `width` bits.
+        // Memory elements shorter than `width` will be left-padded by the simulator.
+        let mut result = String::new();
+        let mut index: usize = 0;
+
+        loop {
+            let bits_to_read = (self.len() - index).min(opts.width);
+            if bits_to_read == 0 {
+                break;
+            }
+
+            for _ in 0..bits_to_read {
+                result.push(
+                    if self.read_bit(index) {'1'} else{'0'}
+                );
+                index += 1;
+            }
+
+            result.push('\n');
+        }
+        result
+    }
+
+
+    pub fn format_readmemh(&self, opts: &FormatReadMemOptions) -> String
+	{
+        // Outputs in Verilog readmemh format: MSB-first, grouped per `width` bits.
+        // Leading bits (<4) form a partial hex digit directly, with no padding or shift.
+        let mut result = String::new();
+        let mut index: usize = 0;
+        let read = |i| self.read_bit(i);
+
+        fn num_to_hex(d: u8) -> char {
+            const HEX: &[u8; 16] = b"0123456789abcdef";
+            HEX[d as usize] as char
+        }
+
+        fn read_bits<F>(read_bit: F, index: &mut usize, n: usize) -> u8
+        where
+            F: Fn(usize) -> bool,
+        {
+            let mut v = 0u8;
+            for _ in 0..n {
+                v = (v << 1) | read_bit(*index) as u8;
+                *index += 1;
+            }
+            v
+        }
+
+        while index < self.len() {
+            let bits = (self.len() - index).min(opts.width);
+            let left = bits % 4;
+            let mut remaining = bits;
+
+            if left > 0 {
+                let v = read_bits(read, &mut index, left);
+                result.push(num_to_hex(v));
+                remaining -= left;
+            }
+
+            for _ in 0..(remaining / 4) {
+                result.push(num_to_hex(read_bits(read, &mut index, 4)));
+            }
+
+            result.push('\n');
+        }
         result
     }
 }
