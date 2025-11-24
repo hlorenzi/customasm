@@ -80,6 +80,12 @@ Examples:
     Uninterrupted string of binary digits.
 * `hexstr`  
     Uninterrupted string of hexadecimal digits.
+
+* `readmemb,width:8`
+    Verilog readmemb format, width bits per line
+* `readmemh,width:8`
+    Verilog readmemh format, width bits per line
+
 * `bindump`  
     Memory-dump style encoded as binary digits.
 * `hexdump`  
