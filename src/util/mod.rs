@@ -14,6 +14,7 @@ mod bitvec_format;
 pub use self::bitvec_format::{
     FormatListOptions,
     FormatAnnotatedOptions,
+    FormatReadMemOptions,
 };
 
 mod overlap_checker;

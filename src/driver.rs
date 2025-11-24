@@ -33,6 +33,8 @@ pub enum OutputFormat
 	IntelHex {
 		address_unit: usize,
 	},
+	ReadMemB(util::FormatReadMemOptions),
+	ReadMemH(util::FormatReadMemOptions),
 	List(util::FormatListOptions),
 	DecComma,
 	HexComma,
@@ -694,6 +696,13 @@ pub fn parse_output_format(
 				address_unit: get_arg_usize(&mut params, report, "addr_unit", 8, check_8_16_or_32)?,
 			},
 
+			"readmemb" => OutputFormat::ReadMemB(util::FormatReadMemOptions {
+			    width: get_arg_usize(&mut params, report, "width", 8, check_nonzero)?
+			}),
+			"readmemh" => OutputFormat::ReadMemH(util::FormatReadMemOptions {
+			    width: get_arg_usize(&mut params, report, "width", 8, check_nonzero)?
+			}),
+
 			"list" => OutputFormat::List(util::FormatListOptions {
 				base: get_arg_usize(&mut params, report, "base", 16, check_valid_base)?,
 				digits_per_group: get_arg_usize(&mut params, report, "group", 2, check_nonzero)?,
@@ -868,6 +877,9 @@ pub fn format_output(
 
 			OutputFormat::BinDump => output.format_bindump(),
 			OutputFormat::HexDump => output.format_hexdump(),
+
+			OutputFormat::ReadMemB(opts) => output.format_readmemb(opts),
+			OutputFormat::ReadMemH(opts) => output.format_readmemh(opts),
 
 			OutputFormat::Mif => output.format_mif(),
 			OutputFormat::IntelHex { address_unit } =>
