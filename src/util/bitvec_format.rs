@@ -28,7 +28,6 @@ pub struct FormatReadMemOptions{
 
 fn to_str_radix(mut value: usize, radix: usize) -> String
 {
-	let orig = value;
 	let mut result = Vec::new();
 
 	if value == 0
@@ -48,8 +47,6 @@ fn to_str_radix(mut value: usize, radix: usize) -> String
 
 		result.push(c);
 	}
-
-	println!("value: {} = {}", orig, result.iter().rev().collect::<String>());
 
 	result.into_iter().rev().collect()
 }
