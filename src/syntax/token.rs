@@ -104,7 +104,8 @@ impl TokenKind
 		self == TokenKind::Tilde ||
 		self == TokenKind::At ||
 		self == TokenKind::LessThan ||
-		self == TokenKind::GreaterThan
+		self == TokenKind::GreaterThan ||
+		self == TokenKind::Colon
 	}
 	
 	
