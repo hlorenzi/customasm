@@ -148,13 +148,13 @@ pub fn init() -> ItemDefs
 
 pub fn define_symbols(
     report: &mut diagn::Report,
-    _opts: &asm::AssemblyOptions,
+    opts: &asm::AssemblyOptions,
     ast: &mut asm::parser::AstTopLevel,
     decls: &asm::decls::ItemDecls,
     defs: &mut asm::defs::ItemDefs)
     -> Result<(), ()>
 {
-    symbol::define(report, ast, decls, defs)?;
+    symbol::define(report, opts, ast, decls, defs)?;
     
     report.stop_at_errors()?;
 
@@ -170,11 +170,11 @@ pub fn define_remaining(
     decls: &mut asm::decls::ItemDecls)
     -> Result<(), ()>
 {
-    bankdef::define(report, ast, decls, defs)?;
+    bankdef::define(report, opts, ast, decls, defs)?;
     ruledef::define(report, ast, decls, defs)?;
     function::define(report, ast, decls, defs)?;
     instruction::define(report, ast, decls, defs)?;
-    data_block::define(report, ast, decls, defs)?;
+    data_block::define(report, opts, ast, decls, defs)?;
     res::define(report, ast, decls, defs)?;
     align::define(report, ast, decls, defs)?;
     addr::define(report, ast, decls, defs)?;

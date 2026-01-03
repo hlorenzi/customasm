@@ -18,12 +18,11 @@ pub fn resolve_assert(
     
     let value = asm::resolver::eval(
         report,
-        opts,
         fileserver,
         decls,
         defs,
         ctx,
-        &mut expr::EvalContext::new(),
+        &mut expr::EvalContext::new(opts),
         &ast_assert.condition_expr)?;
 
     let satisfied = value.expect_bool(

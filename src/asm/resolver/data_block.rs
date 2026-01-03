@@ -29,12 +29,11 @@ pub fn resolve_data_element(
     
     let maybe_value = asm::resolver::eval(
         report,
-        opts,
         fileserver,
         decls,
         defs,
         ctx,
-        &mut expr::EvalContext::new(),
+        &mut expr::EvalContext::new(opts),
         expr);
 
     report.pop_parent();

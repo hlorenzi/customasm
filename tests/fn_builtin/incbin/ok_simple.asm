@@ -1,1 +1,2 @@
-#d incbin("data1.bin") ; = 0x68656c6c6f
+#d $incbin("data1.bin") ; = 0x68656c6c6f
+; legacy: off

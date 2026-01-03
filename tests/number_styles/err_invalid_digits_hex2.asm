@@ -1,1 +1,1 @@
-#d $cdefg ; error: expected line break
+#d $cdefg ; error: failed / error: unknown symbol `$cdefg`

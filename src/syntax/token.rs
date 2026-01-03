@@ -294,6 +294,36 @@ impl<'a> CharWalker<'a>
 	}
 
 
+	pub fn consume_while_with_refinement(
+		&mut self,
+		fn_start: fn(char) -> bool,
+		fn_mid: fn(char) -> bool,
+		fn_accept: fn(char) -> bool)
+		-> bool
+	{
+		if !fn_accept(self.current)
+			{ return false; }
+
+		if !self.consume_if(fn_start)
+			{ return false; }
+
+		loop
+		{
+			let prev = self.current;
+			
+			if self.consume_if(fn_mid)
+			{
+				if !fn_accept(prev)
+					{ return false; }
+
+				continue;
+			}
+
+			return true;
+		}
+	}
+
+
 	pub fn consume_until_char(&mut self, wanted: char)
 	{
 		while !self.ended() && self.current != wanted
@@ -370,11 +400,6 @@ fn check_for_identifier(src: &str) -> Option<(TokenKind, usize)>
 {
 	let mut walker = CharWalker::new(src);
 
-	if walker.consume_if(|c| c == '$')
-	{
-		return Some((TokenKind::Identifier, walker.length));
-	}
-	
 	if !walker.consume_while(
 		is_identifier_start,
 		is_identifier_mid)
@@ -419,8 +444,9 @@ fn check_for_number(src: &str) -> Option<(TokenKind, usize)>
 
 	else if walker.consume_char('$')
 	{
-		if walker.consume_while(
-			is_hex_number_mid,
+		if walker.consume_while_with_refinement(
+			is_identifier_mid,
+			is_identifier_mid,
 			is_hex_number_mid)
 		{
 			return Some((TokenKind::Number, walker.length));
@@ -527,6 +553,7 @@ pub fn is_whitespace(c: char) -> bool
 
 fn is_identifier_start(c: char) -> bool
 {
+	c == '$' ||
 	(c >= 'a' && c <= 'z') ||
 	(c >= 'A' && c <= 'Z') ||
 	c == '_'
@@ -535,6 +562,7 @@ fn is_identifier_start(c: char) -> bool
 
 fn is_identifier_mid(c: char) -> bool
 {
+	c == '$' ||
 	(c >= 'a' && c <= 'z') ||
 	(c >= 'A' && c <= 'Z') ||
 	(c >= '0' && c <= '9') ||
@@ -550,10 +578,7 @@ fn is_number_start(c: char) -> bool
 
 fn is_number_mid(c: char) -> bool
 {
-	(c >= 'a' && c <= 'z') ||
-	(c >= 'A' && c <= 'Z') ||
-	(c >= '0' && c <= '9') ||
-	c == '_'
+	return is_identifier_mid(c)
 }
 
 

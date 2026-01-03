@@ -166,12 +166,13 @@ pub fn match_all(
             for mtch in &mut matches
             {
                 mtch.encoding_statically_known = get_match_statically_known(
+                    opts,
                     decls,
                     defs,
                     symbol_ctx,
                     &mtch);
                 
-                mtch.encoding_size = get_match_static_size(defs, &mtch)
+                mtch.encoding_size = get_match_static_size(opts, defs, &mtch)
                     .unwrap_or(0);
             }
 
@@ -237,6 +238,7 @@ pub fn error_on_no_matches(
 
 
 fn get_match_statically_known(
+    opts: &asm::AssemblyOptions,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     symbol_ctx: &util::SymbolContext,
@@ -262,9 +264,9 @@ fn get_match_statically_known(
         }
     };
 
-    let mut provider = expr::StaticallyKnownProvider::new();
+    let mut provider = expr::StaticallyKnownProvider::new(opts);
     provider.query_variable = &query_variable;
-    provider.query_function = &asm::resolver::get_statically_known_builtin_fn;
+    provider.query_function = &asm::resolver::resolve_and_get_statically_known_builtin_fn;
 
     for i in 0..rule.parameters.len()
     {
@@ -297,6 +299,7 @@ fn get_match_statically_known(
                 if let asm::InstructionArgumentKind::Nested(ref nested_match) = arg.kind
                 {
                     if get_match_statically_known(
+                        opts,
                         decls,
                         defs,
                         symbol_ctx,
@@ -319,6 +322,7 @@ fn get_match_statically_known(
 
 
 fn get_match_static_size(
+    opts: &asm::AssemblyOptions,
     defs: &asm::ItemDefs,
     mtch: &asm::InstructionMatch)
     -> Option<usize>
@@ -326,7 +330,7 @@ fn get_match_static_size(
     let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
     let rule = &ruledef.get_rule(mtch.rule_ref);
 
-    let mut info = expr::StaticallyKnownProvider::new();
+    let mut info = expr::StaticallyKnownProvider::new(opts);
 
     for i in 0..rule.parameters.len()
     {
@@ -354,6 +358,7 @@ fn get_match_static_size(
                 if let asm::InstructionArgumentKind::Nested(ref nested_match) = arg.kind
                 {
                     let maybe_nested_size = get_match_static_size(
+                        opts,
                         defs,
                         nested_match);
                     

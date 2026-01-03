@@ -21,6 +21,7 @@ pub fn resolve_ifs(
         let condition_result = 
             asm::resolver::eval_simple(
                 report,
+                opts,
                 decls,
                 defs,
                 &node.condition_expr)?;
@@ -60,6 +61,7 @@ pub fn resolve_ifs(
 
 pub fn check_leftover_ifs(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     ast: &asm::AstTopLevel,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs)
@@ -77,6 +79,7 @@ pub fn check_leftover_ifs(
         let condition_result = 
             asm::resolver::eval_certain(
                 report,
+                opts,
                 decls,
                 defs,
                 &node.condition_expr);

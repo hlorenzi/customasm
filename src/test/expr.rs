@@ -18,6 +18,7 @@ where S: Into<Vec<u8>>
 		
 		let expr_value = expr.eval(
 			report,
+			&asm::AssemblyOptions::new(),
 			&mut expr::dummy_eval_query)?;
 		
 		Ok(expr_value)

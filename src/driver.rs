@@ -261,6 +261,13 @@ fn make_opts() -> getopts::Options
 		getopts::HasArg::Maybe,
 		getopts::Occur::Optional);
 
+	opts.opt(
+		"", "legacy",
+		"Use legacy behavior. [on/off]",
+		"VALUE",
+		getopts::HasArg::Maybe,
+		getopts::Occur::Optional);
+
     opts.optflag(
 		"", "debug-iters",
 		"Print debug info for the resolution iterations.");
@@ -357,6 +364,23 @@ fn parse_command(
 					&define_arg)?);
 		}
 
+		if parsed.opt_present("legacy")
+		{
+			command.opts.use_legacy_behavior = {
+				match parsed.opt_str("legacy").as_ref().map(|s| s.as_ref())
+				{
+					None => true,
+					Some("on") => true,
+					Some("off") => false,
+					_ =>
+					{
+						report.error("invalid argument for `--legacy`");
+						return Err(());
+					}
+				}
+			};
+		}
+
 		command.opts.debug_iterations |=
 			parsed.opt_present("debug-iters");
 
@@ -371,6 +395,7 @@ fn parse_command(
 			command.use_colors = {
 				match parsed.opt_str("color").as_ref().map(|s| s.as_ref())
 				{
+					None => true,
 					Some("on") => true,
 					Some("off") => false,
 					_ =>

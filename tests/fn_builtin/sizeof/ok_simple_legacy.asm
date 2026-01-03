@@ -1,7 +1,7 @@
 #ruledef test
 {
     ld {x} => {
-        ($sizeof(x) > 8 ? 0xff : 0x00) @ x @ $sizeof(x)`8
+        (sizeof(x) > 8 ? 0xff : 0x00) @ x @ sizeof(x)`8
     }
 }
 
@@ -15,7 +15,7 @@ ld 0x0100 ; = 0xff_0100_10
 ld 0x0000 ; = 0xff_0000_10
 ld 0xeeeee ; = 0xff_eeeee_14
 
-#d8 $sizeof(0x1234) ; = 0x10
-#d8 $sizeof("hello") ; = 0x28
+#d8 sizeof(0x1234) ; = 0x10
+#d8 sizeof("hello") ; = 0x28
 
-; legacy: off
+; legacy: on

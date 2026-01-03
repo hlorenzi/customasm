@@ -32,7 +32,7 @@ pub fn resolve_instruction(
         decls,
         defs,
         ctx,
-        &mut expr::EvalContext::new())?;
+        &mut expr::EvalContext::new(opts))?;
 
     let has_any_matches =
         maybe_encodings.is_some();
@@ -391,7 +391,6 @@ fn resolve_instruction_match_inner(
             {
                 let arg_value = asm::resolver::eval(
                     report,
-                    opts,
                     fileserver,
                     decls,
                     defs,
@@ -455,14 +454,13 @@ fn resolve_instruction_match_inner(
     rule_ctx.file_handle_ctx = Some(rule.expr.span().file_handle);
 
     Ok(asm::resolver::eval(
-            report,
-            opts,
-            fileserver,
-            decls,
-            defs,
-            &rule_ctx,
-            &mut eval_ctx,
-            &rule.expr)?)
+        report,
+        fileserver,
+        decls,
+        defs,
+        &rule_ctx,
+        &mut eval_ctx,
+        &rule.expr)?)
 }
 
 

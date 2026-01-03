@@ -14,6 +14,7 @@ pub struct DataElement
 
 pub fn define(
     _report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     ast: &mut asm::AstTopLevel,
     _decls: &mut asm::ItemDecls,
     defs: &mut asm::ItemDefs)
@@ -32,12 +33,12 @@ pub fn define(
                     {
                         Some(s) => Some(s),
                         None => expr.get_static_size(
-                            &expr::StaticallyKnownProvider::new()),
+                            &expr::StaticallyKnownProvider::new(opts)),
                     }
                 };
 
-                let mut provider = expr::StaticallyKnownProvider::new();
-                provider.query_function = &asm::resolver::get_statically_known_builtin_fn;
+                let mut provider = expr::StaticallyKnownProvider::new(opts);
+                provider.query_function = &asm::resolver::resolve_and_get_statically_known_builtin_fn;
                 
                 let statically_known = expr.is_value_statically_known(&provider);
 

@@ -1,7 +1,17 @@
 use crate::*;
 
 
-type BuiltinFn = fn(
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum AsmBuiltinFn
+{
+    Incbin,
+    Incbinstr,
+    Inchexstr,
+    Bankof,
+}
+
+
+type AsmBuiltinFnEval = fn(
     fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -11,37 +21,74 @@ type BuiltinFn = fn(
 
 
 pub fn resolve_builtin_fn(
-    name: &str)
-    -> Option<BuiltinFn>
+    name: &str,
+    opts: &asm::AssemblyOptions)
+    -> Option<AsmBuiltinFn>
 {
-    match name
+    if !opts.use_legacy_behavior
     {
-        "incbin" => Some(eval_builtin_incbin),
-        "incbinstr" => Some(eval_builtin_incbinstr),
-        "inchexstr" => Some(eval_builtin_inchexstr),
-        "bankof" => Some(eval_builtin_bankof),
-        _ => None,
+        match name
+        {
+            "$incbin" => Some(AsmBuiltinFn::Incbin),
+            "$incbinstr" => Some(AsmBuiltinFn::Incbinstr),
+            "$inchexstr" => Some(AsmBuiltinFn::Inchexstr),
+            "$bankof" => Some(AsmBuiltinFn::Bankof),
+            _ => None,
+        }
+    }
+    else
+    {
+        match name
+        {
+            "incbin" => Some(AsmBuiltinFn::Incbin),
+            "incbinstr" => Some(AsmBuiltinFn::Incbinstr),
+            "inchexstr" => Some(AsmBuiltinFn::Inchexstr),
+            "bankof" => Some(AsmBuiltinFn::Bankof),
+            _ => None,
+        }
     }
 }
 
 
-pub fn get_statically_known_builtin_fn(
+pub fn get_builtin_fn_eval(
+    builtin_fn: AsmBuiltinFn)
+    -> AsmBuiltinFnEval
+{
+    match builtin_fn
+    {
+        AsmBuiltinFn::Incbin => eval_builtin_incbin,
+        AsmBuiltinFn::Incbinstr => eval_builtin_incbinstr,
+        AsmBuiltinFn::Inchexstr => eval_builtin_inchexstr,
+        AsmBuiltinFn::Bankof => eval_builtin_bankof,
+    }
+}
+
+
+pub fn resolve_and_get_statically_known_builtin_fn(
     query: &expr::StaticallyKnownFunctionQuery)
     -> bool
 {
-    match query.func.as_ref()
+    resolve_builtin_fn(query.func, query.opts)
+        .map(get_statically_known_builtin_fn)
+        .unwrap_or(false)
+}
+
+
+pub fn get_statically_known_builtin_fn(
+    builtin_fn: AsmBuiltinFn)
+    -> bool
+{
+    match builtin_fn
     {
-        "incbin" => true,
-        "incbinstr" => true,
-        "inchexstr" => true,
-        "bankof" => false,
-        _ => false,
+        AsmBuiltinFn::Incbin => true,
+        AsmBuiltinFn::Incbinstr => true,
+        AsmBuiltinFn::Inchexstr => true,
+        AsmBuiltinFn::Bankof => false,
     }
 }
 
 
 pub fn eval_fn(
-    opts: &asm::AssemblyOptions,
     fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -49,11 +96,9 @@ pub fn eval_fn(
     query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>
 {
-    if let expr::Value::AsmBuiltInFunction(_, ref name) = query.func
+    if let expr::Value::AsmBuiltinFn(_, builtin_fn) = query.func
     {
-        let builtin_fn = resolve_builtin_fn(name).unwrap();
-
-        builtin_fn(
+        get_builtin_fn_eval(builtin_fn)(
             fileserver,
             decls,
             defs,
@@ -96,7 +141,6 @@ pub fn eval_fn(
 
         let maybe_result = asm::resolver::eval(
             query.report,
-            opts,
             fileserver,
             decls,
             defs,

@@ -49,8 +49,8 @@ pub enum Value
 	String(ValueMetadata, ValueString),
 	Bool(ValueMetadata, bool),
 	Struct(ValueMetadata, ValueStruct),
-	ExprBuiltInFunction(ValueMetadata, String),
-	AsmBuiltInFunction(ValueMetadata, String),
+	ExprBuiltinFn(ValueMetadata, expr::ExprBuiltinFn),
+	AsmBuiltinFn(ValueMetadata, asm::AsmBuiltinFn),
 	Function(ValueMetadata, util::ItemRef<asm::Function>),
 	Bankdef(ValueMetadata, util::ItemRef<asm::Bankdef>),
 }
@@ -157,8 +157,8 @@ impl Value
 			Value::String(..) => "string",
 			Value::Bool(..) => "bool",
 			Value::Struct(..) => "struct",
-			Value::ExprBuiltInFunction(..) => "built-in function",
-			Value::AsmBuiltInFunction(..) => "built-in function",
+			Value::ExprBuiltinFn(..) => "built-in function",
+			Value::AsmBuiltinFn(..) => "built-in function",
 			Value::Function(..) => "function",
 			Value::Bankdef(..) => "bankdef",
 		}
@@ -296,8 +296,8 @@ impl Value
 			Value::String(meta, ..) => meta,
 			Value::Bool(meta, ..) => meta,
 			Value::Struct(meta, ..) => meta,
-			Value::ExprBuiltInFunction(meta, ..) => meta,
-			Value::AsmBuiltInFunction(meta, ..) => meta,
+			Value::ExprBuiltinFn(meta, ..) => meta,
+			Value::AsmBuiltinFn(meta, ..) => meta,
 			Value::Function(meta, ..) => meta,
 			Value::Bankdef(meta, ..) => meta,
 		}
@@ -315,8 +315,8 @@ impl Value
 			Value::String(meta, ..) => meta,
 			Value::Bool(meta, ..) => meta,
 			Value::Struct(meta, ..) => meta,
-			Value::ExprBuiltInFunction(meta, ..) => meta,
-			Value::AsmBuiltInFunction(meta, ..) => meta,
+			Value::ExprBuiltinFn(meta, ..) => meta,
+			Value::AsmBuiltinFn(meta, ..) => meta,
 			Value::Function(meta, ..) => meta,
 			Value::Bankdef(meta, ..) => meta,
 		}
@@ -796,15 +796,15 @@ impl std::cmp::PartialEq for Value
 				_ => false,
 			}
 
-			Value::ExprBuiltInFunction(_, a) => match other
+			Value::ExprBuiltinFn(_, a) => match other
 			{
-				Value::ExprBuiltInFunction(_, b) => a == b,
+				Value::ExprBuiltinFn(_, b) => a == b,
 				_ => false,
 			}
 
-			Value::AsmBuiltInFunction(_, a) => match other
+			Value::AsmBuiltinFn(_, a) => match other
 			{
-				Value::AsmBuiltInFunction(_, b) => a == b,
+				Value::AsmBuiltinFn(_, b) => a == b,
 				_ => false,
 			}
 

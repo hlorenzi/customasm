@@ -3,7 +3,6 @@ use crate::*;
 
 pub fn eval(
     report: &mut diagn::Report,
-    opts: &asm::AssemblyOptions,
     fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -39,7 +38,6 @@ pub fn eval(
                     
             expr::EvalQuery::Function(query_fn) =>
                 asm::resolver::eval_fn(
-                    opts,
                     fileserver,
                     decls,
                     defs,
@@ -48,7 +46,6 @@ pub fn eval(
                 
             expr::EvalQuery::AsmBlock(query_asm) =>
                 asm::resolver::eval_asm(
-                    opts,
                     fileserver,
                     decls,
                     defs,
@@ -69,6 +66,7 @@ pub fn eval(
 /// or user-defined instructions.
 pub fn eval_simple(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     expr: &expr::Expr)
@@ -104,7 +102,7 @@ pub fn eval_simple(
 
     let result = expr.eval_with_ctx(
         report,
-        &mut expr::EvalContext::new(),
+        &mut expr::EvalContext::new(opts),
         &mut provider)?;
 
     match result
@@ -122,6 +120,7 @@ pub fn eval_simple(
 
 pub fn eval_certain(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     expr: &expr::Expr)
@@ -157,7 +156,7 @@ pub fn eval_certain(
 
     let result = expr.eval_with_ctx(
         report,
-        &mut expr::EvalContext::new(),
+        &mut expr::EvalContext::new(opts),
         &mut provider)?;
 
     match result
@@ -355,32 +354,30 @@ fn eval_builtin_symbol(
     name: &str)
     -> Result<Option<expr::Value>, ()>
 {
-    match name
+    if name == "$" ||
+        (name == "$pc" && !query.opts.use_legacy_behavior) ||
+        (name == "pc" && query.opts.use_legacy_behavior)
     {
-        "$" | "pc" =>
+        let addr = ctx.eval_address(
+            query.report,
+            query.span,
+            defs,
+            ctx.can_guess())?;
+        
+        Ok(Some(expr::Value::make_integer(addr)
+            .with_bank_ref(ctx.bank_ref)))
+    }
+    else
+    {
+        if let Some(builtin_fn) = asm::resolver::resolve_builtin_fn(name, query.opts)
         {
-            let addr = ctx.eval_address(
-                query.report,
-                query.span,
-                defs,
-                ctx.can_guess())?;
-            
-            Ok(Some(expr::Value::make_integer(addr)
-                .with_bank_ref(ctx.bank_ref)))
+            Ok(Some(expr::Value::AsmBuiltinFn(
+                expr::Value::make_metadata(),
+                builtin_fn)))
         }
-
-        _ =>
+        else
         {
-            if let Some(_) = asm::resolver::resolve_builtin_fn(name)
-            {
-                Ok(Some(expr::Value::AsmBuiltInFunction(
-                    expr::Value::make_metadata(),
-                    name.to_string())))
-            }
-            else
-            {
-                Ok(None)
-            }
+            Ok(None)
         }
     }
 }

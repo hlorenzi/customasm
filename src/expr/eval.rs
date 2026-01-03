@@ -1,8 +1,9 @@
 use crate::*;
 
 
-pub struct EvalContext
+pub struct EvalContext<'opts>
 {
+	pub opts: &'opts asm::AssemblyOptions,
 	locals: std::collections::HashMap<String, expr::Value>,
 	token_substs: std::collections::HashMap<String, String>,
 	recursion_depth: usize,
@@ -12,12 +13,13 @@ pub struct EvalContext
 static ASM_HYGIENIZE_PREFIX: &'static str = "__";
 
 
-impl EvalContext
+impl<'opts> EvalContext<'opts>
 {
-	pub fn new() -> EvalContext
+	pub fn new(opts: &'opts asm::AssemblyOptions) -> EvalContext<'opts>
 	{
 		EvalContext
 		{
+			opts,
 			locals: std::collections::HashMap::new(),
 			token_substs: std::collections::HashMap::new(),
 			recursion_depth: 0,
@@ -25,9 +27,9 @@ impl EvalContext
 	}
 
 
-	pub fn new_deepened(from: &EvalContext) -> EvalContext
+	pub fn new_deepened<'a>(from: &'a EvalContext<'opts>) -> EvalContext<'opts>
 	{
-		let mut new_ctx = EvalContext::new();
+		let mut new_ctx = EvalContext::new(from.opts);
 		new_ctx.recursion_depth = from.recursion_depth + 1;
 		new_ctx
 	}
@@ -109,7 +111,7 @@ impl EvalContext
 
 	pub fn hygienize_locals_for_asm_subst(
 		&self)
-		-> EvalContext
+		-> EvalContext<'opts>
 	{
 		let mut new_ctx = EvalContext::new_deepened(self);
 		
@@ -153,16 +155,16 @@ impl EvalContext
 
 
 pub type EvalProvider<'provider> =
-	&'provider mut dyn for<'query> FnMut(EvalQuery<'query>) -> Result<expr::Value, ()>;
+	&'provider mut dyn for<'query, 'opts> FnMut(EvalQuery<'query, 'opts>) -> Result<expr::Value, ()>;
 
 
-pub enum EvalQuery<'a>
+pub enum EvalQuery<'a, 'opts>
 {
 	CtxLabel(&'a mut EvalCtxLabelQuery<'a>),
 	Variable(&'a mut EvalVariableQuery<'a>),
 	Member(&'a mut EvalMemberQuery<'a>),
-	Function(&'a mut EvalFunctionQuery<'a>),
-	AsmBlock(&'a mut EvalAsmBlockQuery<'a>),
+	Function(&'a mut EvalFunctionQuery<'a, 'opts>),
+	AsmBlock(&'a mut EvalAsmBlockQuery<'a, 'opts>),
 }
 
 
@@ -177,6 +179,7 @@ pub struct EvalCtxLabelQuery<'a>
 pub struct EvalVariableQuery<'a>
 {
 	pub report: &'a mut diagn::Report,
+	pub opts: &'a asm::AssemblyOptions,
 	pub hierarchy_level: usize,
 	pub hierarchy: &'a Vec<String>,
 	pub span: diagn::Span,
@@ -192,17 +195,17 @@ pub struct EvalMemberQuery<'a>
 }
 
 
-pub struct EvalFunctionQuery<'a>
+pub struct EvalFunctionQuery<'a, 'opts>
 {
 	pub report: &'a mut diagn::Report,
 	pub func: expr::Value,
 	pub args: Vec<EvalFunctionQueryArgument>,
 	pub span: diagn::Span,
-	pub eval_ctx: &'a mut EvalContext,
+	pub eval_ctx: &'a mut EvalContext<'opts>,
 }
 
 
-impl<'a> EvalFunctionQuery<'a>
+impl<'a, 'opts> EvalFunctionQuery<'a, 'opts>
 {
 	pub fn ensure_arg_number(
 		&mut self,
@@ -266,12 +269,12 @@ pub struct EvalFunctionQueryArgument
 }
 
 
-pub struct EvalAsmBlockQuery<'a>
+pub struct EvalAsmBlockQuery<'a, 'opts>
 {
 	pub report: &'a mut diagn::Report,
 	pub ast: &'a asm::AstTopLevel,
 	pub span: diagn::Span,
-	pub eval_ctx: &'a mut EvalContext,
+	pub eval_ctx: &'a mut EvalContext<'opts>,
 }
 
 
@@ -385,12 +388,13 @@ macro_rules! propagate {
 impl expr::Expr
 {
 	pub fn try_eval_usize<'provider>(
-		&self)
+		&self,
+		opts: &asm::AssemblyOptions)
 		-> Option<usize>
 	{
         let value = self.eval_with_ctx(
 			&mut diagn::Report::new(),
-			&mut EvalContext::new(),
+			&mut EvalContext::new(opts),
 			&mut dummy_eval_query);
 
 		if let Ok(expr::Value::Integer(_, bigint)) = value
@@ -407,13 +411,14 @@ impl expr::Expr
 	pub fn eval_nonzero_usize<'provider>(
 		&self,
 		report: &mut diagn::Report,
+		opts: &asm::AssemblyOptions,
 		provider: EvalProvider<'provider>)
 		-> Result<usize, ()>
 	{
         self
 			.eval_with_ctx(
 				report,
-				&mut EvalContext::new(),
+				&mut EvalContext::new(opts),
 				provider)?
 			.expect_nonzero_usize(
 				report,
@@ -424,12 +429,13 @@ impl expr::Expr
 	pub fn eval_bigint<'provider>(
 		&self,
 		report: &mut diagn::Report,
+		opts: &asm::AssemblyOptions,
 		provider: EvalProvider<'provider>)
 		-> Result<util::BigInt, ()>
 	{
         let result = self.eval_with_ctx(
 			report,
-			&mut EvalContext::new(),
+			&mut EvalContext::new(opts),
 			provider)?;
 
 		let bigint = result.expect_bigint(
@@ -443,12 +449,13 @@ impl expr::Expr
 	pub fn eval<'provider>(
 		&self,
 		report: &mut diagn::Report,
+		opts: &asm::AssemblyOptions,
 		provider: EvalProvider<'provider>)
 		-> Result<expr::Value, ()>
 	{
         self.eval_with_ctx(
             report,
-            &mut EvalContext::new(),
+            &mut EvalContext::new(opts),
             provider)
     }
 
@@ -466,9 +473,9 @@ impl expr::Expr
 			
 			&expr::Expr::Variable(span, ref name) =>
 			{
-				if let Some(_) = expr::resolve_builtin_fn(name)
+				if let Some(builtin_fn) = expr::resolve_builtin_fn(name, ctx.opts)
 				{
-					return Ok(expr::Value::ExprBuiltInFunction(expr::Value::make_metadata(), name.clone()));
+					return Ok(expr::Value::ExprBuiltinFn(expr::Value::make_metadata(), builtin_fn));
 				}
 
 				if let Ok(local_value) = ctx.get_local(name)
@@ -479,6 +486,7 @@ impl expr::Expr
 				let mut query = EvalVariableQuery {
 					report,
 					span,
+					opts: ctx.opts,
 					hierarchy_level: 0,
 					hierarchy: &vec![name.clone()],
 				};
@@ -828,10 +836,10 @@ impl expr::Expr
 
 				match query.func
 				{
-					expr::Value::ExprBuiltInFunction(_, _) =>
-						expr::eval_builtin_fn(&mut query),
+					expr::Value::ExprBuiltinFn(_, builtin_fn) =>
+						expr::get_builtin_fn_eval(builtin_fn)(&mut query),
 
-					expr::Value::AsmBuiltInFunction(_, _) =>
+					expr::Value::AsmBuiltinFn(_, _) =>
 						provider(EvalQuery::Function(&mut query)),
 
 					expr::Value::Function(_, _) =>

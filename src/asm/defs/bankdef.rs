@@ -18,6 +18,7 @@ pub struct Bankdef
 
 pub fn define(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     ast: &asm::AstTopLevel,
     decls: &mut asm::ItemDecls,
     defs: &mut asm::ItemDefs)
@@ -53,6 +54,7 @@ pub fn define(
                 Some(expr) =>
                     asm::resolver::eval_certain(
                         report,
+                        opts,
                         decls,
                         defs,
                         expr)?
@@ -65,6 +67,7 @@ pub fn define(
                 Some(expr) => Some(
                     asm::resolver::eval_certain(
                         report,
+                        opts,
                         decls,
                         defs,
                         expr)?
@@ -77,6 +80,7 @@ pub fn define(
                 Some(expr) =>
                     asm::resolver::eval_certain(
                         report,
+                        opts,
                         decls,
                         defs,
                         expr)?
@@ -90,6 +94,7 @@ pub fn define(
                 Some(expr) => Some(
                     asm::resolver::eval_certain(
                         report,
+                        opts,
                         decls,
                         defs,
                         expr)?
@@ -102,6 +107,7 @@ pub fn define(
                 Some(expr) => Some(
                     asm::resolver::eval_certain(
                         report,
+                        opts,
                         decls,
                         defs,
                         expr)?
@@ -163,6 +169,7 @@ pub fn define(
                 Some(expr) => Some(
                     asm::resolver::eval_certain(
                         report,
+                        opts,
                         decls,
                         defs,
                         expr)?
@@ -175,6 +182,7 @@ pub fn define(
                 None => expr::Value::make_void(),
                 Some(expr) => asm::resolver::eval_certain(
                     report,
+                    opts,
                     decls,
                     defs,
                     expr)?,

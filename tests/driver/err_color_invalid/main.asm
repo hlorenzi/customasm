@@ -6,5 +6,5 @@
 halt
 halt
 
-; command: main.asm --color
+; command: main.asm --color=x
 ; error: invalid argument for `--color`

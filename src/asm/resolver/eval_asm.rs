@@ -2,7 +2,6 @@ use crate::*;
 
 
 pub fn eval_asm(
-    opts: &asm::AssemblyOptions,
     fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -64,7 +63,6 @@ pub fn eval_asm(
     }
 
     resolve_iteratively(
-        opts,
         fileserver,
         decls,
         defs,
@@ -76,7 +74,6 @@ pub fn eval_asm(
 
 
 fn resolve_iteratively(
-    opts: &asm::AssemblyOptions,
     fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -87,7 +84,7 @@ fn resolve_iteratively(
     -> Result<expr::Value, ()>
 {
     let mut iter_count = 0;
-    let max_iterations = opts.max_iterations;
+    let max_iterations = query.eval_ctx.opts.max_iterations;
 
     while iter_count < max_iterations
     {
@@ -99,7 +96,6 @@ fn resolve_iteratively(
             ctx.is_last_iteration;
 
         let result = resolve_once(
-            opts,
             fileserver,
             decls,
             defs,
@@ -117,7 +113,6 @@ fn resolve_iteratively(
     }
 
     let result = resolve_once(
-        opts,
         fileserver,
         decls,
         defs,
@@ -154,7 +149,6 @@ struct AsmBlockResult
 
 
 fn resolve_once(
-    opts: &asm::AssemblyOptions,
     fileserver: &mut dyn util::FileServer,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -222,7 +216,7 @@ fn resolve_once(
             
             // Run the matcher algorithm
             let mut matches = asm::matcher::match_instr(
-                opts,
+                query.eval_ctx.opts,
                 defs,
                 ast_instr.span,
                 &new_excerpt);
@@ -279,7 +273,7 @@ fn resolve_once(
             
             let maybe_encodings = asm::resolver::instruction::resolve_encoding(
                 query.report,
-                opts,
+                query.eval_ctx.opts,
                 ast_instr.span,
                 fileserver,
                 &mut matches,

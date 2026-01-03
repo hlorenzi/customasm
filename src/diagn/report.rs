@@ -325,6 +325,12 @@ impl Report
 	}
 	
 	
+	pub fn message_without_parents(&mut self, msg: Message)
+	{
+		self.messages.push(msg);
+	}
+	
+	
 	pub fn message_with_parents_dedup(
 		&mut self,
 		msg: Message)

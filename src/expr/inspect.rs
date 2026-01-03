@@ -3,6 +3,7 @@ use crate::*;
 
 pub struct StaticallyKnownProvider<'a>
 {
+	pub opts: &'a asm::AssemblyOptions,
 	pub locals: std::collections::HashMap<String, StaticallyKnownLocal>,
 	pub query_nesting_level: &'a dyn Fn(&StaticallyKnownNestingLevelQuery) -> bool,
 	pub query_variable: &'a dyn Fn(&StaticallyKnownVariableQuery) -> bool,
@@ -33,6 +34,7 @@ pub struct StaticallyKnownMemberQuery<'a>
 
 pub struct StaticallyKnownFunctionQuery<'a>
 {
+	pub opts: &'a asm::AssemblyOptions,
 	pub func: &'a str,
 	pub args: &'a Vec<expr::Expr>,
 }
@@ -40,9 +42,10 @@ pub struct StaticallyKnownFunctionQuery<'a>
 
 impl<'a> StaticallyKnownProvider<'a>
 {
-	pub fn new() -> StaticallyKnownProvider<'a>
+	pub fn new(opts: &'a asm::AssemblyOptions) -> StaticallyKnownProvider<'a>
 	{
 		StaticallyKnownProvider {
+			opts,
 			locals: std::collections::HashMap::new(),
 			query_nesting_level: &|_| false,
 			query_variable: &|_| false,
@@ -114,8 +117,8 @@ impl expr::Expr
 			
 			expr::Expr::Slice(_, _, left_expr, right_expr, _) =>
 			{
-				let left = left_expr.try_eval_usize()? + 1;
-				let right = right_expr.try_eval_usize()?;
+				let left = left_expr.try_eval_usize(provider.opts)? + 1;
+				let right = right_expr.try_eval_usize(provider.opts)?;
 
 				if right > left
 				{
@@ -127,7 +130,7 @@ impl expr::Expr
 			
 			expr::Expr::SliceShort(_, _, size_expr, _) =>
 			{
-				let size = size_expr.try_eval_usize()?;
+				let size = size_expr.try_eval_usize(provider.opts)?;
 
 				Some(size)
 			}
@@ -154,10 +157,17 @@ impl expr::Expr
 			{
 				if let expr::Expr::Variable(_, ref name) = *func.as_ref()
 				{
-					expr::get_static_size_builtin_fn(
-						name,
-						provider,
-						&args)
+					if let Some(builtin_fn) = expr::resolve_builtin_fn(name, provider.opts)
+					{
+						expr::get_static_size_builtin_fn(
+							builtin_fn,
+							provider,
+							&args)
+					}
+					else
+					{
+						None
+					}
 				}
 				else
 				{
@@ -290,15 +300,19 @@ impl expr::Expr
 							return false;
 						}
 					}
-					
-					if expr::get_statically_known_value_builtin_fn(
-						name,
-						&args)
+
+					if let Some(builtin_fn) = expr::resolve_builtin_fn(name, provider.opts)
 					{
-						return true;
+						if expr::get_statically_known_value_builtin_fn(
+							builtin_fn,
+							&args)
+						{
+							return true;
+						}
 					}
 						
 					let query = StaticallyKnownFunctionQuery {
+						opts: provider.opts,
 						func: name,
 						args,
 					};

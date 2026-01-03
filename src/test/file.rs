@@ -11,6 +11,7 @@ pub struct TestExpectations
     messages: Vec<TestMessageExpectation>,
     command: Option<Vec<String>>,
     output_files: Vec<String>,
+    legacy: bool,
 }
 
 
@@ -33,6 +34,7 @@ pub fn extract_expectations(
         messages: Vec::new(),
         command: None,
         output_files: Vec::new(),
+        legacy: true,
     };
 
     let mut line_num = 0;
@@ -131,6 +133,14 @@ pub fn extract_expectations(
                 .trim()
                 .to_string());
         }
+        else if let Some(_) = line.find("; legacy: off")
+        {
+            expectations.legacy = false;
+        }
+        else if let Some(_) = line.find("; legacy: on")
+        {
+            expectations.legacy = true;
+        }
         else if line.find(";").is_some() && line.find(":").is_some()
         {
             panic!("unrecognized test expectation");
@@ -223,6 +233,7 @@ pub fn test_file(filepath: &str)
         {
             let opts = asm::AssemblyOptions {
                 debug_iterations: true,
+                use_legacy_behavior: expectations.legacy,
                 ..asm::AssemblyOptions::new()
             };
 

@@ -15,12 +15,11 @@ pub fn resolve_align(
 
     let value = asm::resolver::eval(
         report,
-        opts,
         fileserver,
         decls,
         defs,
         ctx,
-        &mut expr::EvalContext::new(),
+        &mut expr::EvalContext::new(opts),
         &ast_align.expr)?;
 
     let value = value.expect_error_or_usize(

@@ -48,8 +48,9 @@ pub use self::builtin_member::resolve_builtin_member;
 
 mod builtin_fn;
 pub use self::builtin_fn::{
+    ExprBuiltinFn,
     resolve_builtin_fn,
-    eval_builtin_fn,
+    get_builtin_fn_eval,
     get_static_size_builtin_fn,
     get_statically_known_value_builtin_fn,
 };

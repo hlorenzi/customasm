@@ -79,6 +79,7 @@ fn resolve_constant_simple(
 
     let value = asm::resolver::eval_simple(
         report,
+        opts,
         decls,
         defs,
         &ast_const.expr)?;
@@ -147,12 +148,11 @@ pub fn resolve_constant(
         
     let value = asm::resolver::eval(
         report,
-        opts,
         fileserver,
         decls,
         defs,
         ctx,
-        &mut expr::EvalContext::new(),
+        &mut expr::EvalContext::new(opts),
         &ast_const.expr)?;
 
 

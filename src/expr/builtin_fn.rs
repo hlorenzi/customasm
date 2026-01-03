@@ -1,38 +1,95 @@
 use crate::*;
 
 
-pub fn resolve_builtin_fn(
-    name: &str)
-    -> Option<fn(&mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>>
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ExprBuiltinFn
 {
-    match name.as_ref()
+    Assert,
+    Sizeof,
+    Le,
+    Ascii,
+    Utf8,
+    Utf16be,
+    Utf16le,
+    Utf32be,
+    Utf32le,
+    Strlen,
+}
+
+
+pub fn resolve_builtin_fn(
+    name: &str,
+    opts: &asm::AssemblyOptions)
+    -> Option<ExprBuiltinFn>
+{
+    if !opts.use_legacy_behavior
     {
-        "assert" => Some(eval_builtin_assert),
-        "sizeof" => Some(eval_builtin_sizeof),
-        "le" => Some(eval_builtin_le),
-        "ascii" => Some(eval_builtin_ascii),
-        "utf8" => Some(eval_builtin_utf8),
-        "utf16be" => Some(eval_builtin_utf16be),
-        "utf16le" => Some(eval_builtin_utf16le),
-        "utf32be" => Some(eval_builtin_utf32be),
-        "utf32le" => Some(eval_builtin_utf32le),
-        "strlen" => Some(eval_builtin_strlen),
-        _ => None,
+        match name
+        {
+            "$assert" => Some(ExprBuiltinFn::Assert),
+            "$sizeof" => Some(ExprBuiltinFn::Sizeof),
+            "$le" => Some(ExprBuiltinFn::Le),
+            "$ascii" => Some(ExprBuiltinFn::Ascii),
+            "$utf8" => Some(ExprBuiltinFn::Utf8),
+            "$utf16be" => Some(ExprBuiltinFn::Utf16be),
+            "$utf16le" => Some(ExprBuiltinFn::Utf16le),
+            "$utf32be" => Some(ExprBuiltinFn::Utf32be),
+            "$utf32le" => Some(ExprBuiltinFn::Utf32le),
+            "$strlen" => Some(ExprBuiltinFn::Strlen),
+            _ => return None,
+        }
+    }
+    else
+    {
+        match name
+        {
+            "assert" => Some(ExprBuiltinFn::Assert),
+            "sizeof" => Some(ExprBuiltinFn::Sizeof),
+            "le" => Some(ExprBuiltinFn::Le),
+            "ascii" => Some(ExprBuiltinFn::Ascii),
+            "utf8" => Some(ExprBuiltinFn::Utf8),
+            "utf16be" => Some(ExprBuiltinFn::Utf16be),
+            "utf16le" => Some(ExprBuiltinFn::Utf16le),
+            "utf32be" => Some(ExprBuiltinFn::Utf32be),
+            "utf32le" => Some(ExprBuiltinFn::Utf32le),
+            "strlen" => Some(ExprBuiltinFn::Strlen),
+            _ => return None,
+        }
+    }
+}
+
+
+pub fn get_builtin_fn_eval(
+    builtin_fn: ExprBuiltinFn)
+    -> fn(&mut expr::EvalFunctionQuery) -> Result<expr::Value, ()>
+{
+    match builtin_fn
+    {
+        ExprBuiltinFn::Assert => eval_builtin_assert,
+        ExprBuiltinFn::Sizeof => eval_builtin_sizeof,
+        ExprBuiltinFn::Le => eval_builtin_le,
+        ExprBuiltinFn::Ascii => eval_builtin_ascii,
+        ExprBuiltinFn::Utf8 => eval_builtin_utf8,
+        ExprBuiltinFn::Utf16be => eval_builtin_utf16be,
+        ExprBuiltinFn::Utf16le => eval_builtin_utf16le,
+        ExprBuiltinFn::Utf32be => eval_builtin_utf32be,
+        ExprBuiltinFn::Utf32le => eval_builtin_utf32le,
+        ExprBuiltinFn::Strlen => eval_builtin_strlen,
     }
 }
 
 
 pub fn get_static_size_builtin_fn(
-    name: &str,
+    builtin_fn: ExprBuiltinFn,
     provider: &expr::StaticallyKnownProvider,
     args: &Vec<expr::Expr>)
     -> Option<usize>
 {
     let get_static_size_fn = {
-        match name.as_ref()
+        match builtin_fn
         {
-            "sizeof" => get_static_size_builtin_sizeof,
-            "le" => get_static_size_builtin_le,
+            ExprBuiltinFn::Sizeof => get_static_size_builtin_sizeof,
+            ExprBuiltinFn::Le => get_static_size_builtin_le,
             _ => return None,
         }
     };
@@ -44,41 +101,23 @@ pub fn get_static_size_builtin_fn(
 
 
 pub fn get_statically_known_value_builtin_fn(
-    name: &str,
+    builtin_fn: ExprBuiltinFn,
     _args: &Vec<expr::Expr>)
     -> bool
 {
-    match name.as_ref()
+    match builtin_fn
     {
-        "assert" => false,
-        "sizeof" => true,
-        "le" => true,
-        "ascii" => true,
-        "utf8" => true,
-        "utf16be" => true,
-        "utf16le" => true,
-        "utf32be" => true,
-        "utf32le" => true,
-        "strlen" => true,
-        _ => false,
+        ExprBuiltinFn::Assert => false,
+        ExprBuiltinFn::Sizeof => true,
+        ExprBuiltinFn::Le => true,
+        ExprBuiltinFn::Ascii => true,
+        ExprBuiltinFn::Utf8 => true,
+        ExprBuiltinFn::Utf16be => true,
+        ExprBuiltinFn::Utf16le => true,
+        ExprBuiltinFn::Utf32be => true,
+        ExprBuiltinFn::Utf32le => true,
+        ExprBuiltinFn::Strlen => true,
     }
-}
-
-
-pub fn eval_builtin_fn(
-    query: &mut expr::EvalFunctionQuery)
-    -> Result<expr::Value, ()>
-{
-    let builtin_name = {
-        match query.func
-        {
-            expr::Value::ExprBuiltInFunction(_, ref name) => name,
-            _ => unreachable!(),
-        }
-    };
-
-    let builtin_fn = resolve_builtin_fn(builtin_name).unwrap();
-    builtin_fn(query)
 }
 
 
@@ -273,5 +312,4 @@ pub fn eval_builtin_strlen(
         query.args[0].span)?;
 
     Ok(expr::Value::make_integer(s.utf8_contents.len()))
-
 }

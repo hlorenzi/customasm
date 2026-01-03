@@ -46,8 +46,11 @@ pub use eval_asm::eval_asm;
 
 mod eval_fn;
 pub use eval_fn::{
+    AsmBuiltinFn,
     resolve_builtin_fn,
+    get_builtin_fn_eval,
     get_statically_known_builtin_fn,
+    resolve_and_get_statically_known_builtin_fn,
     eval_fn,
 };
 

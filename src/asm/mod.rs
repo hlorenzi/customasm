@@ -68,6 +68,7 @@ pub use matcher::{
 
 pub mod resolver;
 pub use resolver::{
+    AsmBuiltinFn,
     ResolutionState,
     ResolveIterator,
     ResolverContext,
@@ -91,6 +92,7 @@ pub struct AssemblyResult
 pub struct AssemblyOptions
 {
     pub max_iterations: usize,
+    pub use_legacy_behavior: bool,
     pub debug_iterations: bool,
     pub optimize_statically_known: bool,
     pub optimize_instruction_matching: bool,
@@ -128,6 +130,7 @@ impl AssemblyOptions
     {
         AssemblyOptions {
             max_iterations: 10,
+            use_legacy_behavior: true,
             debug_iterations: false,
             optimize_statically_known: true,
             optimize_instruction_matching: true,
@@ -202,6 +205,7 @@ pub fn assemble<S>(
 
         resolver::check_leftover_ifs(
             report,
+            opts,
             assembly.ast.as_ref().unwrap(),
             assembly.decls.as_ref().unwrap(),
             assembly.defs.as_ref().unwrap())?;

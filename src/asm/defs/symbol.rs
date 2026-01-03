@@ -15,6 +15,7 @@ pub struct Symbol
 
 pub fn define(
     _report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     ast: &asm::AstTopLevel,
     _decls: &asm::ItemDecls,
     defs: &mut asm::ItemDefs)
@@ -40,8 +41,8 @@ pub fn define(
             {
                 asm::AstSymbolKind::Constant(ref constant) =>
                 {
-                    let mut provider = expr::StaticallyKnownProvider::new();
-                    provider.query_function = &asm::resolver::get_statically_known_builtin_fn;
+                    let mut provider = expr::StaticallyKnownProvider::new(opts);
+                    provider.query_function = &asm::resolver::resolve_and_get_statically_known_builtin_fn;
                     
                     constant.expr.is_value_statically_known(&provider)
                 }

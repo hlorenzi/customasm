@@ -1,1 +1,1 @@
-#d $0x123abc ; error: expected line break
+#d $0x123abc ; error: failed / error: unknown symbol `$0x123abc`
