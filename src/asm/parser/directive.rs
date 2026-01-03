@@ -3,6 +3,7 @@ use crate::*;
 
 pub fn parse(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     walker: &mut syntax::Walker)
     -> Result<asm::AstAny, ()>
 {
@@ -58,7 +59,7 @@ pub fn parse(
             asm::parser::directive_fn::parse(report, walker, header_span)?)),
         
         "if" => Ok(asm::AstAny::DirectiveIf(
-            asm::parser::directive_if::parse(report, walker, header_span)?)),
+            asm::parser::directive_if::parse(report, opts, walker, header_span)?)),
         
         "include" => Ok(asm::AstAny::DirectiveInclude(
             asm::parser::directive_include::parse(report, walker, header_span)?)),
@@ -76,10 +77,10 @@ pub fn parse(
             asm::parser::directive_res::parse(report, walker, header_span)?)),
         
         "ruledef" => Ok(asm::AstAny::DirectiveRuledef(
-            asm::parser::directive_ruledef::parse(report, walker, false, header_span)?)),
+            asm::parser::directive_ruledef::parse(report, opts, walker, false, header_span)?)),
         
         "subruledef" => Ok(asm::AstAny::DirectiveRuledef(
-            asm::parser::directive_ruledef::parse(report, walker, true, header_span)?)),
+            asm::parser::directive_ruledef::parse(report, opts, walker, true, header_span)?)),
         
         "assert" => Ok(asm::AstAny::DirectiveAssert(
             asm::parser::directive_assert::parse(report, walker, header_span)?)),

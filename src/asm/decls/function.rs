@@ -3,6 +3,7 @@ use crate::*;
 
 pub fn collect(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     ast: &mut asm::AstTopLevel,
     decls: &mut asm::ItemDecls)
     -> Result<(), ()>
@@ -21,6 +22,7 @@ pub fn collect(
         let item_ref = decls.symbols.declare(
             report,
             node.name_span,
+            opts,
             &util::SymbolContext::new_global(),
             None,
             node.name.clone(),

@@ -55,6 +55,7 @@ pub enum AstRuleParameterType
 
 pub fn parse(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     walker: &mut syntax::Walker,
     is_subruledef: bool,
     header_span: diagn::Span)
@@ -74,6 +75,7 @@ pub fn parse(
     {
         let rule = parse_rule(
             report,
+            opts,
             walker,
             is_subruledef)?;
         
@@ -99,6 +101,7 @@ pub fn parse(
 
 fn parse_rule(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     walker: &mut syntax::Walker,
     is_subruledef: bool)
     -> Result<AstRule, ()>
@@ -132,7 +135,7 @@ fn parse_rule(
             }
             else
             {
-                let param = parse_rule_parameter(report, walker)?;
+                let param = parse_rule_parameter(report, opts, walker)?;
                 pattern.push(AstRulePatternPart::Parameter(param));
 
                 let tk_close = walker.expect(report, syntax::TokenKind::BraceClose)?;
@@ -188,12 +191,19 @@ fn parse_rule(
 
 fn parse_rule_parameter(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     walker: &mut syntax::Walker)
     -> Result<AstRuleParameter, ()>
 {
     let tk_name = walker.expect(report, syntax::TokenKind::Identifier)?;
     let name = walker.get_span_excerpt(tk_name.span).to_string();
     let name_span = tk_name.span;
+
+    asm::check_reserved_name(
+        report,
+        name_span,
+        opts,
+        &name)?;
 
     let (typ, type_span) = {
         if walker.maybe_expect(syntax::TokenKind::Colon).is_some()

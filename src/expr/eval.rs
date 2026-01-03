@@ -572,8 +572,14 @@ impl expr::Expr
 					
 					match lhs_expr.deref()
 					{
-						&expr::Expr::Variable(_, ref name) =>
+						&expr::Expr::Variable(span, ref name) =>
 						{
+							asm::check_reserved_name(
+								report,
+								span,
+								ctx.opts,
+								name)?;
+
 							let value = propagate!(rhs_expr
 								.eval_with_ctx(report, ctx, provider)?);
 							

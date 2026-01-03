@@ -155,10 +155,11 @@ pub fn assemble<S>(
     {
         assembly.ast = Some(parser::parse_many_and_resolve_includes(
             report,
+            opts,
             fileserver,
             root_filenames)?);
 
-        assembly.decls = Some(decls::init(report)?);
+        assembly.decls = Some(decls::init(report, opts)?);
 
         assembly.defs = Some(defs::init());
 
@@ -168,6 +169,7 @@ pub fn assemble<S>(
         {
             decls::collect(
                 report,
+                opts,
                 assembly.ast.as_mut().unwrap(),
                 assembly.decls.as_mut().unwrap())?;
 
@@ -301,4 +303,36 @@ fn check_unused_defines(
         false => Ok(()),
         true => Err(()),
     }
+}
+
+
+pub fn is_reserved_name(
+    name: &str,
+    opts: &asm::AssemblyOptions)
+    -> bool
+{
+    (!opts.use_legacy_behavior && name.starts_with("$")) ||
+        expr::resolve_builtin_fn(name, opts).is_some() ||
+        asm::resolver::resolve_builtin_fn(name, opts).is_some() ||
+        asm::resolver::resolve_builtin_symbol(name, opts).is_some()
+}
+
+
+pub fn check_reserved_name(
+    report: &mut diagn::Report,
+    span: diagn::Span,
+    opts: &asm::AssemblyOptions,
+    name: &str)
+    -> Result<(), ()>
+{
+    if is_reserved_name(name, opts)
+    {
+        report.error_span(
+            format!("reserved name `{}`", name),
+            span);
+
+        return Err(())
+    }
+
+    Ok(())
 }

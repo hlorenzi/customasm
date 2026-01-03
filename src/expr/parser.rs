@@ -662,6 +662,7 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 
 		let ast = asm::parser::parse_nested_toplevel(
 			self.report,
+			&asm::AssemblyOptions::new(),
 			&mut inner_walker)?;
 
 		let tk_brace_close = self.walker.expect(

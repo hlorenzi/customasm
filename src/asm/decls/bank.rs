@@ -16,7 +16,6 @@ pub fn collect(
         {
             continue;
         }
-        
 
         let item_ref = decls.bankdefs.get_by_name_global(
             report,

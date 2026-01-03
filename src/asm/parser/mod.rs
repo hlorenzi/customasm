@@ -108,6 +108,7 @@ pub struct AstTopLevel
 
 pub fn parse_many_and_resolve_includes<S>(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     fileserver: &mut dyn util::FileServer,
     root_filenames: &[S])
     -> Result<AstTopLevel, ()>
@@ -124,6 +125,7 @@ pub fn parse_many_and_resolve_includes<S>(
         let ast = parse_and_resolve_includes(
             report,
             None,
+            opts,
             fileserver,
             file.borrow(),
             &mut Vec::new(),
@@ -139,6 +141,7 @@ pub fn parse_many_and_resolve_includes<S>(
 pub fn parse_and_resolve_includes<S>(
     report: &mut diagn::Report,
     span: Option<diagn::Span>,
+    opts: &asm::AssemblyOptions,
     fileserver: &mut dyn util::FileServer,
     root_filename: S,
     seen_filenames: &mut Vec<String>,
@@ -168,7 +171,7 @@ pub fn parse_and_resolve_includes<S>(
         file_handle,
         0);
 
-    let mut root_ast = parse(report, &mut walker)?;
+    let mut root_ast = parse(report, opts, &mut walker)?;
 
     // Check presence of an #once directive
     if root_ast.nodes.iter().any(|n| matches!(n, AstAny::DirectiveOnce(_)))
@@ -207,6 +210,7 @@ pub fn parse_and_resolve_includes<S>(
             let inner_ast = parse_and_resolve_includes(
                 report,
                 Some(ast_include.filename_span),
+                opts,
                 fileserver,
                 included_filename.as_ref(),
                 seen_filenames,
@@ -236,6 +240,7 @@ pub fn parse_and_resolve_includes<S>(
 
 pub fn parse(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     walker: &mut syntax::Walker)
     -> Result<AstTopLevel, ()>
 {
@@ -243,7 +248,7 @@ pub fn parse(
     
     while !walker.is_over()
     {
-        if let Some(node) = parse_line(report, walker)?
+        if let Some(node) = parse_line(report, opts, walker)?
         {
             nodes.push(node);
         }
@@ -257,6 +262,7 @@ pub fn parse(
 
 pub fn parse_nested_toplevel(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     walker: &mut syntax::Walker)
     -> Result<AstTopLevel, ()>
 {
@@ -265,7 +271,7 @@ pub fn parse_nested_toplevel(
     while !walker.is_over() &&
         !walker.next_useful_is(0, syntax::TokenKind::BraceClose)
     {
-        if let Some(node) = parse_line(report, walker)?
+        if let Some(node) = parse_line(report, opts, walker)?
         {
             nodes.push(node);
         }
@@ -279,13 +285,14 @@ pub fn parse_nested_toplevel(
 
 fn parse_line(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     walker: &mut syntax::Walker)
     -> Result<Option<AstAny>, ()>
 {
     // Directives (starting with a hash sign)
     if walker.next_useful_is(0, syntax::TokenKind::Hash)
     {
-        Ok(Some(directive::parse(report, walker)?))
+        Ok(Some(directive::parse(report, opts, walker)?))
     }
 
     // Global labels (identifiers followed by colons)

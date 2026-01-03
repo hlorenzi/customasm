@@ -305,6 +305,7 @@ impl<T> SymbolManager<T>
         &mut self,
         report: &mut diagn::Report,
         span: diagn::Span,
+        opts: &asm::AssemblyOptions,
         ctx: &SymbolContext,
         bank_ref: Option<util::ItemRef<asm::Bankdef>>,
         name: String,
@@ -322,6 +323,11 @@ impl<T> SymbolManager<T>
             return Err(());
         }
 
+        asm::check_reserved_name(
+            report,
+            span,
+            opts,
+            &name)?;
 
         // Check for duplicates at the same nesting level
         let parent_ref = self.get_parent(

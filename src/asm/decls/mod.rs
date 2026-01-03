@@ -18,7 +18,8 @@ pub struct ItemDecls
 
 
 pub fn init(
-    report: &mut diagn::Report)
+    report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions)
     -> Result<ItemDecls, ()>
 {
     let mut decls = ItemDecls {
@@ -30,6 +31,7 @@ pub fn init(
     let initial_item_ref = decls.bankdefs.declare(
         report,
         diagn::Span::new_dummy(),
+        opts,
         &util::SymbolContext::new_global(),
         None,
         "#global_bankdef".to_string(),
@@ -44,15 +46,16 @@ pub fn init(
 
 pub fn collect(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     ast: &mut asm::AstTopLevel,
     decls: &mut asm::ItemDecls)
     -> Result<(), ()>
 {
-    bankdef::collect(report, ast, decls)?;
+    bankdef::collect(report, opts, ast, decls)?;
     bank::collect(report, ast, decls)?;
-    ruledef::collect(report, ast, decls)?;
-    symbol::collect(report, ast, decls)?;
-    function::collect(report, ast, decls)?;
+    ruledef::collect(report, opts, ast, decls)?;
+    symbol::collect(report, opts, ast, decls)?;
+    function::collect(report, opts, ast, decls)?;
 
     report.stop_at_errors()?;
 

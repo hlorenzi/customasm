@@ -1,6 +1,13 @@
 use crate::*;
 
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum AsmBuiltinSymbol
+{
+    ProgramCounter,
+}
+
+
 pub fn eval(
     report: &mut diagn::Report,
     fileserver: &mut dyn util::FileServer,
@@ -346,6 +353,24 @@ pub fn eval_variable_certain(
 }
 
 
+pub fn resolve_builtin_symbol(
+    name: &str,
+    opts: &asm::AssemblyOptions)
+    -> Option<AsmBuiltinSymbol>
+{
+    if name == "$" ||
+        (name == "$pc" && !opts.use_legacy_behavior) ||
+        (name == "pc" && opts.use_legacy_behavior)
+    {
+        Some(AsmBuiltinSymbol::ProgramCounter)
+    }
+    else
+    {
+        None
+    }
+}
+
+
 fn eval_builtin_symbol(
     _decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
@@ -354,18 +379,21 @@ fn eval_builtin_symbol(
     name: &str)
     -> Result<Option<expr::Value>, ()>
 {
-    if name == "$" ||
-        (name == "$pc" && !query.opts.use_legacy_behavior) ||
-        (name == "pc" && query.opts.use_legacy_behavior)
+    if let Some(builtin_var) = resolve_builtin_symbol(name, query.opts)
     {
-        let addr = ctx.eval_address(
-            query.report,
-            query.span,
-            defs,
-            ctx.can_guess())?;
-        
-        Ok(Some(expr::Value::make_integer(addr)
-            .with_bank_ref(ctx.bank_ref)))
+        match builtin_var
+        {
+            AsmBuiltinSymbol::ProgramCounter => {
+                let addr = ctx.eval_address(
+                    query.report,
+                    query.span,
+                    defs,
+                    ctx.can_guess())?;
+                
+                Ok(Some(expr::Value::make_integer(addr)
+                    .with_bank_ref(ctx.bank_ref)))
+            }
+        }
     }
     else
     {

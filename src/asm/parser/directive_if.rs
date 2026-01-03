@@ -14,14 +14,15 @@ pub struct AstDirectiveIf
 
 pub fn parse(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     walker: &mut syntax::Walker,
     header_span: diagn::Span)
     -> Result<AstDirectiveIf, ()>
 {
     let expr = expr::parse(report, walker)?;
 
-    let true_arm = parse_braced_block(report, walker)?;
-    let false_arm = parse_else_blocks(report, walker)?;
+    let true_arm = parse_braced_block(report, opts, walker)?;
+    let false_arm = parse_else_blocks(report, opts, walker)?;
 
     Ok(AstDirectiveIf {
         header_span,
@@ -35,6 +36,7 @@ pub fn parse(
 
 fn parse_braced_block(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     walker: &mut syntax::Walker)
     -> Result<asm::AstTopLevel, ()>
 {
@@ -42,6 +44,7 @@ fn parse_braced_block(
 
     let block = asm::parser::parse_nested_toplevel(
         report,
+        opts,
         walker)?;
 
     walker.expect(report, syntax::TokenKind::BraceClose)?;
@@ -52,6 +55,7 @@ fn parse_braced_block(
 
 fn parse_else_blocks(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     walker: &mut syntax::Walker)
     -> Result<Option<asm::AstTopLevel>, ()>
 {
@@ -74,7 +78,7 @@ fn parse_else_blocks(
             report,
             syntax::TokenKind::Identifier)?;
         
-        Ok(Some(parse_braced_block(report, walker)?))
+        Ok(Some(parse_braced_block(report, opts, walker)?))
     }
     else if directive_name == "elif"
     {
@@ -90,6 +94,7 @@ fn parse_else_blocks(
         
         let ast_if = parse(
             report,
+            opts,
             walker,
             header_span)?;
 

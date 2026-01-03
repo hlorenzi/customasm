@@ -39,6 +39,7 @@ pub use eval::{
     eval_variable_simple,
     eval_variable_certain,
     eval_member,
+    resolve_builtin_symbol,
 };
 
 mod eval_asm;

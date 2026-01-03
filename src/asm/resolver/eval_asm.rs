@@ -179,6 +179,12 @@ fn resolve_once(
 
         if let asm::AstAny::Symbol(ast_symbol) = node
         {
+            asm::check_reserved_name(
+                query.report,
+                ast_symbol.decl_span,
+                query.eval_ctx.opts,
+                ast_symbol.name.as_ref())?;
+
             let cur_address = inner_ctx.eval_address(
                 query.report,
                 ast_symbol.decl_span,
