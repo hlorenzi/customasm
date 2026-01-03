@@ -1,6 +1,7 @@
 let g_wasm = null
 let g_codeEditor = null
 let g_initialText = ""
+let g_needsInitialAssembly = false
 
 
 function main()
@@ -11,6 +12,7 @@ function main()
 	document.body.onresize = onResize
 	window.onkeydown = onKeyDown
 	window.onbeforeunload = onBeforeUnload
+	window.onpopstate = onPopState
 	
 	fetch("customasm.wasm")
 		.then(r => r.arrayBuffer())
@@ -20,7 +22,24 @@ function main()
 			g_wasm = wasm
 			document.getElementById("buttonAssemble").disabled = false
 			setupVersionString()
+
+			if (g_needsInitialAssembly)
+				assemble()
 		})
+}
+
+
+function getQueryVariable(desiredName)
+{
+    let query = window.location.search.substring(1)
+	for (const variable of query.split("&"))
+	{
+        let [name, value] = variable.split("=")
+        if (decodeURIComponent(name) == desiredName)
+            return decodeURIComponent(value)
+    }
+
+	return ""
 }
 
 
@@ -31,14 +50,24 @@ function setupEditor()
 		lineNumbers: true, matchBrackets: true, indentWithTabs: true, highlightSelectionMatches : true,
 		tabSize: 4, indentUnit: 4, mode: "z80"
 	})
-	
-	fetch("../examples/basic.asm")
-		.then(r => r.text())
-		.then(r => {
-			r = r.replace(/\r/g, "")
-			g_initialText = r
-			g_codeEditor.setValue(r)
-		})
+
+	let queryInitialText = getQueryVariable("code")
+	if (queryInitialText)
+	{
+		g_initialText = queryInitialText
+		g_codeEditor.setValue(queryInitialText)
+		g_needsInitialAssembly = true
+	}
+	else
+	{	
+		fetch("../examples/basic.asm")
+			.then(r => r.text())
+			.then(r => {
+				r = r.replace(/\r/g, "")
+				g_initialText = r
+				g_codeEditor.setValue(r)
+			})
+	}
 	
 	g_codeEditor.refresh()
 }
@@ -90,6 +119,43 @@ function onKeyDown(ev)
 	{
 		ev.preventDefault()
 		assemble()
+	}
+	
+	if (ev.key.toLowerCase() == "s")
+	{
+		ev.preventDefault()
+		generateLink()
+	}
+}
+
+
+function onPopState()
+{
+	window.location.reload()
+}
+
+
+function generateLink()
+{
+	let str = g_codeEditor.getValue()
+	g_initialText = str
+
+	let encoded = encodeURIComponent(str)
+	let newUrl = 
+		window.location.href.split("?")[0] +
+		"?code=" + encoded
+	
+	try
+	{
+		window.history.pushState(null, "", newUrl)
+		
+		if (newUrl.length > 2000)
+			window.alert("Code is too large and the URL might not work.")
+	}
+	catch (e)
+	{
+		console.error(e)
+		window.alert("An error occurred while generating the link.")
 	}
 }
 
