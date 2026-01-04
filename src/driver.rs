@@ -166,6 +166,7 @@ fn assemble_with_command(
 		if let Some(format) = &output_group.format
 		{
 			let formatted = format_output(
+				report,
 				fileserver,
 				decls,
 				defs,
@@ -878,6 +879,7 @@ fn parse_define_arg(
 
 
 pub fn format_output(
+	report: &mut diagn::Report,
 	fileserver: &dyn util::FileServer,
 	decls: &asm::ItemDecls,
 	defs: &asm::ItemDefs,
@@ -889,7 +891,7 @@ pub fn format_output(
 		match format
 		{
 			OutputFormat::Binary =>
-				return output.format_binary(),
+				return output.format_binary(report),
 
 			OutputFormat::Annotated(opts) =>
 				output.format_annotated(fileserver, opts),

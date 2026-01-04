@@ -38,6 +38,12 @@ impl BitVec
             spans: Vec::new(),
 		}
 	}
+
+
+    pub fn is_in_bounds(&self, index: usize) -> bool
+    {
+        index < self.len
+    }
 	
 	
 	pub fn write_bit(

@@ -40,5 +40,5 @@ pub fn assemble_str_to_binary(
 		&mut fileserver,
 		&[virtual_filename]);
 	
-	(assembly.output.map(|o| o.format_binary()), report)
+	(assembly.output.map(|o| o.format_binary(&mut report)), report)
 }

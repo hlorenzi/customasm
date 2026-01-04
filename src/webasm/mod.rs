@@ -50,6 +50,7 @@ pub unsafe extern "C" fn wasm_assemble(
 		.unwrap();
 	
 	let formatted = driver::format_output(
+		&mut report,
 		&fileserver,
 		&assembly.decls.as_ref().unwrap(),
 		&assembly.defs.as_ref().unwrap(),

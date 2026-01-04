@@ -63,6 +63,7 @@ pub fn extract_expectations(
             expectations.encoding = Some(encoding);
         }
         else if line.find("; error:").is_some() ||
+            line.find("; warning:").is_some() ||
             line.find("; note:").is_some()
         {
             let messages = line
@@ -77,6 +78,7 @@ pub fn extract_expectations(
                 let kind = match parts[0]
                 {
                     "error" => diagn::MessageKind::Error,
+                    "warning" => diagn::MessageKind::Warning,
                     "note" => diagn::MessageKind::Note,
                     _ => unreachable!(),
                 };

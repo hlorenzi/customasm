@@ -19,17 +19,17 @@ fn test_example(filename: &str, hash: &[u8])
         &mut fileserver,
         &[filename]);
 
+    let output = assembly.output.unwrap();
+
+    let mut output_hasher = sha2::Sha256::new();
+    output_hasher.update(output.format_binary(&mut report));
+    let output_hash = output_hasher.finalize();
+
     report.print_all(
         &mut std::io::stdout(),
         &fileserver,
         true);
-
-    let output = assembly.output.unwrap();
-
-    let mut output_hasher = sha2::Sha256::new();
-    output_hasher.update(output.format_binary());
-    let output_hash = output_hasher.finalize();
-
+    
     println!(
         "{}",
         output.format_annotated(&fileserver, &util::FormatAnnotatedOptions {

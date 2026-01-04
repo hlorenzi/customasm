@@ -54,8 +54,16 @@ fn to_str_radix(mut value: usize, radix: usize) -> String
 
 impl util::BitVec
 {
-	pub fn format_binary(&self) -> Vec<u8>
+	pub fn format_binary(
+		&self,
+		report: &mut diagn::Report)
+		-> Vec<u8>
 	{
+		if self.len() % 8 != 0
+		{
+			report.warning("binary is not aligned to an 8-bit boundary; will be padded with zeroes");
+		}
+
 		let mut result = Vec::new();
 
 		let mut index = 0;
@@ -587,20 +595,26 @@ impl util::BitVec
                 if digit_index > 0 && digit_index % options.digits_per_group == 0
                     { contents_str.push_str(" "); }
 
+				let mut is_out_of_bounds = false;
                 let mut digit = 0;
                 for bit_index in 0..bits_per_digit
                 {
                     let i = span.offset.unwrap() + digit_index * bits_per_digit + bit_index;
                     let bit = self.read_bit(i);
+					is_out_of_bounds |= !self.is_in_bounds(i);
 
                     digit <<= 1;
                     digit |= if bit { 1 } else { 0 };
                 }
 
-                let c = if digit < 10
-                    { ('0' as u8 + digit) as char }
-                else
-                    { ('a' as u8 + digit - 10) as char };
+                let c = {
+					if is_out_of_bounds
+						{ '.' }
+					else if digit < 10
+						{ ('0' as u8 + digit) as char }
+					else
+						{ ('a' as u8 + digit - 10) as char }
+				};
 
                 contents_str.push(c);
             }
