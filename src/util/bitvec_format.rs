@@ -794,8 +794,8 @@ impl util::BitVec
 
             if let Some((start, end)) = span.span.location()
             {
-                let (line_start, col_start) = counter.get_line_column_at_index(start);
-                let (line_end, col_end) = counter.get_line_column_at_index(end);
+                let (line_start, col_start) = counter.get_line_column_at_byte_index(start);
+                let (line_end, col_end) = counter.get_line_column_at_byte_index(end);
                 let filename = fileserver.get_filename(span.span.file_handle);
 
                 result.push_str(

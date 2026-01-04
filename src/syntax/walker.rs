@@ -63,6 +63,20 @@ impl<'src> Walker<'src>
 	}
 
 
+    pub fn advance_char(
+        &mut self)
+    {
+        let next_index = self.src[self.cursor_index..self.cursor_limit]
+            .char_indices()
+            .skip(1)
+            .next()
+            .map(|(index, _)| index)
+            .unwrap_or(1);
+
+        self.cursor_index += next_index;
+    }
+
+
     pub fn advance_to_token_end(
         &mut self,
         token: &syntax::Token)

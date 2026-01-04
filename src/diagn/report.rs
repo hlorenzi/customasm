@@ -575,7 +575,7 @@ impl Report
 
 		let counter = util::CharCounter::new(&chars);
 		
-		let (span_line, _) = counter.get_line_column_at_index(location.0);
+		let (span_line, _) = counter.get_line_column_at_byte_index(location.0);
 		
 		if span_line != line
 			{ return false; }
@@ -671,8 +671,8 @@ impl Report
 		
 
 		let (start, end) = span.location().unwrap();
-		let (line1, col1) = counter.get_line_column_at_index(start);
-		let (line2, col2) = counter.get_line_column_at_index(end);
+		let (line1, col1) = counter.get_line_column_at_byte_index(start);
+		let (line2, col2) = counter.get_line_column_at_byte_index(end);
 
 
 		let lines_before = {
@@ -779,7 +779,7 @@ impl Report
 
 			styler.white();
 			
-			let line_pos = counter.get_index_range_of_line(line);
+			let line_pos = counter.get_byte_range_of_line(line);
 			let excerpt = counter
 				.get_excerpt(line_pos.0, line_pos.1)
 				.chars()

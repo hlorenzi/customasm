@@ -178,7 +178,7 @@ pub fn decide_next_token(
 	check_for_identifier(src).unwrap_or_else(||
 	check_for_special   (src).unwrap_or_else(||
 	check_for_string    (src).unwrap_or_else(||
-	(TokenKind::Error, 1)))))))
+	(TokenKind::Error, src.chars().next().map(|c| c.len_utf8()).unwrap_or(1))))))))
 }
 
 
@@ -579,6 +579,19 @@ fn is_number_start(c: char) -> bool
 fn is_number_mid(c: char) -> bool
 {
 	return is_identifier_mid(c)
+}
+
+
+pub fn is_dec_number_start(c: char) -> bool
+{
+	c >= '0' && c <= '9'
+}
+
+
+pub fn is_dec_number_mid(c: char) -> bool
+{
+	(c >= '0' && c <= '9') ||
+	c == '_'
 }
 
 

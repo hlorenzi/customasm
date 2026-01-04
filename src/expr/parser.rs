@@ -18,6 +18,46 @@ pub fn parse_optional(
     let mut dummy_report = diagn::Report::new();
 	parse(&mut dummy_report, walker).ok()
 }
+	
+	
+pub fn parse_optional_decimal_usize_greedy(
+    walker: &mut syntax::Walker)
+	-> Option<expr::Expr>
+{
+	if walker.is_over() ||
+		!syntax::is_dec_number_start(walker.next_char())
+	{
+		return None;
+	}
+
+	let start = walker.get_cursor_index();
+
+	while !walker.is_over() &&
+		syntax::is_dec_number_mid(walker.next_char())
+	{
+		walker.advance_char();
+	}
+
+	let end = walker.get_cursor_index();
+	let span = walker.get_span(start, end);
+	let number = walker.get_span_excerpt(span);
+	
+	if let Ok(value) = syntax::excerpt_as_usize(
+		&mut diagn::Report::new(),
+		span,
+		number)
+	{	
+		let expr = expr::Expr::Literal(
+			span,
+			expr::Value::make_integer(value));
+
+		Some(expr)
+	}
+	else
+	{
+		None
+	}
+}
 
 
 struct ExpressionParser<'a, 'src: 'a>

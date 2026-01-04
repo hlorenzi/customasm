@@ -21,7 +21,7 @@ pub fn parse(
     let line = walker.advance_until_linebreak();
 
     walker.expect_linebreak(report)?;
-    
+
     Ok(AstInstruction {
         span: line.get_full_span(),
         src: line.get_full_excerpt().to_string(),

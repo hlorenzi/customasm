@@ -1,7 +1,7 @@
 pub struct CharCounter<'a>
 {
 	src: &'a str,
-	chars: Vec<char>,
+	chars: Vec<(usize, char)>,
 }
 
 
@@ -11,7 +11,7 @@ impl<'a> CharCounter<'a>
 	{
 		CharCounter {
 			src,
-			chars: src.chars().collect(),
+			chars: src.char_indices().collect(),
 		}
 	}
 	
@@ -22,7 +22,7 @@ impl<'a> CharCounter<'a>
 		end: usize)
 		-> &str
 	{
-		self.src.get(start..end).unwrap()
+		&self.src[start..end]
 	}
 	
 	
@@ -32,7 +32,7 @@ impl<'a> CharCounter<'a>
 		
 		for c in &self.chars
 		{
-			if *c == '\n'
+			if c.1 == '\n'
 				{ lines += 1; }
 		}
 		
@@ -40,18 +40,21 @@ impl<'a> CharCounter<'a>
 	}
 	
 	
-	pub fn get_line_column_at_index(
+	pub fn get_line_column_at_byte_index(
 		&self,
-		index: usize)
+		byte_index: usize)
 		-> (usize, usize)
 	{
 		let mut line = 0;
 		let mut column = 0;
 		
-		let mut i = 0;
-		while i < index && i < self.chars.len()
+		let mut char_index = 0;
+		while char_index < self.chars.len()
 		{
-			if self.chars[i] == '\n'
+			if byte_index == self.chars[char_index].0
+				{ break; }
+
+			if self.chars[char_index].1 == '\n'
 			{
 				line += 1;
 				column = 0;
@@ -59,41 +62,42 @@ impl<'a> CharCounter<'a>
 			else
 				{ column += 1; }
 			
-			i += 1;
+			char_index += 1;
 		}
 		
 		(line, column)
 	}
 	
 	
-	pub fn get_index_range_of_line(
+	pub fn get_byte_range_of_line(
 		&self,
 		line: usize)
 		-> (usize, usize)
 	{
+		let mut char_begin = 0;
+		let mut byte_begin = 0;
+		
 		let mut line_count = 0;
-		let mut line_begin = 0;
-		
-		while line_count < line && line_begin < self.chars.len()
+		while line_count < line && char_begin < self.chars.len()
 		{
-			line_begin += 1;
-			
-			if self.chars[line_begin - 1] == '\n'
+			if self.chars[char_begin].1 == '\n'
 				{ line_count += 1; }
-		}
-		
-		let mut line_end = line_begin;
-		while line_end < self.chars.len()
-		{
-			line_end += 1;
 			
-			if self.chars[line_end - 1] == '\n'
-				{ break; }
+			byte_begin = self.chars[char_begin].0 + self.chars[char_begin].1.len_utf8();
+			char_begin += 1;
 		}
 		
-		(
-			line_begin.try_into().unwrap(),
-			line_end.try_into().unwrap()
-		)
+		let mut char_end = char_begin;
+		let mut byte_end = byte_begin;
+		while char_end < self.chars.len()
+		{
+			if self.chars[char_end].1 == '\n'
+				{ break; }
+
+			byte_end = self.chars[char_end].0 + self.chars[char_end].1.len_utf8();
+			char_end += 1;
+		}
+		
+		(byte_begin, byte_end)
 	}
 }

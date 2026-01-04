@@ -15,6 +15,7 @@ mod parser;
 pub use parser::{
     parse,
     parse_optional,
+    parse_optional_decimal_usize_greedy,
 };
 
 mod inspect;

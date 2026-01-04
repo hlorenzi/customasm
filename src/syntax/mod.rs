@@ -4,6 +4,8 @@ pub use self::token::{
     TokenKind,
     decide_next_token,
     is_whitespace,
+    is_dec_number_start,
+    is_dec_number_mid,
 };
 
 mod walker;

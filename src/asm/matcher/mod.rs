@@ -639,7 +639,9 @@ fn match_with_expr<'src>(
 {
     let walker_start = walker.next_useful_index();
 
-    let exprs = parse_with_and_without_lookahead(
+    let mut walker_usize_greedy = walker.clone();
+
+    let mut exprs = parse_with_and_without_lookahead(
         &rule.pattern,
         at_pattern_part,
         walker,
@@ -648,7 +650,15 @@ fn match_with_expr<'src>(
                 { vec![(expr, walker)] }
             else
                 { vec![] }
-        },
+        });
+        
+    if let Some(expr) = expr::parse_optional_decimal_usize_greedy(&mut walker_usize_greedy)
+    {
+        exprs.push((expr, walker_usize_greedy));
+    }
+    
+    let exprs = remove_duplicates(
+        exprs,
         |a, b| a.1.next_useful_index() == b.1.next_useful_index());
 
     let mut results = WorkingMatches::new();
@@ -702,15 +712,16 @@ fn match_with_nested_ruledef<'src>(
     let walker_limit_prev = walker.get_cursor_limit();
 
     let inner_matches =
-        parse_with_and_without_lookahead(
-            &rule.pattern,
-            at_pattern_part,
-            walker,
-            |walker| match_with_ruledef(
-                defs,
-                nested_ruledef_ref,
-                walker.clone(),
-                false),
+        remove_duplicates(
+            parse_with_and_without_lookahead(
+                &rule.pattern,
+                at_pattern_part,
+                walker,
+                |walker| match_with_ruledef(
+                    defs,
+                    nested_ruledef_ref,
+                    walker.clone(),
+                    false)),
             |a, b| a.0.is_same(&b.0));
     
     let mut results = WorkingMatches::new();
@@ -755,15 +766,14 @@ fn match_with_nested_ruledef<'src>(
 }
 
 
-fn parse_with_and_without_lookahead<'src, FnParse, FnDup, T>(
+fn parse_with_and_without_lookahead<'src, FnParse, T>(
     pattern: &asm::RulePattern,
     at_pattern_part: usize,
     walker: syntax::Walker<'src>,
     mut parse_fn: FnParse,
-    mut is_duplicate_fn: FnDup)
+    )
     -> Vec<(T, syntax::Walker<'src>)>
-    where FnParse: FnMut(syntax::Walker<'src>) -> Vec<(T, syntax::Walker<'src>)>,
-        FnDup: FnMut(&(T, syntax::Walker<'src>), &(T, syntax::Walker<'src>)) -> bool
+    where FnParse: FnMut(syntax::Walker<'src>) -> Vec<(T, syntax::Walker<'src>)>
 {
     let mut results = parse_fn(walker.clone());
 
@@ -774,20 +784,29 @@ fn parse_with_and_without_lookahead<'src, FnParse, FnDup, T>(
             walker.clone(),
             parse_fn));
     
-    // Remove duplicate matches
-    for i in (0..results.len()).rev()
+    results
+}
+
+
+fn remove_duplicates<'src, T, FnDup>(
+    mut list: Vec<(T, syntax::Walker<'src>)>,
+    mut is_duplicate_fn: FnDup)
+    -> Vec<(T, syntax::Walker<'src>)>
+    where FnDup: FnMut(&(T, syntax::Walker<'src>), &(T, syntax::Walker<'src>)) -> bool
+{
+    for i in (0..list.len()).rev()
     {
-        let duplicate = results[0..i]
+        let duplicate = list[0..i]
             .iter()
-            .any(|r| is_duplicate_fn(r, &results[i]));
+            .any(|r| is_duplicate_fn(r, &list[i]));
 
         if duplicate
         {
-            results.remove(i);
+            list.remove(i);
         }
     }
-    
-    results
+
+    list
 }
 
 
