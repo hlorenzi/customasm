@@ -764,8 +764,8 @@ impl expr::Expr
 						let right = propagate!(right_expr
 							.eval_with_ctx(report, ctx, provider)?);
 
-						let left_usize = left.expect_usize(report, span)? + 1;
-						let right_usize = right.expect_usize(report, span)?;
+						let left_usize = left.expect_usize(report, left_expr.span())? + 1;
+						let right_usize = right.expect_usize(report, right_expr.span())?;
 
 						Ok(expr::Value::make_integer(
 							x.checked_slice(
@@ -778,7 +778,7 @@ impl expr::Expr
 				}
 			}
 			
-			&expr::Expr::SliceShort(span, _, ref size_expr, ref inner) =>
+			&expr::Expr::SliceShort(span, size_span, ref size_expr, ref inner) =>
 			{
 				match propagate!(inner
 					.eval_with_ctx(report, ctx, provider)?)
@@ -789,7 +789,7 @@ impl expr::Expr
 						let size = propagate!(size_expr
 							.eval_with_ctx(report, ctx, provider)?);
 
-						let size_usize = size.expect_usize(report, span)?;
+						let size_usize = size.expect_usize(report, size_span)?;
 						
 						Ok(expr::Value::make_integer(
 							x.checked_slice(

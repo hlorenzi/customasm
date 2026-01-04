@@ -406,16 +406,13 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 		if self.walker.next_linebreak().is_some()
 			{ return Ok(inner); }
 		
-		let tk_grave_span = match self.walker.maybe_expect(syntax::TokenKind::Grave)
-		{
-			Some(tk) => tk.span,
-			None => return Ok(inner)
-		};
+		if self.walker.maybe_expect(syntax::TokenKind::Grave).is_none()
+			{ return Ok(inner); }
 
 		let size = self.parse_leaf()?;
 
 		Ok(expr::Expr::SliceShort(
-			tk_grave_span.join(size.span()),
+			inner.span().join(size.span()),
 			size.span(),
 			Box::new(size),
 			Box::new(inner)))
