@@ -414,10 +414,13 @@ fn resolve_instruction_match_inner(
                 eval_ctx.set_local(
                     &param.name,
                     constrained_arg_value);
-                
-                eval_ctx.set_token_subst(
-                    &param.name,
-                    arg.excerpt.clone());
+
+                if !arg.excerpt.contains(expr::ASM_SUBSTITUTION_VARIABLE)
+                {
+                    eval_ctx.set_token_subst(
+                        &param.name,
+                        arg.excerpt.clone());
+                }
             }
 
             asm::InstructionArgumentKind::Nested(ref nested_match) =>
@@ -443,9 +446,12 @@ fn resolve_instruction_match_inner(
                     &param.name,
                     arg_value);
                 
-                eval_ctx.set_token_subst(
-                    &param.name,
-                    arg.excerpt.clone());
+                if !arg.excerpt.contains(expr::ASM_SUBSTITUTION_VARIABLE)
+                {
+                    eval_ctx.set_token_subst(
+                        &param.name,
+                        arg.excerpt.clone());
+                }
             }
         }
     }

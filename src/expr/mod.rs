@@ -36,6 +36,7 @@ pub use self::eval::{
     EvalMemberQuery,
     EvalFunctionQuery,
     EvalAsmBlockQuery,
+    ASM_SUBSTITUTION_VARIABLE,
     dummy_eval_query,
     dummy_eval_ctxlabel,
     dummy_eval_var,

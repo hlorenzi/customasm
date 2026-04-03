@@ -10,7 +10,7 @@ pub struct EvalContext<'opts>
 }
 
 
-static ASM_HYGIENIZE_PREFIX: &'static str = "__";
+pub static ASM_SUBSTITUTION_VARIABLE: &'static str = "$subst";
 
 
 impl<'opts> EvalContext<'opts>
@@ -68,12 +68,12 @@ impl<'opts> EvalContext<'opts>
 	pub fn get_local(
 		&self,
 		name: &str)
-		-> Result<expr::Value, ()>
+		-> Option<expr::Value>
 	{
 		match self.locals.get(name)
 		{
-			Some(value) => Ok(value.clone()),
-			None => Err(()),
+			Some(value) => Some(value.clone()),
+			None => None,
 		}
 	}
 	
@@ -98,58 +98,16 @@ impl<'opts> EvalContext<'opts>
 			return Some(std::borrow::Cow::Borrowed(t));
 		}
 
-		if let Some(_) = self.locals.get(name)
-		{
-			return Some(
-				std::borrow::Cow::Owned(
-					EvalContext::hygienize_name_for_asm_subst(name)));
-		}
-
 		None
 	}
 
 
-	pub fn hygienize_locals_for_asm_subst(
-		&self)
-		-> EvalContext<'opts>
+	pub fn new_asm_subst(&self) -> String
 	{
-		let mut new_ctx = EvalContext::new_deepened(self);
-		
-		for entry in &self.locals
-		{
-			if entry.0.starts_with(ASM_HYGIENIZE_PREFIX)
-			{
-				continue;
-			}
-
-			new_ctx.locals.insert(
-				EvalContext::hygienize_name_for_asm_subst(&entry.0),
-				entry.1.clone());
-		}
-		
-		for entry in &self.token_substs
-		{
-			if entry.0.starts_with(ASM_HYGIENIZE_PREFIX)
-			{
-				continue;
-			}
-			
-			new_ctx.token_substs.insert(
-				EvalContext::hygienize_name_for_asm_subst(&entry.0),
-				entry.1.clone());
-		}
-
-		new_ctx
-	}
-
-
-	pub fn hygienize_name_for_asm_subst(
-		name: &str)
-		-> String
-	{
-		format!("{}{}",
-			ASM_HYGIENIZE_PREFIX,
-			name)
+		format!(
+			"{}{}",
+			expr::ASM_SUBSTITUTION_VARIABLE,
+			self.locals.len())
 	}
 }
 
@@ -478,7 +436,7 @@ impl expr::Expr
 					return Ok(expr::Value::ExprBuiltinFn(expr::Value::make_metadata(), builtin_fn));
 				}
 
-				if let Ok(local_value) = ctx.get_local(name)
+				if let Some(local_value) = ctx.get_local(name)
 				{
 					return Ok(local_value);
 				}
@@ -620,120 +578,7 @@ impl expr::Expr
 				
 				else
 				{
-					let lhs = propagate!(lhs_expr
-						.eval_with_ctx(report, ctx, provider)?);
-
-					let rhs = propagate!(rhs_expr
-						.eval_with_ctx(report, ctx, provider)?);
-
-					if std::mem::discriminant(&lhs) == std::mem::discriminant(&rhs)
-					{
-						match op
-						{
-							expr::BinaryOp::Eq => return Ok(expr::Value::make_bool(lhs == rhs)),
-							expr::BinaryOp::Ne => return Ok(expr::Value::make_bool(lhs != rhs)),
-							_ => {},
-						}
-					}
-
-					match (&lhs, &rhs)
-					{
-						(expr::Value::Bool(_, lhs), expr::Value::Bool(_, rhs)) =>
-						{
-							return match op
-							{
-								expr::BinaryOp::And => Ok(expr::Value::make_bool(lhs & rhs)),
-								expr::BinaryOp::Or  => Ok(expr::Value::make_bool(lhs | rhs)),
-								expr::BinaryOp::Xor => Ok(expr::Value::make_bool(lhs ^ rhs)),
-								_ => Err(report.error_span("invalid argument types to operator", span))
-							}
-						}
-
-						_ => {}
-					}
-					
-					let lhs_bigint = lhs.get_bigint();
-					let rhs_bigint = rhs.get_bigint();
-
-					match (lhs_bigint, rhs_bigint)
-					{
-						(Some(ref lhs), Some(ref rhs)) =>
-						{
-							match op
-							{
-								expr::BinaryOp::Add =>
-									Ok(expr::Value::make_integer(
-										lhs.checked_add(
-											report,
-											span,
-											rhs)?)),
-
-								expr::BinaryOp::Sub =>
-									Ok(expr::Value::make_integer(
-										lhs.checked_sub(
-											report,
-											span,
-											rhs)?)),
-
-								expr::BinaryOp::Mul =>
-									Ok(expr::Value::make_integer(
-										lhs.checked_mul(
-											report,
-											span,
-											rhs)?)),
-								
-								expr::BinaryOp::Div =>
-									Ok(expr::Value::make_integer(
-										lhs.checked_div(
-											report,
-											span,
-											rhs)?)),
-								
-								expr::BinaryOp::Mod =>
-									Ok(expr::Value::make_integer(
-										lhs.checked_mod(
-											report,
-											span,
-											rhs)?)),
-								
-								expr::BinaryOp::Shl =>
-									Ok(expr::Value::make_integer(
-										lhs.checked_shl(
-											report,
-											span,
-											rhs)?)),
-								
-								expr::BinaryOp::Shr =>
-									Ok(expr::Value::make_integer(
-										lhs.checked_shr(
-											report,
-											span,
-											rhs)?)),
-								
-								expr::BinaryOp::And  => Ok(expr::Value::make_integer(lhs & rhs)),
-								expr::BinaryOp::Or   => Ok(expr::Value::make_integer(lhs | rhs)),
-								expr::BinaryOp::Xor  => Ok(expr::Value::make_integer(lhs ^ rhs)),
-								expr::BinaryOp::Lt   => Ok(expr::Value::make_bool(lhs <  rhs)),
-								expr::BinaryOp::Le   => Ok(expr::Value::make_bool(lhs <= rhs)),
-								expr::BinaryOp::Gt   => Ok(expr::Value::make_bool(lhs >  rhs)),
-								expr::BinaryOp::Ge   => Ok(expr::Value::make_bool(lhs >= rhs)),
-								
-								expr::BinaryOp::Concat =>
-								{
-									match (lhs.size, rhs.size)
-									{
-										(Some(lhs_width), Some(rhs_width)) => Ok(expr::Value::make_integer(lhs.concat((lhs_width, 0), &rhs, (rhs_width, 0)))),
-										(None, _) => Err(report.error_span("argument to concatenation with indefinite size", lhs_expr.span())),
-										(_, None) => Err(report.error_span("argument to concatenation with indefinite size", rhs_expr.span()))
-									}
-								}
-
-								_ => Err(report.error_span("invalid argument types to operator", span))
-							}
-						}
-						
-						_ => Err(report.error_span("invalid argument types to operator", span))
-					}
+					eval_binary_op(report, ctx, provider, lhs_expr, rhs_expr, op, span)
 				}
 			}
 			
@@ -872,6 +717,114 @@ impl expr::Expr
 			}
 		}
 	}
+}
+
+
+fn eval_binary_op<'provider>(
+	report: &mut diagn::Report,
+	ctx: &mut EvalContext,
+	provider: EvalProvider<'provider>,
+	lhs_expr: &expr::Expr,
+	rhs_expr: &expr::Expr,
+	op: expr::BinaryOp,
+	span: diagn::Span)
+	-> Result<expr::Value, ()>
+{
+	let lhs = propagate!(lhs_expr
+		.eval_with_ctx(report, ctx, provider)?);
+
+	let rhs = propagate!(rhs_expr
+		.eval_with_ctx(report, ctx, provider)?);
+
+	match (op, &lhs, &rhs)
+	{
+		(expr::BinaryOp::Eq, lhs, rhs)
+		if std::mem::discriminant(lhs) == std::mem::discriminant(rhs) => {
+			return Ok(expr::Value::make_bool(lhs == rhs))
+		}
+		(expr::BinaryOp::Ne, lhs, rhs) =>
+		if std::mem::discriminant(lhs) == std::mem::discriminant(rhs) {
+			return Ok(expr::Value::make_bool(lhs != rhs))
+		}
+		(expr::BinaryOp::And, expr::Value::Bool(_, lhs), expr::Value::Bool(_, rhs)) => {
+			return Ok(expr::Value::make_bool(lhs & rhs))
+		}
+		(expr::BinaryOp::And, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_integer(lhs & rhs))
+		}
+		(expr::BinaryOp::Or, expr::Value::Bool(_, lhs), expr::Value::Bool(_, rhs)) => {
+			return Ok(expr::Value::make_bool(lhs | rhs))
+		}
+		(expr::BinaryOp::Or, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_integer(lhs | rhs))
+		}
+		(expr::BinaryOp::Xor, expr::Value::Bool(_, lhs), expr::Value::Bool(_, rhs)) => {
+			return Ok(expr::Value::make_bool(lhs ^ rhs))
+		}
+		(expr::BinaryOp::Xor, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_integer(lhs ^ rhs))
+		}
+		(expr::BinaryOp::Add, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_integer(lhs.checked_add(report, span, rhs)?))
+		}
+		(expr::BinaryOp::Sub, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_integer(lhs.checked_sub(report, span, rhs)?))
+		}
+		(expr::BinaryOp::Mul, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_integer(lhs.checked_mul(report, span, rhs)?))
+		}
+		(expr::BinaryOp::Div, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_integer(lhs.checked_div(report, span, rhs)?))
+		}
+		(expr::BinaryOp::Mod, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_integer(lhs.checked_mod(report, span, rhs)?))
+		}
+		(expr::BinaryOp::Shl, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_integer(lhs.checked_shl(report, span, rhs)?))
+		}
+		(expr::BinaryOp::Shr, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_integer(lhs.checked_shr(report, span, rhs)?))
+		}
+		(expr::BinaryOp::Lt, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_bool(lhs < rhs))
+		}
+		(expr::BinaryOp::Le, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_bool(lhs <= rhs))
+		}
+		(expr::BinaryOp::Gt, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_bool(lhs > rhs))
+		}
+		(expr::BinaryOp::Ge, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
+			return Ok(expr::Value::make_bool(lhs >= rhs))
+		}
+		(expr::BinaryOp::Concat, lhs, rhs) => {
+			let lhs_bigint = lhs.get_bigint();
+			let rhs_bigint = rhs.get_bigint();
+			if let (Some(lhs), Some(rhs)) = (lhs_bigint, rhs_bigint)
+			{
+				match (lhs.size, rhs.size)
+				{
+					(Some(lhs_width), Some(rhs_width)) =>
+						return Ok(expr::Value::make_integer(lhs.concat((lhs_width, 0), &rhs, (rhs_width, 0)))),
+					(None, _) =>
+						return Err(report.error_span("argument to concatenation with indefinite size", lhs_expr.span())),
+					(_, None) =>
+						return Err(report.error_span("argument to concatenation with indefinite size", rhs_expr.span()))
+				}
+			}
+		}
+		(expr::BinaryOp::Assign, _, _) => unreachable!(),
+		(expr::BinaryOp::LazyAnd, _, _) => unreachable!(),
+		(expr::BinaryOp::LazyOr, _, _) => unreachable!(),
+		_ => {},
+	}
+
+	Err(report.error_span(
+		format!(
+			"invalid argument types to operator (have {} and {})",
+			lhs.type_name(),
+			rhs.type_name()),
+		span))
 }
 
 

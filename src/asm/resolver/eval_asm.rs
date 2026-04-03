@@ -214,9 +214,13 @@ fn resolve_once(
                 ast_instr.span,
                 &ast_instr.src)?;
 
+            let mut new_eval_ctx = expr::EvalContext::new_deepened(
+                query.eval_ctx);
+
             let new_excerpt = perform_substitutions(
                 &ast_instr.src,
                 &substs,
+                &mut new_eval_ctx,
                 query)?;
 
             
@@ -237,7 +241,7 @@ fn resolve_once(
                 {
                     Some(format!(
                         "match attempted: `{}`",
-                        new_excerpt))
+                        &new_excerpt))
                 }
             };
 
@@ -262,9 +266,6 @@ fn resolve_once(
             
 
             // Try to resolve the encoding
-            let mut new_eval_ctx = query.eval_ctx
-                .hygienize_locals_for_asm_subst();
-
             for (label_name, label_value) in labels.iter()
             {
                 new_eval_ctx.set_local(label_name, label_value.clone());
@@ -386,9 +387,10 @@ fn parse_substitutions<'excerpt>(
 }
 
 
-fn perform_substitutions<'src>(
+fn perform_substitutions<'src, 'opts>(
     excerpt: &'src str,
     substs: &Vec<AsmSubstitution>,
+    new_eval_ctx: &mut expr::EvalContext<'opts>,
     info: &mut expr::EvalAsmBlockQuery)
     -> Result<String, ()>
 {
@@ -405,19 +407,25 @@ fn perform_substitutions<'src>(
         }
         
         let subst_str = {
-            match info.eval_ctx.get_token_subst(&subst.name)
+            if let Some(t) = info.eval_ctx.get_token_subst(&subst.name)
             {
-                Some(t) => t,
-                None =>
-                {
-                    info.report.error_span(
-                        format!(
-                            "unknown substitution argument `{}`",
-                            subst.name),
-                        subst.span);
-                    
-                    return Err(());
-                }
+                t
+            }
+            else if let Some(value) = info.eval_ctx.get_local(&subst.name)
+            {
+                let new_name = new_eval_ctx.new_asm_subst();
+                new_eval_ctx.set_local(&new_name, value);
+                std::borrow::Cow::Owned(new_name)
+            }
+            else
+            {
+                info.report.error_span(
+                    format!(
+                        "unknown substitution argument `{}`",
+                        subst.name),
+                    subst.span);
+                
+                return Err(());
             }
         };
 
