@@ -1,1 +1,1 @@
-#d incbin("unk" @ 0xffff) ; error: failed / error: expected string
+#d incbin({}) ; error: failed / error: expected string

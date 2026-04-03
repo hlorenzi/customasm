@@ -143,8 +143,7 @@ pub fn eval_builtin_assert(
                         "assertion failed: {}",
                         query.args[1]
                             .value
-                            .expect_string(query.report, query.args[1].span)?
-                            .utf8_contents),
+                            .expect_string(query.report, query.args[1].span)?),
                     query.span)
             }
             else {
@@ -243,13 +242,10 @@ pub fn eval_builtin_string_encoding(
 {
     query.ensure_arg_number(1)?;
 
-    let s = query.args[0].value.expect_string(
+    query.args[0].value.convert_string_encoding(
         query.report,
-        query.args[0].span)?;
-
-    Ok(expr::Value::make_string(
-        &s.utf8_contents,
-        encoding))
+        query.args[0].span,
+        encoding)
 }
 
 
@@ -311,5 +307,5 @@ pub fn eval_builtin_strlen(
         query.report,
         query.args[0].span)?;
 
-    Ok(expr::Value::make_integer(s.utf8_contents.len()))
+    Ok(expr::Value::make_integer(s.len()))
 }

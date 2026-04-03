@@ -181,7 +181,7 @@ fn eval_builtin_incbin(
         query.report,
         query.args[0].span,
         filename_ctx,
-        &relative_filename.utf8_contents)?;
+        &relative_filename)?;
 
     let file_handle = fileserver.get_handle(
         query.report,
@@ -315,7 +315,7 @@ fn eval_builtin_incstr(
         query.report,
         query.args[0].span,
         filename_ctx,
-        &relative_filename.utf8_contents)?;
+        &relative_filename)?;
 
     let file_handle = fileserver.get_handle(
         query.report,

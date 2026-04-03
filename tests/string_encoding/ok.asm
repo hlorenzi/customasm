@@ -22,4 +22,7 @@
 #d utf32be("😀") ; = 0x0001f600
 #d utf32le("😀") ; = 0x00f60100
 
-#d utf8(utf16be(utf32le(ascii("abc")))) ; = 0x61_62_63
+#d utf8(ascii("abc")) ; = 0x61_62_63
+#d utf8(ascii(utf8(ascii("abc")))) ; = 0x61_62_63
+
+#d utf8(utf16be(utf32le(ascii("abc")))) ; = 0x6100000000000000620000000000000063000000000000

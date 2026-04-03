@@ -5,18 +5,16 @@
     echoi {i: u8} => 0xff @ i
 
     printi {v} => {
-        v = v @ 0`0
         assert(v >> (8 * 9) == 0)
         assert(v > 0)
-        next = (v >> 8)`(sizeof(v) - 8)
+        next = (v >> 8)
         asm {
-            printi ({next})
-            echoi ({v} @ 0`0) & 0xFF
+            printi {next}
+            echoi {v} & 0xff
         }
     }
 
     printi {v} => {
-        v = v @ 0`0
         assert(v == 0)
         asm {}
     }

@@ -46,7 +46,6 @@ pub enum Value
 	FailedConstraint(ValueMetadata, diagn::Message),
 	Void(ValueMetadata),
 	Integer(ValueMetadata, util::BigInt),
-	String(ValueMetadata, ValueString),
 	Bool(ValueMetadata, bool),
 	Struct(ValueMetadata, ValueStruct),
 	ExprBuiltinFn(ValueMetadata, expr::ExprBuiltinFn),
@@ -61,14 +60,6 @@ pub struct ValueMetadata
 {
 	pub symbol_ref: Option<util::ItemRef<asm::Symbol>>,
 	pub bank_ref: Option<util::ItemRef<asm::Bankdef>>,
-}
-
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct ValueString
-{
-	pub utf8_contents: String,
-	pub encoding: String,
 }
 
 
@@ -154,7 +145,6 @@ impl Value
 			Value::FailedConstraint(..) => "failed constraint",
 			Value::Void(..) => "void",
 			Value::Integer(..) => "integer",
-			Value::String(..) => "string",
 			Value::Bool(..) => "bool",
 			Value::Struct(..) => "struct",
 			Value::ExprBuiltinFn(..) => "built-in function",
@@ -235,17 +225,6 @@ impl Value
 	}
 
 
-	pub fn make_string<T: Into<String>, S: Into<String>>(value: T, encoding: S) -> Value
-	{
-		Value::String(
-			Value::make_metadata(),
-			ValueString {
-				utf8_contents: value.into(),
-				encoding: encoding.into(),
-			})
-	}
-
-
 	pub fn make_struct(value: ValueStruct) -> Value
 	{
 		Value::Struct(
@@ -293,7 +272,6 @@ impl Value
 			Value::FailedConstraint(meta, ..) => meta,
 			Value::Void(meta, ..) => meta,
 			Value::Integer(meta, ..) => meta,
-			Value::String(meta, ..) => meta,
 			Value::Bool(meta, ..) => meta,
 			Value::Struct(meta, ..) => meta,
 			Value::ExprBuiltinFn(meta, ..) => meta,
@@ -312,7 +290,6 @@ impl Value
 			Value::FailedConstraint(meta, ..) => meta,
 			Value::Void(meta, ..) => meta,
 			Value::Integer(meta, ..) => meta,
-			Value::String(meta, ..) => meta,
 			Value::Bool(meta, ..) => meta,
 			Value::Struct(meta, ..) => meta,
 			Value::ExprBuiltinFn(meta, ..) => meta,
@@ -328,7 +305,6 @@ impl Value
 		match &self
 		{
 			&Value::Integer(_, bigint) => Some(bigint.clone()),
-			&Value::String(_, s) => Some(s.to_bigint()),
 			_ => None,
 		}
 	}
@@ -338,14 +314,7 @@ impl Value
 		&'a self)
 		-> std::borrow::Cow<'a, expr::Value>
 	{
-		match self
-		{
-			Value::String(_, s) =>
-				std::borrow::Cow::Owned(
-					expr::Value::make_integer(s.to_bigint())),
-
-			_ => std::borrow::Cow::Borrowed(self),
-		}
+		std::borrow::Cow::Borrowed(self)
 	}
 
 
@@ -726,22 +695,113 @@ impl Value
 		&self,
 		report: &mut diagn::Report,
 		span: diagn::Span)
-		-> Result<&ValueString, ()>
+		-> Result<String, ()>
 	{
-		match &self
+		if let Value::Integer(_, bigint) = self
 		{
-			expr::Value::String(_, value) => Ok(value),
+			return Ok(bigint.as_string());
+		}
 
-			_ =>
+		report.error_span(
+			format!(
+				"expected string, got {}",
+				self.type_name()),
+			span);
+
+		Err(())
+	}
+
+
+	pub fn convert_string_encoding(
+		&self,
+		report: &mut diagn::Report,
+		span: diagn::Span,
+		to_encoding: &str)
+		-> Result<expr::Value, ()>
+	{
+		let utf8_contents = self.expect_string(report, span)?;
+
+		match to_encoding
+		{
+			"utf8" =>
 			{
-				report.error_span(
-					format!(
-						"expected string, got {}",
-						self.type_name()),
-					span);
-
-				Err(())
+				Ok(expr::Value::make_integer(
+					util::BigInt::from_bytes_be(utf8_contents.as_bytes())))
 			}
+			"utf16be" =>
+			{
+				let units = utf8_contents.encode_utf16();
+				let mut bytes = Vec::new();
+				for unit in units
+				{
+					bytes.push(((unit >> 8) & 0xff) as u8);
+					bytes.push(((unit >> 0) & 0xff) as u8);
+				}
+					
+				Ok(expr::Value::make_integer(
+					util::BigInt::from_bytes_be(&bytes[..])))
+			}
+			"utf16le" =>
+			{
+				let units = utf8_contents.encode_utf16();
+				let mut bytes = Vec::new();
+				for unit in units
+				{
+					bytes.push(((unit >> 0) & 0xff) as u8);
+					bytes.push(((unit >> 8) & 0xff) as u8);
+				}
+					
+				Ok(expr::Value::make_integer(
+					util::BigInt::from_bytes_be(&bytes[..])))
+			}
+			"utf32be" =>
+			{
+				let units = utf8_contents.chars();
+				let mut bytes = Vec::new();
+				for unit in units
+				{
+					bytes.push(((unit as u32 >> 24) & 0xff) as u8);
+					bytes.push(((unit as u32 >> 16) & 0xff) as u8);
+					bytes.push(((unit as u32 >> 8) & 0xff) as u8);
+					bytes.push(((unit as u32 >> 0) & 0xff) as u8);
+				}
+					
+				Ok(expr::Value::make_integer(
+					util::BigInt::from_bytes_be(&bytes[..])))
+			}
+			"utf32le" =>
+			{
+				let units = utf8_contents.chars();
+				let mut bytes = Vec::new();
+				for unit in units
+				{
+					bytes.push(((unit as u32 >> 0) & 0xff) as u8);
+					bytes.push(((unit as u32 >> 8) & 0xff) as u8);
+					bytes.push(((unit as u32 >> 16) & 0xff) as u8);
+					bytes.push(((unit as u32 >> 24) & 0xff) as u8);
+				}
+					
+				Ok(expr::Value::make_integer(
+					util::BigInt::from_bytes_be(&bytes[..])))
+			}
+			"ascii" =>
+			{
+				let units = utf8_contents.chars();
+				let bytes = units.map(|c| {
+					if c as u32 >= 0x100
+					{
+						0x00
+					}
+					else
+					{
+						c as u8
+					}
+				});
+					
+				Ok(expr::Value::make_integer(
+					util::BigInt::from_bytes_be(&bytes.collect::<Vec<_>>()[..])))
+			}
+			_ => panic!("invalid string encoding"),
 		}
 	}
 }
@@ -784,12 +844,6 @@ impl std::cmp::PartialEq for Value
 				_ => false,
 			}
 
-			Value::String(_, a) => match other
-			{
-				Value::String(_, b) => a == b,
-				_ => false,
-			}
-
 			Value::Struct(_, a) => match other
 			{
 				Value::Struct(_, b) => a == b,
@@ -819,88 +873,6 @@ impl std::cmp::PartialEq for Value
 				Value::Bankdef(_, b) => a == b,
 				_ => false,
 			}
-		}
-	}
-}
-
-
-impl ValueString
-{
-	pub fn to_bigint(&self) -> util::BigInt
-	{
-		match &*self.encoding
-		{
-			"utf8" => util::BigInt::from_bytes_be(&self.utf8_contents.as_bytes()),
-			"utf16be" =>
-			{
-				let units = self.utf8_contents.encode_utf16();
-				let mut bytes = Vec::new();
-				for unit in units
-				{
-					bytes.push(((unit >> 8) & 0xff) as u8);
-					bytes.push(((unit >> 0) & 0xff) as u8);
-				}
-					
-				util::BigInt::from_bytes_be(&bytes[..])
-			}
-			"utf16le" =>
-			{
-				let units = self.utf8_contents.encode_utf16();
-				let mut bytes = Vec::new();
-				for unit in units
-				{
-					bytes.push(((unit >> 0) & 0xff) as u8);
-					bytes.push(((unit >> 8) & 0xff) as u8);
-				}
-					
-				util::BigInt::from_bytes_be(&bytes[..])
-			}
-			"utf32be" =>
-			{
-				let units = self.utf8_contents.chars();
-				let mut bytes = Vec::new();
-				for unit in units
-				{
-					bytes.push(((unit as u32 >> 24) & 0xff) as u8);
-					bytes.push(((unit as u32 >> 16) & 0xff) as u8);
-					bytes.push(((unit as u32 >> 8) & 0xff) as u8);
-					bytes.push(((unit as u32 >> 0) & 0xff) as u8);
-				}
-					
-				util::BigInt::from_bytes_be(&bytes[..])
-			}
-			"utf32le" =>
-			{
-				let units = self.utf8_contents.chars();
-				let mut bytes = Vec::new();
-				for unit in units
-				{
-					bytes.push(((unit as u32 >> 0) & 0xff) as u8);
-					bytes.push(((unit as u32 >> 8) & 0xff) as u8);
-					bytes.push(((unit as u32 >> 16) & 0xff) as u8);
-					bytes.push(((unit as u32 >> 24) & 0xff) as u8);
-				}
-					
-				util::BigInt::from_bytes_be(&bytes[..])
-			}
-			"ascii" =>
-			{
-				let units = self.utf8_contents.chars();
-				let bytes = units.map(|c|
-				{
-					if c as u32 >= 0x100
-					{
-						0x00
-					}
-					else
-					{
-						c as u8
-					}
-				});
-					
-				util::BigInt::from_bytes_be(&bytes.collect::<Vec<_>>()[..])
-			}
-			_ => panic!("invalid string encoding"),
 		}
 	}
 }

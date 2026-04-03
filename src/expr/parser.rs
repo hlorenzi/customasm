@@ -673,12 +673,9 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 		
 		let expr = expr::Expr::Literal(
 			tk_str.span,
-			expr::Value::String(
+			expr::Value::Integer(
 				expr::Value::make_metadata(),
-				expr::ValueString {
-					utf8_contents: string,
-					encoding: "utf8".to_string(),
-				}));
+				util::BigInt::from_bytes_be(string.as_bytes())));
 
 		Ok(expr)
 	}

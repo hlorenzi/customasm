@@ -4,7 +4,6 @@ pub use self::expression::{
     ExprStructMemberInit,
     Value,
     ValueMetadata,
-    ValueString,
     ValueStruct,
     ValueStructMember,
     UnaryOp,

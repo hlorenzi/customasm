@@ -1,1 +1,1 @@
-#d incbinstr("unk" @ 0xffff) ; error: failed / error: expected string
+#d incbinstr({}) ; error: failed / error: expected string
