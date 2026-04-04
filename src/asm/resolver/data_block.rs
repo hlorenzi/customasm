@@ -15,7 +15,8 @@ pub fn resolve_data_element(
     let item_ref = ast_data.item_refs[elem_index];
     let data_elem = defs.data_elems.get(item_ref);
 
-    if data_elem.resolved
+    if data_elem.resolved &&
+        data_elem.encoding_statically_known
     {
         return Ok(asm::ResolutionState::Resolved);
     }
@@ -46,20 +47,7 @@ pub fn resolve_data_element(
         {
             expr::Value::Integer(_, i) => Some(i),
 
-            expr::Value::Unknown(_) =>
-            {
-                if ctx.is_last_iteration ||
-                    data_elem.encoding_statically_known
-                {
-                    report.error_span(
-                        "failed to resolve data element",
-                        expr.span());
-                    
-                    return Err(());
-                }
-
-                None
-            }
+            expr::Value::Unknown(_) => None,
 
             expr::Value::FailedConstraint(_, msg) =>
             {
@@ -81,40 +69,41 @@ pub fn resolve_data_element(
     if ctx.is_last_iteration ||
         data_elem.encoding_statically_known
     {
-        let encoding = maybe_encoding.as_ref().unwrap();
-
-        // Check the element size against the directive size
-        if let Some(elem_size) = ast_data.elem_size
+        if let Some(ref encoding) = maybe_encoding
         {
-            let encoding_size = encoding.size_or_min_size();
-            
-            if encoding_size > elem_size
+            // Check the element size against the directive size
+            if let Some(elem_size) = ast_data.elem_size
             {
-                report.push_parent(
-                    "value out of range for directive",
+                let encoding_size = encoding.size_or_min_size();
+                
+                if encoding_size > elem_size
+                {
+                    report.push_parent(
+                        "value out of range for directive",
+                        expr.span());
+
+                    report.note(
+                        format!(
+                            "data directive has size {}, got size {}",
+                            elem_size,
+                            encoding_size));
+
+                    report.pop_parent();
+
+                    return Err(());
+                }
+            }
+            
+            // Check for definite size
+            if ast_data.elem_size.is_none() &&
+                encoding.size.is_none()
+            {
+                report.error_span(
+                    "data element has no definite size",
                     expr.span());
-
-                report.note(
-                    format!(
-                        "data directive has size {}, got size {}",
-                        elem_size,
-                        encoding_size));
-
-                report.pop_parent();
 
                 return Err(());
             }
-        }
-        
-        // Check for definite size
-        if ast_data.elem_size.is_none() &&
-            encoding.size.is_none()
-        {
-            report.error_span(
-                "data element has no definite size",
-                expr.span());
-
-            return Err(());
         }
     }
 
@@ -165,7 +154,10 @@ pub fn resolve_data_element(
     }
 
     
-    if Some(&prev_encoding) != maybe_encoding.as_ref()
+    data_elem.resolved =
+        Some(&prev_encoding) == maybe_encoding.as_ref();
+    
+    if !data_elem.resolved
     {
         // On the final iteration, unstable guesses become errors
         if ctx.is_last_iteration

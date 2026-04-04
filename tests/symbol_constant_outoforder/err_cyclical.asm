@@ -1,6 +1,6 @@
-x = y + 1 ; error: unresolved
-y = z + 1
-z = x + 1
+x = y + 1 ; error: converge
+y = z + 1 ; error: converge
+z = x + 1 ; error: converge
 
-#d8 x
-#d8 y
+#d8 x ; error: converge
+#d8 y ; error: converge

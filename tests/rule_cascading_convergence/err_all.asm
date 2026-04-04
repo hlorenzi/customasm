@@ -16,4 +16,4 @@
     ld label ; error: converge
     ld label ; error: converge
     ld label ; error: converge
-label: ; error: converge
+label:

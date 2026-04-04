@@ -4,8 +4,8 @@ use sha2::*;
 
 fn test_example(filename: &str, hash: &[u8])
 {
-    test_example_variant(filename, hash, true, true);
     test_example_variant(filename, hash, false, false);
+    test_example_variant(filename, hash, true, true);
 }
 
 

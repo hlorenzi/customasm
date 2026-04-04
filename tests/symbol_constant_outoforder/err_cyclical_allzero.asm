@@ -1,5 +1,5 @@
-x = y ; error: unresolved
-y = x
+x = y ; error: converge
+y = x ; error: converge
 
-#d8 x
-#d8 y
+#d8 x ; error: converge
+#d8 y ; error: converge

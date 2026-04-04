@@ -16,5 +16,5 @@
 x = y ; error: converge
     ld x ; error: converge
     ld x ; error: converge
-label: ; error: converge
-y = label + 3 ; error: converge
+label:
+y = label + 3

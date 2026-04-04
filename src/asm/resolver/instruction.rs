@@ -160,6 +160,12 @@ pub fn resolve_encoding<'encoding>(
                 {
                     msgs.push(msg.clone());
                 }
+                else
+                {
+                    msgs.push(diagn::Message::error_span(
+                        "instruction encoding did not converge",
+                        instr_span));
+                }
             }
             
             report.message(

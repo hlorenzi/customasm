@@ -188,8 +188,8 @@ fn populate_fileserver(
 
 pub fn test_file(filepath: &str)
 {
-    test_file_variant(filepath, true, true);
     test_file_variant(filepath, false, false);
+    test_file_variant(filepath, true, true);
 }
 
 
@@ -317,8 +317,6 @@ fn test_file_variant(
             msg.line,
             &msg.excerpt)
         {
-            print_test_failed();
-
             println!("\
                 > missing diagnostics message\n\
                 > expected: `{}` at file `{}`, line {}\n",
@@ -339,13 +337,12 @@ fn test_file_variant(
     if has_msg_mismatch
     {
         println!("got encoding: 0x{:x}", &encoding);
+        print_test_failed();
         panic!("test failed");
     }
 
     if expectations.messages.len() != report.len_with_inner()
     {
-        print_test_failed();
-
         println!("\
             > diagnostics mismatch\n\
             > expected {} messages, got {}\n",
@@ -353,6 +350,7 @@ fn test_file_variant(
             report.len_with_inner());
             
         println!("got encoding: 0x{:x}", &encoding);
+        print_test_failed();
         panic!("test failed");
     }
     
@@ -360,8 +358,6 @@ fn test_file_variant(
     {
         if format!("{:x}", encoding) != format!("{:x}", expected_encoding)
         {
-            print_test_failed();
-
             println!("\
                 > encoding mismatch\n\
                 > got:      0x{:x}\n\
@@ -369,6 +365,7 @@ fn test_file_variant(
                 &encoding,
                 &expected_encoding);
                 
+            print_test_failed();
             panic!("test failed");
         }
     }
@@ -401,8 +398,6 @@ fn test_file_variant(
 
         if contents_expected != contents_written
         {
-            print_test_failed();
-
             println!("\
                 > output file mismatch\n\
                 > file: `{}`\n\
@@ -418,6 +413,7 @@ fn test_file_variant(
             std::fs::write("test_output_mismatch", contents_written)
                 .unwrap();
                 
+            print_test_failed();
             panic!("test failed");
         }
     }

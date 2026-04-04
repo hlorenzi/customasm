@@ -203,18 +203,10 @@ pub fn eval_ctxlabel(
 
     let symbol = defs.symbols.get(symbol_ref);
 
-    if symbol.value.is_unknown() &&
+    if !symbol.resolved &&
         !ctx.can_guess()
     {
-        query.report.error_span(
-            format!(
-                "unresolved symbol `{}`",
-                decls.symbols.get_displayable_name(
-                    0,
-                    ctx.symbol_ctx.get_hierarchy())),
-            query.span);
-
-        return Err(());
+        return Ok(expr::Value::make_unknown());
     }
 
     Ok(symbol.value.clone())
@@ -252,18 +244,10 @@ pub fn eval_variable(
 
     let symbol = defs.symbols.get(symbol_ref);
 
-    if symbol.value.is_unknown() &&
+    if !symbol.resolved &&
         !ctx.can_guess()
     {
-        query.report.error_span(
-            format!(
-                "unresolved symbol `{}`",
-                decls.symbols.get_displayable_name(
-                    query.hierarchy_level,
-                    query.hierarchy)),
-            query.span);
-
-        return Err(());
+        return Ok(expr::Value::make_unknown());
     }
 
     Ok(symbol.value.clone())

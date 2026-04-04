@@ -138,7 +138,8 @@ pub fn resolve_constant(
     let item_ref = ast_symbol.item_ref.unwrap();
 
     let symbol = defs.symbols.get(item_ref);
-    if symbol.resolved
+    if symbol.resolved &&
+        symbol.value_statically_known
     {
         return Ok(asm::ResolutionState::Resolved);
     }
@@ -180,8 +181,18 @@ pub fn resolve_constant(
         return Ok(asm::ResolutionState::Resolved);
     }
 
+    if opts.debug_iterations
+    {
+        println!("const: {} = {:?}",
+            ast_symbol.name,
+            symbol.value);
+    }
 
-    if symbol.value != prev_value
+    symbol.resolved =
+        symbol.value == prev_value &&
+        !symbol.value.is_unknown();
+    
+    if !symbol.resolved
     {
         // On the final iteration, unstable guesses become errors
         if ctx.is_last_iteration
@@ -191,16 +202,8 @@ pub fn resolve_constant(
                 ast_symbol.decl_span);
         }
 
-        if opts.debug_iterations
-        {
-            println!("const: {} = {:?}",
-                ast_symbol.name,
-                symbol.value);
-        }
-
         return Ok(asm::ResolutionState::Unresolved);
     }
-
     
     Ok(asm::ResolutionState::Resolved)
 }
