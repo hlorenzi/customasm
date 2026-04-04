@@ -1,7 +1,7 @@
 use crate::*;
 
 
-struct Command
+pub struct Command
 {
 	pub input_filenames: Vec<String>,
 	pub output_groups: Vec<CommandOutput>,
@@ -13,7 +13,7 @@ struct Command
 }
 
 
-struct CommandOutput
+pub struct CommandOutput
 {
 	pub format: Option<OutputFormat>,
 	pub printout: bool,
@@ -103,6 +103,29 @@ pub fn drive(
 	let command = parse_command(
 		report,
 		args)?;
+
+	let maybe_result = assemble_with_command(
+		report,
+		fileserver,
+		&command);
+
+	maybe_result
+}
+
+
+pub fn drive_with_modified_command<F>(
+	report: &mut diagn::Report,
+	args: &Vec<String>,
+	fileserver: &mut dyn util::FileServer,
+	modify_command: F)
+	-> Result<asm::AssemblyResult, ()>
+	where F: Fn(&mut Command)
+{
+	let mut command = parse_command(
+		report,
+		args)?;
+
+	modify_command(&mut command);
 
 	let maybe_result = assemble_with_command(
 		report,

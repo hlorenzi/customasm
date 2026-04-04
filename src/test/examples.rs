@@ -2,16 +2,29 @@ use crate::*;
 use sha2::*;
 
 
-
-
 fn test_example(filename: &str, hash: &[u8])
+{
+    test_example_variant(filename, hash, true, true);
+    test_example_variant(filename, hash, false, false);
+}
+
+
+fn test_example_variant(
+    filename: &str,
+    hash: &[u8],
+    optimize_instruction_matching: bool,
+    optimize_statically_known: bool)
 {
 	let mut report = diagn::Report::new();
 
     let mut fileserver = util::FileServerReal::new();
 	fileserver.add_std_files(test::STD_FILES);
 
-    let opts = asm::AssemblyOptions::new();
+    let opts = asm::AssemblyOptions {
+        optimize_instruction_matching,
+        optimize_statically_known,
+        ..asm::AssemblyOptions::new()
+    };
     
 	let assembly = asm::assemble(
         &mut report,

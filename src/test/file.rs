@@ -188,12 +188,26 @@ fn populate_fileserver(
 
 pub fn test_file(filepath: &str)
 {
+    test_file_variant(filepath, true, true);
+    test_file_variant(filepath, false, false);
+}
+
+
+fn test_file_variant(
+    filepath: &str,
+    optimize_instruction_matching: bool,
+    optimize_statically_known: bool)
+{
     let path_prefix = std::path::PathBuf::from(&filepath)
         .parent()
         .unwrap()
         .to_path_buf();
 
 	let contents = std::fs::read_to_string(&filepath).unwrap();
+
+    if contents.contains("; optimize-statically-known") &&
+        !optimize_statically_known
+        { return; }
 	
     let stripped_filename = std::path::PathBuf::from(&filepath)
         .strip_prefix(&path_prefix)
@@ -226,16 +240,22 @@ pub fn test_file(filepath: &str)
             println!("command: {:?}", command);
             println!("output: {:?}", expectations.output_files);
 
-            driver::drive(
+            driver::drive_with_modified_command(
                 &mut report,
                 &command,
-                &mut fileserver)
+                &mut fileserver,
+                |command| {
+                    command.opts.optimize_instruction_matching = optimize_instruction_matching;
+                    command.opts.optimize_statically_known = optimize_statically_known;
+                })
         }
         else
         {
             let opts = asm::AssemblyOptions {
                 debug_iterations: true,
                 use_legacy_behavior: expectations.legacy,
+                optimize_instruction_matching,
+                optimize_statically_known,
                 ..asm::AssemblyOptions::new()
             };
 
@@ -253,6 +273,40 @@ pub fn test_file(filepath: &str)
     print!("{}", String::from_utf8(msgs).unwrap());
 
 
+    let variant_name = format!(
+        "{}{}",
+        if optimize_instruction_matching { 1 } else { 0 },
+        if optimize_statically_known { 1 } else { 0 });
+
+    let print_test_failed = || {
+        let mut styled_filepath = util::StringStyler::new(true);
+        styled_filepath.red();
+        styled_filepath.add(&format!(
+            "\n\
+            [===== test failed (variant {}) =====]\n",
+            variant_name));
+        styled_filepath.gray();
+        styled_filepath.add(&format!("--> {}", filepath));
+        styled_filepath.reset();
+
+        println!("{}", styled_filepath.result);
+    };
+
+    let print_test_passed = || {
+        let mut styled_filepath = util::StringStyler::new(true);
+        styled_filepath.cyan();
+        styled_filepath.add(&format!(
+            "\n\
+            [===== test passed (variant {}) =====]\n",
+            variant_name));
+        styled_filepath.gray();
+        styled_filepath.add(&format!("--> {}", filepath));
+        styled_filepath.reset();
+
+        println!("{}", styled_filepath.result);
+    };
+
+
     let mut has_msg_mismatch = false;
     for msg in &expectations.messages
     {
@@ -263,10 +317,14 @@ pub fn test_file(filepath: &str)
             msg.line,
             &msg.excerpt)
         {
-            println!("\n\
-                > test failed -- missing diagnostics message\n\
+            print_test_failed();
+
+            println!("\
+                > missing diagnostics message\n\
                 > expected: `{}` at file `{}`, line {}\n",
-                msg.excerpt, msg.file, msg.line + 1);
+                msg.excerpt,
+                msg.file,
+                msg.line + 1);
 
             has_msg_mismatch = true;
         }
@@ -286,10 +344,13 @@ pub fn test_file(filepath: &str)
 
     if expectations.messages.len() != report.len_with_inner()
     {
-        println!("\n\
-            > test failed -- diagnostics mismatch\n\
+        print_test_failed();
+
+        println!("\
+            > diagnostics mismatch\n\
             > expected {} messages, got {}\n",
-            expectations.messages.len(), report.len_with_inner());
+            expectations.messages.len(),
+            report.len_with_inner());
             
         println!("got encoding: 0x{:x}", &encoding);
         panic!("test failed");
@@ -299,11 +360,14 @@ pub fn test_file(filepath: &str)
     {
         if format!("{:x}", encoding) != format!("{:x}", expected_encoding)
         {
-            println!("\n\
-                > test failed -- encoding mismatch\n\
+            print_test_failed();
+
+            println!("\
+                > encoding mismatch\n\
                 > got:      0x{:x}\n\
                 > expected: 0x{:x}\n",
-                &encoding, &expected_encoding);
+                &encoding,
+                &expected_encoding);
                 
             panic!("test failed");
         }
@@ -337,8 +401,10 @@ pub fn test_file(filepath: &str)
 
         if contents_expected != contents_written
         {
-            println!("\n\
-                > test failed -- output file mismatch\n\
+            print_test_failed();
+
+            println!("\
+                > output file mismatch\n\
                 > file: `{}`\n\
                 > contents copied to `test_output_mismatch` for debugging\n",
                 filename);
@@ -355,4 +421,6 @@ pub fn test_file(filepath: &str)
             panic!("test failed");
         }
     }
+
+    print_test_passed();
 }

@@ -8,3 +8,4 @@ halt
 
 ; command: main.asm -t 1
 ; output: main.bin
+; optimize-statically-known

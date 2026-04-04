@@ -102,36 +102,27 @@ impl RuledefMap
 
 
     pub fn parse_prefix(
-        walker: &syntax::Walker)
+        mut walker: syntax::Walker)
         -> RuledefMapPrefix
     {
         let mut prefix: RuledefMapPrefix = ['\0'; MAX_PREFIX_SIZE];
         let mut prefix_index = 0;
 
-        let mut walker_index = 0;
-
         while prefix_index < MAX_PREFIX_SIZE
         {
-            let token = walker.next_nth_token(walker_index);
-            walker_index += 1;
+            let c = walker.next_char();
+            walker.advance_char();
 
-            if token.kind.is_allowed_pattern_token()
-            {
-                for c in walker.get_span_excerpt(token.span).chars()
-                {
-                    if prefix_index >= MAX_PREFIX_SIZE
-                    {
-                        break;
-                    }
-
-                    prefix[prefix_index] = c.to_ascii_lowercase();
-                    prefix_index += 1;
-                }
-            }
-            else
-            {
+            if c == '\0' {
                 break;
             }
+
+            if syntax::is_whitespace(c) {
+                continue;
+            }
+
+            prefix[prefix_index] = c.to_ascii_lowercase();
+            prefix_index += 1;
         }
 
         prefix

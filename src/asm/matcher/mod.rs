@@ -469,7 +469,7 @@ fn match_with_ruledef_map<'src>(
 {
     let mut matches = WorkingMatches::new();
 
-    let prefix = asm::RuledefMap::parse_prefix(&walker);
+    let prefix = asm::RuledefMap::parse_prefix(walker.clone());
     let entries = defs.ruledef_map.query_prefixed(prefix);
 
     for entry in entries.iter().flat_map(|e| e.iter())
