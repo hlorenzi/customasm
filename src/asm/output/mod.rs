@@ -132,42 +132,48 @@ pub fn build_output(
         {
             let instr = defs.instructions.get(ast_instr.item_ref.unwrap());
 
-            check_bank_usage(
+            if let Ok(encoding) = asm::resolver::finalize_instruction(
                 report,
                 ast_instr.span,
-                defs,
-                &ctx)?;
-
-            check_bank_output(
-                report,
-                ast_instr.span,
-                decls,
-                defs,
-                &ctx,
-                instr.encoding.size.unwrap(),
-                true)?;
-                
-            let addr = ctx
-                .get_address(
+                instr)
+            {
+                check_bank_usage(
                     report,
                     ast_instr.span,
                     defs,
-                    true)?
-                .unwrap();
-            
-            let pos = ctx.get_output_position(defs).unwrap();
+                    &ctx)?;
 
-            overlap_checker.check_and_insert(
-                report,
-				ast_instr.span,
-                pos,
-                instr.encoding.size.unwrap())?;
+                check_bank_output(
+                    report,
+                    ast_instr.span,
+                    decls,
+                    defs,
+                    &ctx,
+                    encoding.size.unwrap(),
+                    true)?;
+                    
+                let addr = ctx
+                    .get_address(
+                        report,
+                        ast_instr.span,
+                        defs,
+                        true)?
+                    .unwrap();
+                
+                let pos = ctx.get_output_position(defs).unwrap();
 
-			output.write_bigint_with_span(
-				ast_instr.span,
-                pos,
-				addr,
-                &instr.encoding);
+                overlap_checker.check_and_insert(
+                    report,
+                    ast_instr.span,
+                    pos,
+                    encoding.size.unwrap())?;
+
+                output.write_bigint_with_span(
+                    ast_instr.span,
+                    pos,
+                    addr,
+                    &encoding);
+            }
         }
         
         else if let asm::ResolverNode::DataElement(ast_data, elem_index) = ctx.node
@@ -176,41 +182,47 @@ pub fn build_output(
             let elem = defs.data_elems.get(item_ref);
             let span = ast_data.elems[elem_index].span();
 
-            check_bank_usage(
+            if let Ok(bigint) = asm::resolver::check_final_data_element(
                 report,
                 span,
-                defs,
-                &ctx)?;
-
-            check_bank_output(
-                report,
-                span,
-                decls,
-                defs,
-                &ctx,
-                elem.encoding.size.unwrap(),
-                true)?;
-                
-            let pos = ctx.get_output_position(defs).unwrap();
-            let addr = ctx
-                .get_address(
+                elem)
+            {
+                check_bank_usage(
                     report,
                     span,
                     defs,
-                    true)?
-                .unwrap();
+                    &ctx)?;
 
-            overlap_checker.check_and_insert(
-                report,
-                span,
-                pos,
-                elem.encoding.size.unwrap())?;
+                check_bank_output(
+                    report,
+                    span,
+                    decls,
+                    defs,
+                    &ctx,
+                    bigint.size.unwrap(),
+                    true)?;
+                    
+                let pos = ctx.get_output_position(defs).unwrap();
+                let addr = ctx
+                    .get_address(
+                        report,
+                        span,
+                        defs,
+                        true)?
+                    .unwrap();
 
-            output.write_bigint_with_span(
-                span,
-                pos,
-                addr,
-                &elem.encoding);
+                overlap_checker.check_and_insert(
+                    report,
+                    span,
+                    pos,
+                    bigint.size.unwrap())?;
+
+                output.write_bigint_with_span(
+                    span,
+                    pos,
+                    addr,
+                    &bigint);
+            }
         }
         
         else if let asm::ResolverNode::Res(ast_res) = ctx.node
@@ -319,7 +331,7 @@ fn check_bank_output(
         {
             report.push_parent(
                 format!(
-                    "output out of range for bank `{}`",
+                    "output is out of range for bank `{}`",
                     bankdef_decl.name),
                 span);
 

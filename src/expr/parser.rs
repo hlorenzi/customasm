@@ -49,7 +49,7 @@ pub fn parse_optional_decimal_usize_greedy(
 	{	
 		let expr = expr::Expr::Literal(
 			span,
-			expr::Value::make_integer(value));
+			expr::Value::make_integer(value).statically_known());
 
 		Some(expr)
 	}
@@ -628,7 +628,7 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 		
 		let expr = expr::Expr::Literal(
 			tk_number.span,
-			expr::Value::make_integer(bigint));
+			expr::Value::make_integer(bigint).statically_known());
 
 		Ok(expr)
 	}
@@ -642,7 +642,7 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 
 		let expr = expr::Expr::Literal(
 			tk_true.span,
-			expr::Value::make_bool(true));
+			expr::Value::make_bool(true).statically_known());
 
 		Ok(expr)
 	}
@@ -656,7 +656,7 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 
 		let expr = expr::Expr::Literal(
 			tk_true.span,
-			expr::Value::make_bool(false));
+			expr::Value::make_bool(false).statically_known());
 
 		Ok(expr)
 	}
@@ -674,8 +674,9 @@ impl<'a, 'src> ExpressionParser<'a, 'src>
 		let expr = expr::Expr::Literal(
 			tk_str.span,
 			expr::Value::Integer(
-				expr::Value::make_metadata(),
-				util::BigInt::from_bytes_be(string.as_bytes())));
+					expr::ValueMetadata::new(),
+					util::BigInt::from_bytes_be(string.as_bytes()))
+				.statically_known());
 
 		Ok(expr)
 	}

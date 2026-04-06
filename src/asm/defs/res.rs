@@ -5,7 +5,9 @@ use crate::*;
 pub struct ResDirective
 {
     pub item_ref: util::ItemRef<Self>,
+    pub value: expr::Value,
     pub reserve_size: usize,
+    pub resolved: bool,
 }
 
 
@@ -24,7 +26,9 @@ pub fn define(
 
             let res = ResDirective {
                 item_ref,
+                value: expr::Value::make_unknown(),
                 reserve_size: 0,
+                resolved: false,
             };
             
             defs.res_directives.define(item_ref, res);

@@ -1,8 +1,6 @@
 #ruledef
 {
-    ld {i: u8} => 0xff @ i
-
-    echoi {i: u8} => 0xff @ i
+    echoi {i: u8} => 0xff @ i @ ADDRMAP.OUTPUT`8
 
     printi {v} => {
         assert(v >> (8 * 9) == 0)
@@ -20,4 +18,8 @@
     }
 }
 
-printi "12345" ; = 0xff31_ff32_ff33_ff34_ff35
+printi "12345" ; = 0xff3144_ff3244_ff3344_ff3444_ff3544
+
+#addr 0x40
+ADDRMAP:
+    .OUTPUT = ADDRMAP + 0x4

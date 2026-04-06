@@ -64,32 +64,9 @@ pub fn get_builtin_fn_eval(
 }
 
 
-pub fn resolve_and_get_statically_known_builtin_fn(
-    query: &expr::StaticallyKnownFunctionQuery)
-    -> bool
-{
-    resolve_builtin_fn(query.func, query.opts)
-        .map(get_statically_known_builtin_fn)
-        .unwrap_or(false)
-}
-
-
-pub fn get_statically_known_builtin_fn(
-    builtin_fn: AsmBuiltinFn)
-    -> bool
-{
-    match builtin_fn
-    {
-        AsmBuiltinFn::Incbin => true,
-        AsmBuiltinFn::Incbinstr => true,
-        AsmBuiltinFn::Inchexstr => true,
-        AsmBuiltinFn::Bankof => false,
-    }
-}
-
-
 pub fn eval_fn(
     fileserver: &mut dyn util::FileServer,
+    opts: &asm::AssemblyOptions,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
@@ -142,6 +119,7 @@ pub fn eval_fn(
         let maybe_result = asm::resolver::eval(
             query.report,
             fileserver,
+            opts,
             decls,
             defs,
             ctx,
@@ -152,6 +130,7 @@ pub fn eval_fn(
         query.report.pop_parent();
 
         maybe_result
+            .map(|r| r.derived_from(&query.func))
     }
     else
     {
@@ -221,16 +200,11 @@ fn eval_builtin_incbin(
         }
     };
 
-    if bytes.len() == 0
-    {
-        return Ok(expr::Value::make_integer(util::BigInt::from_bytes_be(&[])));
-    }
-
-    if start >= bytes.len()
+    if start > bytes.len()
     {
         query.report.error_span(
             format!(
-                "`incbin` range starts after EOF ({} >= {})",
+                "`incbin` range starts after EOF ({} > {})",
                 start,
                 bytes.len()),
             query.args[1].span);
@@ -249,8 +223,16 @@ fn eval_builtin_incbin(
         return Err(());
     }
 
-    Ok(expr::Value::make_integer(
-        util::BigInt::from_bytes_be(&bytes[start..end])))
+    let mut result = expr::Value::make_integer(
+            util::BigInt::from_bytes_be(&bytes[start..end]))
+        .statically_known();
+
+    for arg in &query.args
+    {
+        result.mark_derived_from(&arg.value)
+    }
+
+    Ok(result)
 }
 
 
@@ -394,11 +376,11 @@ fn eval_builtin_incstr(
         }
     };
 
-    if (start * bits_per_char) >= bigint_size
+    if (start * bits_per_char) > bigint_size
     {
         query.report.error_span(
             format!(
-                "`{}` range starts after EOF ({} >= {})",
+                "`{}` range starts after EOF ({} > {})",
                 funcname,
                 start,
                 bigint_size / bits_per_char),
@@ -419,10 +401,18 @@ fn eval_builtin_incstr(
         return Err(());
     }
 
-    Ok(expr::Value::make_integer(
-        bigint.slice(
-            bigint_size - (start * bits_per_char),
-            bigint_size - (end * bits_per_char))))
+    let mut result = expr::Value::make_integer(
+            bigint.slice(
+                bigint_size - (start * bits_per_char),
+                bigint_size - (end * bits_per_char)))
+        .statically_known();
+
+    for arg in &query.args
+    {
+        result.mark_derived_from(&arg.value)
+    }
+
+    Ok(result)
 }
 
 
@@ -440,7 +430,9 @@ fn eval_builtin_bankof(
 
     if let Some(bank_ref) = metadata.bank_ref
     {
-        Ok(expr::Value::make_bankdef(bank_ref))
+        Ok(expr::Value::make_bankdef(bank_ref)
+            .statically_known()
+            .derived_from(&query.args[0].value))
     }
     else
     {
@@ -464,6 +456,8 @@ fn eval_builtin_bankof(
                 return Err(());
             };
 
-        Ok(expr::Value::make_bankdef(bank_ref))
+        Ok(expr::Value::make_bankdef(bank_ref)
+            .statically_known()
+            .derived_from(&query.args[0].value))
     }
 }

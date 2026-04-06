@@ -4,10 +4,8 @@ use crate::*;
 #[derive(Debug)]
 pub struct Instruction
 {
-    pub item_ref: util::ItemRef<Self>,
     pub matches: asm::InstructionMatches,
-    pub encoding_statically_known: bool,
-    pub encoding: util::BigInt,
+    pub encoding: expr::Value,
     pub resolved: bool,
 }
 
@@ -26,10 +24,8 @@ pub fn define(
             let item_ref = defs.instructions.next_item_ref();
 
             let instr = Instruction {
-                item_ref,
                 matches: asm::InstructionMatches::new(),
-                encoding_statically_known: false,
-                encoding: util::BigInt::new(0, Some(0)),
+                encoding: expr::Value::make_unknown(),
                 resolved: false,
             };
             

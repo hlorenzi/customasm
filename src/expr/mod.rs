@@ -17,14 +17,6 @@ pub use parser::{
     parse_optional_decimal_usize_greedy,
 };
 
-mod inspect;
-pub use inspect::{
-    StaticallyKnownProvider,
-    StaticallyKnownVariableQuery,
-    StaticallyKnownFunctionQuery,
-    StaticallyKnownLocal,
-};
-
 mod eval;
 pub use self::eval::{
     EvalContext,
@@ -52,8 +44,6 @@ pub use self::builtin_fn::{
     ExprBuiltinFn,
     resolve_builtin_fn,
     get_builtin_fn_eval,
-    get_static_size_builtin_fn,
-    get_statically_known_value_builtin_fn,
 };
 
 

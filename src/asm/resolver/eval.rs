@@ -11,6 +11,7 @@ pub enum AsmBuiltinSymbol
 pub fn eval(
     report: &mut diagn::Report,
     fileserver: &mut dyn util::FileServer,
+    opts: &asm::AssemblyOptions,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
@@ -46,6 +47,7 @@ pub fn eval(
             expr::EvalQuery::Function(query_fn) =>
                 asm::resolver::eval_fn(
                     fileserver,
+                    opts,
                     decls,
                     defs,
                     ctx,
@@ -54,6 +56,7 @@ pub fn eval(
             expr::EvalQuery::AsmBlock(query_asm) =>
                 asm::resolver::eval_asm(
                     fileserver,
+                    opts,
                     decls,
                     defs,
                     ctx,
@@ -203,12 +206,6 @@ pub fn eval_ctxlabel(
 
     let symbol = defs.symbols.get(symbol_ref);
 
-    if !symbol.resolved &&
-        !ctx.can_guess()
-    {
-        return Ok(expr::Value::make_unknown());
-    }
-
     Ok(symbol.value.clone())
 }
 
@@ -243,12 +240,6 @@ pub fn eval_variable(
         query.hierarchy)?;
 
     let symbol = defs.symbols.get(symbol_ref);
-
-    if !symbol.resolved &&
-        !ctx.can_guess()
-    {
-        return Ok(expr::Value::make_unknown());
-    }
 
     Ok(symbol.value.clone())
 }
@@ -374,8 +365,7 @@ fn eval_builtin_symbol(
                     defs,
                     ctx.can_guess())?;
                 
-                Ok(Some(expr::Value::make_integer(addr)
-                    .with_bank_ref(ctx.bank_ref)))
+                Ok(Some(addr.with_bank_ref(ctx.bank_ref)))
             }
         }
     }
@@ -383,9 +373,11 @@ fn eval_builtin_symbol(
     {
         if let Some(builtin_fn) = asm::resolver::resolve_builtin_fn(name, query.opts)
         {
-            Ok(Some(expr::Value::AsmBuiltinFn(
-                expr::Value::make_metadata(),
-                builtin_fn)))
+            Ok(Some(
+                expr::Value::AsmBuiltinFn(
+                    expr::ValueMetadata::new(),
+                    builtin_fn)
+                .statically_known()))
         }
         else
         {
@@ -451,11 +443,11 @@ pub fn eval_member_bankdef(
 
     match query.member_name
     {
-        "bits" => Ok(Some(expr::Value::make_integer(bank.addr_unit))),
-        "addr" => Ok(Some(expr::Value::make_integer(bank.addr_start.clone()))),
-        "outp" => Ok(Some(expr::Value::make_maybe_integer(bank.output_offset))),
-        "size" => Ok(Some(expr::Value::make_maybe_integer(bank.size_in_units))),
-        "size_b" => Ok(Some(expr::Value::make_maybe_integer(bank.size_in_bits))),
+        "bits" => Ok(Some(expr::Value::make_integer(bank.addr_unit).statically_known())),
+        "addr" => Ok(Some(expr::Value::make_integer(bank.addr_start.clone()).statically_known())),
+        "outp" => Ok(Some(expr::Value::make_maybe_integer(bank.output_offset).statically_known())),
+        "size" => Ok(Some(expr::Value::make_maybe_integer(bank.size_in_units).statically_known())),
+        "size_b" => Ok(Some(expr::Value::make_maybe_integer(bank.size_in_bits).statically_known())),
         "data" => Ok(Some(bank.userdata.clone())),
         _ => Ok(None)
     }

@@ -18,8 +18,6 @@ pub struct InstructionMatch
     pub rule_ref: util::ItemRef<asm::Rule>,
     pub args: Vec<InstructionArgument>,
     pub exact_part_count: usize,
-    pub encoding_statically_known: bool,
-    pub encoding_size: usize,
     pub encoding: InstructionMatchResolution,
 }
 
@@ -43,8 +41,8 @@ impl InstructionMatch
 pub enum InstructionMatchResolution
 {
     Unresolved,
-    FailedConstraint(diagn::Message),
-    Resolved(util::BigInt),
+    FailedConstraint(expr::ValueMetadata, diagn::Message),
+    Resolved(expr::Value),
 }
 
 
@@ -55,7 +53,7 @@ impl InstructionMatchResolution
         match self
         {
             InstructionMatchResolution::Resolved(_) => true,
-            InstructionMatchResolution::FailedConstraint(_) => false,
+            InstructionMatchResolution::FailedConstraint(_, _) => false,
             InstructionMatchResolution::Unresolved => false,
         }
     }
@@ -66,19 +64,30 @@ impl InstructionMatchResolution
         match self
         {
             InstructionMatchResolution::Resolved(_) => true,
-            InstructionMatchResolution::FailedConstraint(_) => true,
+            InstructionMatchResolution::FailedConstraint(_, _) => true,
             InstructionMatchResolution::Unresolved => false,
         }
     }
 
 
-    pub fn unwrap_resolved(&self) -> &util::BigInt
+    pub fn unwrap_resolved(&self) -> &expr::Value
     {
         match self
         {
-            InstructionMatchResolution::Resolved(bigint) => bigint,
-            InstructionMatchResolution::FailedConstraint(_) => panic!(),
+            InstructionMatchResolution::Resolved(value) => value,
+            InstructionMatchResolution::FailedConstraint(_, _) => panic!(),
             InstructionMatchResolution::Unresolved => panic!(),
+        }
+    }
+
+
+    pub fn is_guess(&self) -> bool
+    {
+        match self
+        {
+            InstructionMatchResolution::Resolved(value) => value.is_guess(),
+            InstructionMatchResolution::FailedConstraint(metadata, _) => metadata.is_guess(),
+            InstructionMatchResolution::Unresolved => true,
         }
     }
 }
@@ -134,23 +143,19 @@ pub fn match_all(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
     ast: &asm::AstTopLevel,
-    decls: &asm::ItemDecls,
+    _decls: &asm::ItemDecls,
     defs: &mut asm::ItemDefs)
     -> Result<(), ()>
 {
-    let mut symbol_ctx = &util::SymbolContext::new_global();
-
-
     for any_node in &ast.nodes
     {
         if let asm::AstAny::Instruction(ast_instr) = any_node
         {
-            let mut matches = match_instr(
+            let matches = match_instr(
                 opts,
                 defs,
                 ast_instr.span,
                 &ast_instr.src);
-
             
             if let Err(()) = error_on_no_matches(
                 report,
@@ -160,55 +165,10 @@ pub fn match_all(
                 continue;
             }
 
-
-            // Statically calculate information for each match,
-            // whenever possible.
-            for mtch in &mut matches
-            {
-                mtch.encoding_statically_known = get_match_statically_known(
-                    opts,
-                    decls,
-                    defs,
-                    symbol_ctx,
-                    &mtch);
-                
-                mtch.encoding_size = get_match_static_size(opts, defs, &mtch)
-                    .unwrap_or(0);
-            }
-
-
             let instr = defs.instructions.get_mut(
                 ast_instr.item_ref.unwrap());
             
             instr.matches = matches;
-
-            instr.encoding_statically_known = instr.matches.iter()
-                .all(|m| m.encoding_statically_known);
-
-            // Statically calculate the encoding size
-            // with a pessimistic guess
-            let largest_encoding = instr.matches
-                .iter()
-                .max_by_key(|m| m.encoding_size)
-                .unwrap();
-
-            instr.encoding = util::BigInt::new(
-                0,
-                Some(largest_encoding.encoding_size));
-
-            if opts.debug_iterations
-            {
-                println!(" size: {} = {:?}{}",
-                    ast_instr.src,
-                    instr.encoding.size.unwrap(),
-                    if instr.encoding_statically_known { " [static]" } else { "" });
-            }
-        }
-
-        else if let asm::AstAny::Symbol(node) = any_node
-        {
-            let item_ref = node.item_ref.unwrap();
-            symbol_ctx = &decls.symbols.get(item_ref).ctx;
         }
     }
 
@@ -234,149 +194,6 @@ pub fn error_on_no_matches(
     {
         Ok(())
     }
-}
-
-
-fn get_match_statically_known(
-    opts: &asm::AssemblyOptions,
-    decls: &asm::ItemDecls,
-    defs: &asm::ItemDefs,
-    symbol_ctx: &util::SymbolContext,
-    mtch: &asm::InstructionMatch)
-    -> bool
-{
-    let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
-    let rule = &ruledef.get_rule(mtch.rule_ref);
-
-    let query_variable = |query: &expr::StaticallyKnownVariableQuery|
-    {
-        match decls.symbols.try_get_by_name(
-            symbol_ctx,
-            query.hierarchy_level,
-            query.hierarchy)
-        {
-            None => false,
-            Some(symbol_ref) =>
-            {
-                let symbol = defs.symbols.get(symbol_ref);
-                symbol.value_statically_known
-            }
-        }
-    };
-
-    let mut provider = expr::StaticallyKnownProvider::new(opts);
-    provider.query_variable = &query_variable;
-    provider.query_function = &asm::resolver::resolve_and_get_statically_known_builtin_fn;
-
-    for i in 0..rule.parameters.len()
-    {
-        let param = &rule.parameters[i];
-        let arg = &mtch.args[i];
-
-        match param.typ
-        {
-            asm::RuleParameterType::Unspecified |
-            asm::RuleParameterType::Integer(_) |
-            asm::RuleParameterType::Unsigned(_) |
-            asm::RuleParameterType::Signed(_) =>
-            {
-                if let InstructionArgumentKind::Expr(ref arg_expr) = arg.kind
-                {
-                    if arg_expr.is_value_statically_known(&provider)
-                    {
-                        provider.locals.insert(
-                            param.name.clone(),
-                            expr::StaticallyKnownLocal {
-                                value_known: true,
-                                ..expr::StaticallyKnownLocal::new()
-                            });
-                    }
-                }
-            }
-
-            asm::RuleParameterType::RuledefRef(_) =>
-            {
-                if let asm::InstructionArgumentKind::Nested(ref nested_match) = arg.kind
-                {
-                    if get_match_statically_known(
-                        opts,
-                        decls,
-                        defs,
-                        symbol_ctx,
-                        nested_match)
-                    {
-                        provider.locals.insert(
-                            param.name.clone(),
-                            expr::StaticallyKnownLocal {
-                                value_known: true,
-                                ..expr::StaticallyKnownLocal::new()
-                            });
-                    }
-                }
-            }
-        }
-    }
-
-    rule.expr.is_value_statically_known(&provider)
-}
-
-
-fn get_match_static_size(
-    opts: &asm::AssemblyOptions,
-    defs: &asm::ItemDefs,
-    mtch: &asm::InstructionMatch)
-    -> Option<usize>
-{
-    let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
-    let rule = &ruledef.get_rule(mtch.rule_ref);
-
-    let mut info = expr::StaticallyKnownProvider::new(opts);
-
-    for i in 0..rule.parameters.len()
-    {
-        let param = &rule.parameters[i];
-        let arg = &mtch.args[i];
-
-        match param.typ
-        {
-            asm::RuleParameterType::Unspecified => {}
-
-            asm::RuleParameterType::Integer(size) |
-            asm::RuleParameterType::Unsigned(size) |
-            asm::RuleParameterType::Signed(size) =>
-            {
-                info.locals.insert(
-                    param.name.clone(),
-                    expr::StaticallyKnownLocal {
-                        size: Some(size),
-                        ..expr::StaticallyKnownLocal::new()
-                    });
-            }
-
-            asm::RuleParameterType::RuledefRef(_) =>
-            {
-                if let asm::InstructionArgumentKind::Nested(ref nested_match) = arg.kind
-                {
-                    let maybe_nested_size = get_match_static_size(
-                        opts,
-                        defs,
-                        nested_match);
-                    
-                    if let Some(nested_size) = maybe_nested_size
-                    {
-                        info.locals.insert(
-                            param.name.clone(),
-                            expr::StaticallyKnownLocal {
-                                size: Some(nested_size),
-                                ..expr::StaticallyKnownLocal::new()
-                            });
-                    }
-                }
-            }
-        }
-    }
-
-    rule.expr.get_static_size(&info)
 }
 
 
@@ -542,8 +359,6 @@ fn begin_match_with_rule<'src>(
             rule_ref,
             args: Vec::new(),
             exact_part_count: 0,
-            encoding_statically_known: false,
-            encoding_size: 0,
             encoding: InstructionMatchResolution::Unresolved,
         })
 }

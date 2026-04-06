@@ -164,9 +164,17 @@ pub fn assemble<S>(
         assembly.defs = Some(defs::init());
 
         let mut prev_resolved_constants_count = 0;
+        let mut pre_iteration_index = 1;
 
         loop
         {
+            if opts.debug_iterations
+            {
+                println!(
+                    "[===== pre-iteration #{} =====]",
+                    pre_iteration_index);
+            }
+
             decls::collect(
                 report,
                 opts,
@@ -203,6 +211,7 @@ pub fn assemble<S>(
             }
 
             prev_resolved_constants_count = resolved_constants_count;
+            pre_iteration_index += 1;
         }
 
         resolver::check_leftover_ifs(

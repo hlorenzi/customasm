@@ -21,6 +21,7 @@ fn test_example_variant(
 	fileserver.add_std_files(test::STD_FILES);
 
     let opts = asm::AssemblyOptions {
+        debug_iterations: true,
         optimize_instruction_matching,
         optimize_statically_known,
         ..asm::AssemblyOptions::new()

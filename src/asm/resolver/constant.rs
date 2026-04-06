@@ -54,14 +54,15 @@ fn resolve_constant_simple(
     let item_ref = ast_symbol.item_ref.unwrap();
 
     let symbol = defs.symbols.get(item_ref);
-    if symbol.resolved
+
+    if (symbol.resolved && opts.optimize_statically_known) ||
+        symbol.driver_defined
     {
         return Ok(asm::ResolutionState::Resolved);
     }
 
     let asm::AstSymbolKind::Constant(ref ast_const) = ast_symbol.kind
         else { unreachable!() };
-
 
     // Overwrite with a value from the command-line, if present
     let symbol_decl = decls.symbols.get(item_ref);
@@ -72,10 +73,23 @@ fn resolve_constant_simple(
         let symbol = defs.symbols.get_mut(item_ref);
         symbol.value = driver_def.value.clone();
         symbol.value.get_mut_metadata().symbol_ref = Some(item_ref);
+        symbol.driver_defined = true;
         symbol.resolved = true;
-        return Ok(asm::ResolutionState::Resolved);
+        
+        return asm::resolver::handle_value_resolution(
+            opts,
+            report,
+            ast_symbol.decl_span,
+            false,
+            false,
+            true,
+            &mut symbol.resolved,
+            false,
+            "driver const",
+            "constant value",
+            Some(&ast_symbol.name),
+            &symbol.value);
     }
-
 
     let value = asm::resolver::eval_simple(
         report,
@@ -84,44 +98,24 @@ fn resolve_constant_simple(
         defs,
         &ast_const.expr)?;
 
-
     let symbol = defs.symbols.get_mut(item_ref);
+    let is_stable = value.is_stable(&symbol.value);
     symbol.value = value;
     symbol.value.get_mut_metadata().symbol_ref = Some(item_ref);
 
-
-    if symbol.value.is_unknown()
-    {
-        return Ok(asm::ResolutionState::Unresolved);
-    }
-
-
-    // Optimize future iterations for the case where it's
-    // statically known that the encoding can be resolved
-    // in the first pass
-    if opts.optimize_statically_known &&
-        symbol.value_statically_known
-    {
-        if opts.debug_iterations
-        {
-            println!("const: {} = {:?} [static]",
-                ast_symbol.name,
-                symbol.value);
-        }
-
-        symbol.resolved = true;
-        return Ok(asm::ResolutionState::Resolved);
-    }
-
-
-    if opts.debug_iterations
-    {
-        println!("const: {} = {:?}",
-            ast_symbol.name,
-            symbol.value);
-    }
-    
-    Ok(asm::ResolutionState::Resolved)
+    asm::resolver::handle_value_resolution(
+        opts,
+        report,
+        ast_symbol.decl_span,
+        true,
+        symbol.value.is_guess(),
+        is_stable,
+        &mut symbol.resolved,
+        false,
+        "const",
+        "constant value",
+        Some(&ast_symbol.name),
+        &symbol.value)
 }
 
 
@@ -135,75 +129,45 @@ pub fn resolve_constant(
     ctx: &asm::ResolverContext)
     -> Result<asm::ResolutionState, ()>
 {
+    let asm::AstSymbolKind::Constant(ref ast_const) = ast_symbol.kind
+        else { unreachable!() };
+    
     let item_ref = ast_symbol.item_ref.unwrap();
 
     let symbol = defs.symbols.get(item_ref);
-    if symbol.resolved &&
-        symbol.value_statically_known
+    
+    if (symbol.resolved && opts.optimize_statically_known) ||
+        symbol.driver_defined
     {
         return Ok(asm::ResolutionState::Resolved);
     }
 
-    let asm::AstSymbolKind::Constant(ref ast_const) = ast_symbol.kind
-        else { unreachable!() };
-        
     let value = asm::resolver::eval(
         report,
         fileserver,
+        opts,
         decls,
         defs,
         ctx,
         &mut expr::EvalContext::new(opts),
         &ast_const.expr)?;
 
-
     let symbol = defs.symbols.get_mut(item_ref);
-    let prev_value = symbol.value.clone();
+    let is_stable = value.is_stable(&symbol.value);
     symbol.value = value;
     symbol.value.get_mut_metadata().symbol_ref = Some(item_ref);
 
-    
-    // Optimize future iterations for the case where it's
-    // statically known that the encoding can be resolved
-    // in the first pass
-    if opts.optimize_statically_known &&
-        ctx.is_first_iteration &&
-        symbol.value_statically_known
-    {
-        if opts.debug_iterations
-        {
-            println!("const: {} = {:?} [static]",
-                ast_symbol.name,
-                symbol.value);
-        }
-
-        symbol.resolved = true;
-        return Ok(asm::ResolutionState::Resolved);
-    }
-
-    if opts.debug_iterations
-    {
-        println!("const: {} = {:?}",
-            ast_symbol.name,
-            symbol.value);
-    }
-
-    symbol.resolved =
-        symbol.value == prev_value &&
-        !symbol.value.is_unknown();
-    
-    if !symbol.resolved
-    {
-        // On the final iteration, unstable guesses become errors
-        if ctx.is_last_iteration
-        {
-            report.error_span(
-                "constant value did not converge",
-                ast_symbol.decl_span);
-        }
-
-        return Ok(asm::ResolutionState::Unresolved);
-    }
-    
-    Ok(asm::ResolutionState::Resolved)
+    asm::resolver::handle_value_resolution(
+        opts,
+        report,
+        ast_symbol.decl_span,
+        ctx.can_guess(),
+        symbol.value.is_guess(),
+        is_stable,
+        &mut symbol.resolved,
+        false,
+        "const",
+        "constant value",
+        Some(&ast_symbol.name),
+        &symbol.value)
 }

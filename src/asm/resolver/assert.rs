@@ -11,14 +11,14 @@ pub fn resolve_assert(
     ctx: &asm::ResolverContext)
     -> Result<asm::ResolutionState, ()>
 {
-    if !ctx.is_last_iteration
-    {
+    if !ctx.is_last_iteration {
         return Ok(asm::ResolutionState::Unresolved);
     }
     
     let value = asm::resolver::eval(
         report,
         fileserver,
+        opts,
         decls,
         defs,
         ctx,

@@ -17,7 +17,15 @@ pub use constant::{
 
 mod label;
 mod instruction;
+pub use instruction::{
+    finalize_instruction,
+};
+
 mod data_block;
+pub use data_block::{
+    check_final_data_element,
+};
+
 mod res;
 mod align;
 mod addr;
@@ -50,26 +58,69 @@ pub use eval_fn::{
     AsmBuiltinFn,
     resolve_builtin_fn,
     get_builtin_fn_eval,
-    get_statically_known_builtin_fn,
-    resolve_and_get_statically_known_builtin_fn,
     eval_fn,
 };
 
 
+#[derive(Copy, Clone)]
 pub enum ResolutionState
 {
     Unresolved,
+    Stable,
     Resolved,
 }
 
 
 impl ResolutionState
 {
+    pub fn is_resolved(&self) -> bool
+    {
+        match self
+        {
+            ResolutionState::Resolved => true,
+            ResolutionState::Stable | ResolutionState::Unresolved => false,
+        }
+    }
+
+
+    pub fn is_stable_or_resolved(&self) -> bool
+    {
+        match self
+        {
+            ResolutionState::Resolved | ResolutionState::Stable => true,
+            ResolutionState::Unresolved => false,
+        }
+    }
+
+
     pub fn merge(&mut self, other: ResolutionState)
     {
-        if let ResolutionState::Unresolved = other
+        *self = {
+            match (&self, other)
+            {
+                (ResolutionState::Unresolved, _) |
+                (_, ResolutionState::Unresolved) =>
+                    ResolutionState::Unresolved,
+                
+                (ResolutionState::Stable, ResolutionState::Stable) |
+                (ResolutionState::Stable, ResolutionState::Resolved) |
+                (ResolutionState::Resolved, ResolutionState::Stable) =>
+                    ResolutionState::Stable,
+                
+                (ResolutionState::Resolved, ResolutionState::Resolved) =>
+                    ResolutionState::Resolved,
+            }
+        };
+    }
+
+
+    pub fn debug_label(&self) -> &'static str
+    {
+        match self
         {
-            *self = ResolutionState::Unresolved;
+            ResolutionState::Resolved => "resolved",
+            ResolutionState::Stable => "stable",
+            ResolutionState::Unresolved => "unresolved",
         }
     }
 }
@@ -105,7 +156,7 @@ pub fn resolve_iteratively(
             is_first_iteration,
             is_last_iteration)?;
 
-        if let asm::ResolutionState::Resolved = resolution_state
+        if resolution_state.is_stable_or_resolved()
         {
             if is_last_iteration
             {
@@ -133,7 +184,7 @@ pub fn resolve_iteratively(
         false,
         true)?;
 
-    if let asm::ResolutionState::Resolved = resolution_state
+    if resolution_state.is_stable_or_resolved()
     {
         Ok(iter_count)
     }
@@ -243,6 +294,14 @@ pub fn resolve_once(
                         decls,
                         defs,
                         &ctx)?);
+
+                if is_last_iteration {
+                    res::finalize_res(
+                        report,
+                        ast_res,
+                        defs,
+                        &ctx)?;
+                }
             }
         
             asm::ResolverNode::Align(ast_align) =>
@@ -256,6 +315,14 @@ pub fn resolve_once(
                         decls,
                         defs,
                         &ctx)?);
+
+                if is_last_iteration {
+                    align::finalize_align(
+                        report,
+                        ast_align,
+                        defs,
+                        &ctx)?;
+                }
             }
         
             asm::ResolverNode::Addr(ast_addr) =>
@@ -269,6 +336,14 @@ pub fn resolve_once(
                         decls,
                         defs,
                         &ctx)?);
+
+                if is_last_iteration {
+                    addr::finalize_addr(
+                        report,
+                        ast_addr,
+                        defs,
+                        &ctx)?;
+                }
             }
         
             asm::ResolverNode::Assert(ast_assert) =>
@@ -286,5 +361,59 @@ pub fn resolve_once(
         }
     }
 
+    if opts.debug_iterations
+    {
+        println!(
+            "iteration result: {}\n",
+            resolution_state.debug_label());
+    }
+
     Ok(resolution_state)
+}
+
+
+pub fn handle_value_resolution(
+    opts: &asm::AssemblyOptions,
+    report: &mut diagn::Report,
+    span: diagn::Span,
+    can_guess: bool,
+    is_guess: bool,
+    is_stable: bool,
+    is_resolved: &mut bool,
+    suppress_diagn: bool,
+    debug_element_type: &str,
+    user_element_type: &str,
+    element_name: Option<&str>,
+    value: &expr::Value)
+    -> Result<asm::ResolutionState, ()>
+{
+    if opts.debug_iterations
+    {
+        println!(" {}{:>5} `{}` = {}",
+            if !is_guess && opts.optimize_statically_known { "🟢" }
+                else if is_stable { "🔵" }
+                else { "  " },
+            debug_element_type,
+            if let Some(name) = element_name { name.to_string() } else { format!("{:?}", span) },
+            value);
+    }
+
+    if !is_guess
+    {
+        *is_resolved = true;
+        return Ok(asm::ResolutionState::Resolved);
+    }
+
+    if is_stable
+    {
+        return Ok(asm::ResolutionState::Stable);
+    }
+    
+    if !can_guess && !suppress_diagn {
+        report.error_span(
+            format!("{} did not converge", user_element_type),
+            span);
+    }
+
+    Ok(asm::ResolutionState::Unresolved)
 }

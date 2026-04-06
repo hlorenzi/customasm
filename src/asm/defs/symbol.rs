@@ -6,16 +6,16 @@ pub struct Symbol
 {
     pub item_ref: util::ItemRef<Self>,
     pub no_emit: bool,
-    pub value_statically_known: bool,
     pub value: expr::Value,
     pub resolved: bool,
+    pub driver_defined: bool,
     pub bankdef_ref: Option<util::ItemRef<asm::Bankdef>>,
 }
 
 
 pub fn define(
     _report: &mut diagn::Report,
-    opts: &asm::AssemblyOptions,
+    _opts: &asm::AssemblyOptions,
     ast: &asm::AstTopLevel,
     _decls: &asm::ItemDecls,
     defs: &mut asm::ItemDefs)
@@ -36,28 +36,13 @@ pub fn define(
 
         let item_ref = node.item_ref.unwrap();
 
-        let value_statically_known = {
-            match node.kind
-            {
-                asm::AstSymbolKind::Constant(ref constant) =>
-                {
-                    let mut provider = expr::StaticallyKnownProvider::new(opts);
-                    provider.query_function = &asm::resolver::resolve_and_get_statically_known_builtin_fn;
-                    
-                    constant.expr.is_value_statically_known(&provider)
-                }
-                
-                _ => false,
-            }
-        };
-
         let symbol = Symbol {
             item_ref,
             no_emit: node.no_emit,
-            value_statically_known,
             value: expr::Value::make_unknown()
                 .with_symbol_ref(item_ref),
             resolved: false,
+            driver_defined: false,
             bankdef_ref: None,
         };
 

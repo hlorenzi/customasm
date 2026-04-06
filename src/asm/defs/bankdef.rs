@@ -153,7 +153,7 @@ pub fn define(
                         None =>
                         {
                             report.error_span(
-                                "value is out of supported range",
+                                "value is outside the supported range",
                                 node.addr_size.as_ref().unwrap().span());
 
                             return Err(());

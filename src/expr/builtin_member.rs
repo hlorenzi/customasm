@@ -25,7 +25,9 @@ pub fn resolve_builtin_member(
                 query.report,
                 query.span)?;
             
-            Ok(Some(expr::Value::make_integer(size)))
+            Ok(Some(expr::Value::make_integer(size)
+                .statically_known()
+                .derived_from(&query.value)))
         }
 
         _ => Ok(None)

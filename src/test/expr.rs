@@ -276,10 +276,10 @@ fn test_ops_slice()
 	test("0x00`{}", Fail(("test", 1, "expected non-negative integer")));
 	test("0x00`(1 == 2)", Fail(("test", 1, "expected non-negative integer")));
 	test("0x00`-1", Fail(("test", 1, "expected expression")));
-	test("0x00`(-1)", Fail(("test", 1, "out of supported range")));
-	test("0x00[7:-1]", Fail(("test", 1, "out of supported range")));
-	test("0x00[-1:-2]", Fail(("test", 1, "out of supported range")));
-	test("0x00[0x1_ffff_ffff_ffff_ffff:7]", Fail(("test", 1, "out of supported range")));
+	test("0x00`(-1)", Fail(("test", 1, "outside the supported range")));
+	test("0x00[7:-1]", Fail(("test", 1, "outside the supported range")));
+	test("0x00[-1:-2]", Fail(("test", 1, "outside the supported range")));
+	test("0x00[0x1_ffff_ffff_ffff_ffff:7]", Fail(("test", 1, "outside the supported range")));
 }
 
 
@@ -449,9 +449,9 @@ fn test_ops_arith_errors()
 	test("2 % 0",       Fail(("test", 1, "modulo by zero")));
 	test("2 % (1 - 1)", Fail(("test", 1, "modulo by zero")));
 	
-	test("2 << (1 << 1000)", Fail(("test", 1, "out of supported range")));
-	test("2 >> (1 << 1000)", Fail(("test", 1, "out of supported range")));
-	test("2 >> (1 << 1000)", Fail(("test", 1, "out of supported range")));
+	test("2 << (1 << 1000)", Fail(("test", 1, "outside the supported range")));
+	test("2 >> (1 << 1000)", Fail(("test", 1, "outside the supported range")));
+	test("2 >> (1 << 1000)", Fail(("test", 1, "outside the supported range")));
 }
 
 

@@ -1,6 +1,7 @@
 use crate::*;
 
 
+#[derive(Clone)]
 pub struct EvalContext<'opts>
 {
 	pub opts: &'opts asm::AssemblyOptions,
@@ -32,6 +33,12 @@ impl<'opts> EvalContext<'opts>
 		let mut new_ctx = EvalContext::new(from.opts);
 		new_ctx.recursion_depth = from.recursion_depth + 1;
 		new_ctx
+	}
+
+
+	pub fn get_recursion_depth(&self) -> usize
+	{
+		self.recursion_depth
 	}
 
 
@@ -433,7 +440,11 @@ impl expr::Expr
 			{
 				if let Some(builtin_fn) = expr::resolve_builtin_fn(name, ctx.opts)
 				{
-					return Ok(expr::Value::ExprBuiltinFn(expr::Value::make_metadata(), builtin_fn));
+					return Ok(
+						expr::Value::ExprBuiltinFn(
+							expr::ValueMetadata::new(),
+							builtin_fn)
+						.statically_known());
 				}
 
 				if let Some(local_value) = ctx.get_local(name)
@@ -454,12 +465,16 @@ impl expr::Expr
 
 			&expr::Expr::StructInit { ref members_init, .. } =>
 			{
+				let mut metadata = expr::Value::make_unknown().statically_known();
+
 				let mut members = Vec::with_capacity(members_init.len());
 				for member_init in members_init
 				{
 					let value = propagate!(member_init.value
 						.eval_with_ctx(report, ctx, provider)?);
 					
+					metadata = metadata.derived_from(&value);
+
 					members.push(expr::ValueStructMember {
 						name: member_init.name.clone(),
 						value,
@@ -467,7 +482,7 @@ impl expr::Expr
 				}
 
 				Ok(expr::Value::Struct(
-					expr::Value::make_metadata(),
+					*metadata.get_metadata(),
 					expr::ValueStruct {
 						members,
 					}))
@@ -501,86 +516,37 @@ impl expr::Expr
 			
 			&expr::Expr::UnaryOp(span, _, op, ref inner_expr) =>
 			{
-				let lhs = propagate!(inner_expr
+				let inner = propagate!(inner_expr
 					.eval_with_ctx(report, ctx, provider)?);
 
-				match lhs
+				match inner
 				{
 					expr::Value::Integer(_, ref x) => match op
 					{
-						expr::UnaryOp::Neg => Ok(expr::Value::make_integer(-x)),
-						expr::UnaryOp::Not => Ok(expr::Value::make_integer(!x))
+						expr::UnaryOp::Neg => Ok(expr::Value::make_integer(-x).statically_known().derived_from(&inner)),
+						expr::UnaryOp::Not => Ok(expr::Value::make_integer(!x).statically_known().derived_from(&inner))
 					},
 					
 					expr::Value::Bool(_, b) => match op
 					{
-						expr::UnaryOp::Not => Ok(expr::Value::make_bool(!b)),
-						_ => Err(report.error_span("invalid argument type to operator", span))
+						expr::UnaryOp::Not => Ok(expr::Value::make_bool(!b).statically_known().derived_from(&inner)),
+						_ => Err(report.error_span(
+								format!(
+									"invalid argument type to operator (have {})",
+									inner.type_name()),
+								span))
 					},
 					
-					_ => Err(report.error_span("invalid argument type to operator", span))
+					_ => Err(report.error_span(
+							format!(
+								"invalid argument type to operator (have {})",
+								inner.type_name()),
+							span))
 				}
 			}
 			
 			&expr::Expr::BinaryOp(span, _, op, ref lhs_expr, ref rhs_expr) =>
-			{
-				if op == expr::BinaryOp::Assign
-				{
-					use std::ops::Deref;
-					
-					match lhs_expr.deref()
-					{
-						&expr::Expr::Variable(span, ref name) =>
-						{
-							asm::check_reserved_name(
-								report,
-								span,
-								ctx.opts,
-								name)?;
-
-							let value = propagate!(rhs_expr
-								.eval_with_ctx(report, ctx, provider)?);
-							
-							ctx.set_local(name.clone(), value);
-							return Ok(expr::Value::make_void());
-						}
-						
-						_ => Err(report.error_span("invalid assignment destination", lhs_expr.span()))
-					}
-				}
-				
-				else if op == expr::BinaryOp::LazyOr || op == expr::BinaryOp::LazyAnd
-				{
-					let lhs = propagate!(lhs_expr
-						.eval_with_ctx(report, ctx, provider)?);
-					
-					match (op, &lhs)
-					{
-						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(_, true))  => return Ok(lhs),
-						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(_, false)) => return Ok(lhs),
-						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(_, false)) => { }
-						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(_, true))  => { }
-						_ => return Err(report.error_span("invalid argument type to operator", lhs_expr.span()))
-					}
-					
-					let rhs = propagate!(rhs_expr
-						.eval_with_ctx(report, ctx, provider)?);
-					
-					match (op, &rhs)
-					{
-						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(_, true))  => Ok(rhs),
-						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(_, false)) => Ok(rhs),
-						(expr::BinaryOp::LazyOr,  &expr::Value::Bool(_, false)) => Ok(rhs),
-						(expr::BinaryOp::LazyAnd, &expr::Value::Bool(_, true))  => Ok(rhs),
-						_ => Err(report.error_span("invalid argument type to operator", rhs_expr.span()))
-					}
-				}
-				
-				else
-				{
-					eval_binary_op(report, ctx, provider, lhs_expr, rhs_expr, op, span)
-				}
-			}
+				eval_binary_op(report, ctx, provider, lhs_expr, rhs_expr, op, span),
 			
 			&expr::Expr::TernaryOp(_, ref cond, ref true_branch, ref false_branch) =>
 			{
@@ -595,13 +561,14 @@ impl expr::Expr
 				}
 			}
 			
-			&expr::Expr::Slice(span, _, ref left_expr, ref right_expr, ref inner) =>
+			&expr::Expr::Slice(span, _, ref left_expr, ref right_expr, ref inner_expr) =>
 			{
-				match propagate!(inner
-					.eval_with_ctx(report, ctx, provider)?)
-					.get_bigint()
+				let inner = propagate!(
+					inner_expr.eval_with_ctx(report, ctx, provider)?);
+				
+				match inner
 				{
-					Some(ref x) =>
+					expr::Value::Integer(_, ref inner_int) =>
 					{
 						let left = propagate!(left_expr
 							.eval_with_ctx(report, ctx, provider)?);
@@ -613,23 +580,28 @@ impl expr::Expr
 						let right_usize = right.expect_usize(report, right_expr.span())?;
 
 						Ok(expr::Value::make_integer(
-							x.checked_slice(
-								report,
-								span,
-								left_usize,
-								right_usize)?))
+								inner_int.checked_slice(report, span, left_usize, right_usize)?)
+							.statically_known()
+							.derived_from(&inner)
+							.derived_from(&left)
+							.derived_from(&right))
 					}
-					None => Err(report.error_span("invalid argument type to slice", span))
+					_ => Err(report.error_span(
+						format!(
+							"invalid argument type to slice (have {})",
+							inner.type_name()),
+						inner_expr.span()))
 				}
 			}
 			
-			&expr::Expr::SliceShort(span, size_span, ref size_expr, ref inner) =>
+			&expr::Expr::SliceShort(span, size_span, ref size_expr, ref inner_expr) =>
 			{
-				match propagate!(inner
-					.eval_with_ctx(report, ctx, provider)?)
-					.get_bigint()
+				let inner = propagate!(
+					inner_expr.eval_with_ctx(report, ctx, provider)?);
+				
+				match inner
 				{
-					Some(ref x) =>
+					expr::Value::Integer(_, ref inner_int) =>
 					{
 						let size = propagate!(size_expr
 							.eval_with_ctx(report, ctx, provider)?);
@@ -637,39 +609,46 @@ impl expr::Expr
 						let size_usize = size.expect_usize(report, size_span)?;
 						
 						Ok(expr::Value::make_integer(
-							x.checked_slice(
-								report,
-								span,
-								size_usize,
-								0)?))
+								inner_int.checked_slice(report, span, size_usize, 0)?)
+							.statically_known()
+							.derived_from(&inner)
+							.derived_from(&size))
 					}
-					None => Err(report.error_span("invalid argument type to slice", span))
+					_ => Err(report.error_span(
+						format!(
+							"invalid argument type to slice (have {})",
+							inner.type_name()),
+						inner_expr.span()))
 				}
 			}
 			
 			&expr::Expr::Block(_, ref exprs) =>
 			{
-				let mut result = expr::Value::make_void();
+				let mut result = expr::Value::make_void().statically_known();
+				let mut metadata = expr::ValueMetadata::new().statically_known();
 				
 				for expr in exprs
 				{
-					result = propagate!(
+					let value = propagate!(
 						expr.eval_with_ctx(report, ctx, provider)?);
+					
+					metadata.mark_derived_from(value.get_metadata());
+					result = value;
 				}
 					
-				Ok(result)
+				Ok(result.with_metadata(metadata))
 			}
 			
 			&expr::Expr::Call(span, ref target, ref arg_exprs) =>
 			{
-				let func = propagate!(target
-					.eval_with_ctx(report, ctx, provider)?);
+				let func = propagate!(
+					target.eval_with_ctx(report, ctx, provider)?);
 
 				let mut args = Vec::with_capacity(arg_exprs.len());
 				for expr in arg_exprs
 				{
-					let value = propagate!(expr
-						.eval_with_ctx(report, ctx, provider)?);
+					let value = propagate!(
+						expr.eval_with_ctx(report, ctx, provider)?);
 					
 					args.push(EvalFunctionQueryArgument {
 						value,
@@ -730,87 +709,134 @@ fn eval_binary_op<'provider>(
 	span: diagn::Span)
 	-> Result<expr::Value, ()>
 {
-	let lhs = propagate!(lhs_expr
-		.eval_with_ctx(report, ctx, provider)?);
+	if op == expr::BinaryOp::Assign
+	{
+		match lhs_expr
+		{
+			&expr::Expr::Variable(span, ref name) =>
+			{
+				asm::check_reserved_name(
+					report,
+					span,
+					ctx.opts,
+					name)?;
 
-	let rhs = propagate!(rhs_expr
-		.eval_with_ctx(report, ctx, provider)?);
+				let value = propagate!(rhs_expr
+					.eval_with_ctx(report, ctx, provider)?);
+
+				let result = expr::Value::make_void()
+					.statically_known()
+					.derived_from(&value);
+				
+				ctx.set_local(name.clone(), value);
+				
+				return Ok(result);
+			}
+			
+			_ => return Err(report.error_span("invalid assignment destination", lhs_expr.span()))
+		}
+	}
+	
+	else if op == expr::BinaryOp::LazyOr || op == expr::BinaryOp::LazyAnd
+	{
+		let lhs = propagate!(lhs_expr
+			.eval_with_ctx(report, ctx, provider)?);
+		
+		match (op, &lhs)
+		{
+			(expr::BinaryOp::LazyOr,  &expr::Value::Bool(_, true))  => return Ok(lhs),
+			(expr::BinaryOp::LazyAnd, &expr::Value::Bool(_, false)) => return Ok(lhs),
+			(expr::BinaryOp::LazyOr,  &expr::Value::Bool(_, false)) => { }
+			(expr::BinaryOp::LazyAnd, &expr::Value::Bool(_, true))  => { }
+			_ => return Err(report.error_span("invalid argument type to operator", lhs_expr.span()))
+		}
+		
+		let rhs = propagate!(rhs_expr
+			.eval_with_ctx(report, ctx, provider)?);
+		
+		match (op, &rhs)
+		{
+			(expr::BinaryOp::LazyOr,  &expr::Value::Bool(_, true))  => return Ok(rhs.statically_known().derived_from(&lhs)),
+			(expr::BinaryOp::LazyAnd, &expr::Value::Bool(_, false)) => return Ok(rhs.statically_known().derived_from(&lhs)),
+			(expr::BinaryOp::LazyOr,  &expr::Value::Bool(_, false)) => return Ok(rhs.statically_known().derived_from(&lhs)),
+			(expr::BinaryOp::LazyAnd, &expr::Value::Bool(_, true))  => return Ok(rhs.statically_known().derived_from(&lhs)),
+			_ => return Err(report.error_span("invalid argument type to operator", rhs_expr.span()))
+		}
+	}
+
+	let lhs = propagate!(lhs_expr.eval_with_ctx(report, ctx, provider)?);
+	let rhs = propagate!(rhs_expr.eval_with_ctx(report, ctx, provider)?);
 
 	match (op, &lhs, &rhs)
 	{
 		(expr::BinaryOp::Eq, lhs, rhs)
 		if std::mem::discriminant(lhs) == std::mem::discriminant(rhs) => {
-			return Ok(expr::Value::make_bool(lhs == rhs))
+			return Ok(expr::Value::make_bool(lhs == rhs).statically_known().derived_from(lhs).derived_from(rhs))
 		}
 		(expr::BinaryOp::Ne, lhs, rhs) =>
 		if std::mem::discriminant(lhs) == std::mem::discriminant(rhs) {
-			return Ok(expr::Value::make_bool(lhs != rhs))
+			return Ok(expr::Value::make_bool(lhs != rhs).statically_known().derived_from(lhs).derived_from(rhs))
 		}
-		(expr::BinaryOp::And, expr::Value::Bool(_, lhs), expr::Value::Bool(_, rhs)) => {
-			return Ok(expr::Value::make_bool(lhs & rhs))
+		(expr::BinaryOp::And, expr::Value::Bool(_, lhs_bool), expr::Value::Bool(_, rhs_bool)) => {
+			return Ok(expr::Value::make_bool(lhs_bool & rhs_bool).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::And, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_integer(lhs & rhs))
+		(expr::BinaryOp::And, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_integer(lhs_int & rhs_int).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Or, expr::Value::Bool(_, lhs), expr::Value::Bool(_, rhs)) => {
-			return Ok(expr::Value::make_bool(lhs | rhs))
+		(expr::BinaryOp::Or, expr::Value::Bool(_, lhs_bool), expr::Value::Bool(_, rhs_bool)) => {
+			return Ok(expr::Value::make_bool(lhs_bool | rhs_bool).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Or, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_integer(lhs | rhs))
+		(expr::BinaryOp::Or, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_integer(lhs_int | rhs_int).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Xor, expr::Value::Bool(_, lhs), expr::Value::Bool(_, rhs)) => {
-			return Ok(expr::Value::make_bool(lhs ^ rhs))
+		(expr::BinaryOp::Xor, expr::Value::Bool(_, lhs_bool), expr::Value::Bool(_, rhs_bool)) => {
+			return Ok(expr::Value::make_bool(lhs_bool ^ rhs_bool).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Xor, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_integer(lhs ^ rhs))
+		(expr::BinaryOp::Xor, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_integer(lhs_int ^ rhs_int).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Add, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_integer(lhs.checked_add(report, span, rhs)?))
+		(expr::BinaryOp::Add, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_integer(lhs_int.checked_add(report, span, rhs_int)?).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Sub, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_integer(lhs.checked_sub(report, span, rhs)?))
+		(expr::BinaryOp::Sub, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_integer(lhs_int.checked_sub(report, span, rhs_int)?).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Mul, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_integer(lhs.checked_mul(report, span, rhs)?))
+		(expr::BinaryOp::Mul, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_integer(lhs_int.checked_mul(report, span, rhs_int)?).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Div, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_integer(lhs.checked_div(report, span, rhs)?))
+		(expr::BinaryOp::Div, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_integer(lhs_int.checked_div(report, span, rhs_int)?).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Mod, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_integer(lhs.checked_mod(report, span, rhs)?))
+		(expr::BinaryOp::Mod, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_integer(lhs_int.checked_mod(report, span, rhs_int)?).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Shl, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_integer(lhs.checked_shl(report, span, rhs)?))
+		(expr::BinaryOp::Shl, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_integer(lhs_int.checked_shl(report, span, rhs_int)?).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Shr, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_integer(lhs.checked_shr(report, span, rhs)?))
+		(expr::BinaryOp::Shr, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_integer(lhs_int.checked_shr(report, span, rhs_int)?).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Lt, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_bool(lhs < rhs))
+		(expr::BinaryOp::Lt, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_bool(lhs_int < rhs_int).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Le, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_bool(lhs <= rhs))
+		(expr::BinaryOp::Le, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_bool(lhs_int <= rhs_int).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Gt, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_bool(lhs > rhs))
+		(expr::BinaryOp::Gt, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_bool(lhs_int > rhs_int).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Ge, expr::Value::Integer(_, lhs), expr::Value::Integer(_, rhs)) => {
-			return Ok(expr::Value::make_bool(lhs >= rhs))
+		(expr::BinaryOp::Ge, expr::Value::Integer(_, lhs_int), expr::Value::Integer(_, rhs_int)) => {
+			return Ok(expr::Value::make_bool(lhs_int >= rhs_int).statically_known().derived_from(&lhs).derived_from(&rhs))
 		}
-		(expr::BinaryOp::Concat, lhs, rhs) => {
-			let lhs_bigint = lhs.get_bigint();
-			let rhs_bigint = rhs.get_bigint();
-			if let (Some(lhs), Some(rhs)) = (lhs_bigint, rhs_bigint)
+		(expr::BinaryOp::Concat, expr::Value::Integer(_, lhs_bigint), expr::Value::Integer(_, rhs_bigint)) => {
+			match (lhs_bigint.size, rhs_bigint.size)
 			{
-				match (lhs.size, rhs.size)
-				{
-					(Some(lhs_width), Some(rhs_width)) =>
-						return Ok(expr::Value::make_integer(lhs.concat((lhs_width, 0), &rhs, (rhs_width, 0)))),
-					(None, _) =>
-						return Err(report.error_span("argument to concatenation with indefinite size", lhs_expr.span())),
-					(_, None) =>
-						return Err(report.error_span("argument to concatenation with indefinite size", rhs_expr.span()))
-				}
+				(Some(lhs_width), Some(rhs_width)) =>
+					return Ok(expr::Value::make_integer(lhs_bigint.concat((lhs_width, 0), &rhs_bigint, (rhs_width, 0))).statically_known().derived_from(&lhs).derived_from(&rhs)),
+				(None, _) =>
+					return Err(report.error_span("argument to concatenation with indefinite size", lhs_expr.span())),
+				(_, None) =>
+					return Err(report.error_span("argument to concatenation with indefinite size", rhs_expr.span()))
 			}
 		}
 		(expr::BinaryOp::Assign, _, _) => unreachable!(),

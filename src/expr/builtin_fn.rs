@@ -79,48 +79,6 @@ pub fn get_builtin_fn_eval(
 }
 
 
-pub fn get_static_size_builtin_fn(
-    builtin_fn: ExprBuiltinFn,
-    provider: &expr::StaticallyKnownProvider,
-    args: &Vec<expr::Expr>)
-    -> Option<usize>
-{
-    let get_static_size_fn = {
-        match builtin_fn
-        {
-            ExprBuiltinFn::Sizeof => get_static_size_builtin_sizeof,
-            ExprBuiltinFn::Le => get_static_size_builtin_le,
-            _ => return None,
-        }
-    };
-
-    get_static_size_fn(
-        provider,
-        args)
-}
-
-
-pub fn get_statically_known_value_builtin_fn(
-    builtin_fn: ExprBuiltinFn,
-    _args: &Vec<expr::Expr>)
-    -> bool
-{
-    match builtin_fn
-    {
-        ExprBuiltinFn::Assert => false,
-        ExprBuiltinFn::Sizeof => true,
-        ExprBuiltinFn::Le => true,
-        ExprBuiltinFn::Ascii => true,
-        ExprBuiltinFn::Utf8 => true,
-        ExprBuiltinFn::Utf16be => true,
-        ExprBuiltinFn::Utf16le => true,
-        ExprBuiltinFn::Utf32be => true,
-        ExprBuiltinFn::Utf32le => true,
-        ExprBuiltinFn::Strlen => true,
-    }
-}
-
-
 pub fn eval_builtin_assert(
     query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>
@@ -152,11 +110,15 @@ pub fn eval_builtin_assert(
         };
         
         return Ok(expr::Value::FailedConstraint(
-            expr::Value::make_metadata(),
-            query.report.wrap_in_parents_capped(msg)));
+                expr::ValueMetadata::new(),
+                query.report.wrap_in_parents_capped(msg))
+            .statically_known()
+            .derived_from(&query.args[0].value));
     }
 
-    Ok(expr::Value::make_void())
+    Ok(expr::Value::make_void()
+        .statically_known()
+        .derived_from(&query.args[0].value))
 }
 
 
@@ -170,7 +132,9 @@ pub fn eval_builtin_sizeof(
         query.report,
         query.args[0].span)?;
     
-    Ok(expr::Value::make_integer(size))
+    Ok(expr::Value::make_integer(size)
+        .statically_known()
+        .derived_from(&query.args[0].value))
 }
 
 
@@ -199,39 +163,9 @@ pub fn eval_builtin_le(
         return Err(());
     }
 
-    Ok(expr::Value::make_integer(bigint.convert_le()))
-}
-
-
-pub fn get_static_size_builtin_sizeof(
-    provider: &expr::StaticallyKnownProvider,
-    args: &Vec<expr::Expr>)
-    -> Option<usize>
-{
-    if args.len() == 1
-    {
-        args[0].get_static_size(provider)
-    }
-    else
-    {
-        None
-    }
-}
-
-
-pub fn get_static_size_builtin_le(
-    provider: &expr::StaticallyKnownProvider,
-    args: &Vec<expr::Expr>)
-    -> Option<usize>
-{
-    if args.len() == 1
-    {
-        args[0].get_static_size(provider)
-    }
-    else
-    {
-        None
-    }
+    Ok(expr::Value::make_integer(bigint.convert_le())
+        .statically_known()
+        .derived_from(&query.args[0].value))
 }
 
 
@@ -307,5 +241,7 @@ pub fn eval_builtin_strlen(
         query.report,
         query.args[0].span)?;
 
-    Ok(expr::Value::make_integer(s.len()))
+    Ok(expr::Value::make_integer(s.len())
+        .statically_known()
+        .derived_from(&query.args[0].value))
 }

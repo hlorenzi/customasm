@@ -53,11 +53,12 @@ pub fn define(
             let symbol = asm::Symbol {
                 item_ref,
                 no_emit: true,
-                value_statically_known: true,
                 value: expr::Value::Function(
-                    expr::Value::make_metadata(),
-                    fn_ref),
+                        expr::ValueMetadata::new(),
+                        fn_ref)
+                    .statically_known(),
                 resolved: true,
+                driver_defined: false,
                 bankdef_ref: None,
             };
 

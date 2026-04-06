@@ -1,8 +1,27 @@
 use crate::*;
 
 
+struct AsmBlockLabel
+{
+    pub name: String,
+    pub value: expr::Value,
+}
+
+
+struct AsmBlockInstruction<'opts>
+{
+    pub src: String,
+    pub substs: Vec<AsmSubstitution>,
+    pub eval_ctx: expr::EvalContext<'opts>,
+    pub matches: asm::InstructionMatches,
+    pub encoding: expr::Value,
+    pub resolved: bool,
+}
+
+
 pub fn eval_asm(
     fileserver: &mut dyn util::FileServer,
+    opts: &asm::AssemblyOptions,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
@@ -17,9 +36,12 @@ pub fn eval_asm(
     // Keep the current position to advance
     // between instructions
     let position_at_start = ctx.bank_data.cur_position;
+    let position_at_start_resolved = ctx.bank_data.cur_position_resolved;
 
 
-    let mut labels = std::collections::HashMap::<String, expr::Value>::new();
+    let mut labels = Vec::new();
+    let mut instrs = Vec::new();
+
     for node in &query.ast.nodes
     {
         if let asm::AstAny::Symbol(ast_symbol) = node
@@ -42,169 +64,16 @@ pub fn eval_asm(
                 return Err(());
             }
 
-            labels.insert(
-                ast_symbol.name.clone(),
-                expr::Value::make_unknown());
-        }
-
-        else if let asm::AstAny::Instruction(_) = node
-        {
-            continue;
-        }
-
-        else
-        {
-            query.report.error_span(
-                "invalid content for `asm` block",
-                node.span());
-
-            return Err(());
-        }
-    }
-
-    resolve_iteratively(
-        fileserver,
-        decls,
-        defs,
-        ctx,
-        query,
-        position_at_start,
-        &mut labels)
-}
-
-
-fn resolve_iteratively(
-    fileserver: &mut dyn util::FileServer,
-    decls: &asm::ItemDecls,
-    defs: &asm::ItemDefs,
-    ctx: &asm::ResolverContext,
-    query: &mut expr::EvalAsmBlockQuery,
-    position_at_start: usize,
-    labels: &mut std::collections::HashMap::<String, expr::Value>)
-    -> Result<expr::Value, ()>
-{
-    let mut iter_count = 0;
-    let max_iterations = query.eval_ctx.opts.max_iterations;
-
-    while iter_count < max_iterations
-    {
-        iter_count += 1;
-
-        let is_first_iteration = iter_count == 1;
-        let is_last_iteration =
-            iter_count == max_iterations &&
-            ctx.is_last_iteration;
-
-        let result = resolve_once(
-            fileserver,
-            decls,
-            defs,
-            ctx,
-            query,
-            position_at_start,
-            labels,
-            is_first_iteration,
-            is_last_iteration)?;
-
-        if !result.unstable
-        {
-            break;
-        }
-    }
-
-    let result = resolve_once(
-        fileserver,
-        decls,
-        defs,
-        ctx,
-        query,
-        position_at_start,
-        labels,
-        false,
-        ctx.is_last_iteration)?;
-
-    if !result.unstable
-    {
-        return Ok(result.value);
-    }
-    
-    if ctx.can_guess()
-    {
-        return Ok(expr::Value::make_unknown());
-    }
-
-    query.report.error_span(
-        "`asm` block did not converge",
-        query.span);
-
-    return Err(());
-}
-
-
-struct AsmBlockResult
-{
-    value: expr::Value,
-    unstable: bool,
-}
-
-
-fn resolve_once(
-    fileserver: &mut dyn util::FileServer,
-    decls: &asm::ItemDecls,
-    defs: &asm::ItemDefs,
-    ctx: &asm::ResolverContext,
-    query: &mut expr::EvalAsmBlockQuery,
-    position_at_start: usize,
-    labels: &mut std::collections::HashMap::<String, expr::Value>,
-    is_first_iteration: bool,
-    is_last_iteration: bool)
-    -> Result<AsmBlockResult, ()>
-{
-    let mut result = util::BigInt::new(0, Some(0));
-    let mut cur_position = position_at_start;
-    let mut unstable = false;
-    
-    for node in &query.ast.nodes
-    {
-        // Clone the context to use our own position
-        let new_bank_datum = asm::resolver::BankData {
-            cur_position,
-        };
-
-        let mut inner_ctx = ctx.clone();
-        inner_ctx.bank_data = &new_bank_datum;
-        inner_ctx.is_first_iteration = is_first_iteration;
-        inner_ctx.is_last_iteration = is_last_iteration;
-
-
-        if let asm::AstAny::Symbol(ast_symbol) = node
-        {
             asm::check_reserved_name(
                 query.report,
                 ast_symbol.decl_span,
                 query.eval_ctx.opts,
                 ast_symbol.name.as_ref())?;
 
-            let cur_address = inner_ctx.eval_address(
-                query.report,
-                ast_symbol.decl_span,
-                defs,
-                inner_ctx.can_guess())?;
-
-            let new_value = expr::Value::make_integer(cur_address);
-            
-            let maybe_prev_value = labels.get(&ast_symbol.name);
-            if let Some(prev_value) = maybe_prev_value
-            {
-                if prev_value != &new_value
-                {
-                    unstable = true;
-                }
-            }
-
-            labels.insert(
-                ast_symbol.name.clone(),
-                new_value);
+            labels.push(AsmBlockLabel {
+                name: ast_symbol.name.clone(),
+                value: expr::Value::make_unknown(),
+            });
         }
 
         else if let asm::AstAny::Instruction(ast_instr) = node
@@ -222,15 +91,12 @@ fn resolve_once(
                 &substs,
                 &mut new_eval_ctx,
                 query)?;
-
             
-            // Run the matcher algorithm
-            let mut matches = asm::matcher::match_instr(
+            let matches = asm::matcher::match_instr(
                 query.eval_ctx.opts,
                 defs,
                 ast_instr.span,
                 &new_excerpt);
-
 
             let attempted_match_excerpt = {
                 if substs.len() == 0
@@ -251,7 +117,7 @@ fn resolve_once(
                     excerpt.clone(),
                     ast_instr.span);
             }
-                    
+            
             let maybe_no_matches = asm::matcher::error_on_no_matches(
                 query.report,
                 ast_instr.span,
@@ -264,12 +130,272 @@ fn resolve_once(
 
             maybe_no_matches?;
             
+            instrs.push(AsmBlockInstruction {
+                src: new_excerpt,
+                substs,
+                eval_ctx: new_eval_ctx,
+                matches,
+                encoding: expr::Value::make_unknown(),
+                resolved: false,
+            });
+            continue;
+        }
 
-            // Try to resolve the encoding
-            for (label_name, label_value) in labels.iter()
+        else
+        {
+            query.report.error_span(
+                "invalid content for `asm` block",
+                node.span());
+
+            return Err(());
+        }
+    }
+
+    resolve_iteratively(
+        fileserver,
+        opts,
+        decls,
+        defs,
+        ctx,
+        query,
+        position_at_start,
+        position_at_start_resolved,
+        &mut labels,
+        &mut instrs)
+}
+
+
+fn resolve_iteratively(
+    fileserver: &mut dyn util::FileServer,
+    opts: &asm::AssemblyOptions,
+    decls: &asm::ItemDecls,
+    defs: &asm::ItemDefs,
+    ctx: &asm::ResolverContext,
+    query: &mut expr::EvalAsmBlockQuery,
+    position_at_start: usize,
+    position_at_start_resolved: bool,
+    labels: &mut Vec<AsmBlockLabel>,
+    instrs: &mut Vec<AsmBlockInstruction>)
+    -> Result<expr::Value, ()>
+{
+    let mut iter_count = 0;
+    let max_iterations = query.eval_ctx.opts.max_iterations;
+
+    while iter_count < max_iterations
+    {
+        iter_count += 1;
+
+        if opts.debug_iterations
+        {
+            println!(
+                "{} [== asm block `{:?}` iteration {} ==]",
+                " ".repeat(query.eval_ctx.get_recursion_depth()),
+                query.span,
+                iter_count);
+        }
+
+        let is_first_iteration = iter_count == 1;
+        let is_last_iteration =
+            iter_count == max_iterations &&
+            ctx.is_last_iteration;
+
+        let result = resolve_once(
+            fileserver,
+            opts,
+            decls,
+            defs,
+            ctx,
+            query,
+            position_at_start,
+            position_at_start_resolved,
+            labels,
+            instrs,
+            is_first_iteration,
+            is_last_iteration)?;
+
+        if opts.debug_iterations
+        {
+            println!(
+                "{} asm block `{:?}` result = {}",
+                " ".repeat(query.eval_ctx.get_recursion_depth()),
+                query.span,
+                result.resolution.debug_label());
+        }
+
+        if result.resolution.is_resolved() &&
+            opts.optimize_statically_known
+        {
+            return Ok(result.value);
+        }
+
+        if result.resolution.is_stable_or_resolved()
+        {
+            break;
+        }
+    
+        if ctx.is_first_iteration &&
+            ctx.can_guess()
+        {
+            return Ok(expr::Value::make_unknown());
+        }
+    }
+
+    iter_count += 1;
+
+    if opts.debug_iterations
+    {
+        println!(
+            "{} [== asm block iteration {} (final) ==]",
+            " ".repeat(query.eval_ctx.get_recursion_depth()),
+            iter_count);
+    }
+
+    let result = resolve_once(
+        fileserver,
+        opts,
+        decls,
+        defs,
+        ctx,
+        query,
+        position_at_start,
+        position_at_start_resolved,
+        labels,
+        instrs,
+        false,
+        ctx.is_last_iteration)?;
+
+    if opts.debug_iterations
+    {
+        println!(
+            "{} asm block `{:?}` result = {}",
+            " ".repeat(query.eval_ctx.get_recursion_depth()),
+            query.span,
+            result.resolution.debug_label());
+    }
+
+    if result.resolution.is_stable_or_resolved()
+    {
+        return Ok(result.value);
+    }
+    
+    if ctx.can_guess()
+    {
+        return Ok(expr::Value::make_unknown());
+    }
+
+    query.report.error_span(
+        "`asm` block did not converge",
+        query.span);
+
+    return Err(());
+}
+
+
+struct AsmBlockResult
+{
+    value: expr::Value,
+    resolution: asm::ResolutionState,
+}
+
+
+fn resolve_once(
+    fileserver: &mut dyn util::FileServer,
+    _opts: &asm::AssemblyOptions,
+    decls: &asm::ItemDecls,
+    defs: &asm::ItemDefs,
+    ctx: &asm::ResolverContext,
+    query: &mut expr::EvalAsmBlockQuery,
+    position_at_start: usize,
+    position_at_start_resolved: bool,
+    labels: &mut Vec<AsmBlockLabel>,
+    instrs: &mut Vec<AsmBlockInstruction>,
+    is_first_iteration: bool,
+    is_last_iteration: bool)
+    -> Result<AsmBlockResult, ()>
+{
+    let mut result_metadata = expr::ValueMetadata::new().statically_known();
+    let mut result = util::BigInt::new(0, Some(0));
+    let mut cur_position = position_at_start;
+    let mut cur_position_resolved = position_at_start_resolved;
+    let mut resolution = asm::ResolutionState::Resolved;
+
+    let mut cur_label = 0;
+    let mut cur_instr = 0;
+    
+    for node in &query.ast.nodes
+    {
+        // Clone the context to use our own position
+        let new_bank_datum = asm::resolver::BankData {
+            cur_position,
+            cur_position_resolved,
+        };
+
+        let mut inner_ctx = ctx.clone();
+        inner_ctx.bank_data = &new_bank_datum;
+        inner_ctx.is_first_iteration = is_first_iteration;
+        inner_ctx.is_last_iteration = is_last_iteration;
+
+
+        if let asm::AstAny::Symbol(ast_symbol) = node
+        {
+            let label = &labels[cur_label];
+
+            let cur_address = inner_ctx.eval_address(
+                query.report,
+                ast_symbol.decl_span,
+                defs,
+                inner_ctx.can_guess())?;
+
+            let is_stable = cur_address.is_stable(&label.value);
+            let mut is_resolved = false;
+
+            let label_resolution = asm::resolver::handle_value_resolution(
+                query.eval_ctx.opts,
+                query.report,
+                ast_symbol.decl_span,
+                inner_ctx.can_guess(),
+                cur_address.is_guess(),
+                is_stable,
+                &mut is_resolved,
+                true,
+                "label",
+                "label address",
+                Some(&ast_symbol.name),
+                &cur_address)?;
+
+            resolution.merge(label_resolution);
+
+            let label = &mut labels[cur_label];
+            label.value = cur_address;
+
+            cur_label += 1;
+        }
+
+        else if let asm::AstAny::Instruction(ast_instr) = node
+        {
+            let instr = &instrs[cur_instr];
+
+            let mut new_eval_ctx = instr.eval_ctx.clone();
+
+            for label in labels.iter()
             {
-                new_eval_ctx.set_local(label_name, label_value.clone());
+                new_eval_ctx.set_local(
+                    label.name.clone(),
+                    label.value.clone());
             }
+
+            let attempted_match_excerpt = {
+                if instr.substs.len() == 0
+                {
+                    None
+                }
+                else
+                {
+                    Some(format!(
+                        "match attempted: `{}`",
+                        &instr.src))
+                }
+            };
 
             if let Some(ref s) = attempted_match_excerpt
             {
@@ -277,15 +403,29 @@ fn resolve_once(
                     s,
                     ast_instr.span);
             }
+
+            // Extract matches to satisfy the borrow checker
+            let instr = &mut instrs[cur_instr];
+            let mut matches = std::mem::replace(
+                &mut instr.matches,
+                asm::InstructionMatches::new());
+
+            let mut new_encoding = expr::Value::make_unknown();
+            let mut is_resolved = false;
             
-            let maybe_encodings = asm::resolver::instruction::resolve_encoding(
+            let instr_resolution = asm::resolver::instruction::resolve_instruction_inner(
                 query.report,
-                query.eval_ctx.opts,
                 ast_instr.span,
+                query.eval_ctx.opts,
                 fileserver,
-                &mut matches,
                 decls,
                 defs,
+                &instr.src,
+                &mut matches,
+                &instr.encoding,
+                &mut new_encoding,
+                &mut is_resolved,
+                true,
                 &mut inner_ctx,
                 &mut new_eval_ctx);
                 
@@ -294,34 +434,56 @@ fn resolve_once(
                 query.report.pop_parent();
             }
 
+            let instr_resolution = instr_resolution?;
+
+            let instr = &mut instrs[cur_instr];
+            instr.matches = matches;
+            instr.resolved = is_resolved;
+            instr.encoding = new_encoding;
+
+            resolution.merge(instr_resolution);
+
             // Add the encoding to the result value
             // and advance the position
-            if let Some(encodings) = maybe_encodings?
+            if let expr::Value::Integer(_, ref bigint) = instr.encoding
             {
-                let size = encodings[0].1.size.unwrap();
+                let size = bigint.size.unwrap();
 
                 cur_position += size;
+                cur_position_resolved &= instr.resolved;
 
                 result = result.concat(
                     (result.size.unwrap(), 0),
-                    &encodings[0].1,
+                    bigint,
                     (size, 0));
+
+                result_metadata.mark_derived_from(instr.encoding.get_metadata());
             }
             else 
             {
-                unstable = true;
+                result_metadata.mark_guess();
+                cur_position_resolved &= false;
 
                 if !inner_ctx.can_guess()
                 {
                     return Err(());
                 }
             }
+            
+            cur_instr += 1;
+        }
+
+        else
+        {
+            unreachable!();
         }
     }
 
     Ok(AsmBlockResult {
-        value: expr::Value::make_integer(result),
-        unstable,
+        value: expr::Value::make_integer(result)
+            .statically_known()
+            .with_metadata(result_metadata),
+        resolution,
     })
 }
 

@@ -5,7 +5,9 @@ use crate::*;
 pub struct AddrDirective
 {
     pub item_ref: util::ItemRef<Self>,
-    pub address: util::BigInt,
+    pub value: expr::Value,
+    pub offset_from_bank_start_in_bits: usize,
+    pub resolved: bool,
 }
 
 
@@ -24,7 +26,9 @@ pub fn define(
 
             let res = AddrDirective {
                 item_ref,
-                address: util::BigInt::new(0, None),
+                value: expr::Value::make_unknown(),
+                offset_from_bank_start_in_bits: 0,
+                resolved: false,
             };
             
             defs.addr_directives.define(item_ref, res);

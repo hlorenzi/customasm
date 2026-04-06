@@ -30,6 +30,7 @@ pub struct ResolveIterator<'ast, 'decls>
 pub struct BankData
 {
     pub cur_position: usize,
+    pub cur_position_resolved: bool,
 }
 
 
@@ -71,6 +72,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
     {
         let bank_datum = BankData {
             cur_position: 0,
+            cur_position_resolved: true,
         };
     
         let bank_data = vec![bank_datum; defs.bankdefs.len()];
@@ -169,6 +171,8 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                             span,
                             cur_address_in_bits,
                             label_align)?;
+
+                        cur_bank_data.cur_position_resolved &= true;
                     }
                 }
 
@@ -298,6 +302,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
         static DUMMY_BANK_DATA: BankData = BankData {
             cur_position: 0,
+            cur_position_resolved: true,
         };
 
         Ok(Some(ResolverContext {
@@ -337,12 +342,12 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
                 // Advance the current bank's position
                 cur_bank_data.cur_position += {
-                    match instr.encoding.size
-                    {
-                        Some(size) => size,
-                        None => 0,
+                    match &instr.encoding {
+                        expr::Value::Integer(_, bigint) => bigint.size.unwrap_or(0),
+                        _ => 0,
                     }
                 };
+                cur_bank_data.cur_position_resolved &= instr.resolved;
             }
 
             asm::AstAny::DirectiveData(ast_data) =>
@@ -354,12 +359,17 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
                 // Advance the current bank's position
                 cur_bank_data.cur_position += {
-                    match data_elem.encoding.size
-                    {
+                    match data_elem.elem_size {
                         Some(size) => size,
-                        None => 0,
+                        None => match &data_elem.encoding {
+                            expr::Value::Integer(_, bigint) => bigint.size.unwrap_or(0),
+                            _ => 0,
+                        }
                     }
                 };
+                cur_bank_data.cur_position_resolved &=
+                    data_elem.elem_size.is_some() ||
+                    data_elem.resolved;
             }
 
             asm::AstAny::DirectiveRes(ast_res) =>
@@ -368,9 +378,8 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let res = defs.res_directives.get(item_ref);
 
                 let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
-
-                // Advance the current bank's position
                 cur_bank_data.cur_position += res.reserve_size;
+                cur_bank_data.cur_position_resolved &= res.resolved;
             }
 
             asm::AstAny::DirectiveAlign(ast_align) =>
@@ -397,6 +406,8 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                     span,
                     cur_address_in_bits,
                     align.align_size)?;
+                    
+                cur_bank_data.cur_position_resolved &= align.resolved;
             }
 
             asm::AstAny::DirectiveAddr(ast_addr) =>
@@ -404,27 +415,9 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let item_ref = ast_addr.item_ref.unwrap();
                 let addr = defs.addr_directives.get(item_ref);
 
-                let bank = defs.bankdefs.get(self.bank_ref);
                 let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
-
-                let new_position = {
-                    if addr.address >= bank.addr_start
-                    {
-                        &addr.address.checked_sub(
-                                report,
-                                ast_addr.header_span,
-                                &bank.addr_start)?
-                            .maybe_into::<usize>()
-                            .unwrap_or(0)
-                            * bank.addr_unit
-                    }
-                    else
-                    {
-                        0
-                    }
-                };
-
-                cur_bank_data.cur_position = new_position;
+                cur_bank_data.cur_position = addr.offset_from_bank_start_in_bits;
+                cur_bank_data.cur_position_resolved = addr.resolved;
             }
 
             _ => {}
@@ -521,7 +514,7 @@ impl<'iter, 'ast, 'decls> ResolverContext<'iter, 'ast, 'decls>
         span: diagn::Span,
         defs: &asm::ItemDefs,
         can_guess: bool)
-        -> Result<util::BigInt, ()>
+        -> Result<expr::Value, ()>
     {
         let bankdef = &defs.bankdefs.get(self.bank_ref);
         let addr_unit = bankdef.addr_unit;
@@ -529,7 +522,9 @@ impl<'iter, 'ast, 'decls> ResolverContext<'iter, 'ast, 'decls>
         let cur_position = self.bank_data.cur_position;
         
         let excess_bits = cur_position % addr_unit;
-        if excess_bits != 0 && !can_guess
+        let has_excess_bits = excess_bits != 0;
+
+        if has_excess_bits && !can_guess
         {
             let bits_short = addr_unit - excess_bits;
 
@@ -561,6 +556,7 @@ impl<'iter, 'ast, 'decls> ResolverContext<'iter, 'ast, 'decls>
                 span,
                 &bankdef.addr_start)?;
 
-        Ok(addr)
+        Ok(expr::Value::make_integer(addr)
+            .statically_known_if(self.bank_data.cur_position_resolved && !has_excess_bits))
     }
 }

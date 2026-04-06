@@ -120,7 +120,7 @@ impl BigInt
             None =>
             {            
                 report.error_span(
-                    "value is out of supported range",
+                    "value is outside the supported range",
                     span);
                 
                 Err(())
@@ -140,7 +140,7 @@ impl BigInt
             None | Some(0) =>
             {            
                 report.error_span(
-                    "value is out of supported range",
+                    "value is outside the supported range",
                     span);
                 
                 Err(())
@@ -164,7 +164,7 @@ impl BigInt
         if largest_bits >= BIGINT_MAX_BITS - 1
         {
             report.error_span(
-                "value is out of supported range",
+                "value is outside the supported range",
                 span);
             
             return Err(());
@@ -177,12 +177,10 @@ impl BigInt
     }
 
 
-    pub fn checked_sub(
+    pub fn maybe_sub(
         &self,
-        report: &mut diagn::Report,
-        span: diagn::Span,
         rhs: &BigInt)
-        -> Result<BigInt, ()>
+        -> Option<BigInt>
     {
         let largest_bits = std::cmp::max(
             self.bigint.bits(),
@@ -190,16 +188,55 @@ impl BigInt
             
         if largest_bits >= BIGINT_MAX_BITS - 2
         {
-            report.error_span(
-                "value is out of supported range",
-                span);
-            
-            return Err(());
+            return None;
         }
 
         self.bigint
             .checked_sub(&rhs.bigint)
-            .ok_or(())
+            .map(|res| res.into())
+    }
+
+
+    pub fn checked_sub(
+        &self,
+        report: &mut diagn::Report,
+        span: diagn::Span,
+        rhs: &BigInt)
+        -> Result<BigInt, ()>
+    {
+        let res = self.maybe_sub(rhs);
+            
+        match res
+        {
+            Some(res) => Ok(res),
+            None =>
+            {
+                report.error_span(
+                    "value is outside the supported range",
+                    span);
+                
+                Err(())
+            }
+        }
+    }
+
+
+    pub fn maybe_mul(
+        &self,
+        rhs: &BigInt)
+        -> Option<BigInt>
+    {
+        let largest_bits = std::cmp::max(
+            self.bigint.bits(),
+            rhs.bigint.bits());
+            
+        if largest_bits >= BIGINT_MAX_BITS / 2
+        {
+            return None;
+        }
+
+        self.bigint
+            .checked_mul(&rhs.bigint)
             .map(|res| res.into())
     }
 
@@ -211,23 +248,20 @@ impl BigInt
         rhs: &BigInt)
         -> Result<BigInt, ()>
     {
-        let largest_bits = std::cmp::max(
-            self.bigint.bits(),
-            rhs.bigint.bits());
+        let res = self.maybe_mul(rhs);
             
-        if largest_bits >= BIGINT_MAX_BITS / 2
+        match res
         {
-            report.error_span(
-                "value is out of supported range",
-                span);
-            
-            return Err(());
+            Some(res) => Ok(res),
+            None =>
+            {
+                report.error_span(
+                    "value is outside the supported range",
+                    span);
+                
+                Err(())
+            }
         }
-
-        self.bigint
-            .checked_mul(&rhs.bigint)
-            .ok_or(())
-            .map(|res| res.into())
     }
 
 
@@ -295,7 +329,7 @@ impl BigInt
         if result_too_large
         {
             report.error_span(
-                "value is out of supported range",
+                "value is outside the supported range",
                 span);
             
             return Err(());
@@ -327,7 +361,7 @@ impl BigInt
             Err(_) =>
             {
                 report.error_span(
-                    "value is out of supported range",
+                    "value is outside the supported range",
                     span);
                 
                 Err(())

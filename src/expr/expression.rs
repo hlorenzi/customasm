@@ -55,9 +55,10 @@ pub enum Value
 }
 
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct ValueMetadata
 {
+	pub is_guess: bool,
 	pub symbol_ref: Option<util::ItemRef<asm::Symbol>>,
 	pub bank_ref: Option<util::ItemRef<asm::Bankdef>>,
 }
@@ -107,12 +108,6 @@ pub enum BinaryOp
 
 impl Expr
 {
-	pub fn new_dummy() -> Expr
-	{
-		Expr::Literal(diagn::Span::new_dummy(), Value::make_bool(false))
-	}
-
-	
 	pub fn span(&self) -> diagn::Span
 	{
 		match self
@@ -131,6 +126,74 @@ impl Expr
 			&Expr::Call         (span, ..) => span,
 			&Expr::Asm          (span, ..) => span,
 		}
+	}
+
+
+	pub fn returned_value_span(&self) -> diagn::Span
+	{
+		match self
+		{
+			&expr::Expr::Block(span, ref exprs) =>
+			{
+				match exprs.last()
+				{
+					None => span,
+					Some(expr) => expr.returned_value_span()
+				}
+			}
+			
+			_ => self.span()
+		}
+	}
+}
+
+
+impl ValueMetadata
+{
+	pub fn new() -> ValueMetadata
+	{
+		ValueMetadata {
+			is_guess: true,
+			symbol_ref: None,
+			bank_ref: None,
+		}
+	}
+
+
+	pub fn is_guess(&self) -> bool
+	{
+		self.is_guess
+	}
+
+
+	pub fn statically_known(mut self) -> ValueMetadata
+	{
+		self.mark_statically_known();
+		self
+	}
+
+
+	pub fn mark_statically_known(&mut self)
+	{
+		self.is_guess = false;
+	}
+
+
+	pub fn mark_statically_known_if(&mut self, resolved: bool)
+	{
+		self.is_guess = !resolved;
+	}
+
+
+	pub fn mark_guess(&mut self)
+	{
+		self.is_guess = true;
+	}
+
+
+	pub fn mark_derived_from(&mut self, other: &ValueMetadata)
+	{
+		self.is_guess |= other.is_guess;
 	}
 }
 
@@ -175,6 +238,12 @@ impl Value
 		}
 	}
 
+
+	pub fn is_stable(&self, previous: &expr::Value) -> bool
+	{
+		!self.is_unknown() && !previous.is_unknown() && self == previous
+	}
+
 	
 	pub fn make_literal(&self) -> Expr
 	{
@@ -184,20 +253,20 @@ impl Value
 
 	pub fn make_unknown() -> Value
 	{
-		Value::Unknown(Value::make_metadata())
+		Value::Unknown(ValueMetadata::new())
 	}
 
 
 	pub fn make_void() -> Value
 	{
-		Value::Void(Value::make_metadata())
+		Value::Void(ValueMetadata::new())
 	}
 
 
 	pub fn make_integer<T: Into<util::BigInt>>(value: T) -> Value
 	{
 		Value::Integer(
-			Value::make_metadata(),
+			ValueMetadata::new(),
 			value.into())
 	}
 
@@ -207,7 +276,7 @@ impl Value
 		if let Some(value) = maybe_value
 		{
 			Value::Integer(
-				Value::make_metadata(),
+				ValueMetadata::new(),
 				value.into())
 		}
 		else
@@ -220,7 +289,7 @@ impl Value
 	pub fn make_bool(value: bool) -> Value
 	{
 		Value::Bool(
-			Value::make_metadata(),
+			ValueMetadata::new(),
 			value)
 	}
 
@@ -228,7 +297,7 @@ impl Value
 	pub fn make_struct(value: ValueStruct) -> Value
 	{
 		Value::Struct(
-			Value::make_metadata(),
+			ValueMetadata::new(),
 			value)
 	}
 
@@ -236,20 +305,64 @@ impl Value
 	pub fn make_bankdef(value: util::ItemRef<asm::Bankdef>) -> Value
 	{
 		Value::Bankdef(
-			Value::make_metadata(),
+			ValueMetadata::new(),
 			value)
 	}
 
 	
-	pub fn make_metadata() -> ValueMetadata
+	#[must_use]
+	pub fn with_metadata(mut self, metadata: ValueMetadata) -> Value
 	{
-		ValueMetadata {
-			symbol_ref: None,
-			bank_ref: None,
-		}
+		*self.get_mut_metadata() = metadata;
+		self
 	}
 
 
+	#[must_use]
+	pub fn statically_known(mut self) -> Value
+	{
+		self.get_mut_metadata().mark_statically_known();
+		self
+	}
+
+
+	#[must_use]
+	pub fn statically_known_if(mut self, resolved: bool) -> Value
+	{
+		self.get_mut_metadata().mark_statically_known_if(resolved);
+		self
+	}
+
+
+	#[must_use]
+	pub fn as_guess(mut self) -> Value
+	{
+		self.get_mut_metadata().mark_guess();
+		self
+	}
+
+
+	pub fn mark_guess(&mut self)
+	{
+		self.get_mut_metadata().mark_guess();
+	}
+
+
+	#[must_use]
+	pub fn derived_from(mut self, other: &Value) -> Value
+	{
+		self.mark_derived_from(other);
+		self
+	}
+
+
+	pub fn mark_derived_from(&mut self, other: &Value)
+	{
+		self.get_mut_metadata().mark_derived_from(other.get_metadata());
+	}
+
+
+	#[must_use]
 	pub fn with_symbol_ref(mut self, symbol_ref: util::ItemRef<asm::Symbol>) -> Value
 	{
 		self.get_mut_metadata().symbol_ref = Some(symbol_ref);
@@ -257,10 +370,17 @@ impl Value
 	}
 
 
+	#[must_use]
 	pub fn with_bank_ref(mut self, bank_ref: util::ItemRef<asm::Bankdef>) -> Value
 	{
 		self.get_mut_metadata().bank_ref = Some(bank_ref);
 		self
+	}
+
+
+	pub fn is_guess(&self) -> bool
+	{
+		self.is_unknown() || self.get_metadata().is_guess
 	}
 
 
@@ -307,14 +427,6 @@ impl Value
 			&Value::Integer(_, bigint) => Some(bigint.clone()),
 			_ => None,
 		}
-	}
-
-
-	pub fn coallesce_to_integer<'a>(
-		&'a self)
-		-> std::borrow::Cow<'a, expr::Value>
-	{
-		std::borrow::Cow::Borrowed(self)
 	}
 
 
@@ -428,7 +540,7 @@ impl Value
 		span: diagn::Span)
 		-> Result<(util::BigInt, usize), ()>
 	{
-		if let Some(bigint) = self.coallesce_to_integer().get_bigint()
+		if let Some(bigint) = self.get_bigint()
 		{
 			if let Some(size) = bigint.size
 			{
@@ -458,23 +570,21 @@ impl Value
 		span: diagn::Span)
 		-> Result<expr::Value, ()>
 	{
-		let coallesced = self.coallesce_to_integer();
-
-		match coallesced.as_ref()
+		match self
 		{
 			expr::Value::Unknown(_) |
 			expr::Value::FailedConstraint(_, _) =>
-				Ok(coallesced.into_owned()),
+				Ok(self),
 
 			expr::Value::Integer(_, _) =>
-				Ok(coallesced.into_owned()),
+				Ok(self),
 
 			_ =>
 			{
 				report.error_span(
 					format!(
 						"expected integer, got {}",
-						coallesced.type_name()),
+						self.type_name()),
 					span);
 
 				Err(())
@@ -489,24 +599,22 @@ impl Value
 		span: diagn::Span)
 		-> Result<expr::Value, ()>
 	{
-		let coallesced = self.coallesce_to_integer();
-
-		match coallesced.as_ref()
+		match self
 		{
 			expr::Value::Unknown(_) |
 			expr::Value::FailedConstraint(_, _) =>
-				Ok(coallesced.into_owned()),
+				Ok(self),
 
-			expr::Value::Integer(_, bigint)
+			expr::Value::Integer(_, ref bigint)
 				if bigint.size.is_some() =>
-				Ok(expr::Value::make_integer(bigint.to_owned())),
+				Ok(self),
 
 			_ =>
 			{
 				report.error_span(
 					format!(
 						"expected integer with definite size, got {}",
-						coallesced.type_name()),
+						self.type_name()),
 					span);
 
 				Err(())
@@ -521,23 +629,21 @@ impl Value
 		span: diagn::Span)
 		-> Result<expr::Value, ()>
 	{
-		let coallesced = self.coallesce_to_integer();
-
-		match coallesced.as_ref()
+		match self
 		{
 			expr::Value::Unknown(_) |
 			expr::Value::FailedConstraint(_, _) =>
-				Ok(coallesced.into_owned()),
+				Ok(self),
 
 			expr::Value::Bool(_, _) =>
-				Ok(coallesced.into_owned()),
+				Ok(self),
 
 			_ =>
 			{
 				report.error_span(
 					format!(
 						"expected boolean, got {}",
-						coallesced.type_name()),
+						self.type_name()),
 					span);
 
 				Err(())
@@ -726,7 +832,9 @@ impl Value
 			"utf8" =>
 			{
 				Ok(expr::Value::make_integer(
-					util::BigInt::from_bytes_be(utf8_contents.as_bytes())))
+						util::BigInt::from_bytes_be(utf8_contents.as_bytes()))
+					.statically_known()
+					.derived_from(&self))
 			}
 			"utf16be" =>
 			{
@@ -739,7 +847,9 @@ impl Value
 				}
 					
 				Ok(expr::Value::make_integer(
-					util::BigInt::from_bytes_be(&bytes[..])))
+						util::BigInt::from_bytes_be(&bytes[..]))
+					.statically_known()
+					.derived_from(&self))
 			}
 			"utf16le" =>
 			{
@@ -752,7 +862,9 @@ impl Value
 				}
 					
 				Ok(expr::Value::make_integer(
-					util::BigInt::from_bytes_be(&bytes[..])))
+						util::BigInt::from_bytes_be(&bytes[..]))
+					.statically_known()
+					.derived_from(&self))
 			}
 			"utf32be" =>
 			{
@@ -767,7 +879,9 @@ impl Value
 				}
 					
 				Ok(expr::Value::make_integer(
-					util::BigInt::from_bytes_be(&bytes[..])))
+						util::BigInt::from_bytes_be(&bytes[..]))
+					.statically_known()
+					.derived_from(&self))
 			}
 			"utf32le" =>
 			{
@@ -782,7 +896,9 @@ impl Value
 				}
 					
 				Ok(expr::Value::make_integer(
-					util::BigInt::from_bytes_be(&bytes[..])))
+						util::BigInt::from_bytes_be(&bytes[..]))
+					.statically_known()
+					.derived_from(&self))
 			}
 			"ascii" =>
 			{
@@ -799,7 +915,9 @@ impl Value
 				});
 					
 				Ok(expr::Value::make_integer(
-					util::BigInt::from_bytes_be(&bytes.collect::<Vec<_>>()[..])))
+						util::BigInt::from_bytes_be(&bytes.collect::<Vec<_>>()[..]))
+					.statically_known()
+					.derived_from(&self))
 			}
 			_ => panic!("invalid string encoding"),
 		}
@@ -875,4 +993,59 @@ impl std::cmp::PartialEq for Value
 			}
 		}
 	}
+}
+
+
+impl std::fmt::Display for expr::Value
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    {
+		let mut write_meta = |meta: &ValueMetadata| {
+			write!(f, "{}", if !meta.is_guess { "✅" } else { "" })
+		};
+
+		match self
+		{
+			Value::Unknown(meta) => {
+				write_meta(meta)?;
+				write!(f, "Unknown")
+			}
+			Value::FailedConstraint(meta, ..) => {
+				write_meta(meta)?;
+				write!(f, "FailedConstraint")
+			}
+			Value::Void(meta) => {
+				write_meta(meta)?;
+				write!(f, "Void")
+			}
+			Value::Integer(meta, value) => {
+				write_meta(meta)?;
+				write!(f, "Integer({:?})", value)
+			}
+			Value::Bool(meta, value) => {
+				write_meta(meta)?;
+				write!(f, "Bool({:?})", value)
+			}
+			Value::Struct(meta, value) => {
+				write_meta(meta)?;
+				write!(f, "Struct({:?})", value)
+			}
+			Value::ExprBuiltinFn(meta, value) => {
+				write_meta(meta)?;
+				write!(f, "ExprBuiltinFn({:?})", value)
+			}
+			Value::AsmBuiltinFn(meta, value) => {
+				write_meta(meta)?;
+				write!(f, "AsmBuiltinFn({:?})", value)
+			}
+			Value::Function(meta, value) => {
+				write_meta(meta)?;
+				write!(f, "Function({:?})", value)
+			}
+			Value::Bankdef(meta, value) => {
+				write_meta(meta)?;
+				write!(f, "Bankdef({:?})", value)
+			}
+		}
+    }
 }

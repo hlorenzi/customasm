@@ -13,67 +13,104 @@ pub fn resolve_align(
 {
     let item_ref = ast_align.item_ref.unwrap();
 
+    let align = defs.align_directives.get(item_ref);
+
+    if align.resolved && opts.optimize_statically_known {
+        return Ok(asm::ResolutionState::Resolved);
+    }
+    
     let value = asm::resolver::eval(
         report,
         fileserver,
+        opts,
         decls,
         defs,
         ctx,
         &mut expr::EvalContext::new(opts),
         &ast_align.expr)?;
 
-    let value = value.expect_error_or_usize(
+    let align = defs.align_directives.get_mut(item_ref);
+    let is_stable = value.is_stable(&align.value);
+    align.value = value;
+    
+    let align_size = finalize_align(
         report,
-        ast_align.expr.span())?;
-
-    let value = {
-        match value
-        {
-            expr::Value::Integer(_, bigint) =>
-                bigint.checked_into::<usize>(
-                    report,
-                    ast_align.header_span)?,
-
-            _ => 0,
-        }
-    };
+        ast_align,
+        defs,
+        ctx)?;
 
     let align = defs.align_directives.get_mut(item_ref);
-    let prev_value = align.align_size;
-    align.align_size = value;
+    align.align_size = align_size;
+
+    asm::resolver::handle_value_resolution(
+        opts,
+        report,
+        ast_align.expr.span(),
+        ctx.can_guess(),
+        align.value.is_guess(),
+        is_stable,
+        &mut align.resolved,
+        false,
+        "align",
+        "alignment value",
+        None,
+        &align.value)
+}
 
 
-    if align.align_size != prev_value
+pub fn finalize_align(
+    report: &mut diagn::Report,
+    ast_align: &asm::AstDirectiveAlign,
+    defs: &asm::ItemDefs,
+    ctx: &asm::ResolverContext)
+    -> Result<usize, ()>
+{
+    let item_ref = ast_align.item_ref.unwrap();
+
+    let align = defs.align_directives.get(item_ref);
+
+    if let expr::Value::Integer(_, bigint) = &align.value
     {
-        // On the final iteration, unstable guesses become errors
-        if ctx.is_last_iteration
-        {
-            report.error_span(
-                "alignment size did not converge",
-                ast_align.expr.span());
-        }
+        let align_size = bigint.maybe_into::<usize>();
 
-        if opts.debug_iterations
+        if let Some(align_size) = align_size
         {
-            println!("align: {:?}", align.align_size);
+            if align_size == 0
+            {
+                if ctx.can_guess() {
+                    return Ok(0);
+                }
+
+                report.error_span(
+                    "invalid alignment size",
+                    ast_align.expr.span());
+
+                return Err(());
+            }
+            
+            return Ok(align_size);
         }
         
-        return Ok(asm::ResolutionState::Unresolved);
-    }
-
-    
-    if ctx.is_last_iteration
-    {
-        if align.align_size == 0
-        {
-            report.error_span(
-                "invalid alignment size",
-                ast_align.expr.span());
-
-            return Err(());
+        if ctx.can_guess() {
+            return Ok(0);
         }
+        
+        report.error_span(
+            "alignment size outside the supported range",
+            ast_align.expr.span());
+    }
+    else
+    {
+        if ctx.can_guess() {
+            return Ok(0);
+        }
+
+        report.error_span(
+            format!(
+                "invalid type for alignment size (have {})",
+                align.value.type_name()),
+            ast_align.expr.span());
     }
 
-
-    Ok(asm::ResolutionState::Resolved)
+    Err(())
 }
