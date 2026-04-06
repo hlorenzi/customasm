@@ -337,10 +337,9 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
                 // Advance the current bank's position
                 cur_bank_data.cur_position += {
-                    match instr.encoding.size
-                    {
-                        Some(size) => size,
-                        None => 0,
+                    match &instr.encoding {
+                        expr::Value::Integer(_, bigint) => bigint.size.unwrap_or(0),
+                        _ => 0,
                     }
                 };
             }
@@ -354,10 +353,12 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
                 // Advance the current bank's position
                 cur_bank_data.cur_position += {
-                    match data_elem.encoding.size
-                    {
+                    match data_elem.elem_size {
                         Some(size) => size,
-                        None => 0,
+                        None => match &data_elem.encoding {
+                            expr::Value::Integer(_, bigint) => bigint.size.unwrap_or(0),
+                            _ => 0,
+                        }
                     }
                 };
             }

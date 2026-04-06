@@ -6,8 +6,9 @@ pub struct DataElement
 {
     pub item_ref: util::ItemRef<Self>,
     pub position_within_bank: Option<usize>,
+    pub elem_size: Option<usize>,
     pub encoding_statically_known: bool,
-    pub encoding: util::BigInt,
+    pub encoding: expr::Value,
     pub resolved: bool,
 }
 
@@ -24,31 +25,19 @@ pub fn define(
     {
         if let asm::AstAny::DirectiveData(ast_data) = any_node
         {
-            for expr in &ast_data.elems
+            for _ in &ast_data.elems
             {
                 let item_ref = defs.data_elems.next_item_ref();
-
-                let size = {
-                    match ast_data.elem_size
-                    {
-                        Some(s) => Some(s),
-                        None => expr.get_static_size(
-                            &expr::StaticallyKnownProvider::new(opts)),
-                    }
-                };
 
                 let mut provider = expr::StaticallyKnownProvider::new(opts);
                 provider.query_function = &asm::resolver::resolve_and_get_statically_known_builtin_fn;
                 
-                let statically_known = expr.is_value_statically_known(&provider);
-
                 let data_block = DataElement {
                     item_ref,
                     position_within_bank: None,
-                    encoding_statically_known: statically_known,
-                    encoding: util::BigInt::new(
-                        0,
-                        Some(size.unwrap_or(0))),
+                    elem_size: ast_data.elem_size,
+                    encoding_statically_known: false,
+                    encoding: expr::Value::make_unknown(),
                     resolved: false,
                 };
                 

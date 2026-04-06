@@ -160,6 +160,7 @@ fn resolve_once(
     is_last_iteration: bool)
     -> Result<AsmBlockResult, ()>
 {
+    let mut result_metadata = expr::Value::make_unknown().statically_known();
     let mut result = util::BigInt::new(0, Some(0));
     let mut cur_position = position_at_start;
     let mut unstable = false;
@@ -298,17 +299,26 @@ fn resolve_once(
             // and advance the position
             if let Some(encodings) = maybe_encodings?
             {
-                let size = encodings[0].1.size.unwrap();
+                let size = encodings[0].1.unwrap_bigint().size.unwrap();
 
                 cur_position += size;
 
                 result = result.concat(
                     (result.size.unwrap(), 0),
-                    &encodings[0].1,
+                    &encodings[0].1.unwrap_bigint(),
                     (size, 0));
+
+                result_metadata = {
+                    match encodings.len()
+                    {
+                        1 => result_metadata.derived_from(encodings[0].1),
+                        _ => result_metadata.mark_guess(),
+                    }
+                };
             }
             else 
             {
+                result_metadata = result_metadata.mark_guess();
                 unstable = true;
 
                 if !inner_ctx.can_guess()
@@ -320,7 +330,7 @@ fn resolve_once(
     }
 
     Ok(AsmBlockResult {
-        value: expr::Value::make_integer(result),
+        value: expr::Value::make_integer(result).statically_known().derived_from(&result_metadata),
         unstable,
     })
 }

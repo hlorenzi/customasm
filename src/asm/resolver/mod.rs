@@ -17,7 +17,15 @@ pub use constant::{
 
 mod label;
 mod instruction;
+pub use instruction::{
+    check_final_instruction,
+};
+
 mod data_block;
+pub use data_block::{
+    check_final_data_element,
+};
+
 mod res;
 mod align;
 mod addr;
@@ -256,6 +264,13 @@ pub fn resolve_once(
                         decls,
                         defs,
                         &ctx)?);
+
+                if is_last_iteration {
+                    align::check_final_align(
+                        report,
+                        ast_align,
+                        defs)?;
+                }
             }
         
             asm::ResolverNode::Addr(ast_addr) =>
@@ -287,4 +302,49 @@ pub fn resolve_once(
     }
 
     Ok(resolution_state)
+}
+
+
+pub fn handle_value_resolution(
+    opts: &asm::AssemblyOptions,
+    report: &mut diagn::Report,
+    span: diagn::Span,
+    can_guess: bool,
+    is_guess: bool,
+    is_stable: bool,
+    is_resolved: &mut bool,
+    suppress_diagn: bool,
+    debug_element_type: &str,
+    user_element_type: &str,
+    element_name: Option<&str>,
+    value: &expr::Value)
+    -> Result<asm::ResolutionState, ()>
+{
+    let will_resolve =
+        *is_resolved ||
+        !is_guess ||
+        (!can_guess && is_stable);
+    
+    if opts.debug_iterations
+    {
+        println!("{}{} `{}` = {}",
+            if will_resolve { "✅" } else { "" },
+            debug_element_type,
+            if let Some(name) = element_name { name.to_string() } else { format!("{:?}", span) },
+            value);
+    }
+
+    if will_resolve
+    {
+        *is_resolved = true;
+        return Ok(asm::ResolutionState::Resolved);
+    }
+    
+    if !can_guess && !suppress_diagn {
+        report.error_span(
+            format!("{} did not converge", user_element_type),
+            span);
+    }
+
+    Ok(asm::ResolutionState::Unresolved)
 }

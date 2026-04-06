@@ -13,6 +13,12 @@ pub fn resolve_align(
 {
     let item_ref = ast_align.item_ref.unwrap();
 
+    let align = defs.align_directives.get(item_ref);
+
+    if align.resolved && opts.optimize_statically_known {
+        return Ok(asm::ResolutionState::Resolved);
+    }
+    
     let value = asm::resolver::eval(
         report,
         fileserver,
@@ -22,48 +28,51 @@ pub fn resolve_align(
         &mut expr::EvalContext::new(opts),
         &ast_align.expr)?;
 
-    let value = value.expect_error_or_usize(
-        report,
-        ast_align.expr.span())?;
-
-    let value = {
+    let align_size = {
         match value
         {
-            expr::Value::Integer(_, bigint) =>
-                bigint.checked_into::<usize>(
-                    report,
-                    ast_align.header_span)?,
+            expr::Value::Integer(_, ref bigint) =>
+                bigint.maybe_into::<usize>().unwrap_or(0),
 
             _ => 0,
         }
     };
 
     let align = defs.align_directives.get_mut(item_ref);
-    let prev_value = align.align_size;
-    align.align_size = value;
-
-
-    if align.align_size != prev_value
-    {
-        // On the final iteration, unstable guesses become errors
-        if ctx.is_last_iteration
-        {
-            report.error_span(
-                "alignment size did not converge",
-                ast_align.expr.span());
-        }
-
-        if opts.debug_iterations
-        {
-            println!("align: {:?}", align.align_size);
-        }
-        
-        return Ok(asm::ResolutionState::Unresolved);
-    }
-
+    let is_stable = value.is_stable(&align.value);
+    align.align_size = align_size;
+    align.value = value;
     
-    if ctx.is_last_iteration
+    asm::resolver::handle_value_resolution(
+        opts,
+        report,
+        ast_align.expr.span(),
+        ctx.can_guess(),
+        align.value.is_guess(),
+        is_stable,
+        &mut align.resolved,
+        false,
+        "align",
+        "alignment value",
+        None,
+        &align.value)
+}
+
+
+pub fn check_final_align(
+    report: &mut diagn::Report,
+    ast_align: &asm::AstDirectiveAlign,
+    defs: &mut asm::ItemDefs)
+    -> Result<(), ()>
+{
+    let item_ref = ast_align.item_ref.unwrap();
+
+    let align = defs.align_directives.get(item_ref);
+
+    if let expr::Value::Integer(_, bigint) = &align.value
     {
+        bigint.checked_into::<usize>(report, ast_align.expr.span())?;
+        
         if align.align_size == 0
         {
             report.error_span(
@@ -73,7 +82,16 @@ pub fn resolve_align(
             return Err(());
         }
     }
+    else
+    {
+        report.error_span(
+            format!(
+                "invalid type for data element (have {})",
+                align.value.type_name()),
+            ast_align.expr.span());
 
+        return Err(());
+    }
 
-    Ok(asm::ResolutionState::Resolved)
+    Ok(())
 }

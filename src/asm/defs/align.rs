@@ -6,6 +6,8 @@ pub struct AlignDirective
 {
     pub item_ref: util::ItemRef<Self>,
     pub align_size: usize,
+    pub value: expr::Value,
+    pub resolved: bool,
 }
 
 
@@ -25,6 +27,8 @@ pub fn define(
             let res = AlignDirective {
                 item_ref,
                 align_size: 0,
+                value: expr::Value::make_unknown(),
+                resolved: false,
             };
             
             defs.align_directives.define(item_ref, res);

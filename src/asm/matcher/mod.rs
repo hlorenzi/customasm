@@ -44,7 +44,7 @@ pub enum InstructionMatchResolution
 {
     Unresolved,
     FailedConstraint(diagn::Message),
-    Resolved(util::BigInt),
+    Resolved(expr::Value),
 }
 
 
@@ -72,11 +72,11 @@ impl InstructionMatchResolution
     }
 
 
-    pub fn unwrap_resolved(&self) -> &util::BigInt
+    pub fn unwrap_resolved(&self) -> &expr::Value
     {
         match self
         {
-            InstructionMatchResolution::Resolved(bigint) => bigint,
+            InstructionMatchResolution::Resolved(value) => value,
             InstructionMatchResolution::FailedConstraint(_) => panic!(),
             InstructionMatchResolution::Unresolved => panic!(),
         }
@@ -192,15 +192,16 @@ pub fn match_all(
                 .max_by_key(|m| m.encoding_size)
                 .unwrap();
 
-            instr.encoding = util::BigInt::new(
-                0,
-                Some(largest_encoding.encoding_size));
+            instr.encoding = expr::Value::make_integer(
+                util::BigInt::new(
+                    0,
+                    Some(largest_encoding.encoding_size)));
 
             if opts.debug_iterations
             {
                 println!(" size: {} = {:?}{}",
                     ast_instr.src,
-                    instr.encoding.size.unwrap(),
+                    largest_encoding.encoding_size,
                     if instr.encoding_statically_known { " [static]" } else { "" });
             }
         }

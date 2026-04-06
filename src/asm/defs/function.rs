@@ -58,6 +58,7 @@ pub fn define(
                     expr::Value::make_metadata(),
                     fn_ref),
                 resolved: true,
+                driver_defined: false,
                 bankdef_ref: None,
             };
 

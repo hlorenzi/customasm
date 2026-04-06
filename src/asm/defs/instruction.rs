@@ -7,7 +7,7 @@ pub struct Instruction
     pub item_ref: util::ItemRef<Self>,
     pub matches: asm::InstructionMatches,
     pub encoding_statically_known: bool,
-    pub encoding: util::BigInt,
+    pub encoding: expr::Value,
     pub resolved: bool,
 }
 
@@ -29,7 +29,7 @@ pub fn define(
                 item_ref,
                 matches: asm::InstructionMatches::new(),
                 encoding_statically_known: false,
-                encoding: util::BigInt::new(0, Some(0)),
+                encoding: expr::Value::make_unknown().statically_known(),
                 resolved: false,
             };
             

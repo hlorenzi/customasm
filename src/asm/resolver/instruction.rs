@@ -13,8 +13,7 @@ pub fn resolve_instruction(
 {
     let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
 
-    if instr.resolved
-    {
+    if instr.resolved && opts.optimize_statically_known {
         return Ok(asm::ResolutionState::Resolved);
     }
 
@@ -34,8 +33,8 @@ pub fn resolve_instruction(
         ctx,
         &mut expr::EvalContext::new(opts))?;
 
-    let has_any_matches =
-        maybe_encodings.is_some();
+    let suppress_diagn =
+        maybe_encodings.is_none();
 
     let has_single_match =
         maybe_encodings.as_ref().map_or(false, |e| e.len() == 1);
@@ -47,61 +46,43 @@ pub fn resolve_instruction(
     let instr = defs.instructions.get_mut(ast_instr.item_ref.unwrap());
     instr.matches = matches;
 
-
     // Check for stable resolution
-    let is_stable =
-        Some(&instr.encoding) == maybe_chosen_encoding.as_ref();
+    let is_stable = maybe_chosen_encoding
+        .as_ref()
+        .map_or(false, |e| e.is_stable(&instr.encoding));
 
-
-    // Update the instruction's encoding if available
     if let Some(encoding) = maybe_chosen_encoding
     {
         instr.encoding = encoding;
-
-        // Optimize future iterations for the case where it's
-        // statically known that the encoding can be resolved
-        // in the first pass
-        if opts.optimize_statically_known &&
-            ctx.is_first_iteration &&
-            instr.encoding_statically_known &&
-            has_single_match
-        {
-            if opts.debug_iterations
-            {
-                println!("instr: {} = {:?} [static]",
-                    ast_instr.src,
-                    instr.encoding);
-            }
-
-            instr.resolved = true;
-            return Ok(asm::ResolutionState::Resolved);
-        }
     }
 
+    asm::resolver::handle_value_resolution(
+        opts,
+        report,
+        ast_instr.span,
+        ctx.can_guess(),
+        instr.encoding.is_guess() || !has_single_match,
+        is_stable,
+        &mut instr.resolved,
+        suppress_diagn,
+        "instr",
+        "instruction encoding",
+        Some(&ast_instr.src),
+        &instr.encoding)
+}
+
+
+pub fn check_final_instruction<'instr>(
+    _report: &mut diagn::Report,
+    _span: diagn::Span,
+    instr: &'instr asm::Instruction)
+    -> Result<&'instr util::BigInt, ()>
+{
+    let expr::Value::Integer(_, ref encoding) = instr.encoding
+        else { unreachable!() };
     
-    if !is_stable
-    {
-        // On the final iteration, unstable guesses become errors.
-        // If encodings came out None, an inner error has already been reported.
-        if ctx.is_last_iteration && has_any_matches
-        {
-            report.error_span(
-                "instruction encoding did not converge",
-                ast_instr.span);
-        }
-        
-        if opts.debug_iterations
-        {
-            println!("instr: {} = {:?}",
-                ast_instr.src,
-                instr.encoding);
-        }
-        
-        return Ok(asm::ResolutionState::Unresolved);
-    }
-
-
-    Ok(asm::ResolutionState::Resolved)
+    // Definite size was checked in resolve_instruction_matches
+    Ok(encoding)
 }
 
 
@@ -115,7 +96,7 @@ pub fn resolve_encoding<'encoding>(
     defs: &asm::ItemDefs,
     ctx: &asm::ResolverContext,
     arg_eval_ctx: &mut expr::EvalContext)
-    -> Result<Option<Vec<(usize, &'encoding util::BigInt)>>, ()>
+    -> Result<Option<Vec<(usize, &'encoding expr::Value)>>, ()>
 {
     report.push_parent_cap();
 
@@ -188,13 +169,13 @@ pub fn resolve_encoding<'encoding>(
     // Now only retain the smallest encodings
     let smallest_size = encodings_resolved
         .iter()
-        .map(|e| e.1.size.unwrap())
+        .map(|e| e.1.unwrap_bigint().size.unwrap())
         .min()
         .unwrap();
 
     let smallest_encodings = encodings_resolved
         .iter()
-        .filter(|e| e.1.size.unwrap() == smallest_size)
+        .filter(|e| e.1.unwrap_bigint().size.unwrap() == smallest_size)
         .copied()
         .collect::<Vec<_>>();
     
@@ -263,10 +244,10 @@ fn resolve_instruction_matches(
             rule.expr.returned_value_span())?;
 
 
-        if let expr::Value::Integer(_, bigint) = value_definite
+        if let expr::Value::Integer(_, _) = value_definite
         {
             matches[index].encoding =
-                asm::InstructionMatchResolution::Resolved(bigint);
+                asm::InstructionMatchResolution::Resolved(value_definite);
         }
         else if let expr::Value::FailedConstraint(_, msg) = value_definite
         {
@@ -483,11 +464,6 @@ pub fn check_and_constrain_argument(
     typ: asm::RuleParameterType)
     -> Result<expr::Value, ()>
 {
-    let bigint = value
-        .coallesce_to_integer()
-        .expect_bigint(report, span)?
-        .to_owned();
-
     match typ
     {
         asm::RuleParameterType::Unspecified =>
@@ -500,7 +476,7 @@ pub fn check_and_constrain_argument(
                 span,
                 size,
                 "u",
-                bigint,
+                value,
                 |x| x.sign() == -1 ||
                     x.min_size() > size)
         }
@@ -512,7 +488,7 @@ pub fn check_and_constrain_argument(
                 span,
                 size,
                 "s",
-                bigint,
+                value,
                 |x| (x.sign() == 0 && size == 0) ||
                     (x.sign() == 1 && x.min_size() >= size) ||
                     (x.sign() == -1 && x.min_size() > size))
@@ -525,7 +501,7 @@ pub fn check_and_constrain_argument(
                 span,
                 size,
                 "i",
-                bigint,
+                value,
                 |x| x.min_size() > size)
         }
 
@@ -540,10 +516,13 @@ fn check_and_constrain_value_for_integer_type(
     span: diagn::Span,
     size: usize,
     typename_prefix: &'static str,
-    mut bigint: util::BigInt,
+    mut value: expr::Value,
     failure_check: impl Fn(&util::BigInt) -> bool)
     -> Result<expr::Value, ()>
 {
+    let bigint = value
+        .expect_bigint(report, span)?;
+
     if failure_check(&bigint)
     {
         let msg = diagn::Message::error_span(
@@ -559,7 +538,10 @@ fn check_and_constrain_value_for_integer_type(
     }
     else
     {
+        let expr::Value::Integer(_, ref mut bigint) = value
+            else { unreachable!() };
+
         bigint.size = Some(size);
-        Ok(expr::Value::make_integer(bigint))
+        Ok(value)
     }
 }

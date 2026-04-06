@@ -245,6 +245,7 @@ fn test_file_variant(
                 &command,
                 &mut fileserver,
                 |command| {
+                    command.opts.debug_iterations = true;
                     command.opts.optimize_instruction_matching = optimize_instruction_matching;
                     command.opts.optimize_statically_known = optimize_statically_known;
                 })

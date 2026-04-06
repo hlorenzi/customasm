@@ -837,7 +837,7 @@ fn parse_define_arg(
 	{
 		return Ok(asm::DriverSymbolDef {
 			name,
-			value: expr::Value::make_bool(true),
+			value: expr::Value::make_bool(true).statically_known(),
 		});
 	}
 
@@ -856,11 +856,11 @@ fn parse_define_arg(
 	let value = {
 		if value_str == "true"
 		{
-			expr::Value::make_bool(true)
+			expr::Value::make_bool(true).statically_known()
 		}
 		else if value_str == "false"
 		{
-			expr::Value::make_bool(false)
+			expr::Value::make_bool(false).statically_known()
 		}
 		else
 		{
@@ -878,7 +878,8 @@ fn parse_define_arg(
 			{
 				Ok(value) =>
 					expr::Value::make_integer(
-						if has_negative_sign { value.neg() } else { value }),
+							if has_negative_sign { value.neg() } else { value })
+						.statically_known(),
 
 				Err(()) =>
 				{

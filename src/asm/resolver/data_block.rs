@@ -15,12 +15,9 @@ pub fn resolve_data_element(
     let item_ref = ast_data.item_refs[elem_index];
     let data_elem = defs.data_elems.get(item_ref);
 
-    if data_elem.resolved &&
-        data_elem.encoding_statically_known
-    {
+    if data_elem.resolved && opts.optimize_statically_known {
         return Ok(asm::ResolutionState::Resolved);
     }
-
 
     let expr = &ast_data.elems[elem_index];
 
@@ -39,145 +36,90 @@ pub fn resolve_data_element(
 
     report.pop_parent();
 
-            
-    let maybe_encoding = {
-        match maybe_value?.expect_error_or_bigint(
-            report,
-            expr.span())?
-        {
-            expr::Value::Integer(_, i) => Some(i),
+    let value = maybe_value?;
 
-            expr::Value::Unknown(_) => None,
+    let data_elem = defs.data_elems.get_mut(item_ref);
+    let is_stable = value.is_stable(&data_elem.encoding);
+    data_elem.encoding = value;
 
-            expr::Value::FailedConstraint(_, msg) =>
-            {
-                if ctx.is_last_iteration ||
-                    data_elem.encoding_statically_known
-                {
-                    report.message(msg.clone());
-                    return Err(());
-                }
-
-                None
-            }
-
-            _ => unreachable!(),
-        }
-    };
+    asm::resolver::handle_value_resolution(
+        opts,
+        report,
+        ast_data.elems[elem_index].span(),
+        ctx.can_guess(),
+        data_elem.encoding.is_guess(),
+        is_stable,
+        &mut data_elem.resolved,
+        false,
+        "data",
+        "data element value",
+        None,
+        &data_elem.encoding)
+}
 
 
-    if ctx.is_last_iteration ||
-        data_elem.encoding_statically_known
+pub fn check_final_data_element(
+    report: &mut diagn::Report,
+    span: diagn::Span,
+    elem: &asm::DataElement)
+    -> Result<util::BigInt, ()>
+{
+    if let expr::Value::Integer(_, ref encoding) = elem.encoding
     {
-        if let Some(ref encoding) = maybe_encoding
+        // Check the element size against the directive size
+        if let Some(elem_size) = elem.elem_size
         {
-            // Check the element size against the directive size
-            if let Some(elem_size) = ast_data.elem_size
-            {
-                let encoding_size = encoding.size_or_min_size();
-                
-                if encoding_size > elem_size
-                {
-                    report.push_parent(
-                        "value out of range for directive",
-                        expr.span());
-
-                    report.note(
-                        format!(
-                            "data directive has size {}, got size {}",
-                            elem_size,
-                            encoding_size));
-
-                    report.pop_parent();
-
-                    return Err(());
-                }
-            }
+            let encoding_size = encoding.size_or_min_size();
             
-            // Check for definite size
-            if ast_data.elem_size.is_none() &&
-                encoding.size.is_none()
+            if encoding_size > elem_size
             {
-                report.error_span(
-                    "data element has no definite size",
-                    expr.span());
+                report.push_parent(
+                    "value out of range for directive",
+                    span);
+
+                report.note(
+                    format!(
+                        "data directive has size {}, got size {}",
+                        elem_size,
+                        encoding_size));
+
+                report.pop_parent();
 
                 return Err(());
             }
         }
-    }
-
-
-    // Apply definite size via slice
-    let maybe_encoding = {
-        maybe_encoding.map(|e|
-        {
-            if let Some(elem_size) = ast_data.elem_size
-            {
-                e.slice(elem_size, 0)
-            }
-            else
-            {
-                e.slice(e.size_or_min_size(), 0)
-            }
-        })
-    };
-
-
-    let data_elem = defs.data_elems.get_mut(item_ref);
-    let prev_encoding = data_elem.encoding.clone();
-
-
-    if let Some(ref encoding) = maybe_encoding
-    {
-        data_elem.encoding = encoding.clone();
-
-        // Optimize future iterations for the case where it's
-        // statically known that the encoding can be resolved
-        // in the first pass
-        if opts.optimize_statically_known &&
-            ctx.is_first_iteration &&
-            data_elem.encoding_statically_known &&
-            encoding.size.is_some()
-        {
-            if opts.debug_iterations
-            {
-                println!(
-                    " data: {} = {:?} [static]",
-                    fileserver.get_excerpt(expr.span()),
-                    data_elem.encoding);
-            }
-
-            data_elem.resolved = true;
-            return Ok(asm::ResolutionState::Resolved);
-        }
-    }
-
-    
-    data_elem.resolved =
-        Some(&prev_encoding) == maybe_encoding.as_ref();
-    
-    if !data_elem.resolved
-    {
-        // On the final iteration, unstable guesses become errors
-        if ctx.is_last_iteration
+        
+        // Check for definite size
+        if elem.elem_size.is_none() &&
+            encoding.size.is_none()
         {
             report.error_span(
-                "data element did not converge",
-                expr.span());
+                "data element has no definite size",
+                span);
+
+            return Err(());
         }
-        
-        if opts.debug_iterations
-        {
-            println!(
-                " data: {} = {:?}",
-                fileserver.get_excerpt(expr.span()),
-                data_elem.encoding);
-        }
-        
-        return Ok(asm::ResolutionState::Unresolved);
+
+        // Apply definite size via slice
+        let encoding = {
+            if let Some(elem_size) = elem.elem_size {
+                encoding.slice(elem_size, 0)
+            }
+            else {
+                encoding.slice(encoding.size_or_min_size(), 0)
+            }
+        };
+
+        Ok(encoding)
     }
+    else
+    {
+        report.error_span(
+            format!(
+                "invalid type for data element (have {})",
+                elem.encoding.type_name()),
+            span);
 
-
-    Ok(asm::ResolutionState::Resolved)
+        Err(())
+    }
 }

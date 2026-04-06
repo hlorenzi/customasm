@@ -203,12 +203,6 @@ pub fn eval_ctxlabel(
 
     let symbol = defs.symbols.get(symbol_ref);
 
-    if !symbol.resolved &&
-        !ctx.can_guess()
-    {
-        return Ok(expr::Value::make_unknown());
-    }
-
     Ok(symbol.value.clone())
 }
 
@@ -243,12 +237,6 @@ pub fn eval_variable(
         query.hierarchy)?;
 
     let symbol = defs.symbols.get(symbol_ref);
-
-    if !symbol.resolved &&
-        !ctx.can_guess()
-    {
-        return Ok(expr::Value::make_unknown());
-    }
 
     Ok(symbol.value.clone())
 }
