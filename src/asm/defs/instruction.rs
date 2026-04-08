@@ -29,7 +29,7 @@ pub fn define(
                 item_ref,
                 matches: asm::InstructionMatches::new(),
                 encoding_statically_known: false,
-                encoding: expr::Value::make_unknown().statically_known(),
+                encoding: expr::Value::make_unknown(),
                 resolved: false,
             };
             

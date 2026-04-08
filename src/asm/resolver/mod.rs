@@ -67,17 +67,51 @@ pub use eval_fn::{
 pub enum ResolutionState
 {
     Unresolved,
+    Stable,
     Resolved,
 }
 
 
 impl ResolutionState
 {
+    pub fn is_stable_or_resolved(&self) -> bool
+    {
+        match self
+        {
+            ResolutionState::Resolved | ResolutionState::Stable => true,
+            ResolutionState::Unresolved => false,
+        }
+    }
+
+
     pub fn merge(&mut self, other: ResolutionState)
     {
-        if let ResolutionState::Unresolved = other
+        *self = {
+            match (&self, other)
+            {
+                (ResolutionState::Unresolved, _) |
+                (_, ResolutionState::Unresolved) =>
+                    ResolutionState::Unresolved,
+                
+                (ResolutionState::Stable, ResolutionState::Stable) |
+                (ResolutionState::Stable, ResolutionState::Resolved) |
+                (ResolutionState::Resolved, ResolutionState::Stable) =>
+                    ResolutionState::Stable,
+                
+                (ResolutionState::Resolved, ResolutionState::Resolved) =>
+                    ResolutionState::Resolved,
+            }
+        };
+    }
+
+
+    pub fn debug_label(&self) -> &'static str
+    {
+        match self
         {
-            *self = ResolutionState::Unresolved;
+            ResolutionState::Resolved => "resolved",
+            ResolutionState::Stable => "stable",
+            ResolutionState::Unresolved => "unresolved",
         }
     }
 }
@@ -113,7 +147,7 @@ pub fn resolve_iteratively(
             is_first_iteration,
             is_last_iteration)?;
 
-        if let asm::ResolutionState::Resolved = resolution_state
+        if resolution_state.is_stable_or_resolved()
         {
             if is_last_iteration
             {
@@ -141,7 +175,7 @@ pub fn resolve_iteratively(
         false,
         true)?;
 
-    if let asm::ResolutionState::Resolved = resolution_state
+    if resolution_state.is_stable_or_resolved()
     {
         Ok(iter_count)
     }
@@ -301,6 +335,13 @@ pub fn resolve_once(
         }
     }
 
+    if opts.debug_iterations
+    {
+        println!(
+            "iteration result: {}\n",
+            resolution_state.debug_label());
+    }
+
     Ok(resolution_state)
 }
 
@@ -320,24 +361,26 @@ pub fn handle_value_resolution(
     value: &expr::Value)
     -> Result<asm::ResolutionState, ()>
 {
-    let will_resolve =
-        *is_resolved ||
-        !is_guess ||
-        (!can_guess && is_stable);
-    
     if opts.debug_iterations
     {
-        println!("{}{} `{}` = {}",
-            if will_resolve { "✅" } else { "" },
+        println!("{:>2}{:>5} `{}` = {}",
+            if !is_guess && opts.optimize_statically_known { "🟢" }
+                else if is_stable { "🔵" }
+                else { "" },
             debug_element_type,
             if let Some(name) = element_name { name.to_string() } else { format!("{:?}", span) },
             value);
     }
 
-    if will_resolve
+    if !is_guess
     {
         *is_resolved = true;
         return Ok(asm::ResolutionState::Resolved);
+    }
+
+    if is_stable
+    {
+        return Ok(asm::ResolutionState::Stable);
     }
     
     if !can_guess && !suppress_diagn {

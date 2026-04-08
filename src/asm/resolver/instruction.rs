@@ -156,6 +156,31 @@ pub fn resolve_encoding<'encoding>(
         return Ok(None);
     }
 
+    
+    let num_encodings_known = matches
+        .iter()
+        .filter(|m| m.encoding.is_resolved() && !m.encoding.unwrap_resolved().is_unknown())
+        .count();
+
+    if num_encodings_known == 0
+    {
+        if !ctx.can_guess()
+        {
+            let mut msgs = Vec::new();
+
+            for _ in matches
+            {
+                msgs.push(diagn::Message::error_span(
+                    "instruction encoding did not converge",
+                    instr_span));
+            }
+            
+            report.message(
+                diagn::Message::fuse_topmost(msgs));
+        }
+
+        return Ok(None);
+    }
 
     // Retain only encodings which are Resolved,
     // and keep their original indices
@@ -243,13 +268,7 @@ fn resolve_instruction_matches(
             report,
             rule.expr.returned_value_span())?;
 
-
-        if let expr::Value::Integer(_, _) = value_definite
-        {
-            matches[index].encoding =
-                asm::InstructionMatchResolution::Resolved(value_definite);
-        }
-        else if let expr::Value::FailedConstraint(_, msg) = value_definite
+        if let expr::Value::FailedConstraint(_, msg) = value_definite
         {
             matches[index].encoding =
                 asm::InstructionMatchResolution::FailedConstraint(msg);
@@ -257,7 +276,7 @@ fn resolve_instruction_matches(
         else
         {
             matches[index].encoding =
-                asm::InstructionMatchResolution::Unresolved;
+                asm::InstructionMatchResolution::Resolved(value_definite);
         }
     }
 

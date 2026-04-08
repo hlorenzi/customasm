@@ -20,6 +20,8 @@ pub fn eval_asm(
 
 
     let mut labels = std::collections::HashMap::<String, expr::Value>::new();
+    let mut instrs = Vec::new();
+
     for node in &query.ast.nodes
     {
         if let asm::AstAny::Symbol(ast_symbol) = node
@@ -49,6 +51,7 @@ pub fn eval_asm(
 
         else if let asm::AstAny::Instruction(_) = node
         {
+            instrs.push(expr::Value::make_unknown());
             continue;
         }
 
@@ -69,7 +72,8 @@ pub fn eval_asm(
         ctx,
         query,
         position_at_start,
-        &mut labels)
+        &mut labels,
+        &mut instrs)
 }
 
 
@@ -80,7 +84,8 @@ fn resolve_iteratively(
     ctx: &asm::ResolverContext,
     query: &mut expr::EvalAsmBlockQuery,
     position_at_start: usize,
-    labels: &mut std::collections::HashMap::<String, expr::Value>)
+    labels: &mut std::collections::HashMap::<String, expr::Value>,
+    instrs: &mut Vec<expr::Value>)
     -> Result<expr::Value, ()>
 {
     let mut iter_count = 0;
@@ -103,10 +108,11 @@ fn resolve_iteratively(
             query,
             position_at_start,
             labels,
+            instrs,
             is_first_iteration,
             is_last_iteration)?;
 
-        if !result.unstable
+        if result.resolution.is_stable_or_resolved()
         {
             break;
         }
@@ -120,10 +126,11 @@ fn resolve_iteratively(
         query,
         position_at_start,
         labels,
+        instrs,
         false,
         ctx.is_last_iteration)?;
 
-    if !result.unstable
+    if result.resolution.is_stable_or_resolved()
     {
         return Ok(result.value);
     }
@@ -144,7 +151,7 @@ fn resolve_iteratively(
 struct AsmBlockResult
 {
     value: expr::Value,
-    unstable: bool,
+    resolution: asm::ResolutionState,
 }
 
 
@@ -156,6 +163,7 @@ fn resolve_once(
     query: &mut expr::EvalAsmBlockQuery,
     position_at_start: usize,
     labels: &mut std::collections::HashMap::<String, expr::Value>,
+    instrs: &mut Vec<expr::Value>,
     is_first_iteration: bool,
     is_last_iteration: bool)
     -> Result<AsmBlockResult, ()>
@@ -163,7 +171,9 @@ fn resolve_once(
     let mut result_metadata = expr::Value::make_unknown().statically_known();
     let mut result = util::BigInt::new(0, Some(0));
     let mut cur_position = position_at_start;
-    let mut unstable = false;
+    let mut resolution = asm::ResolutionState::Resolved;
+
+    let mut cur_instr = 0;
     
     for node in &query.ast.nodes
     {
@@ -197,9 +207,13 @@ fn resolve_once(
             let maybe_prev_value = labels.get(&ast_symbol.name);
             if let Some(prev_value) = maybe_prev_value
             {
-                if prev_value != &new_value
+                if new_value.is_stable(prev_value)
                 {
-                    unstable = true;
+                    resolution.merge(asm::ResolutionState::Stable);
+                }
+                else
+                {
+                    resolution.merge(asm::ResolutionState::Unresolved);
                 }
             }
 
@@ -295,23 +309,38 @@ fn resolve_once(
                 query.report.pop_parent();
             }
 
+            let prev_encoding = &instrs[cur_instr];
+
             // Add the encoding to the result value
             // and advance the position
             if let Some(encodings) = maybe_encodings?
             {
-                let size = encodings[0].1.unwrap_bigint().size.unwrap();
+                let encoding = encodings[0].1;
+
+                if encoding.is_stable(prev_encoding)
+                {
+                    resolution.merge(asm::ResolutionState::Stable);
+                }
+                else
+                {
+                    resolution.merge(asm::ResolutionState::Unresolved);
+                }
+
+                instrs[cur_instr] = encoding.clone();
+
+                let size = encoding.unwrap_bigint().size.unwrap();
 
                 cur_position += size;
 
                 result = result.concat(
                     (result.size.unwrap(), 0),
-                    &encodings[0].1.unwrap_bigint(),
+                    encoding.unwrap_bigint(),
                     (size, 0));
 
                 result_metadata = {
                     match encodings.len()
                     {
-                        1 => result_metadata.derived_from(encodings[0].1),
+                        1 => result_metadata.derived_from(encoding),
                         _ => result_metadata.mark_guess(),
                     }
                 };
@@ -319,19 +348,20 @@ fn resolve_once(
             else 
             {
                 result_metadata = result_metadata.mark_guess();
-                unstable = true;
 
                 if !inner_ctx.can_guess()
                 {
                     return Err(());
                 }
             }
+            
+            cur_instr += 1;
         }
     }
 
     Ok(AsmBlockResult {
         value: expr::Value::make_integer(result).statically_known().derived_from(&result_metadata),
-        unstable,
+        resolution,
     })
 }
 

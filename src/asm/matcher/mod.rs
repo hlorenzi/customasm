@@ -182,8 +182,8 @@ pub fn match_all(
             
             instr.matches = matches;
 
-            instr.encoding_statically_known = instr.matches.iter()
-                .all(|m| m.encoding_statically_known);
+            /*instr.encoding_statically_known = instr.matches.iter()
+                .all(|m| m.encoding_statically_known);*/
 
             // Statically calculate the encoding size
             // with a pessimistic guess
@@ -192,14 +192,14 @@ pub fn match_all(
                 .max_by_key(|m| m.encoding_size)
                 .unwrap();
 
-            instr.encoding = expr::Value::make_integer(
+            /*instr.encoding = expr::Value::make_integer(
                 util::BigInt::new(
                     0,
-                    Some(largest_encoding.encoding_size)));
+                    Some(largest_encoding.encoding_size)));*/
 
             if opts.debug_iterations
             {
-                println!(" size: {} = {:?}{}",
+                println!(" instr: `{}` = size {}{}",
                     ast_instr.src,
                     largest_encoding.encoding_size,
                     if instr.encoding_statically_known { " [static]" } else { "" });

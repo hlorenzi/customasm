@@ -173,7 +173,7 @@ impl Value
 
 	pub fn is_stable(&self, previous: &expr::Value) -> bool
 	{
-		!self.is_unknown() && self == previous
+		!self.is_unknown() && !previous.is_unknown() && self == previous
 	}
 
 	
