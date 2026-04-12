@@ -10,4 +10,4 @@
 }
 
 label:
-    #d16 bankof(label).unknown ; error: failed / error: unknown symbol `unknown`
+    #d16 $bankof(label).unknown ; error: failed / error: unknown symbol `unknown`

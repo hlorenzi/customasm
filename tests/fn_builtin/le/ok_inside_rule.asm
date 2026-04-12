@@ -1,6 +1,6 @@
 #ruledef
 {
-    ld {addr: u16} => 0xaa @ le(addr)
+    ld {addr: u16} => 0xaa @ $le(addr)
 }
 
 ld 0 ; = 0xaa0000

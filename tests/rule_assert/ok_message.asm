@@ -2,7 +2,7 @@
 {
     ld {x} =>
     {
-        assert(x < 0x10, "your custom message!")
+        $assert(x < 0x10, "your custom message!")
         0x55 @ x`8
     }
 }

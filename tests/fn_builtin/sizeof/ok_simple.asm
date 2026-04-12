@@ -17,5 +17,3 @@ ld 0xeeeee ; = 0xff_eeeee_14
 
 #d8 $sizeof(0x1234) ; = 0x10
 #d8 $sizeof("hello") ; = 0x28
-
-; legacy: off

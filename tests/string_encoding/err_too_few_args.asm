@@ -1,1 +1,1 @@
-#d utf8() ; error: failed / error: expected 1 argument
+#d $utf8() ; error: failed / error: expected 1 argument

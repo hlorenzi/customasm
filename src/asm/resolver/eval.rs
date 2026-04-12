@@ -255,9 +255,15 @@ pub fn eval_variable_simple(
 {
     if query.hierarchy_level == 0
     {
-        match query.hierarchy[0].as_ref()
+        let symbol = resolve_builtin_symbol(
+            query.hierarchy[0].as_ref(),
+            query.opts);
+
+        match symbol
         {
-            "$" | "pc" => return Ok(expr::Value::make_unknown()),
+            Some(AsmBuiltinSymbol::ProgramCounter) =>
+                return Ok(expr::Value::make_unknown()),
+            
             _ => {}
         }
     }
@@ -285,9 +291,13 @@ pub fn eval_variable_certain(
 {
     if query.hierarchy_level == 0
     {
-        match query.hierarchy[0].as_ref()
+        let symbol = resolve_builtin_symbol(
+            query.hierarchy[0].as_ref(),
+            query.opts);
+
+        match symbol
         {
-            "$" | "pc" =>
+            Some(AsmBuiltinSymbol::ProgramCounter) =>
             {
                 query.report.error_span(
                     "cannot get address in this context",
@@ -333,15 +343,22 @@ pub fn resolve_builtin_symbol(
     opts: &asm::AssemblyOptions)
     -> Option<AsmBuiltinSymbol>
 {
-    if name == "$" ||
-        (name == "$pc" && !opts.use_legacy_behavior) ||
-        (name == "pc" && opts.use_legacy_behavior)
+    match name
     {
-        Some(AsmBuiltinSymbol::ProgramCounter)
-    }
-    else
-    {
-        None
+        "$" => Some(AsmBuiltinSymbol::ProgramCounter),
+        _ => {
+            if opts.use_legacy_behavior
+            {
+                match name
+                {
+                    "pc" => Some(AsmBuiltinSymbol::ProgramCounter),
+                    _ => None,
+                }
+            }
+            else {
+                None
+            }
+        }
     }
 }
 

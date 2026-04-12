@@ -1,1 +1,1 @@
-#d incbinstr("unk") ; error: failed / error: file not found
+#d $incbinstr("unk") ; error: failed / error: file not found

@@ -11,5 +11,3 @@ $assert:
     ld $
 $:
     ld $
-
-; legacy: off

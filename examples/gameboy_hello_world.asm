@@ -149,5 +149,5 @@ Customasm:
 .size = $ - Customasm
 
 Tiles:
-#d incbin("ibmpc1.bin")
+#d $incbin("ibmpc1.bin")
 .size = $ - Tiles

@@ -1,11 +1,11 @@
 #ruledef
 {
     emit {x: i8} => {
-        assert(x < 0x10)
+        $assert(x < 0x10)
         x
     }
     emit {x: i8} => {
-        assert(x >= 0x10 && x < 0x20)
+        $assert(x >= 0x10 && x < 0x20)
         x
     }
     test {x} => asm { emit {x} }

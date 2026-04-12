@@ -1,1 +1,1 @@
-#d incbinstr("data3.txt") ; = 0x5af5a
+#d $incbinstr("data3.txt") ; = 0x5af5a

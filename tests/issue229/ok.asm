@@ -1,6 +1,6 @@
 #subruledef words {
-    {w1: u8} => le(w1)
-    {w1: u8}, {wn: words} => le(w1) @ wn
+    {w1: u8} => $le(w1)
+    {w1: u8}, {wn: words} => $le(w1) @ wn
 }
 #ruledef {
     dw {w: words} => w

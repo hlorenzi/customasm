@@ -28,10 +28,10 @@ label_a:
 label_b:
     #d 0xbb ; = 0xbb
 
-    #d16 bankof(label_a).addr ; = 0xabcd
-    #d16 bankof(label_a).data.a ; = 0xaa00
-    #d16 bankof(label_a).data.b ; = 0xbb00
+    #d16 $bankof(label_a).addr ; = 0xabcd
+    #d16 $bankof(label_a).data.a ; = 0xaa00
+    #d16 $bankof(label_a).data.b ; = 0xbb00
 
-    #d16 bankof(label_b).addr ; = 0xeffe
-    #d16 bankof(label_b).data.a ; = 0x00aa
-    #d16 bankof(label_b).data.b ; = 0x00bb
+    #d16 $bankof(label_b).addr ; = 0xeffe
+    #d16 $bankof(label_b).data.a ; = 0x00aa
+    #d16 $bankof(label_b).data.b ; = 0x00bb

@@ -8,5 +8,3 @@
 $le: ; error: reserved
     ld le
     ld $le(0x04)
-
-; legacy: off

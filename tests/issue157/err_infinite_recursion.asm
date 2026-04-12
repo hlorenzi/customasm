@@ -1,6 +1,6 @@
 #ruledef {
   a {a} => {
-    assert(a == 0)
+    $assert(a == 0)
     0`1
   }
   a {a} => {

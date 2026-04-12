@@ -1,8 +1,8 @@
 #subruledef sm83_reladdr {
     {addr: u16} => {
         reladdr = addr - $ - 2
-        assert(reladdr <=  0x7f)
-		assert(reladdr >= !0x7f)
+        $assert(reladdr <=  0x7f)
+		$assert(reladdr >= !0x7f)
 		reladdr`8
     }
 }
@@ -34,7 +34,7 @@
     DE => 1`2
     HL => 2`2
     SP => 3`2
-    AF => assert(0!=0, "invalid operand AF for this instruction")
+    AF => $assert(0!=0, "invalid operand AF for this instruction")
 }
 
 #subruledef sm83_r16_pushpop {
@@ -42,7 +42,7 @@
     DE => 1`2
     HL => 2`2
     AF => 3`2
-    SP => assert(0!=0, "invalid operand SP for this instruction")
+    SP => $assert(0!=0, "invalid operand SP for this instruction")
 }
 
 ; indirect registers are only used in LD [BC/DE/HLI/HLD], A and the inverse
@@ -79,7 +79,7 @@
 ; RST vectors are every 8 bytes before $0040 (which is itself vblank)
 #subruledef sm83_rst {
     {n: u8} => {
-        assert((n%8==0)&&(n<0x40),"invalid RST vector!")
+        $assert((n%8==0)&&(n<0x40),"invalid RST vector!")
         n[5:3]
     }
 }
@@ -89,7 +89,7 @@
 #subruledef sm83_a8 {
     {byte: u8} => byte
     {addr: u16} => {
-        assert(addr>=0xff00, "invalid operand address for LDH")
+        $assert(addr>=0xff00, "invalid operand address for LDH")
         addr`8
     }
 }
@@ -113,7 +113,7 @@
 ; 8-bit register; the yyy comes from here
 #subruledef sm83_u3 {
     {n} => {
-        assert(n<8, "invalid operand (must be in 0-7 range)")
+        $assert(n<8, "invalid operand (must be in 0-7 range)")
         n`3
     }
 }
@@ -130,8 +130,8 @@
     ; the 16-bit registers in these instructions use the upper 2 bits of the
     ; octal digit as the register index, with the lower bit of the octal digit
     ; being 0 for one set of instructions and 1 for the other
-	LD {r16: sm83_r16},{n16: u16} => (r16 @ 0b0 @ 0o1)`8 @ le(n16)
-    ADD HL,{r16: sm83_r16} => (r16 @ 0b1 @ 0o1)`8 @ le(n16)
+	LD {r16: sm83_r16},{n16: u16} => (r16 @ 0b0 @ 0o1)`8 @ $le(n16)
+    ADD HL,{r16: sm83_r16} => (r16 @ 0b1 @ 0o1)`8 @ $le(n16)
     LD {r16: sm83_r16_indirect},A => (r16 @ 0b0 @ 0o2)`8
     LD A,{r16: sm83_r16_indirect} => (r16 @ 0b1 @ 0o2)`8
     INC {r16: sm83_r16} => (r16 @ 0b0 @ 0o3)`8
@@ -146,7 +146,7 @@
     RRCA => 0o17`8
     RLA => 0o27`8
     RRA => 0o37`8
-    LD [{a16: u16}],SP => 0o10`8 @ le(a16)
+    LD [{a16: u16}],SP => 0o10`8 @ $le(a16)
     STOP {n8: u8} => 0o20`8 @ n8
     ; alias to let you STOP without defining the following byte
     ; (it's not used, but canonically 0x10 0x00 is the "correct" use of STOP)
@@ -166,7 +166,7 @@
     ; where source and destination are [hl], which would read a byte from memory 
     ; and then write it directly back but instead is the encoding for `halt`
     LD {dst: sm83_r8},{src: sm83_r8} => {
-        assert(!(dst==6 && src==6),"`ld [hl],[hl]` encodes as `halt`")
+        $assert(!(dst==6 && src==6),"`ld [hl],[hl]` encodes as `halt`")
         0b01 @ dst @ src
     }
     HALT => 0x76
@@ -181,25 +181,25 @@
     ; now for the rest of 0b11xxxxxx
     RET {cond: sm83_cond} => 0b11 @ 0b0 @ cond @ 0o0
     POP {r16: sm83_r16_pushpop} => 0b11 @ r16 @ 0b0 @ 0o1
-    JP {cond: sm83_cond},{a16: u16} => 0b11 @ 0b0 @ cond @ 0o2 @ le(a16)
-    JP {a16: u16} => 0xc3 @ le(a16)
-    CALL {cond: sm83_cond},{a16: u16} => 0b11 @ 0b0 @ cond @ 0o4 @ le(a16)
+    JP {cond: sm83_cond},{a16: u16} => 0b11 @ 0b0 @ cond @ 0o2 @ $le(a16)
+    JP {a16: u16} => 0xc3 @ $le(a16)
+    CALL {cond: sm83_cond},{a16: u16} => 0b11 @ 0b0 @ cond @ 0o4 @ $le(a16)
     PUSH {r16: sm83_r16_pushpop} => 0b11 @ r16 @ 0b0 @ 0o5
     RST {vector: sm83_rst} => 0b11 @ vector @ 0o7
     RET => 0xc9
     {instr: sm83_cbprefix} => 0xcb @ instr
-    CALL {a16: u16} => 0xcd @ le(a16)
+    CALL {a16: u16} => 0xcd @ $le(a16)
     RETI => 0xd9
     LDH [{a8: sm83_a8}],A => 0xe0 @ a8
     LDH [C],A => 0xe2
     ADD SP, {e8: s8} => 0xe8 @ e8
     JP HL => 0xe9
-    LD [{a16: u16}],A => 0xea @ le(a16)
+    LD [{a16: u16}],A => 0xea @ $le(a16)
     LDH A,[{a8: sm83_a8}] => 0xf0 @ a8
     LDH A,[C] => 0xf2
     DI => 0xf3
     LD HL,SP+{e8: s8} => 0xf8 @ e8
     LD SP, HL => 0xf9
-    LD A,[{a16: u16}] => 0xfa @ le(a16)
+    LD A,[{a16: u16}] => 0xfa @ $le(a16)
     EI => 0xfb
 }

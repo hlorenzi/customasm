@@ -7,5 +7,3 @@
     ld $
 $xxxx: ; error: reserved
     ld $
-
-; legacy: off

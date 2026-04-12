@@ -1,8 +1,8 @@
-#bankdef header   { #addr 0x0,    #size 0x10,   #outp 8 * 0x0    }
-#bankdef prg      { #addr 0x8000, #size 0x7ffa, #outp 8 * 0x10   }
-#bankdef vectors  { #addr 0xfffa, #size 0x6,    #outp 8 * 0x800a }
-#bankdef zeropage { #addr 0x0,    #size 0x100 }
-#bankdef ram      { #addr 0x200,  #size 0x600 }
+#bankdef header   { addr = 0x0,    size = 0x10,   outp = 8 * 0x0    }
+#bankdef prg      { addr = 0x8000, size = 0x7ffa, outp = 8 * 0x10   }
+#bankdef vectors  { addr = 0xfffa, size = 0x6,    outp = 8 * 0x800a }
+#bankdef zeropage { addr = 0x0,    size = 0x100 }
+#bankdef ram      { addr = 0x200,  size = 0x600 }
 
 
 #bank header
@@ -29,6 +29,6 @@
 
 
 #bank vectors
-#d16 le(nmi`16)
-#d16 le(reset`16)
-#d16 le(irq`16)
+#d16 $le(nmi`16)
+#d16 $le(reset`16)
+#d16 $le(irq`16)

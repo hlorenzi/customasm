@@ -3,8 +3,8 @@
     echoi {i: u8} => 0xff @ i @ ADDRMAP.OUTPUT`8
 
     printi {v} => {
-        assert(v >> (8 * 9) == 0)
-        assert(v > 0)
+        $assert(v >> (8 * 9) == 0)
+        $assert(v > 0)
         asm {
             printi ({v} >> 8)
             echoi {v} & 0xff
@@ -12,7 +12,7 @@
     }
 
     printi {v} => {
-        assert(v == 0)
+        $assert(v == 0)
         asm {}
     }
 }

@@ -2,12 +2,12 @@
 {
     emit {x: i8} =>
     {
-        assert(x < 0x10)
+        $assert(x < 0x10)
         0x11 @ x
     }
     emit {x: i8} =>
     {
-        assert(x >= 0x10)
+        $assert(x >= 0x10)
         0x22 @ x
     }
     test {x} => asm { emit {x} }

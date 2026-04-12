@@ -130,7 +130,7 @@ impl AssemblyOptions
     {
         AssemblyOptions {
             max_iterations: 10,
-            use_legacy_behavior: true,
+            use_legacy_behavior: false,
             debug_iterations: false,
             optimize_statically_known: true,
             optimize_instruction_matching: true,
@@ -320,7 +320,7 @@ pub fn is_reserved_name(
     opts: &asm::AssemblyOptions)
     -> bool
 {
-    (!opts.use_legacy_behavior && name.starts_with("$")) ||
+    name.starts_with("$") ||
         expr::resolve_builtin_fn(name, opts).is_some() ||
         asm::resolver::resolve_builtin_fn(name, opts).is_some() ||
         asm::resolver::resolve_builtin_symbol(name, opts).is_some()

@@ -2,7 +2,7 @@
 {
     ld {x} =>
     {
-        assert(x < 0x10, {})
+        $assert(x < 0x10, {})
         0x55 @ x`8
     }
 }

@@ -1,1 +1,1 @@
-#d inchexstr("data3.txt") ; = 0x00005a5af5a5a0000
+#d $inchexstr("data3.txt") ; = 0x00005a5af5a5a0000

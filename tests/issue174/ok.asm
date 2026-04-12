@@ -2,8 +2,8 @@
 {
 	test8_be  a, {val: i8}  => val
 	test32_be a, {val: i32} => val
-	test8_le  a, {val: i8}  => le(val)
-	test32_le a, {val: i32} => le(val)
+	test8_le  a, {val: i8}  => $le(val)
+	test32_le a, {val: i32} => $le(val)
 }
 
 test8_be a,  0x0f ; = 0x0f

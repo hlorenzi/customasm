@@ -25,26 +25,27 @@ pub fn resolve_builtin_fn(
     opts: &asm::AssemblyOptions)
     -> Option<AsmBuiltinFn>
 {
-    if !opts.use_legacy_behavior
+    match name
     {
-        match name
-        {
-            "$incbin" => Some(AsmBuiltinFn::Incbin),
-            "$incbinstr" => Some(AsmBuiltinFn::Incbinstr),
-            "$inchexstr" => Some(AsmBuiltinFn::Inchexstr),
-            "$bankof" => Some(AsmBuiltinFn::Bankof),
-            _ => None,
-        }
-    }
-    else
-    {
-        match name
-        {
-            "incbin" => Some(AsmBuiltinFn::Incbin),
-            "incbinstr" => Some(AsmBuiltinFn::Incbinstr),
-            "inchexstr" => Some(AsmBuiltinFn::Inchexstr),
-            "bankof" => Some(AsmBuiltinFn::Bankof),
-            _ => None,
+        "$incbin" => Some(AsmBuiltinFn::Incbin),
+        "$incbinstr" => Some(AsmBuiltinFn::Incbinstr),
+        "$inchexstr" => Some(AsmBuiltinFn::Inchexstr),
+        "$bankof" => Some(AsmBuiltinFn::Bankof),
+        _ => {
+            if opts.use_legacy_behavior
+            {
+                match name
+                {
+                    "incbin" => Some(AsmBuiltinFn::Incbin),
+                    "incbinstr" => Some(AsmBuiltinFn::Incbinstr),
+                    "inchexstr" => Some(AsmBuiltinFn::Inchexstr),
+                    "bankof" => Some(AsmBuiltinFn::Bankof),
+                    _ => None,
+                }
+            }
+            else {
+                None
+            }
         }
     }
 }

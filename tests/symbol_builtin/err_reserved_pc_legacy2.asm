@@ -4,7 +4,9 @@
 }
 
 
-    ld $pc
-$pc: ; error: reserved
-    ld $pc
     ld pc
+$pc: ; error: reserved
+    ld pc
+    ld $pc
+
+; legacy: on

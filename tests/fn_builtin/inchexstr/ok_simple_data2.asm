@@ -1,1 +1,1 @@
-#d inchexstr("data2.txt") ; = 0x5
+#d $inchexstr("data2.txt") ; = 0x5

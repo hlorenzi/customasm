@@ -3,8 +3,8 @@
 	{addr: u16} =>
 	{
 		reladdr = addr - $ - 2
-		assert(reladdr <=  0x7f)
-		assert(reladdr >= !0x7f)
+		$assert(reladdr <=  0x7f)
+		$assert(reladdr >= !0x7f)
 		reladdr`8
 	}
 }

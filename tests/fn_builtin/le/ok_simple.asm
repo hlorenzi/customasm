@@ -18,5 +18,3 @@
 #d $le($le(0xffeeddccbbaa)) ; = 0xffeeddccbbaa
 #d $le($le($le(0xffeeddccbbaa))) ; = 0xaabbccddeeff
 #d $le(1234`16) ; = 0xd204
-
-; legacy: off

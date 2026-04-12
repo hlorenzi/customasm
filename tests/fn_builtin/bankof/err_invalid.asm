@@ -9,4 +9,4 @@
     }
 }
 
-#d16 bankof(123).addr ; error: failed / error: must have an associated symbol
+#d16 $bankof(123).addr ; error: failed / error: must have an associated symbol

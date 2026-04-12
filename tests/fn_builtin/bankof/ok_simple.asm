@@ -20,5 +20,3 @@ label:
     #d16 $bankof(label).size_b ; = 0x0778
     #d16 $bankof(label).data.a ; = 0x00aa
     #d16 $bankof(label).data.b ; = 0x00bb
-
-; legacy: off

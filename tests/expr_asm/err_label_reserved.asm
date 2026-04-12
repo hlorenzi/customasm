@@ -11,4 +11,3 @@
 }
 
 loop ; error: failed / note:_:4: within / error:_:6: reserved
-; legacy: off

@@ -3,8 +3,8 @@
     echoi {i: u8} => 0xff @ i
 
     printi {v} => {
-        assert(v >> (8 * 9) == 0)
-        assert(v > 0)
+        $assert(v >> (8 * 9) == 0)
+        $assert(v > 0)
         next = (v >> 8)
         asm {
             printi {next}
@@ -13,7 +13,7 @@
     }
 
     printi {v} => {
-        assert(v == 0)
+        $assert(v == 0)
         asm {}
     }
 }

@@ -1,1 +1,1 @@
-#d inchexstr("data4.txt") ; error: failed / error: invalid character
+#d $inchexstr("data4.txt") ; error: failed / error: invalid character

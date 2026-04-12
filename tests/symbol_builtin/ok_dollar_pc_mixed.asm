@@ -7,3 +7,5 @@
 ld $ + $ ; = 0x5500
 ld $ + pc ; = 0x5504
 ld pc + $ ; = 0x5508
+
+; legacy: on

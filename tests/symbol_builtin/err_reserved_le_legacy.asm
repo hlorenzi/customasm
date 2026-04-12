@@ -7,6 +7,6 @@
     ld le
 le: ; error: reserved
     ld le
-    ld le(0x04)
+    ld $le(0x04)
 
 ; legacy: on

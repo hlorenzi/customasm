@@ -1,1 +1,1 @@
-#d incbinstr("data4.txt") ; error: failed / error: invalid character
+#d $incbinstr("data4.txt") ; error: failed / error: invalid character

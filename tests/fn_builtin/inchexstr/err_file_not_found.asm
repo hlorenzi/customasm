@@ -1,1 +1,1 @@
-#d inchexstr("unk") ; error: failed / error: not found
+#d $inchexstr("unk") ; error: failed / error: not found

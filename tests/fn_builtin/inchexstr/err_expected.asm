@@ -1,1 +1,1 @@
-#d inchexstr({}) ; error: failed / error: expected string
+#d $inchexstr({}) ; error: failed / error: expected string

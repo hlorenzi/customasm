@@ -34,7 +34,7 @@ pub fn extract_expectations(
         messages: Vec::new(),
         command: None,
         output_files: Vec::new(),
-        legacy: true,
+        legacy: false,
     };
 
     let mut line_num = 0;
@@ -254,9 +254,9 @@ fn test_file_variant(
         {
             let opts = asm::AssemblyOptions {
                 debug_iterations: true,
-                use_legacy_behavior: expectations.legacy,
                 optimize_instruction_matching,
                 optimize_statically_known,
+                use_legacy_behavior: expectations.legacy,
                 ..asm::AssemblyOptions::new()
             };
 

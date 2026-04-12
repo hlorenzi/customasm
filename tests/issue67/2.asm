@@ -8,7 +8,7 @@
 {
     add {r: Reg} =>
 	{
-		assert(r != 0xff)
+		$assert(r != 0xff)
 		r
 	}
 }

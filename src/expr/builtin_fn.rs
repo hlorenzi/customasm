@@ -22,38 +22,39 @@ pub fn resolve_builtin_fn(
     opts: &asm::AssemblyOptions)
     -> Option<ExprBuiltinFn>
 {
-    if !opts.use_legacy_behavior
+    match name
     {
-        match name
-        {
-            "$assert" => Some(ExprBuiltinFn::Assert),
-            "$sizeof" => Some(ExprBuiltinFn::Sizeof),
-            "$le" => Some(ExprBuiltinFn::Le),
-            "$ascii" => Some(ExprBuiltinFn::Ascii),
-            "$utf8" => Some(ExprBuiltinFn::Utf8),
-            "$utf16be" => Some(ExprBuiltinFn::Utf16be),
-            "$utf16le" => Some(ExprBuiltinFn::Utf16le),
-            "$utf32be" => Some(ExprBuiltinFn::Utf32be),
-            "$utf32le" => Some(ExprBuiltinFn::Utf32le),
-            "$strlen" => Some(ExprBuiltinFn::Strlen),
-            _ => return None,
-        }
-    }
-    else
-    {
-        match name
-        {
-            "assert" => Some(ExprBuiltinFn::Assert),
-            "sizeof" => Some(ExprBuiltinFn::Sizeof),
-            "le" => Some(ExprBuiltinFn::Le),
-            "ascii" => Some(ExprBuiltinFn::Ascii),
-            "utf8" => Some(ExprBuiltinFn::Utf8),
-            "utf16be" => Some(ExprBuiltinFn::Utf16be),
-            "utf16le" => Some(ExprBuiltinFn::Utf16le),
-            "utf32be" => Some(ExprBuiltinFn::Utf32be),
-            "utf32le" => Some(ExprBuiltinFn::Utf32le),
-            "strlen" => Some(ExprBuiltinFn::Strlen),
-            _ => return None,
+        "$assert" => Some(ExprBuiltinFn::Assert),
+        "$sizeof" => Some(ExprBuiltinFn::Sizeof),
+        "$le" => Some(ExprBuiltinFn::Le),
+        "$ascii" => Some(ExprBuiltinFn::Ascii),
+        "$utf8" => Some(ExprBuiltinFn::Utf8),
+        "$utf16be" => Some(ExprBuiltinFn::Utf16be),
+        "$utf16le" => Some(ExprBuiltinFn::Utf16le),
+        "$utf32be" => Some(ExprBuiltinFn::Utf32be),
+        "$utf32le" => Some(ExprBuiltinFn::Utf32le),
+        "$strlen" => Some(ExprBuiltinFn::Strlen),
+        _ => {
+            if opts.use_legacy_behavior
+            {
+                match name
+                {
+                    "assert" => Some(ExprBuiltinFn::Assert),
+                    "sizeof" => Some(ExprBuiltinFn::Sizeof),
+                    "le" => Some(ExprBuiltinFn::Le),
+                    "ascii" => Some(ExprBuiltinFn::Ascii),
+                    "utf8" => Some(ExprBuiltinFn::Utf8),
+                    "utf16be" => Some(ExprBuiltinFn::Utf16be),
+                    "utf16le" => Some(ExprBuiltinFn::Utf16le),
+                    "utf32be" => Some(ExprBuiltinFn::Utf32be),
+                    "utf32le" => Some(ExprBuiltinFn::Utf32le),
+                    "strlen" => Some(ExprBuiltinFn::Strlen),
+                    _ => None,
+                }
+            }
+            else {
+                None
+            }
         }
     }
 }

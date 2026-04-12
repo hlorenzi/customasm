@@ -4,4 +4,3 @@
 }
 
 ld 0x11
-; legacy: off
