@@ -2,4 +2,3 @@
 /pkg/
 /.pkgtemp/
 /.vscode/
-/Cargo.lock

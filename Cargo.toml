@@ -1,6 +1,6 @@
 [package]
 name = "customasm"
-version = "0.13.13"
+version = "0.14.0"
 edition = "2024"
 authors = ["hlorenzi <https://hlorenzi.com>"]
 description = "An assembler for custom, user-defined instruction sets!"
@@ -27,4 +27,4 @@ getopts = "0.2"
 num-bigint = "0.4"
 
 [dev-dependencies]
-sha2 = "0.9"
+sha2 = "0.11"

@@ -2,7 +2,6 @@
 /pkg/
 /.pkgtemp/
 /.vscode/
-/Cargo.lock
 /test.asm
 /test_output_mismatch
 
