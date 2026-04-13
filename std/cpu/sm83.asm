@@ -152,10 +152,10 @@
     ; (it's not used, but canonically 0x10 0x00 is the "correct" use of STOP)
     STOP => asm { STOP 0 }
     JR {e8: sm83_reladdr} => 0o30`8 @ e8
-    DAA => 0o47
-    CPL => 0o57
-    SCF => 0o67
-    CCF => 0o77
+    DAA => 0o47`8
+    CPL => 0o57`8
+    SCF => 0o67`8
+    CCF => 0o77`8
     ; conditional JR uses the lower 2 bits of the octal digit as the condition
     ; code, with the upper bit of the octal digit fixed at 1
     JR {cond: sm83_cond},{e8: sm83_reladdr} => (0b1 @ cond @ 0o0)`8 @ e8
