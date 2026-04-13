@@ -342,10 +342,15 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
 
                 // Advance the current bank's position
                 cur_bank_data.cur_position += {
-                    match &instr.encoding {
-                        expr::Value::Integer(_, bigint) => bigint.size.unwrap_or(0),
-                        _ => 0,
-                    }
+                    let bigint_size = {
+                        match &instr.encoding {
+                            expr::Value::Integer(_, bigint) => bigint.size,
+                            _ => None,
+                        }
+                    };
+                    bigint_size
+                        .or(instr.encoding_size_guess)
+                        .unwrap_or(0)
                 };
                 cur_bank_data.cur_position_resolved &= instr.resolved;
             }

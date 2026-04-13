@@ -36,6 +36,12 @@ pub use self::eval::{
     dummy_eval_asm,
 };
 
+mod inspect;
+pub use self::inspect::{
+    StaticallyKnownProvider,
+    StaticallyKnownLocal,
+};
+
 mod builtin_member;
 pub use self::builtin_member::resolve_builtin_member;
 
@@ -44,6 +50,7 @@ pub use self::builtin_fn::{
     ExprBuiltinFn,
     resolve_builtin_fn,
     get_builtin_fn_eval,
+    get_builtin_fn_size_guess,
 };
 
 

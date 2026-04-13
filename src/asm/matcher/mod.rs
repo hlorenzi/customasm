@@ -19,6 +19,7 @@ pub struct InstructionMatch
     pub args: Vec<InstructionArgument>,
     pub exact_part_count: usize,
     pub encoding: InstructionMatchResolution,
+    pub encoding_size_guess: Option<usize>,
 }
 
 
@@ -156,7 +157,7 @@ pub fn match_all(
                 defs,
                 ast_instr.span,
                 &ast_instr.src);
-            
+
             if let Err(()) = error_on_no_matches(
                 report,
                 ast_instr.span,
@@ -169,6 +170,11 @@ pub fn match_all(
                 ast_instr.item_ref.unwrap());
             
             instr.matches = matches;
+
+            instr.encoding_size_guess = instr.matches
+                .iter()
+                .max_by_key(|m| m.encoding_size_guess)
+                .and_then(|m| m.encoding_size_guess);
         }
     }
 
@@ -274,6 +280,14 @@ pub fn match_instr(
 
     matches.retain(|c| c.exact_part_count == max_exact_count);
 
+    // Calculate pessimistic guesses for encoding size for each match
+    for mtch in &mut matches
+    {
+        mtch.encoding_size_guess = get_encoding_size_guess(
+            opts,
+            defs,
+            &mtch);
+    }
 
     matches
 }
@@ -360,6 +374,7 @@ fn begin_match_with_rule<'src>(
             args: Vec::new(),
             exact_part_count: 0,
             encoding: InstructionMatchResolution::Unresolved,
+            encoding_size_guess: None,
         })
 }
 
@@ -740,4 +755,63 @@ fn get_recursive_exact_part_count(
     let rule = &ruledef.rules[instr_match.rule_ref.0];
 
     count + rule.exact_part_count
+}
+
+
+fn get_encoding_size_guess(
+    opts: &asm::AssemblyOptions,
+    defs: &asm::ItemDefs,
+    mtch: &asm::InstructionMatch)
+    -> Option<usize>
+{
+    let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
+    let rule = &ruledef.get_rule(mtch.rule_ref);
+
+    let mut info = expr::StaticallyKnownProvider::new(opts);
+
+    for i in 0..rule.parameters.len()
+    {
+        let param = &rule.parameters[i];
+        let arg = &mtch.args[i];
+
+        match param.typ
+        {
+            asm::RuleParameterType::Unspecified => {}
+
+            asm::RuleParameterType::Integer(size) |
+            asm::RuleParameterType::Unsigned(size) |
+            asm::RuleParameterType::Signed(size) =>
+            {
+                info.locals.insert(
+                    param.name.clone(),
+                    expr::StaticallyKnownLocal {
+                        size: Some(size),
+                        ..expr::StaticallyKnownLocal::new()
+                    });
+            }
+
+            asm::RuleParameterType::RuledefRef(_) =>
+            {
+                if let asm::InstructionArgumentKind::Nested(ref nested_match) = arg.kind
+                {
+                    let maybe_nested_size = get_encoding_size_guess(
+                        opts,
+                        defs,
+                        nested_match);
+                    
+                    if let Some(nested_size) = maybe_nested_size
+                    {
+                        info.locals.insert(
+                            param.name.clone(),
+                            expr::StaticallyKnownLocal {
+                                size: Some(nested_size),
+                                ..expr::StaticallyKnownLocal::new()
+                            });
+                    }
+                }
+            }
+        }
+    }
+
+    rule.expr.size_guess(&info)
 }

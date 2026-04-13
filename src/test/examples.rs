@@ -2,15 +2,16 @@ use crate::*;
 use sha2::*;
 
 
-fn test_example(filename: &str, hash: &[u8])
+fn test_example(filename: &str, max_iterations: usize, hash: &[u8])
 {
-    test_example_variant(filename, hash, false, false);
-    test_example_variant(filename, hash, true, true);
+    test_example_variant(filename, max_iterations, hash, false, false);
+    test_example_variant(filename, max_iterations, hash, true, true);
 }
 
 
 fn test_example_variant(
     filename: &str,
+    max_iterations: usize,
     hash: &[u8],
     optimize_instruction_matching: bool,
     optimize_statically_known: bool)
@@ -22,6 +23,7 @@ fn test_example_variant(
 
     let opts = asm::AssemblyOptions {
         debug_iterations: true,
+        max_iterations,
         optimize_instruction_matching,
         optimize_statically_known,
         ..asm::AssemblyOptions::new()
@@ -61,7 +63,7 @@ fn test_example_variant(
 fn test_nes_example()
 {
     test_example(
-        "examples/nes_colors.asm",
+        "examples/nes_colors.asm", 3,
         &[
             226, 68, 213, 226, 71, 200, 16, 113, 21, 132,
             193, 34, 10, 134, 112, 238, 69, 165, 45, 199, 40,
@@ -74,7 +76,7 @@ fn test_nes_example()
 fn test_basic_example()
 {
     test_example(
-        "examples/basic.asm",
+        "examples/basic.asm", 1,
         &[
             70, 139, 45, 46, 111, 126, 164, 124, 241, 45, 193,
             32, 116, 119, 229, 149, 159, 100, 110, 138, 69, 217,

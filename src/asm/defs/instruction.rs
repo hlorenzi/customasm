@@ -5,6 +5,7 @@ use crate::*;
 pub struct Instruction
 {
     pub matches: asm::InstructionMatches,
+    pub encoding_size_guess: Option<usize>,
     pub encoding: expr::Value,
     pub resolved: bool,
 }
@@ -25,6 +26,7 @@ pub fn define(
 
             let instr = Instruction {
                 matches: asm::InstructionMatches::new(),
+                encoding_size_guess: None,
                 encoding: expr::Value::make_unknown(),
                 resolved: false,
             };

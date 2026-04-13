@@ -80,6 +80,20 @@ pub fn get_builtin_fn_eval(
 }
 
 
+pub fn get_builtin_fn_size_guess(
+    builtin_fn: ExprBuiltinFn,
+    provider: &expr::StaticallyKnownProvider,
+    args: &Vec<expr::Expr>)
+    -> Option<usize>
+{
+    match builtin_fn
+    {
+        ExprBuiltinFn::Le => args[0].size_guess(provider),
+        _ => return None,
+    }
+}
+
+
 pub fn eval_builtin_assert(
     query: &mut expr::EvalFunctionQuery)
     -> Result<expr::Value, ()>
