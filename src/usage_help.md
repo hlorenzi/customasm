@@ -36,7 +36,7 @@ Examples:
 * `--legacy=on/off`  
     Use pre-v0.14 legacy naming without the `$` prefix
     for built-in functions and variables.  
-    (Default: on)  
+    (Default: off)  
 * `--debug-iters`  
     Print debug info during resolution iterations.  
 * `--debug-no-optimize-static`  
