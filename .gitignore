@@ -2,7 +2,3 @@
 /pkg/
 /.pkgtemp/
 /.vscode/
-/test.asm
-/test_output_mismatch
-
-/web/customasm.wasm
