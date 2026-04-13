@@ -563,8 +563,8 @@ impl util::BitVec
 		result.push_str("\n");
 		result.push_str("\n");
 
-		let mut prev_file_handle = util::FileServerHandle::MAX;
-        let mut prev_file_chars = "".to_string();
+		let mut cur_file_handle = util::FileServerHandle::MAX;
+        let mut cur_file_chars = "".to_string();
 
         for span in &sorted_spans
         {
@@ -619,18 +619,16 @@ impl util::BitVec
                 contents_str.push(c);
             }
 
-            if span.span.file_handle != prev_file_handle
+            if span.span.file_handle != cur_file_handle
             {
-                prev_file_handle = span.span.file_handle;
-                prev_file_chars = fileserver
-					.get_str_unwrap(prev_file_handle);
+                cur_file_handle = span.span.file_handle;
+                cur_file_chars = fileserver.get_str_unwrap(cur_file_handle);
             }
 
             let span_location = span.span.location().unwrap();
-            let char_counter = util::CharCounter::new(&prev_file_chars);
 
             result.push_str(&format!("{:1$}", contents_str, content_width));
-            result.push_str(&format!(" ; {}", char_counter.get_excerpt(span_location.0, span_location.1)));
+            result.push_str(&format!(" ; {}", &cur_file_chars[span_location.0..span_location.1]));
             result.push_str("\n");
 		}
 
@@ -703,8 +701,8 @@ impl util::BitVec
 		result.push_str("\n");
 		result.push_str("\n");
 
-		let mut prev_file_handle = util::FileServerHandle::MAX;
-        let mut prev_file_chars = "".to_string();
+		let mut cur_file_handle = util::FileServerHandle::MAX;
+        let mut cur_file_chars = "".to_string();
 
         for span in &sorted_spans
         {
@@ -725,15 +723,13 @@ impl util::BitVec
             result.push_str(&format!("{:1$x} \n", span.addr, addr_width));
 
 			// instruction excerpt
-			if span.span.file_handle != prev_file_handle
+			if span.span.file_handle != cur_file_handle
             {
-                prev_file_handle = span.span.file_handle;
-                prev_file_chars = fileserver
-					.get_str_unwrap(prev_file_handle);
+                cur_file_handle = span.span.file_handle;
+                cur_file_chars = fileserver.get_str_unwrap(cur_file_handle);
             }
             let span_location = span.span.location().unwrap();
-            let char_counter = util::CharCounter::new(&prev_file_chars);
-            result.push_str(&format!("{comment} {}\n", char_counter.get_excerpt(span_location.0, span_location.1)));
+            result.push_str(&format!("{comment} {}\n", &cur_file_chars[span_location.0..span_location.1]));
 
 			// bytecode
             let mut contents_str = String::new();
