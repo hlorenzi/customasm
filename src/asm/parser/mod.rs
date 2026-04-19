@@ -54,9 +54,16 @@ mod directive_ruledef;
 pub use directive_ruledef::{
     AstDirectiveRuledef,
     AstRule,
+    AstRulePattern,
     AstRulePatternPart,
     AstRuleParameter,
     AstRuleParameterType,
+    parse_pattern,
+};
+
+mod directive_macro;
+pub use directive_macro::{
+    AstDirectiveMacro,
 };
 
 mod fields;
@@ -90,6 +97,7 @@ pub enum AstAny
     DirectiveIf(AstDirectiveIf),
     DirectiveInclude(AstDirectiveInclude),
     DirectiveLabelAlign(AstDirectiveLabelAlign),
+    DirectiveMacro(AstDirectiveMacro),
     DirectiveNoEmit(AstDirectiveNoEmit),
     DirectiveOnce(AstDirectiveOnce),
     DirectiveRes(AstDirectiveRes),
@@ -347,6 +355,7 @@ impl AstAny
             AstAny::DirectiveIf(node) => node.header_span,
             AstAny::DirectiveInclude(node) => node.header_span,
             AstAny::DirectiveLabelAlign(node) => node.header_span,
+            AstAny::DirectiveMacro(node) => node.header_span,
             AstAny::DirectiveNoEmit(node) => node.header_span,
             AstAny::DirectiveOnce(node) => node.header_span,
             AstAny::DirectiveRes(node) => node.header_span,

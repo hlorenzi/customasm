@@ -236,6 +236,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
             asm::AstAny::DirectiveIf(..) |
             asm::AstAny::DirectiveInclude(..) |
             asm::AstAny::DirectiveLabelAlign(..) |
+            asm::AstAny::DirectiveMacro(..) |
             asm::AstAny::DirectiveNoEmit(..) |
             asm::AstAny::DirectiveOnce(..) |
             asm::AstAny::DirectiveRuledef(..) =>

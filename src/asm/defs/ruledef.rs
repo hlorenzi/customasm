@@ -106,7 +106,7 @@ pub fn resolve_rule(
     let mut exact_parts = 0;
     let mut parameters = Vec::<RuleParameter>::new();
 
-    for ast_part in &ast_rule.pattern
+    for ast_part in &ast_rule.pattern.parts
     {
         let part = {
             match &ast_part
@@ -137,7 +137,7 @@ pub fn resolve_rule(
     }
 
     Ok(Rule {
-        pattern_span: ast_rule.pattern_span,
+        pattern_span: ast_rule.pattern.span,
         pattern,
         exact_part_count: exact_parts,
         parameters,

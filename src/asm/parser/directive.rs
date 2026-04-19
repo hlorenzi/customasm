@@ -67,6 +67,9 @@ pub fn parse(
         "labelalign" => Ok(asm::AstAny::DirectiveLabelAlign(
             asm::parser::directive_labelalign::parse(report, walker, header_span)?)),
         
+        "macro" => Ok(asm::AstAny::DirectiveMacro(
+            asm::parser::directive_macro::parse(report, opts, walker, header_span)?)),
+        
         "noemit" => Ok(asm::AstAny::DirectiveNoEmit(
             asm::parser::directive_noemit::parse(report, walker, header_span)?)),
         

@@ -26,9 +26,10 @@ pub use parser::{
     AstSymbolKind,
     AstSymbolConstant,
     AstRule,
+    AstRulePattern,
+    AstRulePatternPart,
     AstRuleParameter,
     AstRuleParameterType,
-    AstRulePatternPart,
     AstTopLevel,
 };
 
