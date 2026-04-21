@@ -25,30 +25,35 @@ pub fn define(
     -> Result<(), ()>
 {
     let initial_item_ref = util::ItemRef::new(0);
+    if !defs.bankdefs.is_defined(initial_item_ref)
+    {
+        let initial_bankdef = Bankdef {
+            item_ref: initial_item_ref,
+            addr_unit: 8,
+            label_align: None,
+            addr_start: util::BigInt::new(0, None),
+            size_in_units: None,
+            size_in_bits: None,
+            output_offset: Some(0),
+            fill: false,
+            userdata: expr::Value::make_void(),
+        };
 
-    let initial_bankdef = Bankdef {
-        item_ref: initial_item_ref,
-        addr_unit: 8,
-        label_align: None,
-        addr_start: util::BigInt::new(0, None),
-        size_in_units: None,
-        size_in_bits: None,
-        output_offset: Some(0),
-        fill: false,
-        userdata: expr::Value::make_void(),
-    };
-
-    defs.bankdefs.define(initial_item_ref, initial_bankdef);
-
+        defs.bankdefs.define(initial_item_ref, initial_bankdef);
+    }
 
 
     for any_node in &ast.nodes
     {
-        if let asm::AstAny::DirectiveBankdef(node) = any_node
+        if let asm::AstAny::DirectiveBankdef(ast_bankdef) = any_node
         {
-            let item_ref = node.item_ref.unwrap();
+            let item_ref = ast_bankdef.item_ref.unwrap();
 
-            let addr_unit = match &node.addr_unit
+            if defs.bankdefs.is_defined(item_ref) {
+                continue;
+            }
+
+            let addr_unit = match &ast_bankdef.addr_unit
             {
                 None => 8,
                 Some(expr) =>
@@ -61,7 +66,7 @@ pub fn define(
                     .expect_usize(report, expr.span())?,
             };
             
-            let label_align = match &node.label_align
+            let label_align = match &ast_bankdef.label_align
             {
                 None => None,
                 Some(expr) => Some(
@@ -74,7 +79,7 @@ pub fn define(
                     .expect_usize(report, expr.span())?),
             };
             
-            let addr_start = match &node.addr_start
+            let addr_start = match &ast_bankdef.addr_start
             {
                 None => util::BigInt::new(0, None),
                 Some(expr) =>
@@ -88,7 +93,7 @@ pub fn define(
                     .clone(),
             };
             
-            let addr_size = match &node.addr_size
+            let addr_size = match &ast_bankdef.addr_size
             {
                 None => None,
                 Some(expr) => Some(
@@ -101,7 +106,7 @@ pub fn define(
                     .expect_usize(report, expr.span())?),
             };
             
-            let addr_end = match &node.addr_end
+            let addr_end = match &ast_bankdef.addr_end
             {
                 None => None,
                 Some(expr) => Some(
@@ -125,17 +130,17 @@ pub fn define(
                         Some(end
                             .checked_sub(
                                 report,
-                                node.addr_end.as_ref().unwrap().span(),
+                                ast_bankdef.addr_end.as_ref().unwrap().span(),
                                 &addr_start)?
                             .checked_into::<usize>(
                                 report,
-                                node.addr_end.as_ref().unwrap().span())?)
+                                ast_bankdef.addr_end.as_ref().unwrap().span())?)
                     }
                     (Some(_), Some(_)) =>
                     {
                         report.error_span(
                             "both `addr_end` and `size` defined",
-                            node.header_span);
+                            ast_bankdef.header_span);
 
                         return Err(());
                     }
@@ -154,7 +159,7 @@ pub fn define(
                         {
                             report.error_span(
                                 "value is outside the supported range",
-                                node.addr_size.as_ref().unwrap().span());
+                                ast_bankdef.addr_size.as_ref().unwrap().span());
 
                             return Err(());
                         }
@@ -163,7 +168,7 @@ pub fn define(
                 else { None }
             };
             
-            let output_offset = match &node.output_offset
+            let output_offset = match &ast_bankdef.output_offset
             {
                 None => None,
                 Some(expr) => Some(
@@ -176,9 +181,9 @@ pub fn define(
                     .expect_usize(report, expr.span())?),
             };
 
-            let fill = node.fill;
+            let fill = ast_bankdef.fill;
             
-            let userdata = match &node.userdata {
+            let userdata = match &ast_bankdef.userdata {
                 None => expr::Value::make_void(),
                 Some(expr) => asm::resolver::eval_certain(
                     report,

@@ -22,6 +22,10 @@ pub fn define(
     {
         if let asm::AstAny::Instruction(ast_instr) = any_node
         {
+            if ast_instr.item_ref.is_some() {
+                continue;
+            }
+
             let item_ref = defs.instructions.next_item_ref();
 
             let instr = Instruction {

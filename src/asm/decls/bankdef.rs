@@ -13,8 +13,7 @@ pub fn collect(
         let asm::AstAny::DirectiveBankdef(node) = any_node
             else { continue };
 
-        if node.item_ref.is_some()
-        {
+        if node.item_ref.is_some() {
             continue;
         }
         

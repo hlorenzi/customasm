@@ -27,19 +27,23 @@ pub fn define(
 {
     for any_node in &ast.nodes
     {
-        if let asm::AstAny::DirectiveFn(node) = any_node
+        if let asm::AstAny::DirectiveFn(ast_fn) = any_node
         {
-            let item_ref = node.item_ref.unwrap();
+            let item_ref = ast_fn.item_ref.unwrap();
+
+            if defs.symbols.is_defined(item_ref) {
+                continue;
+            }
 
             let mut params = Vec::new();
-            for param in &node.params
+            for param in &ast_fn.params
             {
                 params.push(FunctionParameter {
                     name: param.name.clone(),
                 });
             }
 
-            let body = node.body.clone();
+            let body = ast_fn.body.clone();
 
             let fn_ref = defs.functions.next_item_ref();
 

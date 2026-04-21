@@ -22,6 +22,10 @@ pub fn define(
     {
         if let asm::AstAny::DirectiveAlign(ast_align) = any_node
         {
+            if ast_align.item_ref.is_some() {
+                continue;
+            }
+
             let item_ref = defs.align_directives.next_item_ref();
 
             let res = AlignDirective {

@@ -23,6 +23,10 @@ pub fn define(
     {
         if let asm::AstAny::DirectiveData(ast_data) = any_node
         {
+            if ast_data.item_refs.len() == ast_data.elems.len() {
+                continue;
+            }
+
             for _ in &ast_data.elems
             {
                 let item_ref = defs.data_elems.next_item_ref();

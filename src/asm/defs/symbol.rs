@@ -26,15 +26,18 @@ pub fn define(
         let asm::AstAny::Symbol(node) = any_node
             else { continue };
 
+        let item_ref = node.item_ref.unwrap();
+
+        if defs.symbols.is_defined(item_ref) {
+            continue;
+        }
+
         if defs.symbols
-            .maybe_get(node.item_ref.unwrap())
+            .maybe_get(item_ref)
             .is_some()
         {
             continue;
         }
-
-
-        let item_ref = node.item_ref.unwrap();
 
         let symbol = Symbol {
             item_ref,

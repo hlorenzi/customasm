@@ -22,8 +22,12 @@ pub fn define(
     {
         if let asm::AstAny::DirectiveAddr(ast_addr) = any_node
         {
-            let item_ref = defs.addr_directives.next_item_ref();
+            if ast_addr.item_ref.is_some() {
+                continue;
+            }
 
+            let item_ref = defs.addr_directives.next_item_ref();
+            
             let res = AddrDirective {
                 item_ref,
                 value: expr::Value::make_unknown(),

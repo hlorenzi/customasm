@@ -21,7 +21,7 @@ pub struct Rule
     pub exact_part_count: usize,
     
     pub parameters: Vec<RuleParameter>,
-    pub expr: expr::Expr,
+    pub production: asm::AstRuleProduction,
 }
 
 
@@ -58,6 +58,7 @@ pub enum RuleParameterType
 
 pub fn define(
     report: &mut diagn::Report,
+    opts: &asm::AssemblyOptions,
     ast: &asm::AstTopLevel,
     decls: &mut asm::ItemDecls,
     defs: &mut asm::ItemDefs)
@@ -65,13 +66,17 @@ pub fn define(
 {
     for any_node in &ast.nodes
     {
-        if let asm::AstAny::DirectiveRuledef(node) = any_node
+        if let asm::AstAny::DirectiveRuledef(ast_ruledef) = any_node
         {
-            let item_ref = node.item_ref.unwrap();
+            let item_ref = ast_ruledef.item_ref.unwrap();
             
+            if defs.ruledefs.is_defined(item_ref) {
+                continue;
+            }
+
             let mut rules = Vec::new();
 
-            for node_rule in &node.rules
+            for node_rule in &ast_ruledef.rules
             {
                 let rule = resolve_rule(
                     report,
@@ -83,10 +88,14 @@ pub fn define(
 
             let ruledef = Ruledef {
                 item_ref,
-                is_subruledef: node.is_subruledef,
+                is_subruledef: ast_ruledef.is_subruledef,
                 rules,
             };
 
+            if opts.optimize_instruction_matching {
+                defs.ruledef_map.build(item_ref, &ruledef);
+            }
+            
             defs.ruledefs.define(item_ref, ruledef);
         }
     }
@@ -141,7 +150,7 @@ pub fn resolve_rule(
         pattern,
         exact_part_count: exact_parts,
         parameters,
-        expr: ast_rule.expr.clone(),
+        production: ast_rule.production.clone(),
     })
 }
 

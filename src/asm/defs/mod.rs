@@ -78,6 +78,13 @@ impl<T> DefList<T>
     }
 
 
+    pub fn is_defined(&mut self, item_ref: util::ItemRef<T>) -> bool
+    {
+        item_ref.0 < self.defs.len() &&
+            self.defs[item_ref.0].is_some()
+    }
+
+
     pub fn define(&mut self, item_ref: util::ItemRef<T>, item: T)
     {
         while item_ref.0 >= self.defs.len()
@@ -166,12 +173,12 @@ pub fn define_remaining(
     report: &mut diagn::Report,
     opts: &asm::AssemblyOptions,
     ast: &mut asm::parser::AstTopLevel,
-    defs: &mut asm::defs::ItemDefs,
-    decls: &mut asm::decls::ItemDecls)
+    decls: &mut asm::decls::ItemDecls,
+    defs: &mut asm::defs::ItemDefs)
     -> Result<(), ()>
 {
     bankdef::define(report, opts, ast, decls, defs)?;
-    ruledef::define(report, ast, decls, defs)?;
+    ruledef::define(report, opts, ast, decls, defs)?;
     function::define(report, ast, decls, defs)?;
     instruction::define(report, ast, decls, defs)?;
     data_block::define(report, opts, ast, decls, defs)?;
@@ -180,11 +187,6 @@ pub fn define_remaining(
     addr::define(report, ast, decls, defs)?;
     
     report.stop_at_errors()?;
-
-    if opts.optimize_instruction_matching
-    {
-        defs.ruledef_map.build(&defs.ruledefs);
-    }
 
     Ok(())
 }

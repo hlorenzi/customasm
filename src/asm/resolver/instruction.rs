@@ -338,7 +338,7 @@ fn resolve_instruction_matches(
 
         let value_definite = value.expect_error_or_sized_bigint(
             report,
-            rule.expr.returned_value_span())?;
+            rule.production.unwrap_expr().returned_value_span())?;
 
         if let expr::Value::FailedConstraint(metadata, msg) = value_definite
         {
@@ -536,7 +536,7 @@ fn resolve_instruction_match_inner(
     }
 
     let mut rule_ctx = (*ctx).clone();
-    rule_ctx.file_handle_ctx = Some(rule.expr.span().file_handle);
+    rule_ctx.file_handle_ctx = Some(rule.production.unwrap_expr().span().file_handle);
 
     Ok(asm::resolver::eval(
         report,
@@ -546,7 +546,7 @@ fn resolve_instruction_match_inner(
         defs,
         &rule_ctx,
         &mut eval_ctx,
-        &rule.expr)?)
+        &rule.production.unwrap_expr())?)
 }
 
 

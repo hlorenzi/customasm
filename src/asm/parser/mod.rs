@@ -54,6 +54,7 @@ mod directive_ruledef;
 pub use directive_ruledef::{
     AstDirectiveRuledef,
     AstRule,
+    AstRuleProduction,
     AstRulePatternPart,
     AstRuleParameter,
     AstRuleParameterType,

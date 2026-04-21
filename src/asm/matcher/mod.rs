@@ -152,6 +152,13 @@ pub fn match_all(
     {
         if let asm::AstAny::Instruction(ast_instr) = any_node
         {
+            let instr = defs.instructions.get(
+                ast_instr.item_ref.unwrap());
+            
+            if instr.matches.len() != 0 {
+                continue;
+            }
+            
             let matches = match_instr(
                 opts,
                 defs,
@@ -767,6 +774,9 @@ fn get_encoding_size_guess(
     let ruledef = defs.ruledefs.get(mtch.ruledef_ref);
     let rule = &ruledef.get_rule(mtch.rule_ref);
 
+    let asm::AstRuleProduction::Expr(ref expr) = rule.production
+        else { return Some(0) };
+
     let mut info = expr::StaticallyKnownProvider::new(opts);
 
     for i in 0..rule.parameters.len()
@@ -812,6 +822,6 @@ fn get_encoding_size_guess(
             }
         }
     }
-
-    rule.expr.size_guess(&info)
+    
+    expr.size_guess(&info)
 }

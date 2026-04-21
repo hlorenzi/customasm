@@ -38,27 +38,21 @@ impl RuledefMap
 
     pub fn build(
         &mut self,
-        ruledefs: &asm::defs::DefList<asm::Ruledef>)
+        ruledef_ref: util::ItemRef<asm::Ruledef>,
+        ruledef: &asm::Ruledef)
     {
-        for i in 0..ruledefs.defs.len()
+        if ruledef.is_subruledef {
+            return;
+        }
+
+        for rule_ref in ruledef.iter_rule_refs()
         {
-            let ruledef_ref = util::ItemRef::<asm::Ruledef>::new(i);
-            let ruledef = ruledefs.get(ruledef_ref);
+            let rule = &ruledef.get_rule(rule_ref);
 
-            if ruledef.is_subruledef
-            {
-                continue;
-            }
-    
-            for rule_ref in ruledef.iter_rule_refs()
-            {
-                let rule = &ruledef.get_rule(rule_ref);
-
-                self.insert(
-                    ruledef_ref,
-                    rule_ref,
-                    rule);
-            }
+            self.insert(
+                ruledef_ref,
+                rule_ref,
+                rule);
         }
     }
 

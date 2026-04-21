@@ -19,7 +19,28 @@ pub struct AstRule
 {
     pub pattern_span: diagn::Span,
     pub pattern: Vec<AstRulePatternPart>,
-    pub expr: expr::Expr,
+    pub production: AstRuleProduction,
+}
+
+
+#[derive(Clone, Debug)]
+pub enum AstRuleProduction
+{
+    Expr(expr::Expr),
+    Macro(asm::AstTopLevel),
+}
+
+
+impl AstRuleProduction
+{
+    pub fn unwrap_expr(&self) -> &expr::Expr
+    {
+        match self
+        {
+            AstRuleProduction::Expr(expr) => expr,
+            AstRuleProduction::Macro(_) => panic!("not an expression"),
+        }
+    }
 }
 
 
@@ -179,13 +200,40 @@ fn parse_rule(
     }
 
 
-    let expr = expr::parse(report, walker)?;
+    if let Some(_tk_macro) = walker.maybe_expect(syntax::TokenKind::KeywordMacro)
+    {
+		let _tk_brace_open = walker.expect(
+			report,
+			syntax::TokenKind::BraceOpen)?;
 
-    Ok(AstRule {
-        pattern_span,
-        pattern,
-        expr,
-    })
+		let mut inner_walker = walker
+			.advance_until_closing_brace();
+
+        let ast = asm::parser::parse_nested_toplevel(
+            report,
+            opts,
+            &mut inner_walker)?;
+
+		let _tk_brace_close = walker.expect(
+			report,
+			syntax::TokenKind::BraceClose)?;
+
+        Ok(AstRule {
+            pattern_span,
+            pattern,
+            production: AstRuleProduction::Macro(ast),
+        })
+    }
+    else
+    {
+        let expr = expr::parse(report, walker)?;
+
+        Ok(AstRule {
+            pattern_span,
+            pattern,
+            production: AstRuleProduction::Expr(expr),
+        })
+    }
 }
 
 

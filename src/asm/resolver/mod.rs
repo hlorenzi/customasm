@@ -21,6 +21,11 @@ pub use instruction::{
     finalize_instruction,
 };
 
+mod instruction_macro;
+pub use instruction_macro::{
+    resolve_instruction_macros,
+};
+
 mod data_block;
 pub use data_block::{
     check_final_data_element,

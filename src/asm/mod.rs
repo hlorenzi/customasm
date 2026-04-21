@@ -26,6 +26,7 @@ pub use parser::{
     AstSymbolKind,
     AstSymbolConstant,
     AstRule,
+    AstRuleProduction,
     AstRuleParameter,
     AstRuleParameterType,
     AstRulePatternPart,
@@ -225,8 +226,8 @@ pub fn assemble<S>(
             report,
             opts,
             assembly.ast.as_mut().unwrap(),
-            assembly.defs.as_mut().unwrap(),
-            assembly.decls.as_mut().unwrap())?;
+            assembly.decls.as_mut().unwrap(),
+            assembly.defs.as_mut().unwrap())?;
 
         matcher::match_all(
             report,
@@ -234,6 +235,47 @@ pub fn assemble<S>(
             assembly.ast.as_ref().unwrap(),
             assembly.decls.as_ref().unwrap(),
             assembly.defs.as_mut().unwrap())?;
+
+        println!("{:#?}", assembly.ast.as_ref());
+
+        while resolver::resolve_instruction_macros(
+            report,
+            opts,
+            assembly.ast.as_mut().unwrap(),
+            assembly.decls.as_ref().unwrap(),
+            assembly.defs.as_mut().unwrap())? > 0
+        {
+            println!("{:#?}", assembly.ast.as_ref());
+
+            decls::collect(
+                report,
+                opts,
+                assembly.ast.as_mut().unwrap(),
+                assembly.decls.as_mut().unwrap())?;
+
+            defs::define_symbols(
+                report,
+                opts,
+                assembly.ast.as_mut().unwrap(),
+                assembly.decls.as_mut().unwrap(),
+                assembly.defs.as_mut().unwrap())?;
+
+            defs::define_remaining(
+                report,
+                opts,
+                assembly.ast.as_mut().unwrap(),
+                assembly.decls.as_mut().unwrap(),
+                assembly.defs.as_mut().unwrap())?;
+                
+            matcher::match_all(
+                report,
+                opts,
+                assembly.ast.as_ref().unwrap(),
+                assembly.decls.as_ref().unwrap(),
+                assembly.defs.as_mut().unwrap())?;
+                
+            println!("{:#?}", assembly.ast.as_ref());
+        }
 
         assembly.iterations_taken = Some(resolver::resolve_iteratively(
             report,

@@ -22,6 +22,10 @@ pub fn define(
     {
         if let asm::AstAny::DirectiveRes(ast_res) = any_node
         {
+            if ast_res.item_ref.is_some() {
+                continue;
+            }
+
             let item_ref = defs.res_directives.next_item_ref();
 
             let res = ResDirective {
