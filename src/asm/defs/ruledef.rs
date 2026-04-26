@@ -216,7 +216,7 @@ impl Ruledef
 {
     pub fn get_rule(&self, rule_ref: util::ItemRef<Rule>) -> &Rule
     {
-        &self.rules[rule_ref.0]
+        &self.rules[rule_ref.get_raw()]
     }
 
 

@@ -27,8 +27,8 @@ impl InstructionMatch
 {
     pub fn is_same(&self, other: &InstructionMatch) -> bool
     {
-        self.ruledef_ref.0 == other.ruledef_ref.0 &&
-        self.rule_ref.0 == other.rule_ref.0 &&
+        self.ruledef_ref == other.ruledef_ref &&
+        self.rule_ref == other.rule_ref &&
         self.args.len() == other.args.len() &&
         self.args
             .iter()
@@ -752,7 +752,7 @@ fn get_recursive_exact_part_count(
     }
 
     let ruledef = defs.ruledefs.get(instr_match.ruledef_ref);
-    let rule = &ruledef.rules[instr_match.rule_ref.0];
+    let rule = &ruledef.rules[instr_match.rule_ref.get_raw()];
 
     count + rule.exact_part_count
 }

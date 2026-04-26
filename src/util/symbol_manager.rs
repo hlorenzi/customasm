@@ -152,7 +152,7 @@ impl<T> SymbolManager<T>
         item_ref: util::ItemRef<T>)
         -> &util::SymbolDecl<T>
     {
-        &self.decls[item_ref.0]
+        &self.decls[item_ref.get_raw()]
     }
 
 
@@ -161,7 +161,7 @@ impl<T> SymbolManager<T>
         item_ref: util::ItemRef<T>)
         -> &mut util::SymbolDecl<T>
     {
-        &mut self.decls[item_ref.0]
+        &mut self.decls[item_ref.get_raw()]
     }
 
 

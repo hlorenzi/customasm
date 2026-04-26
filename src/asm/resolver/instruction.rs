@@ -376,7 +376,7 @@ fn build_recursive_candidate_note(
                 format!(
                     "match on `{}`, rule {}:",
                     ruledef_name,
-                    instr_match.rule_ref.0),
+                    instr_match.rule_ref.get_raw()),
                 rule.pattern_span)
         }
         else
@@ -385,7 +385,7 @@ fn build_recursive_candidate_note(
                 format!(
                     "nested match on `{}`, rule {}:",
                     ruledef_name,
-                    instr_match.rule_ref.0),
+                    instr_match.rule_ref.get_raw()),
                 rule.pattern_span)
         }
     };
@@ -425,7 +425,7 @@ fn resolve_instruction_match(
         format!(
             "within `{}`, rule {}",
             ruledef_name,
-            mtch.rule_ref.0),
+            mtch.rule_ref.get_raw()),
         rule.pattern_span);
 
     let maybe_value = resolve_instruction_match_inner(

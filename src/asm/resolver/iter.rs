@@ -154,7 +154,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                     {
                         let span = ast_symbol.decl_span;
                         let bank = defs.bankdefs.get(self.bank_ref);
-                        let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+                        let cur_bank_data = &mut self.bank_data[self.bank_ref.get_raw()];
         
                         let cur_address_in_bits = bank.addr_start
                             .checked_mul(
@@ -253,7 +253,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
             file_handle_ctx,
             symbol_ctx: self.symbol_ctx,
             bank_ref: self.bank_ref,
-            bank_data: &self.bank_data[self.bank_ref.0],
+            bank_data: &self.bank_data[self.bank_ref.get_raw()],
         }))
     }
 
@@ -338,7 +338,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let item_ref = ast_instr.item_ref.unwrap();
                 let instr = defs.instructions.get(item_ref);
 
-                let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+                let cur_bank_data = &mut self.bank_data[self.bank_ref.get_raw()];
 
                 // Advance the current bank's position
                 cur_bank_data.cur_position += {
@@ -360,7 +360,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let item_ref = ast_data.item_refs[self.subindex_prev.unwrap()];
                 let data_elem = defs.data_elems.get(item_ref);
 
-                let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+                let cur_bank_data = &mut self.bank_data[self.bank_ref.get_raw()];
 
                 // Advance the current bank's position
                 cur_bank_data.cur_position += {
@@ -382,7 +382,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let item_ref = ast_res.item_ref.unwrap();
                 let res = defs.res_directives.get(item_ref);
 
-                let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+                let cur_bank_data = &mut self.bank_data[self.bank_ref.get_raw()];
                 cur_bank_data.cur_position += res.reserve_size;
                 cur_bank_data.cur_position_resolved &= res.resolved;
             }
@@ -394,7 +394,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let span = ast_align.expr.span();
 
                 let bank = defs.bankdefs.get(self.bank_ref);
-                let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+                let cur_bank_data = &mut self.bank_data[self.bank_ref.get_raw()];
 
                 let cur_address_in_bits = bank.addr_start
                     .checked_mul(
@@ -420,7 +420,7 @@ impl<'ast, 'decls> ResolveIterator<'ast, 'decls>
                 let item_ref = ast_addr.item_ref.unwrap();
                 let addr = defs.addr_directives.get(item_ref);
 
-                let cur_bank_data = &mut self.bank_data[self.bank_ref.0];
+                let cur_bank_data = &mut self.bank_data[self.bank_ref.get_raw()];
                 cur_bank_data.cur_position = addr.offset_from_bank_start_in_bits;
                 cur_bank_data.cur_position_resolved = addr.resolved;
             }

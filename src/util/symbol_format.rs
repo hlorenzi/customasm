@@ -119,7 +119,7 @@ impl util::SymbolManager<asm::Symbol>
             .iter()
             .collect::<Vec<_>>();
 
-        sorted_children.sort_by_key(|c| c.1.0);
+        sorted_children.sort_by_key(|c| c.1.get_raw());
 
         for (child_name, child_ref) in sorted_children
         {

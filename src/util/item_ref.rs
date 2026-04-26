@@ -1,5 +1,24 @@
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct NonMaxUsize(std::num::NonZeroUsize);
+
+
+impl NonMaxUsize
+{
+    pub fn new(value: usize) -> NonMaxUsize
+    {
+        NonMaxUsize(std::num::NonZeroUsize::new(!value).unwrap())
+    }
+
+
+    pub fn get(&self) -> usize
+    {
+        !self.0.get()
+    }
+}
+
+
 pub struct ItemRef<T>(
-    pub usize,
+    NonMaxUsize,
     std::marker::PhantomData<*const T>);
 
 
@@ -7,7 +26,13 @@ impl<T> ItemRef<T>
 {
     pub fn new(value: usize) -> Self
     {
-        ItemRef(value, std::marker::PhantomData)
+        ItemRef(NonMaxUsize::new(value), std::marker::PhantomData)
+    }
+
+
+    pub fn get_raw(&self) -> usize
+    {
+        self.0.get()
     }
 }
 
@@ -42,7 +67,7 @@ impl<T> std::fmt::Debug for ItemRef<T>
         f.write_str("ItemRef<")?;
         f.write_str(name.rsplit_once("::").map(|n| n.1).unwrap_or(name))?;
         f.write_str(">(")?;
-        self.0.fmt(f)?;
+        self.get_raw().fmt(f)?;
         f.write_str(")")?;
         Ok(())
     }

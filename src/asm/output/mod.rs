@@ -293,7 +293,7 @@ fn check_bank_usage(
     ctx: &asm::ResolverContext)
     -> Result<(), ()>
 {
-    if ctx.bank_ref.0 == 0
+    if ctx.bank_ref.get_raw() == 0
     {
         if defs.bankdefs.defs.len() == 1
         {

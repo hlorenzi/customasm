@@ -38,7 +38,7 @@ pub fn init(
         0,
         util::SymbolKind::Other)?;
     
-    debug_assert!(initial_item_ref.0 == 0);
+    debug_assert!(initial_item_ref.get_raw() == 0);
 
     Ok(decls)
 }

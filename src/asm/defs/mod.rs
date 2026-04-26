@@ -80,14 +80,14 @@ impl<T> DefList<T>
 
     pub fn define(&mut self, item_ref: util::ItemRef<T>, item: T)
     {
-        while item_ref.0 >= self.defs.len()
+        while item_ref.get_raw() >= self.defs.len()
         {
             self.defs.push(None);
         }
 
-        assert!(self.defs[item_ref.0].is_none());
+        assert!(self.defs[item_ref.get_raw()].is_none());
 
-        self.defs[item_ref.0] = Some(item);
+        self.defs[item_ref.get_raw()] = Some(item);
     }
 
 
@@ -99,25 +99,25 @@ impl<T> DefList<T>
 
     pub fn get(&self, item_ref: util::ItemRef<T>) -> &T
     {
-        self.defs[item_ref.0].as_ref().unwrap()
+        self.defs[item_ref.get_raw()].as_ref().unwrap()
     }
 
 
     pub fn get_mut(&mut self, item_ref: util::ItemRef<T>) -> &mut T
     {
-        self.defs[item_ref.0].as_mut().unwrap()
+        self.defs[item_ref.get_raw()].as_mut().unwrap()
     }
 
 
     pub fn maybe_get(&self, item_ref: util::ItemRef<T>) -> Option<&T>
     {
-        if item_ref.0 >= self.defs.len()
+        if item_ref.get_raw() >= self.defs.len()
         {
             None
         }
         else
         {
-            Some(self.defs[item_ref.0].as_ref().unwrap())
+            Some(self.defs[item_ref.get_raw()].as_ref().unwrap())
         }
     }
 
