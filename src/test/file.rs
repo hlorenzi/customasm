@@ -12,6 +12,7 @@ pub struct TestExpectations
     command: Option<Vec<String>>,
     output_files: Vec<String>,
     legacy: bool,
+    extern_refs: Vec<TestExternExpectation>,
 }
 
 
@@ -21,6 +22,14 @@ pub struct TestMessageExpectation
     kind: diagn::MessageKind,
     line: usize,
     excerpt: String,
+}
+
+
+pub struct TestExternExpectation
+{
+    name: String,
+    offset: usize,
+    slice: (usize, usize),
 }
 
 
@@ -35,6 +44,7 @@ pub fn extract_expectations(
         command: None,
         output_files: Vec::new(),
         legacy: false,
+        extern_refs: Vec::new(),
     };
 
     let mut line_num = 0;
@@ -135,6 +145,46 @@ pub fn extract_expectations(
                 .trim()
                 .to_string());
         }
+        else if let Some(pos_output) = line.find("; extern: ")
+        {
+            let data = line
+                .get((pos_output + "; extern: ".len())..).unwrap();
+
+            let name = data
+                .get(0..data.find("[").unwrap()).unwrap().trim();
+            
+            let slice = data
+                .get(data.find("[").unwrap() + 1..data.find("]").unwrap()).unwrap();
+            
+            let slice_hi = slice
+                .get(0..slice.find(":").unwrap()).unwrap().trim();
+
+            let slice_lo = slice
+                .get(slice.find(":").unwrap() + 1..).unwrap().trim();
+
+            let offset = data
+                .get(data.find("@").unwrap() + 1..).unwrap().trim();
+            
+            expectations.extern_refs.push(TestExternExpectation {
+                name: name.to_string(),
+                offset: syntax::excerpt_as_usize(
+                        None,
+                        diagn::Span::new_dummy(),
+                        offset)
+                    .unwrap(),
+                slice: (
+                    syntax::excerpt_as_usize(
+                        None,
+                        diagn::Span::new_dummy(),
+                        slice_hi)
+                    .unwrap(),
+                    syntax::excerpt_as_usize(
+                        None,
+                        diagn::Span::new_dummy(),
+                        slice_lo)
+                    .unwrap())
+            })
+        }
         else if let Some(_) = line.find("; legacy: off")
         {
             expectations.legacy = false;
@@ -220,6 +270,7 @@ fn test_file_variant(
         &contents);
 
     if expectations.encoding.is_none() &&
+        expectations.extern_refs.len() == 0 &&
         expectations.messages.len() == 0 &&
         expectations.command.is_none() &&
         expectations.output_files.len() == 0
@@ -330,10 +381,12 @@ fn test_file_variant(
     }
 
 
+    let encoding_empty = util::BitVec::new();
     let encoding = maybe_assembly
-        .map(|asm| asm.output)
-        .unwrap_or(None)
-        .unwrap_or_else(|| util::BitVec::new());
+        .as_ref()
+        .ok()
+        .and_then(|asm| asm.output.as_ref())
+        .unwrap_or_else(|| &encoding_empty);
     
     if has_msg_mismatch
     {
@@ -368,6 +421,46 @@ fn test_file_variant(
                 
             print_test_failed();
             panic!("test failed");
+        }
+    }
+
+    if let Some(extern_refs) = maybe_assembly.ok().and_then(|asm| asm.extern_refs)
+    {
+        if extern_refs.len() != expectations.extern_refs.len()
+        {
+            println!("\
+                > extern refs count mismatch\n\
+                > got:      {}\n\
+                > expected: {}\n",
+                &extern_refs.len(),
+                &expectations.extern_refs.len());
+                
+            print_test_failed();
+            panic!("test failed");
+        }
+
+        for (expected_ref, got_ref) in extern_refs.iter().zip(expectations.extern_refs.iter())
+        {
+            if expected_ref.name != got_ref.name ||
+                expected_ref.offset != got_ref.offset ||
+                expected_ref.slice != got_ref.slice
+            {
+                println!("\
+                    > extern ref mismatch\n\
+                    > got:      {}[{}:{}] @ {}\n\
+                    > expected: {}[{}:{}] @ {}\n",
+                    &expected_ref.name,
+                    expected_ref.slice.0,
+                    expected_ref.slice.1,
+                    expected_ref.offset,
+                    &got_ref.name,
+                    got_ref.slice.0,
+                    got_ref.slice.1,
+                    got_ref.offset);
+                    
+                print_test_failed();
+                panic!("test failed");
+            }
         }
     }
 

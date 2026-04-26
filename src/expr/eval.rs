@@ -465,7 +465,7 @@ impl expr::Expr
 
 			&expr::Expr::StructInit { ref members_init, .. } =>
 			{
-				let mut metadata = expr::Value::make_unknown().statically_known();
+				let mut metadata = expr::ValueMetadata::new().statically_known();
 
 				let mut members = Vec::with_capacity(members_init.len());
 				for member_init in members_init
@@ -473,7 +473,7 @@ impl expr::Expr
 					let value = propagate!(member_init.value
 						.eval_with_ctx(report, ctx, provider)?);
 					
-					metadata = metadata.derived_from(&value);
+					metadata.mark_derived_from(value.get_metadata());
 
 					members.push(expr::ValueStructMember {
 						name: member_init.name.clone(),
@@ -482,7 +482,7 @@ impl expr::Expr
 				}
 
 				Ok(expr::Value::Struct(
-					*metadata.get_metadata(),
+					metadata,
 					expr::ValueStruct {
 						members,
 					}))
@@ -612,7 +612,8 @@ impl expr::Expr
 								inner_int.checked_slice(report, span, size_usize, 0)?)
 							.statically_known()
 							.derived_from(&inner)
-							.derived_from(&size))
+							.derived_from(&size)
+							.receive_extern(&inner, 0, (size_usize, 0)))
 					}
 					_ => Err(report.error_span(
 						format!(
@@ -625,18 +626,16 @@ impl expr::Expr
 			&expr::Expr::Block(_, ref exprs) =>
 			{
 				let mut result = expr::Value::make_void().statically_known();
-				let mut metadata = expr::ValueMetadata::new().statically_known();
 				
 				for expr in exprs
 				{
 					let value = propagate!(
 						expr.eval_with_ctx(report, ctx, provider)?);
 					
-					metadata.mark_derived_from(value.get_metadata());
 					result = value;
 				}
-					
-				Ok(result.with_metadata(metadata))
+				
+				Ok(result)
 			}
 			
 			&expr::Expr::Call(span, ref target, ref arg_exprs) =>
@@ -832,7 +831,12 @@ fn eval_binary_op<'provider>(
 			match (lhs_bigint.size, rhs_bigint.size)
 			{
 				(Some(lhs_width), Some(rhs_width)) =>
-					return Ok(expr::Value::make_integer(lhs_bigint.concat((lhs_width, 0), &rhs_bigint, (rhs_width, 0))).statically_known().derived_from(&lhs).derived_from(&rhs)),
+					return Ok(expr::Value::make_integer(lhs_bigint.concat((lhs_width, 0), &rhs_bigint, (rhs_width, 0)))
+						.statically_known()
+						.derived_from(&lhs)
+						.derived_from(&rhs)
+						.receive_extern(&lhs, 0, (lhs_width, 0))
+						.receive_extern(&rhs, lhs_width, (rhs_width, 0))),
 				(None, _) =>
 					return Err(report.error_span("argument to concatenation with indefinite size", lhs_expr.span())),
 				(_, None) =>

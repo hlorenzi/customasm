@@ -71,7 +71,8 @@ fn resolve_constant_simple(
         .find(|s| s.name == symbol_decl.name)
     {
         let symbol = defs.symbols.get_mut(item_ref);
-        symbol.value = driver_def.value.clone();
+        symbol.value = driver_def.value.clone()
+            .statically_known();
         symbol.value.get_mut_metadata().symbol_ref = Some(item_ref);
         symbol.driver_defined = true;
         symbol.resolved = true;
@@ -87,6 +88,31 @@ fn resolve_constant_simple(
             false,
             "driver const",
             "constant value",
+            Some(&ast_symbol.name),
+            &symbol.value);
+    }
+
+    if ast_symbol.is_extern
+    {
+        let symbol = defs.symbols.get_mut(item_ref);
+        symbol.value = expr::Value::make_integer(0)
+            .statically_known()
+            .add_extern(item_ref, 0, (255, 0));
+        symbol.value.get_mut_metadata().symbol_ref = Some(item_ref);
+        symbol.driver_defined = true;
+        symbol.resolved = true;
+        
+        return asm::resolver::handle_value_resolution(
+            opts,
+            report,
+            ast_symbol.decl_span,
+            false,
+            false,
+            true,
+            &mut symbol.resolved,
+            false,
+            "extern const",
+            "extern constant",
             Some(&ast_symbol.name),
             &symbol.value);
     }

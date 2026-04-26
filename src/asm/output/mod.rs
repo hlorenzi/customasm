@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{asm::ExternRef, *};
 
 
 pub fn check_bank_overlap(
@@ -79,9 +79,10 @@ pub fn build_output(
     ast: &asm::AstTopLevel,
     decls: &asm::ItemDecls,
     defs: &asm::ItemDefs)
-    -> Result<util::BitVec, ()>
+    -> Result<(util::BitVec, Vec<asm::ExternRef>), ()>
 {
     let mut output = util::BitVec::new();
+    let mut extern_refs = Vec::new();
 
     let mut overlap_checker = util::OverlapChecker::new();
 
@@ -173,6 +174,12 @@ pub fn build_output(
                     pos,
                     addr,
                     &encoding);
+
+                emit_extern(
+                    decls,
+                    &mut extern_refs,
+                    &instr.encoding,
+                    pos);
             }
         }
         
@@ -182,7 +189,7 @@ pub fn build_output(
             let elem = defs.data_elems.get(item_ref);
             let span = ast_data.elems[elem_index].span();
 
-            if let Ok(bigint) = asm::resolver::check_final_data_element(
+            if let Ok(bigint) = asm::resolver::finalize_data_element(
                 report,
                 span,
                 elem)
@@ -222,6 +229,12 @@ pub fn build_output(
                     pos,
                     addr,
                     &bigint);
+
+                emit_extern(
+                    decls,
+                    &mut extern_refs,
+                    &elem.encoding,
+                    pos);
             }
         }
         
@@ -256,7 +269,24 @@ pub fn build_output(
         }
     }
 
-    Ok(output)
+    Ok((output, extern_refs))
+}
+
+
+fn emit_extern(
+    decls: &asm::ItemDecls,
+    extern_refs: &mut Vec<ExternRef>,
+    value: &expr::Value,
+    offset: usize)
+{
+    for extern_ref in &value.get_metadata().extern_refs
+    {
+        extern_refs.push(ExternRef {
+            name: decls.symbols.get(extern_ref.symbol_ref).name.clone(),
+            offset: offset + extern_ref.offset,
+            slice: (extern_ref.hi_bit, extern_ref.lo_bit),
+        })
+    }
 }
 
 

@@ -85,6 +85,7 @@ pub struct AssemblyResult
     pub decls: Option<asm::ItemDecls>,
     pub defs: Option<asm::ItemDefs>,
     pub output: Option<util::BitVec>,
+    pub extern_refs: Option<Vec<asm::ExternRef>>,
     pub iterations_taken: Option<usize>,
 }
 
@@ -108,6 +109,14 @@ pub struct DriverSymbolDef
 }
 
 
+pub struct ExternRef
+{
+    pub name: String,
+    pub offset: usize,
+    pub slice: (usize, usize),
+}
+
+
 impl AssemblyResult
 {
     pub fn new() -> AssemblyResult
@@ -118,6 +127,7 @@ impl AssemblyResult
             decls: None,
             defs: None,
             output: None,
+            extern_refs: None,
             iterations_taken: None,
         }
     }
@@ -249,11 +259,14 @@ pub fn assemble<S>(
             assembly.decls.as_ref().unwrap(),
             assembly.defs.as_mut().unwrap())?;
 
-        assembly.output = Some(output::build_output(
+        let build = output::build_output(
             report,
             assembly.ast.as_ref().unwrap(),
             assembly.decls.as_ref().unwrap(),
-            assembly.defs.as_ref().unwrap())?);
+            assembly.defs.as_ref().unwrap())?;
+
+        assembly.output = Some(build.0);
+        assembly.extern_refs = Some(build.1);
 
         check_unused_defines(
             report,

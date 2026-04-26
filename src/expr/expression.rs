@@ -55,12 +55,13 @@ pub enum Value
 }
 
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct ValueMetadata
 {
 	pub is_guess: bool,
 	pub symbol_ref: Option<util::ItemRef<asm::Symbol>>,
 	pub bank_ref: Option<util::ItemRef<asm::Bankdef>>,
+	pub extern_refs: Vec<ExternRef>,
 }
 
 
@@ -76,6 +77,16 @@ pub struct ValueStructMember
 {
 	pub name: String,
 	pub value: Value,
+}
+
+
+#[derive(Clone, Debug)]
+pub struct ExternRef
+{
+	pub symbol_ref: util::ItemRef<asm::Symbol>,
+	pub offset: usize,
+	pub lo_bit: usize,
+	pub hi_bit: usize,
 }
 
 
@@ -156,6 +167,7 @@ impl ValueMetadata
 			is_guess: true,
 			symbol_ref: None,
 			bank_ref: None,
+			extern_refs: Vec::new(),
 		}
 	}
 
@@ -194,6 +206,59 @@ impl ValueMetadata
 	pub fn mark_derived_from(&mut self, other: &ValueMetadata)
 	{
 		self.is_guess |= other.is_guess;
+	}
+
+
+	pub fn add_extern(
+		&mut self,
+		symbol_ref: util::ItemRef<asm::Symbol>,
+		offset: usize,
+		slice: (usize, usize))
+	{
+		self.extern_refs.push(ExternRef {
+			symbol_ref,
+			offset: offset,
+			lo_bit: slice.1,
+			hi_bit: slice.0,
+		});
+	}
+
+
+	pub fn receive_extern(
+		&mut self,
+		other: &ValueMetadata,
+		offset: usize,
+		slice: (usize, usize))
+	{
+		//println!("{:?}, {}, {:?}", other, offset, slice);
+		let size = slice.0 - slice.1;
+
+		for other_extern_ref in &other.extern_refs
+		{
+			let orig_size = other_extern_ref.hi_bit - other_extern_ref.lo_bit;
+			let mut new_offset = offset as isize + size as isize - orig_size as isize;
+			let mut new_hi_bit = other_extern_ref.hi_bit;
+			let new_lo_bit = other_extern_ref.lo_bit;
+
+			if new_offset < 0
+			{
+				let shift = (-new_offset) as usize;
+
+				if shift > new_hi_bit {
+					continue;
+				}
+
+				new_hi_bit -= shift;
+				new_offset = 0;
+			}
+
+			self.extern_refs.push(ExternRef {
+				symbol_ref: other_extern_ref.symbol_ref,
+				offset: new_offset as usize,
+				lo_bit: new_lo_bit,
+				hi_bit: new_hi_bit,
+			});
+		}
 	}
 }
 
@@ -374,6 +439,30 @@ impl Value
 	pub fn with_bank_ref(mut self, bank_ref: util::ItemRef<asm::Bankdef>) -> Value
 	{
 		self.get_mut_metadata().bank_ref = Some(bank_ref);
+		self
+	}
+
+
+	#[must_use]
+	pub fn add_extern(
+		mut self,
+		symbol_ref: util::ItemRef<asm::Symbol>,
+		offset: usize,
+		slice: (usize, usize)) -> Value
+	{
+		self.get_mut_metadata().add_extern(symbol_ref, offset, slice);
+		self
+	}
+
+
+	#[must_use]
+	pub fn receive_extern(
+		mut self,
+		other: &Value,
+		offset: usize,
+		slice: (usize, usize)) -> Value
+	{
+		self.get_mut_metadata().receive_extern(other.get_metadata(), offset, slice);
 		self
 	}
 
@@ -1000,52 +1089,54 @@ impl std::fmt::Display for expr::Value
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
-		let mut write_meta = |meta: &ValueMetadata| {
-			write!(f, "{}", if !meta.is_guess { "✅" } else { "" })
-		};
-
+		let meta = self.get_metadata();
+		write!(f, "{}", if !meta.is_guess { "✅" } else { "" })?;
+		
 		match self
 		{
-			Value::Unknown(meta) => {
-				write_meta(meta)?;
-				write!(f, "Unknown")
+			Value::Unknown(_) => {
+				write!(f, "Unknown")?;
 			}
-			Value::FailedConstraint(meta, ..) => {
-				write_meta(meta)?;
-				write!(f, "FailedConstraint")
+			Value::FailedConstraint(..) => {
+				write!(f, "FailedConstraint")?;
 			}
-			Value::Void(meta) => {
-				write_meta(meta)?;
-				write!(f, "Void")
+			Value::Void(_) => {
+				write!(f, "Void")?;
 			}
-			Value::Integer(meta, value) => {
-				write_meta(meta)?;
-				write!(f, "Integer({:?})", value)
+			Value::Integer(_, value) => {
+				write!(f, "Integer({:?})", value)?;
 			}
-			Value::Bool(meta, value) => {
-				write_meta(meta)?;
-				write!(f, "Bool({:?})", value)
+			Value::Bool(_, value) => {
+				write!(f, "Bool({:?})", value)?;
 			}
-			Value::Struct(meta, value) => {
-				write_meta(meta)?;
-				write!(f, "Struct({:?})", value)
+			Value::Struct(_, value) => {
+				write!(f, "Struct({:?})", value)?;
 			}
-			Value::ExprBuiltinFn(meta, value) => {
-				write_meta(meta)?;
-				write!(f, "ExprBuiltinFn({:?})", value)
+			Value::ExprBuiltinFn(_, value) => {
+				write!(f, "ExprBuiltinFn({:?})", value)?;
 			}
-			Value::AsmBuiltinFn(meta, value) => {
-				write_meta(meta)?;
-				write!(f, "AsmBuiltinFn({:?})", value)
+			Value::AsmBuiltinFn(_, value) => {
+				write!(f, "AsmBuiltinFn({:?})", value)?;
 			}
-			Value::Function(meta, value) => {
-				write_meta(meta)?;
-				write!(f, "Function({:?})", value)
+			Value::Function(_, value) => {
+				write!(f, "Function({:?})", value)?;
 			}
-			Value::Bankdef(meta, value) => {
-				write_meta(meta)?;
-				write!(f, "Bankdef({:?})", value)
+			Value::Bankdef(_, value) => {
+				write!(f, "Bankdef({:?})", value)?;
 			}
 		}
+
+		for extern_ref in &meta.extern_refs
+		{
+			write!(
+				f,
+				" [extern {:?}[{}:{}] @ {}]",
+				extern_ref.symbol_ref,
+				extern_ref.hi_bit,
+				extern_ref.lo_bit,
+				extern_ref.offset)?;
+		}
+
+		Ok(())
     }
 }

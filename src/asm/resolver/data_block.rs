@@ -59,7 +59,7 @@ pub fn resolve_data_element(
 }
 
 
-pub fn check_final_data_element(
+pub fn finalize_data_element(
     report: &mut diagn::Report,
     span: diagn::Span,
     elem: &asm::DataElement)

@@ -8,6 +8,7 @@ pub fn parse(
     -> Result<asm::AstSymbol, ()>
 {
     let mut no_emit = false;
+    let mut is_extern = false;
 
     if let Some(_) = walker.maybe_expect(syntax::TokenKind::ParenOpen)
     {
@@ -17,6 +18,7 @@ pub fn parse(
         match attrb.as_ref()
         {
             "noemit" => no_emit = true,
+            "extern" => is_extern = true,
             _ =>
             {
                 report.error_span(
@@ -44,10 +46,19 @@ pub fn parse(
     let name = walker.get_span_excerpt(tk_name.span).to_string();
     decl_span = decl_span.join(tk_name.span);
 
+    let expr = {
+        if !is_extern
+        {
+            walker.expect(report, syntax::TokenKind::Equal)?;
 
-    walker.expect(report, syntax::TokenKind::Equal)?;
+            expr::parse(report, walker)?
+        }
+        else
+        {
+            expr::Expr::Literal(decl_span, expr::Value::make_unknown())
+        }
+    };
 
-    let expr = expr::parse(report, walker)?;
     walker.expect_linebreak(report)?;
     
     Ok(asm::AstSymbol {
@@ -58,6 +69,7 @@ pub fn parse(
             expr,
         }),
         no_emit,
+        is_extern,
 
         item_ref: None,
     })

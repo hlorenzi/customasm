@@ -118,7 +118,7 @@ pub fn unescape_string(
 
 
 pub fn excerpt_as_usize(
-	report: &mut diagn::Report,
+	report: Option<&mut diagn::Report>,
 	span: diagn::Span,
 	excerpt: &str)
 	-> Result<usize, ()>
@@ -142,9 +142,9 @@ pub fn excerpt_as_usize(
 			Some(d) => d,
 			None => 
 			{
-				report.error_span(
+				report.and_then(|r| Some(r.error_span(
 					"invalid digits",
-					span);
+					span)));
 				
 				return Err(());
 			}
@@ -155,9 +155,9 @@ pub fn excerpt_as_usize(
 			Some(v) => v,
 			None =>
 			{
-				report.error_span(
+				report.and_then(|r| Some(r.error_span(
 					"value is too large",
-					span);
+					span)));
 				
 				return Err(());
 			}
@@ -168,9 +168,9 @@ pub fn excerpt_as_usize(
 			Some(v) => v,
 			None =>
 			{
-				report.error_span(
+				report.and_then(|r| Some(r.error_span(
 					"value is too large",
-					span);
+					span)));
 				
 				return Err(());
 			}

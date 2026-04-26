@@ -23,7 +23,7 @@ pub use instruction::{
 
 mod data_block;
 pub use data_block::{
-    check_final_data_element,
+    finalize_data_element,
 };
 
 mod res;

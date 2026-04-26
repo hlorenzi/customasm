@@ -43,7 +43,7 @@ pub fn parse_optional_decimal_usize_greedy(
 	let number = walker.get_span_excerpt(span);
 	
 	if let Ok(value) = syntax::excerpt_as_usize(
-		&mut diagn::Report::new(),
+		Some(&mut diagn::Report::new()),
 		span,
 		number)
 	{	

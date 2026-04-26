@@ -9,6 +9,7 @@ pub struct AstSymbol
     pub name: String,
     pub kind: AstSymbolKind,
     pub no_emit: bool,
+    pub is_extern: bool,
     
     pub item_ref: Option<util::ItemRef::<asm::Symbol>>,
 }
@@ -61,6 +62,7 @@ pub fn parse(
                 expr,
             }),
             no_emit: false,
+            is_extern: false,
 
             item_ref: None,
         }))
@@ -76,6 +78,7 @@ pub fn parse(
             name,
             kind: AstSymbolKind::Label,
             no_emit: false,
+            is_extern: false,
 
             item_ref: None,
         }))
