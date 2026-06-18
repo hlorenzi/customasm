@@ -132,8 +132,10 @@ Examples:
     wrapped in a C-style declaration.
 
 * `logisim8`  
-    For use with the Logisim logic simulator program.
 * `logisim16`  
+* `logisim24`  
+* `logisim32`  
+* `logisim64`  
     For use with the Logisim logic simulator program.
 
 * `addrspan`  

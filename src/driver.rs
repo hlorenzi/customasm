@@ -42,8 +42,9 @@ pub enum OutputFormat
 	HexSpace,
 	DecC,
 	HexC,
-	LogiSim8,
-	LogiSim16,
+	Logisim {
+		bits_per_chunk: usize,
+	},
 	AddressSpan,
 	TCGame {
 		base: usize,
@@ -506,6 +507,7 @@ fn derive_output_filename(
 		{
 			OutputFormat::Binary => "bin",
 			OutputFormat::SymbolsMesenMlb => "mlb",
+			OutputFormat::Logisim { .. } => "hex",
 			_ => "txt",
 		}
 	};
@@ -771,8 +773,11 @@ pub fn parse_output_format(
 			"hexc" => OutputFormat::HexC,
 			"c" => OutputFormat::HexC,
 
-			"logisim8" => OutputFormat::LogiSim8,
-			"logisim16" => OutputFormat::LogiSim16,
+			"logisim8" => OutputFormat::Logisim { bits_per_chunk: 8 },
+			"logisim16" => OutputFormat::Logisim { bits_per_chunk: 16 },
+			"logisim24" => OutputFormat::Logisim { bits_per_chunk: 24 },
+			"logisim32" => OutputFormat::Logisim { bits_per_chunk: 32 },
+			"logisim64" => OutputFormat::Logisim { bits_per_chunk: 64 },
 
 			"addrspan" => OutputFormat::AddressSpan,
 
@@ -947,8 +952,8 @@ pub fn format_output(
 			OutputFormat::DecC => output.format_c_array(10),
 			OutputFormat::HexC => output.format_c_array(16),
 
-			OutputFormat::LogiSim8 => output.format_logisim(8),
-			OutputFormat::LogiSim16 => output.format_logisim(16),
+			OutputFormat::Logisim { bits_per_chunk } =>
+				output.format_logisim(*bits_per_chunk),
 
 			OutputFormat::AddressSpan => output.format_addrspan(fileserver),
 

@@ -472,24 +472,50 @@ impl util::BitVec
 	}
 
 
-	// From: https://github.com/milanvidakovic/customasm/blob/master/src/asm/binary_output.rs#L84
+	// Adapted from the historical implementation in:
+	// https://github.com/milanvidakovic/customasm/blob/master/src/asm/binary_output.rs#L84
 	pub fn format_logisim(&self, bits_per_chunk: usize) -> String
 	{
 		let mut result = String::new();
 		result.push_str("v2.0 raw\n");
 
+		assert!(bits_per_chunk > 0);
+
+		fn hex_digit(v: u8) -> char
+		{
+			const HEX: &[u8; 16] = b"0123456789abcdef";
+			HEX[v as usize] as char
+		}
+
 		let mut index = 0;
 		while index < self.len()
 		{
-			let mut value: u16 = 0;
-			for _ in 0..bits_per_chunk
+			let chunk_end = std::cmp::min(index + bits_per_chunk, self.len());
+			let chunk_bits = chunk_end - index;
+			let first_digit_bits = {
+				let r = chunk_bits % 4;
+				if r == 0 { 4 } else { r }
+			};
+
+			let mut bits_left = chunk_bits;
+			let mut digit_bits = first_digit_bits;
+
+			while bits_left > 0
 			{
-				value <<= 1;
-				value |= if self.read_bit(index) { 1 } else { 0 };
-				index += 1;
+				let mut digit = 0u8;
+				for _ in 0..digit_bits
+				{
+					digit <<= 1;
+					digit |= if self.read_bit(index) { 1 } else { 0 };
+					index += 1;
+				}
+
+				result.push(hex_digit(digit));
+				bits_left -= digit_bits;
+				digit_bits = 4;
 			}
 
-			result.push_str(&format!("{:01$x} ", value, bits_per_chunk / 4));
+			result.push(' ');
 			if (index / 8) % 16 == 0
 				{ result.push('\n'); }
 		}
