@@ -20,6 +20,24 @@ impl util::SymbolManager<asm::Symbol>
     }
 
 
+    pub fn format_relative(
+        &self,
+        decls: &asm::ItemDecls,
+        defs: &asm::ItemDefs)
+        -> String
+    {
+        self.format(
+            decls,
+            defs,
+            &mut |result, decl, name, bigint|
+            {
+                result.push_str(".".repeat(decl.depth).as_str());
+                result.push_str(name.split('.').last().unwrap());
+                result.push_str(&format!(" = 0x{:x}\n", bigint));
+            })
+    }
+
+
     pub fn format_mesen_mlb(
         &self,
         decls: &asm::ItemDecls,

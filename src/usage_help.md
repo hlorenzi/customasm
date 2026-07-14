@@ -151,6 +151,8 @@ Examples:
     Same as: `tcgame,base:2,group:8`
 
 * `symbols`  
-    Lists all defined symbols with their resolved values.
+    Lists all defined symbols by full name along with their resolved values.
+* `relative-symbols`  
+    Lists all defined symbols by relative name along with their resolved values.
 * `mesen-mlb`  
     Symbol file for usage with the Mesen NES emulator.

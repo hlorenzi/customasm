@@ -52,6 +52,7 @@ pub enum OutputFormat
 	},
 
 	Symbols,
+	SymbolsRelative,
 	SymbolsMesenMlb,
 }
 
@@ -506,8 +507,8 @@ fn derive_output_filename(
 		match format
 		{
 			OutputFormat::Binary => "bin",
-			OutputFormat::SymbolsMesenMlb => "mlb",
 			OutputFormat::Logisim { .. } => "hex",
+			OutputFormat::SymbolsMesenMlb => "mlb",
 			_ => "txt",
 		}
 	};
@@ -792,6 +793,7 @@ pub fn parse_output_format(
 			},
 
 			"symbols" => OutputFormat::Symbols,
+			"relative-symbols" => OutputFormat::SymbolsRelative,
 			"mesen-mlb" => OutputFormat::SymbolsMesenMlb,
 
 			_ =>
@@ -958,6 +960,7 @@ pub fn format_output(
 			OutputFormat::AddressSpan => output.format_addrspan(fileserver),
 
 			OutputFormat::Symbols => decls.symbols.format_default(decls, defs),
+			OutputFormat::SymbolsRelative => decls.symbols.format_relative(decls, defs),
 			OutputFormat::SymbolsMesenMlb => decls.symbols.format_mesen_mlb(decls, defs),
 		}
 	};
