@@ -451,7 +451,7 @@ fn eval_builtin_bankof(
         let Some(bank_ref) = symbol.bank_ref
             else {
                 query.report.error_span(
-                    "argument to `bankof` must have an associated symbol",
+                    "argument to `bankof` must have an associated bank",
                     query.args[0].span);
                 
                 return Err(());

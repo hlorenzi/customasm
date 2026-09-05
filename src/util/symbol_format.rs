@@ -54,16 +54,10 @@ impl util::SymbolManager<asm::Symbol>
                     return;
                 }
 
-                let symbol = defs.symbols.get(symbol_decl.item_ref);
-                let bankdef_ref = {
-                    match symbol.bankdef_ref
-                    {
-                        Some(r) => r,
-                        None => return,
-                    }
-                };
+                let Some(bank_ref) = symbol_decl.bank_ref
+                    else { return };
 
-                let bankdef = defs.bankdefs.get(bankdef_ref);
+                let bankdef = defs.bankdefs.get(bank_ref);
                 if let Some(output_offset) = bankdef.output_offset
                 {
                     if let Some(addr) = bigint.maybe_into::<usize>()

@@ -1,10 +1,11 @@
 use crate::*;
 
 
-pub fn collect(
+pub fn define(
     report: &mut diagn::Report,
     ast: &mut asm::AstTopLevel,
-    decls: &mut asm::ItemDecls)
+    decls: &mut asm::ItemDecls,
+    _defs: &mut asm::ItemDefs)
     -> Result<(), ()>
 {
     for any_node in &mut ast.nodes

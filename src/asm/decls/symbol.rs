@@ -19,7 +19,7 @@ pub fn collect(
         {
             asm::AstAny::DirectiveBank(ast_bank) =>
             {
-                bank_ref = Some(ast_bank.item_ref.unwrap());
+                bank_ref = ast_bank.item_ref;
             }
 
             asm::AstAny::DirectiveBankdef(ast_bankdef) =>

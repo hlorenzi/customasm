@@ -1,0 +1,9 @@
+R:0:zero1
+R:10:zero2
+R:20:zero3
+R:200:var1
+R:300:var2
+R:400:var3
+P:0:reset
+P:1000:nmi
+P:2000:irq

@@ -59,7 +59,6 @@ pub fn define(
                     .statically_known(),
                 resolved: true,
                 driver_defined: false,
-                bankdef_ref: None,
             };
 
             defs.functions.define(fn_ref, function);

@@ -1,6 +1,8 @@
 use crate::*;
 
 
+mod bank;
+
 mod bankdef;
 pub use bankdef::Bankdef;
 
@@ -122,6 +124,19 @@ impl<T> DefList<T>
     }
 
 
+    pub fn maybe_get_mut(&mut self, item_ref: util::ItemRef<T>) -> Option<&mut T>
+    {
+        if item_ref.get_raw() >= self.defs.len()
+        {
+            None
+        }
+        else
+        {
+            Some(self.defs[item_ref.get_raw()].as_mut().unwrap())
+        }
+    }
+
+
     pub fn next_item_ref(&self) -> util::ItemRef<T>
     {
         util::ItemRef::new(self.defs.len())
@@ -171,6 +186,8 @@ pub fn define_remaining(
     -> Result<(), ()>
 {
     bankdef::define(report, opts, ast, decls, defs)?;
+    bank::define(report, ast, decls, defs)?;
+    symbol::update_bank_refs(report, opts, ast, decls, defs);
     ruledef::define(report, ast, decls, defs)?;
     function::define(report, ast, decls, defs)?;
     instruction::define(report, ast, decls, defs)?;

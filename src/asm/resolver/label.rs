@@ -31,7 +31,6 @@ pub fn resolve_label(
     let is_stable = value.is_stable(&symbol.value);
     symbol.value = value;
     symbol.value.get_mut_metadata().symbol_ref = Some(item_ref);
-    symbol.bankdef_ref = Some(ctx.bank_ref);
 
     asm::resolver::handle_value_resolution(
         opts,

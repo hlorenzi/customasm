@@ -9,7 +9,6 @@ pub struct Symbol
     pub value: expr::Value,
     pub resolved: bool,
     pub driver_defined: bool,
-    pub bankdef_ref: Option<util::ItemRef<asm::Bankdef>>,
 }
 
 
@@ -43,7 +42,6 @@ pub fn define(
                 .with_symbol_ref(item_ref),
             resolved: false,
             driver_defined: false,
-            bankdef_ref: None,
         };
 
         defs.symbols.define(item_ref, symbol);
@@ -51,4 +49,41 @@ pub fn define(
 
 
     Ok(())
+}
+
+
+pub fn update_bank_refs(
+    _report: &mut diagn::Report,
+    _opts: &asm::AssemblyOptions,
+    ast: &asm::AstTopLevel,
+    decls: &mut asm::ItemDecls,
+    _defs: &mut asm::ItemDefs)
+{
+    let mut bank_ref = None;
+
+    for any_node in &ast.nodes
+    {
+        match any_node
+        {
+            asm::AstAny::DirectiveBank(ast_bank) =>
+            {
+                bank_ref = ast_bank.item_ref;
+            }
+
+            asm::AstAny::DirectiveBankdef(ast_bankdef) =>
+            {
+                bank_ref = Some(ast_bankdef.item_ref.unwrap());
+            }
+
+            asm::AstAny::Symbol(ast_symbol) =>
+            {
+                let decl = decls.symbols
+                    .get_mut(ast_symbol.item_ref.unwrap());
+
+                decl.bank_ref = bank_ref;
+            }
+
+            _ => {}
+        }
+    }
 }

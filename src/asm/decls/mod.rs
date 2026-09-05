@@ -1,7 +1,6 @@
 use crate::*;
 
 
-mod bank;
 mod bankdef;
 mod ruledef;
 mod symbol;
@@ -52,7 +51,6 @@ pub fn collect(
     -> Result<(), ()>
 {
     bankdef::collect(report, opts, ast, decls)?;
-    bank::collect(report, ast, decls)?;
     ruledef::collect(report, opts, ast, decls)?;
     symbol::collect(report, opts, ast, decls)?;
     function::collect(report, opts, ast, decls)?;
